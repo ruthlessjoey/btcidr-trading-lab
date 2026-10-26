@@ -1,0 +1,15 @@
+{
+  "exchange": "tokocrypto",
+  "pair": "BTC_USDT",
+  "timeframe": "1h",
+  "lookback_days": 30,
+  "mode": "read_only",
+  "max_missing_ratio": 0.02,
+  "max_spike_pct": 10,
+  "http_timeout_seconds": 15,
+  "http_retries": 3,
+  "sources": [
+    {"name": "tokocrypto-mbx", "style": "binance_style", "base_url": "https://www.tokocrypto.site"},
+    {"name": "tokocrypto-open-v1", "style": "open_v1", "base_url": "https://www.tokocrypto.com"}
+  ]
+}
