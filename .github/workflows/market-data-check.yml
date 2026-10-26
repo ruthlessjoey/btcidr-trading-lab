@@ -1,0 +1,35 @@
+name: Market data check
+
+on:
+  workflow_dispatch:        # lets you press "Run workflow" by hand
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 */6 * * *"  # every 6 hours (GitHub may start it late)
+
+permissions:
+  contents: read            # this workflow can only read the repository
+
+jobs:
+  test-probe-fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Probe Tokocrypto public endpoints (shows raw answers)
+        run: python3 probe.py
+
+      - name: Fetch and validate real BTC/USDT candles (read-only)
+        run: python3 run.py
+
+      - name: Keep the reports and candle file
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-data-report
+          path: out/
+          if-no-files-found: ignore
