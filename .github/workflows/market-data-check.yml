@@ -23,6 +23,10 @@ jobs:
       - name: Probe Tokocrypto public endpoints (shows raw answers)
         run: python3 probe.py
 
+      - name: Reachability lab (which public providers answer from GitHub?)
+        continue-on-error: true
+        run: python3 tools/net_lab.py
+
       - name: Fetch and validate real BTC/USDT candles (read-only)
         run: python3 run.py
 
