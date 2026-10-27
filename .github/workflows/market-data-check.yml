@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "23 */6 * * *"  # every 6 hours (GitHub may start it late)
+    - cron: "23 3 * * *"    # once a day (GitHub may start it late)
 
 permissions:
   contents: write           # only used to publish reports to the 'data' branch
@@ -20,15 +20,21 @@ jobs:
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -v
 
-      - name: Probe Tokocrypto public endpoints (shows raw answers)
-        run: python3 probe.py
+      - name: Live smoke test - real candles from each public provider (READ-ONLY)
+        # This is the REQUIRED live check. It fails the run if no provider delivers validated data.
+        run: python3 live_check.py
 
-      - name: Reachability lab (which public providers answer from GitHub?)
+      - name: Diagnostic - Tokocrypto only (expected to be refused from GitHub, see report)
+        if: always()
+        continue-on-error: true
+        run: |
+          python3 probe.py
+          python3 run.py
+
+      - name: Diagnostic - reachability lab (which public hosts answer from GitHub?)
+        if: always()
         continue-on-error: true
         run: python3 tools/net_lab.py
-
-      - name: Fetch and validate real BTC/USDT candles (read-only)
-        run: python3 run.py
 
       - name: Keep the reports and candle file
         if: always()
