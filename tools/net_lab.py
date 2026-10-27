@@ -29,6 +29,15 @@ CANDIDATES = [
     ("forex", "ecb sdmx", "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?lastNObservations=5&format=jsondata"),
     ("stocks", "stooq spy daily", "https://stooq.com/q/d/l/?s=spy.us&i=d"),
     ("stocks", "yahoo chart spy (unofficial)", "https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=1mo&interval=1d"),
+    ("shape", "kraken assetpairs", "https://api.kraken.com/0/public/AssetPairs"),
+    ("shape", "kraken ticker all", "https://api.kraken.com/0/public/Ticker"),
+    ("shape", "coinbase products", "https://api.exchange.coinbase.com/products"),
+    ("shape", "binance vision exchangeInfo", "https://data-api.binance.vision/api/v3/exchangeInfo?symbol=BTCUSDT"),
+    ("shape", "binance vision klines 1d", "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=3"),
+    ("shape", "frankfurter v2 rates", "https://api.frankfurter.dev/v2/rates?base=USD&quotes=EUR,JPY,IDR"),
+    ("shape", "frankfurter v2 series", "https://api.frankfurter.dev/v2/rates?from=2026-10-15&to=2026-10-20&base=USD&quotes=EUR"),
+    ("shape", "frankfurter v2 currencies", "https://api.frankfurter.dev/v2/currencies"),
+    ("shape", "frankfurter v1 series (old)", "https://api.frankfurter.dev/v1/2026-10-15..2026-10-20?base=USD&symbols=EUR"),
 ]
 
 
@@ -59,6 +68,15 @@ def main():
         text = " ".join(body.decode("utf-8", "replace").split())[:110].replace("|", "/").replace("`", "'")
         result = err or f"HTTP {status}"
         lines.append(f"| {cls} | {name} | {result} | {len(body)} | {secs} | {text} |")
+    samples = ["# Raw samples (first 1500 characters)", ""]
+    for cls, name, url in CANDIDATES:
+        if cls == "shape":
+            status, body, err, secs = get(url)
+            sample = body.decode("utf-8", "replace")[:1500].replace("```", "'''")
+            samples += [f"## {name}", f"`{url}` -> {err or 'HTTP ' + str(status)}, {len(body)} bytes",
+                        "```", sample, "```", ""]
+    with open("out/lab_samples.md", "w", encoding="utf-8") as f:
+        f.write("\n".join(samples))
     text = "\n".join(lines) + "\n"
     with open("out/lab.md", "w", encoding="utf-8") as f:
         f.write(text)
