@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "dataset_name": "binance-vision_BTCUSDT_1d",
+  "version_id": "v20261027T102341Z_c11776a0",
+  "fetched_utc": "2026-10-27 10:23:41 UTC",
+  "market": {
+    "provider": "binance-vision",
+    "host": "https://data-api.binance.vision",
+    "symbol": "BTCUSDT",
+    "base_asset": "BTC",
+    "quote_asset": "USDT",
+    "pair_label": "BTC/USDT",
+    "timeframe": "1d",
+    "market_type": "spot"
+  },
+  "price_basis_warning": "Prices come from the exchange named in 'market'. They are a PROXY for research and are NOT Tokocrypto execution prices.",
+  "candle_convention": "open_time_unix is the candle OPEN time in UTC seconds. A candle is complete only at open_time + timeframe; only completed candles are stored.",
+  "csv_file": "v20261027T102341Z_c11776a0.csv",
+  "csv_sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+  "row_count": 3358,
+  "first_open_utc": "2017-08-17 00:00:00 UTC",
+  "last_open_utc": "2026-10-26 00:00:00 UTC",
+  "first_open_unix": 1502928000,
+  "last_open_unix": 1792972800,
+  "timeframe_seconds": 86400,
+  "exchange_info": {
+    "symbol": "BTCUSDT",
+    "status": "TRADING",
+    "baseAsset": "BTC",
+    "quoteAsset": "USDT",
+    "isSpotTradingAllowed": true
+  },
+  "coverage": {
+    "first_open_utc": "2017-08-17",
+    "last_open_utc": "2026-10-26",
+    "rows": 3358,
+    "expected_rows": 3358,
+    "missing": 0,
+    "exact_duplicates": 0,
+    "conflicting_duplicates": 0,
+    "forming_excluded": 1,
+    "requests": 6
+  },
+  "gate_checks": [
+    {
+      "name": "market_identity",
+      "status": "PASS",
+      "detail": "exchange says symbol=BTCUSDT base=BTC quote=USDT status=TRADING spot=True; expected BTCUSDT BTC/USDT TRADING spot"
+    },
+    {
+      "name": "clock",
+      "status": "PASS",
+      "detail": "exchange time 2026-10-27 10:23:42 UTC; runner differs by 1s"
+    },
+    {
+      "name": "pagination",
+      "status": "PASS",
+      "detail": "4 request(s); 3359 rows received; 0 page boundary problem(s); every page ascending and not earlier than its requested start"
+    },
+    {
+      "name": "duplicates",
+      "status": "PASS",
+      "detail": "0 exact duplicate(s), 0 conflicting duplicate(s) among 3359 received rows (the pager asks for non-overlapping ranges, so none are expected)"
+    },
+    {
+      "name": "closed_candles_only",
+      "status": "PASS",
+      "detail": "1 still-forming candle(s) excluded; 3358 completed candles kept"
+    },
+    {
+      "name": "history_depth",
+      "status": "PASS",
+      "detail": "actual first candle 2017-08-17, last 2026-10-26, 3358 rows; required: first on or before 2017-09-30 and at least 3000 rows"
+    },
+    {
+      "name": "missing_days",
+      "status": "PASS",
+      "detail": "0 missing of 3358 expected"
+    },
+    {
+      "name": "timestamp_grid",
+      "status": "PASS",
+      "detail": "0 candle(s) not on a UTC 1d boundary"
+    },
+    {
+      "name": "validator_ohlc_sanity",
+      "status": "PASS",
+      "detail": "high/low/open/close are consistent and positive"
+    },
+    {
+      "name": "validator_volume_sanity",
+      "status": "PASS",
+      "detail": "0 invalid volume(s); 0 zero-volume candle(s) of 3358"
+    },
+    {
+      "name": "validator_price_spikes",
+      "status": "WARN",
+      "detail": "1 close-to-close move(s) larger than 25%"
+    },
+    {
+      "name": "validator_freshness",
+      "status": "PASS",
+      "detail": "newest closed candle ended 37422s before exchange time (limit 172800s)"
+    },
+    {
+      "name": "previous_version",
+      "status": "PASS",
+      "detail": "v20261027T102241Z_c11776a0 re-verified (hash ok). vs this fetch: 3358 common candles, 0 changed, 0 only in old, 0 new"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 # Dataset gate: BTC/USDT 1d (binance-vision)
-Generated 2026-10-27 10:22:41 UTC · **READ-ONLY** · no keys, no orders
+Generated 2026-10-27 10:23:41 UTC · **READ-ONLY** · no keys, no orders
 
 ## GATE: ✅ PASS
 The dataset passed every check. The backtest may use it.
@@ -38,7 +38,7 @@ The dataset passed every check. The backtest may use it.
 | Check | Result | Detail |
 |---|---|---|
 | market_identity | ✅ PASS | exchange says symbol=BTCUSDT base=BTC quote=USDT status=TRADING spot=True; expected BTCUSDT BTC/USDT TRADING spot |
-| clock | ✅ PASS | exchange time 2026-10-27 10:22:42 UTC; runner differs by 1s |
+| clock | ✅ PASS | exchange time 2026-10-27 10:23:42 UTC; runner differs by 1s |
 | pagination | ✅ PASS | 4 request(s); 3359 rows received; 0 page boundary problem(s); every page ascending and not earlier than its requested start |
 | duplicates | ✅ PASS | 0 exact duplicate(s), 0 conflicting duplicate(s) among 3359 received rows (the pager asks for non-overlapping ranges, so none are expected) |
 | closed_candles_only | ✅ PASS | 1 still-forming candle(s) excluded; 3358 completed candles kept |
@@ -48,8 +48,8 @@ The dataset passed every check. The backtest may use it.
 | validator_ohlc_sanity | ✅ PASS | high/low/open/close are consistent and positive |
 | validator_volume_sanity | ✅ PASS | 0 invalid volume(s); 0 zero-volume candle(s) of 3358 |
 | validator_price_spikes | ⚠️ WARN | 1 close-to-close move(s) larger than 25% |
-| validator_freshness | ✅ PASS | newest closed candle ended 37362s before exchange time (limit 172800s) |
-| previous_version | ✅ PASS | no earlier version exists yet; this is the first |
+| validator_freshness | ✅ PASS | newest closed candle ended 37422s before exchange time (limit 172800s) |
+| previous_version | ✅ PASS | v20261027T102241Z_c11776a0 re-verified (hash ok). vs this fetch: 3358 common candles, 0 changed, 0 only in old, 0 new |
 | csv_hash_roundtrip | ✅ PASS | re-read from disk: 3358 rows, sha256 c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54, identical to fetched: True |
 
 HTTP evidence (first requests): `/api/v3/exchangeInfo` HTTP 200; `/api/v3/time` HTTP 200; `/api/v3/klines` HTTP 200; `/api/v3/klines` HTTP 200; `/api/v3/klines` HTTP 200; `/api/v3/klines` HTTP 200
@@ -64,15 +64,15 @@ HTTP evidence (first requests): `/api/v3/exchangeInfo` HTTP 200; `/api/v3/time` 
 
 ## Dataset version (preserved, never overwritten)
 
-- Version: `v20261027T102241Z_c11776a0`
-- CSV: `v20261027T102241Z_c11776a0.csv`
-- Manifest: `v20261027T102241Z_c11776a0.manifest.json`
+- Version: `v20261027T102341Z_c11776a0`
+- CSV: `v20261027T102341Z_c11776a0.csv`
+- Manifest: `v20261027T102341Z_c11776a0.manifest.json`
 - SHA-256: `c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54`
 - Rows: 3358
 
 ## Earlier version
 
-- None yet; this is the first version.
+- v20261027T102241Z_c11776a0
 
 ## Limits
 
