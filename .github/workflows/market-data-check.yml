@@ -8,7 +8,7 @@ on:
     - cron: "23 */6 * * *"  # every 6 hours (GitHub may start it late)
 
 permissions:
-  contents: read            # this workflow can only read the repository
+  contents: write           # only used to publish reports to the 'data' branch
 
 jobs:
   test-probe-fetch:
@@ -33,3 +33,19 @@ jobs:
           name: market-data-report
           path: out/
           if-no-files-found: ignore
+
+      - name: Publish reports to the data branch (readable without Actions logs)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          rm -rf /tmp/pub && mkdir /tmp/pub
+          cp -r out/. /tmp/pub/ 2>/dev/null || true
+          cd /tmp/pub
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q --allow-empty -m "Reports from run ${{ github.run_id }}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
