@@ -1,0 +1,214 @@
+{
+  "generated_utc": "2026-10-28 10:04:51 UTC",
+  "market": {
+    "provider": "binance-vision",
+    "host": "https://data-api.binance.vision",
+    "symbol": "BTCUSDT",
+    "base_asset": "BTC",
+    "quote_asset": "USDT",
+    "pair_label": "BTC/USDT",
+    "timeframe": "1d",
+    "market_type": "spot"
+  },
+  "config": {
+    "fetch_from_utc_date": "2017-01-01",
+    "require_first_candle_on_or_before": "2017-09-30",
+    "min_rows": 3000,
+    "page_limit": 1000
+  },
+  "checks": [
+    {
+      "name": "market_identity",
+      "status": "PASS",
+      "detail": "exchange says symbol=BTCUSDT base=BTC quote=USDT status=TRADING spot=True; expected BTCUSDT BTC/USDT TRADING spot"
+    },
+    {
+      "name": "clock",
+      "status": "PASS",
+      "detail": "exchange time 2026-10-28 10:04:52 UTC; runner differs by 1s"
+    },
+    {
+      "name": "pagination",
+      "status": "PASS",
+      "detail": "4 request(s); 3360 rows received; 0 page boundary problem(s); every page ascending and not earlier than its requested start"
+    },
+    {
+      "name": "duplicates",
+      "status": "PASS",
+      "detail": "0 exact duplicate(s), 0 conflicting duplicate(s) among 3360 received rows (the pager asks for non-overlapping ranges, so none are expected)"
+    },
+    {
+      "name": "closed_candles_only",
+      "status": "PASS",
+      "detail": "1 still-forming candle(s) excluded; 3359 completed candles kept"
+    },
+    {
+      "name": "history_depth",
+      "status": "PASS",
+      "detail": "actual first candle 2017-08-17, last 2026-10-27, 3359 rows; required: first on or before 2017-09-30 and at least 3000 rows"
+    },
+    {
+      "name": "missing_days",
+      "status": "PASS",
+      "detail": "0 missing of 3359 expected"
+    },
+    {
+      "name": "timestamp_grid",
+      "status": "PASS",
+      "detail": "0 candle(s) not on a UTC 1d boundary"
+    },
+    {
+      "name": "validator_ohlc_sanity",
+      "status": "PASS",
+      "detail": "high/low/open/close are consistent and positive"
+    },
+    {
+      "name": "validator_volume_sanity",
+      "status": "PASS",
+      "detail": "0 invalid volume(s); 0 zero-volume candle(s) of 3359"
+    },
+    {
+      "name": "validator_price_spikes",
+      "status": "WARN",
+      "detail": "1 close-to-close move(s) larger than 25%"
+    },
+    {
+      "name": "validator_freshness",
+      "status": "PASS",
+      "detail": "newest closed candle ended 36292s before exchange time (limit 172800s)"
+    },
+    {
+      "name": "previous_version",
+      "status": "PASS",
+      "detail": "v20261027T102341Z_c11776a0 re-verified (hash ok). vs this fetch: 3358 common candles, 0 changed, 0 only in old, 1 new"
+    },
+    {
+      "name": "csv_hash_roundtrip",
+      "status": "PASS",
+      "detail": "re-read from disk: 3359 rows, sha256 3a39e8b75451e71d123e31e762416a801188126f7b00d6b88aa2ffc25ac3df59, identical to fetched: True"
+    }
+  ],
+  "pages": [
+    {
+      "requested_from": "2017-01-01",
+      "rows": 1000,
+      "first": "2017-08-17",
+      "last": "2020-05-12",
+      "starts_before_request": false,
+      "ascending": true
+    },
+    {
+      "requested_from": "2020-05-13",
+      "rows": 1000,
+      "first": "2020-05-13",
+      "last": "2023-02-06",
+      "starts_before_request": false,
+      "ascending": true
+    },
+    {
+      "requested_from": "2023-02-07",
+      "rows": 1000,
+      "first": "2023-02-07",
+      "last": "2025-11-02",
+      "starts_before_request": false,
+      "ascending": true
+    },
+    {
+      "requested_from": "2025-11-03",
+      "rows": 360,
+      "first": "2025-11-03",
+      "last": "2026-10-28",
+      "starts_before_request": false,
+      "ascending": true
+    }
+  ],
+  "gate": "PASS",
+  "dataset": {
+    "version_id": "v20261028T100451Z_3a39e8b7",
+    "csv": "v20261028T100451Z_3a39e8b7.csv",
+    "manifest": "v20261028T100451Z_3a39e8b7.manifest.json",
+    "sha256": "3a39e8b75451e71d123e31e762416a801188126f7b00d6b88aa2ffc25ac3df59",
+    "rows": 3359
+  },
+  "previous": {
+    "found": true,
+    "version": "v20261027T102341Z_c11776a0",
+    "compare": {
+      "old_rows": 3358,
+      "new_rows": 3359,
+      "common": 3358,
+      "changed": 0,
+      "changed_first": [],
+      "only_in_old": 0,
+      "added_in_new": 1
+    }
+  },
+  "coverage": {
+    "first_open_utc": "2017-08-17",
+    "last_open_utc": "2026-10-27",
+    "rows": 3359,
+    "expected_rows": 3359,
+    "missing": 0,
+    "exact_duplicates": 0,
+    "conflicting_duplicates": 0,
+    "forming_excluded": 1,
+    "requests": 6
+  },
+  "exchange_info": {
+    "symbol": "BTCUSDT",
+    "status": "TRADING",
+    "baseAsset": "BTC",
+    "quoteAsset": "USDT",
+    "isSpotTradingAllowed": true
+  },
+  "stop_reason": null,
+  "top_moves": [
+    {
+      "date": "2020-03-12",
+      "close_to_close_pct": -39.5
+    },
+    {
+      "date": "2017-12-07",
+      "close_to_close_pct": 22.5
+    },
+    {
+      "date": "2021-02-08",
+      "close_to_close_pct": 19.54
+    },
+    {
+      "date": "2018-01-16",
+      "close_to_close_pct": -19.5
+    },
+    {
+      "date": "2017-09-14",
+      "close_to_close_pct": -19.16
+    }
+  ],
+  "http_log": [
+    [
+      "/api/v3/exchangeInfo",
+      "HTTP 200"
+    ],
+    [
+      "/api/v3/time",
+      "HTTP 200"
+    ],
+    [
+      "/api/v3/klines",
+      "HTTP 200"
+    ],
+    [
+      "/api/v3/klines",
+      "HTTP 200"
+    ],
+    [
+      "/api/v3/klines",
+      "HTTP 200"
+    ],
+    [
+      "/api/v3/klines",
+      "HTTP 200"
+    ]
+  ],
+  "backtest_allowed": true
+}
