@@ -1,0 +1,86 @@
+{
+  "selected_n": 150,
+  "candidates": [
+    50,
+    100,
+    150,
+    200
+  ],
+  "rule_text": "Pre-registered before any test result was computed. Candidates: 50, 100, 150, 200 days. Costs for selection: the BASE scenario. Step 1 (training, bars from index 200 to the end of the training window, identical for all candidates): a candidate is eligible only if its training total return is above zero. Step 2 (validation): among eligible candidates choose the highest validation score = total return / max(max drawdown, 5%). Ties: fewer validation trades, then the larger period. If no candidate is eligible, nothing is selected and the test period is not evaluated. The test period is never used to choose anything.",
+  "selection_costs": "BASE: fee 0.40%, slippage 0.05%",
+  "splits": {
+    "train": {
+      "start_index": 200,
+      "end_index": 2014,
+      "first_open_unix": 1520208000,
+      "last_open_unix": 1676851200
+    },
+    "validation": {
+      "start_index": 2014,
+      "end_index": 2685,
+      "first_open_unix": 1676937600,
+      "last_open_unix": 1734825600
+    },
+    "test": {
+      "start_index": 2685,
+      "end_index": 3358,
+      "first_open_unix": 1734912000,
+      "last_open_unix": 1792972800
+    }
+  },
+  "dataset": {
+    "version_id": "v20261027T102241Z_c11776a0",
+    "sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+    "rows": 3358,
+    "first_open_utc": "2017-08-17 00:00:00 UTC",
+    "last_open_utc": "2026-10-26 00:00:00 UTC",
+    "market": {
+      "provider": "binance-vision",
+      "host": "https://data-api.binance.vision",
+      "symbol": "BTCUSDT",
+      "base_asset": "BTC",
+      "quote_asset": "USDT",
+      "pair_label": "BTC/USDT",
+      "timeframe": "1d",
+      "market_type": "spot"
+    }
+  },
+  "rules_assumed": {
+    "capital": 1000.0,
+    "fraction": 1.0,
+    "min_notional": 10.0,
+    "qty_step": 1e-05
+  },
+  "code_revision": "1d1f4a862339c571e10055ce8ba36ab8e24b57f5",
+  "scores": [
+    {
+      "n": 50,
+      "eligible": true,
+      "score": 5.51288236839235,
+      "train_return": 4.056387219619099,
+      "validation_return": 1.5985983860746318
+    },
+    {
+      "n": 100,
+      "eligible": true,
+      "score": 2.4754725505773205,
+      "train_return": 6.233601800943094,
+      "validation_return": 0.9857139875926162
+    },
+    {
+      "n": 150,
+      "eligible": true,
+      "score": 6.447131977990796,
+      "train_return": 6.039346097837561,
+      "validation_return": 1.7138191298212604
+    },
+    {
+      "n": 200,
+      "eligible": true,
+      "score": 6.1913135722666865,
+      "train_return": 1.4601678546523273,
+      "validation_return": 1.7323389537920875
+    }
+  ],
+  "frozen_hash": "00431d956bd4387bde37bfca87681e91aed40e785a7af413cb18db46eecf714c"
+}

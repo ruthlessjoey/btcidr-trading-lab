@@ -1,0 +1,1073 @@
+{
+  "status": "OK",
+  "error": null,
+  "run_id": "40669227958",
+  "dataset": {
+    "version_id": "v20261027T102241Z_c11776a0",
+    "sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+    "rows": 3358,
+    "first_open_utc": "2017-08-17 00:00:00 UTC",
+    "last_open_utc": "2026-10-26 00:00:00 UTC",
+    "market": {
+      "provider": "binance-vision",
+      "host": "https://data-api.binance.vision",
+      "symbol": "BTCUSDT",
+      "base_asset": "BTC",
+      "quote_asset": "USDT",
+      "pair_label": "BTC/USDT",
+      "timeframe": "1d",
+      "market_type": "spot"
+    }
+  },
+  "splits": {
+    "train": {
+      "start": "2018-03-05",
+      "end": "2023-02-20",
+      "bars": 1814,
+      "start_index": 200,
+      "end_index": 2014
+    },
+    "validation": {
+      "start": "2023-02-21",
+      "end": "2024-12-22",
+      "bars": 671,
+      "start_index": 2014,
+      "end_index": 2685
+    },
+    "test": {
+      "start": "2024-12-23",
+      "end": "2026-10-26",
+      "bars": 673,
+      "start_index": 2685,
+      "end_index": 3358
+    }
+  },
+  "selection": {
+    "rows": [
+      {
+        "n": 50,
+        "train": {
+          "total_return": 4.056387219619099,
+          "max_drawdown": 0.6135524239604457,
+          "closed_trades": 48,
+          "open_position": true,
+          "win_rate": 0.14583333333333334,
+          "profit_factor": 1.3602963321195423,
+          "gross_profit": 9231.717724715745,
+          "gross_loss": -6786.549009017298,
+          "exposure": 0.48180815876515987,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 1108.772086699818,
+          "final_equity": 5056.387219619099
+        },
+        "validation": {
+          "total_return": 1.5985983860746318,
+          "max_drawdown": 0.2899750582816826,
+          "closed_trades": 16,
+          "open_position": true,
+          "win_rate": 0.25,
+          "profit_factor": 2.102588136077217,
+          "gross_profit": 1363.553174343902,
+          "gross_loss": -648.5117798143164,
+          "exposure": 0.6557377049180327,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 189.514329885521,
+          "final_equity": 2598.598386074632
+        },
+        "eligible": true,
+        "score": 5.51288236839235
+      },
+      {
+        "n": 100,
+        "train": {
+          "total_return": 6.233601800943094,
+          "max_drawdown": 0.40779820576363074,
+          "closed_trades": 28,
+          "open_position": true,
+          "win_rate": 0.17857142857142858,
+          "profit_factor": 2.0909896453174737,
+          "gross_profit": 8142.268553164814,
+          "gross_loss": -3893.9784189742263,
+          "exposure": 0.46747519294377066,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 707.8769665369172,
+          "final_equity": 7233.6018009430945
+        },
+        "validation": {
+          "total_return": 0.9857139875926162,
+          "max_drawdown": 0.3981922511573524,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.13333333333333333,
+          "profit_factor": 1.393549832951403,
+          "gross_profit": 1099.7764147231496,
+          "gross_loss": -789.1905899008507,
+          "exposure": 0.7526080476900149,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 157.5893929362864,
+          "final_equity": 1985.7139875926161
+        },
+        "eligible": true,
+        "score": 2.4754725505773205
+      },
+      {
+        "n": 150,
+        "train": {
+          "total_return": 6.039346097837561,
+          "max_drawdown": 0.4633925012449348,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.2,
+          "profit_factor": 2.371700894096671,
+          "gross_profit": 7546.283138675416,
+          "gross_loss": -3181.8022067869692,
+          "exposure": 0.43329658213891953,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 494.8861183650436,
+          "final_equity": 7039.3460978375615
+        },
+        "validation": {
+          "total_return": 1.7138191298212604,
+          "max_drawdown": 0.2658265932312061,
+          "closed_trades": 8,
+          "open_position": true,
+          "win_rate": 0.375,
+          "profit_factor": 4.339933406404469,
+          "gross_profit": 1052.7547859967303,
+          "gross_loss": -242.57394927838595,
+          "exposure": 0.7883755588673621,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 96.8913821452914,
+          "final_equity": 2713.8191298212605
+        },
+        "eligible": true,
+        "score": 6.447131977990796
+      },
+      {
+        "n": 200,
+        "train": {
+          "total_return": 1.4601678546523273,
+          "max_drawdown": 0.6634104913188859,
+          "closed_trades": 16,
+          "open_position": true,
+          "win_rate": 0.125,
+          "profit_factor": 1.4920276038003812,
+          "gross_profit": 2979.639807809482,
+          "gross_loss": -1997.0406715130243,
+          "exposure": 0.4294377067254686,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 250.7912467568764,
+          "final_equity": 2460.167854652327
+        },
+        "validation": {
+          "total_return": 1.7323389537920875,
+          "max_drawdown": 0.279801520884342,
+          "closed_trades": 7,
+          "open_position": true,
+          "win_rate": 0.42857142857142855,
+          "profit_factor": 5.328719362478436,
+          "gross_profit": 1114.8595008750249,
+          "gross_loss": -209.2171542613371,
+          "exposure": 0.8032786885245902,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 101.262052982014,
+          "final_equity": 2732.3389537920875
+        },
+        "eligible": true,
+        "score": 6.1913135722666865
+      }
+    ],
+    "selected_n": 150
+  },
+  "frozen": {
+    "selected_n": 150,
+    "candidates": [
+      50,
+      100,
+      150,
+      200
+    ],
+    "rule_text": "Pre-registered before any test result was computed. Candidates: 50, 100, 150, 200 days. Costs for selection: the BASE scenario. Step 1 (training, bars from index 200 to the end of the training window, identical for all candidates): a candidate is eligible only if its training total return is above zero. Step 2 (validation): among eligible candidates choose the highest validation score = total return / max(max drawdown, 5%). Ties: fewer validation trades, then the larger period. If no candidate is eligible, nothing is selected and the test period is not evaluated. The test period is never used to choose anything.",
+    "selection_costs": "BASE: fee 0.40%, slippage 0.05%",
+    "splits": {
+      "train": {
+        "start_index": 200,
+        "end_index": 2014,
+        "first_open_unix": 1520208000,
+        "last_open_unix": 1676851200
+      },
+      "validation": {
+        "start_index": 2014,
+        "end_index": 2685,
+        "first_open_unix": 1676937600,
+        "last_open_unix": 1734825600
+      },
+      "test": {
+        "start_index": 2685,
+        "end_index": 3358,
+        "first_open_unix": 1734912000,
+        "last_open_unix": 1792972800
+      }
+    },
+    "dataset": {
+      "version_id": "v20261027T102241Z_c11776a0",
+      "sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+      "rows": 3358,
+      "first_open_utc": "2017-08-17 00:00:00 UTC",
+      "last_open_utc": "2026-10-26 00:00:00 UTC",
+      "market": {
+        "provider": "binance-vision",
+        "host": "https://data-api.binance.vision",
+        "symbol": "BTCUSDT",
+        "base_asset": "BTC",
+        "quote_asset": "USDT",
+        "pair_label": "BTC/USDT",
+        "timeframe": "1d",
+        "market_type": "spot"
+      }
+    },
+    "rules_assumed": {
+      "capital": 1000.0,
+      "fraction": 1.0,
+      "min_notional": 10.0,
+      "qty_step": 1e-05
+    },
+    "code_revision": "1d1f4a862339c571e10055ce8ba36ab8e24b57f5",
+    "scores": [
+      {
+        "n": 50,
+        "eligible": true,
+        "score": 5.51288236839235,
+        "train_return": 4.056387219619099,
+        "validation_return": 1.5985983860746318
+      },
+      {
+        "n": 100,
+        "eligible": true,
+        "score": 2.4754725505773205,
+        "train_return": 6.233601800943094,
+        "validation_return": 0.9857139875926162
+      },
+      {
+        "n": 150,
+        "eligible": true,
+        "score": 6.447131977990796,
+        "train_return": 6.039346097837561,
+        "validation_return": 1.7138191298212604
+      },
+      {
+        "n": 200,
+        "eligible": true,
+        "score": 6.1913135722666865,
+        "train_return": 1.4601678546523273,
+        "validation_return": 1.7323389537920875
+      }
+    ],
+    "frozen_hash": "00431d956bd4387bde37bfca87681e91aed40e785a7af413cb18db46eecf714c"
+  },
+  "test": {
+    "status": "skipped",
+    "reason": "dry run: the config says evaluate_test is false, so the test window was not computed or looked at"
+  },
+  "shown": {
+    "train": {
+      "BASE: fee 0.40%, slippage 0.05%": {
+        "strategy": {
+          "total_return": 6.039346097837561,
+          "max_drawdown": 0.4633925012449348,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.2,
+          "profit_factor": 2.371700894096671,
+          "gross_profit": 7546.283138675416,
+          "gross_loss": -3181.8022067869692,
+          "exposure": 0.43329658213891953,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 494.8861183650436,
+          "final_equity": 7039.3460978375615
+        },
+        "buy_and_hold": {
+          "total_return": 1.1476548261815003,
+          "max_drawdown": 0.7662864213639166,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 3.9838779434999996,
+          "final_equity": 2147.6548261815
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "STRESS: fee 0.40%, slippage 0.20%": {
+        "strategy": {
+          "total_return": 5.719232716843435,
+          "max_drawdown": 0.469792520966031,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.2,
+          "profit_factor": 2.275016211995759,
+          "gross_profit": 7366.022786576681,
+          "gross_loss": -3237.789140902356,
+          "exposure": 0.43329658213891953,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 480.4855422641616,
+          "final_equity": 6719.232716843435
+        },
+        "buy_and_hold": {
+          "total_return": 1.1444321034015998,
+          "max_drawdown": 0.7662855230266116,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 3.9838509984,
+          "final_equity": 2144.4321034015998
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "LOW FEE: fee 0.10%, slippage 0.05%": {
+        "strategy": {
+          "total_return": 6.7252436690422535,
+          "max_drawdown": 0.4503570812592053,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.2,
+          "profit_factor": 2.5959632050449217,
+          "gross_profit": 7920.785454773325,
+          "gross_loss": -3051.193267832261,
+          "exposure": 0.43329658213891953,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 131.28471453989695,
+          "final_equity": 7725.243669042254
+        },
+        "buy_and_hold": {
+          "total_return": 1.154103314292175,
+          "max_drawdown": 0.7662878117757785,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0.998964882825,
+          "final_equity": 2154.103314292175
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "LOW FEE + STRESS SLIPPAGE: fee 0.10%, slippage 0.20%": {
+        "strategy": {
+          "total_return": 6.374426432722061,
+          "max_drawdown": 0.4569133029283289,
+          "closed_trades": 15,
+          "open_position": true,
+          "win_rate": 0.2,
+          "profit_factor": 2.478181252795076,
+          "gross_profit": 7731.100747201975,
+          "gross_loss": -3119.667190800619,
+          "exposure": 0.43329658213891953,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 127.44142973773741,
+          "final_equity": 7374.426432722062
+        },
+        "buy_and_hold": {
+          "total_return": 1.1508760759626004,
+          "max_drawdown": 0.7662875100706602,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0.9989626374000001,
+          "final_equity": 2150.8760759626
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 1814,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      }
+    },
+    "validation": {
+      "BASE: fee 0.40%, slippage 0.05%": {
+        "strategy": {
+          "total_return": 1.7138191298212604,
+          "max_drawdown": 0.2658265932312061,
+          "closed_trades": 8,
+          "open_position": true,
+          "win_rate": 0.375,
+          "profit_factor": 4.339933406404469,
+          "gross_profit": 1052.7547859967303,
+          "gross_loss": -242.57394927838595,
+          "exposure": 0.7883755588673621,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 96.8913821452914,
+          "final_equity": 2713.8191298212605
+        },
+        "buy_and_hold": {
+          "total_return": 2.8141374495853055,
+          "max_drawdown": 0.26151164178017633,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 3.9839696785446,
+          "final_equity": 3814.1374495853056
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "STRESS: fee 0.40%, slippage 0.20%": {
+        "strategy": {
+          "total_return": 1.6453807065674892,
+          "max_drawdown": 0.27457528226799854,
+          "closed_trades": 8,
+          "open_position": true,
+          "win_rate": 0.125,
+          "profit_factor": 3.9157920232751073,
+          "gross_profit": 1030.3302565711106,
+          "gross_loss": -263.12180280436814,
+          "exposure": 0.7883755588673621,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 95.4780829071112,
+          "final_equity": 2645.380706567489
+        },
+        "buy_and_hold": {
+          "total_return": 2.8084266475342887,
+          "max_drawdown": 0.2615116051513738,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 3.9839681879111994,
+          "final_equity": 3808.426647534289
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "LOW FEE: fee 0.10%, slippage 0.05%": {
+        "strategy": {
+          "total_return": 1.8556435086201541,
+          "max_drawdown": 0.2479776258468437,
+          "closed_trades": 8,
+          "open_position": true,
+          "win_rate": 0.375,
+          "profit_factor": 5.418224740363367,
+          "gross_profit": 1102.582739299437,
+          "gross_loss": -203.49520223583295,
+          "exposure": 0.7883755588673621,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 24.9479576070478,
+          "final_equity": 2855.643508620154
+        },
+        "buy_and_hold": {
+          "total_return": 2.82556203905338,
+          "max_drawdown": 0.2615114488739045,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0.9989751770695497,
+          "final_equity": 3825.5620390533804
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      },
+      "LOW FEE + STRESS SLIPPAGE: fee 0.10%, slippage 0.20%": {
+        "strategy": {
+          "total_return": 1.7835936500962681,
+          "max_drawdown": 0.2569512800805256,
+          "closed_trades": 8,
+          "open_position": true,
+          "win_rate": 0.375,
+          "profit_factor": 4.82316636234783,
+          "gross_profit": 1077.4323653295282,
+          "gross_loss": -223.38693803732986,
+          "exposure": 0.7883755588673621,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 24.5825574131322,
+          "final_equity": 2783.593650096268
+        },
+        "buy_and_hold": {
+          "total_return": 2.8198467595122887,
+          "max_drawdown": 0.26151181136640833,
+          "closed_trades": 0,
+          "open_position": true,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 1.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0.9989792763114,
+          "final_equity": 3819.846759512289
+        },
+        "cash": {
+          "total_return": 0.0,
+          "max_drawdown": 0.0,
+          "closed_trades": 0,
+          "open_position": false,
+          "win_rate": null,
+          "profit_factor": null,
+          "gross_profit": 0,
+          "gross_loss": 0,
+          "exposure": 0.0,
+          "bars": 671,
+          "rejected_orders": 0,
+          "total_fees": 0,
+          "final_equity": 1000.0
+        }
+      }
+    }
+  },
+  "crosscheck": {
+    "dataset_version": "v20261027T102241Z_c11776a0",
+    "dataset_sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+    "rule": "open and close within 3.0%, and the day's return within 3.0 percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
+    "coinbase_error": null,
+    "bitstamp_error": null,
+    "http_log": [
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "/products/BTC-USD/candles",
+        "HTTP 200"
+      ],
+      [
+        "...",
+        "13 requests in total"
+      ]
+    ],
+    "common_days": 3358,
+    "binance_days": 3358,
+    "coinbase_days": 3359,
+    "summary": {
+      "median_abs_close_diff_pct": 0.05557663893300813,
+      "p95_abs_close_diff_pct": 0.926445649318075,
+      "p99_abs_close_diff_pct": 2.845912837303821,
+      "max_abs_close_diff_pct": 11.77966939265277,
+      "days_over_1pct": 157,
+      "days_over_2pct": 65,
+      "days_over_5pct": 8
+    },
+    "worst_days": [
+      {
+        "date": "2017-12-23",
+        "abs_close_diff_pct": 11.78
+      },
+      {
+        "date": "2017-09-04",
+        "abs_close_diff_pct": 8.851
+      },
+      {
+        "date": "2017-12-12",
+        "abs_close_diff_pct": 7.784
+      },
+      {
+        "date": "2017-12-22",
+        "abs_close_diff_pct": 6.22
+      },
+      {
+        "date": "2018-01-16",
+        "abs_close_diff_pct": 5.791
+      },
+      {
+        "date": "2018-11-14",
+        "abs_close_diff_pct": 5.654
+      },
+      {
+        "date": "2018-02-08",
+        "abs_close_diff_pct": 5.282
+      },
+      {
+        "date": "2017-12-24",
+        "abs_close_diff_pct": 5.076
+      }
+    ],
+    "flagged": [
+      {
+        "date": "2020-03-12",
+        "table": [
+          {
+            "date": "2020-03-10",
+            "source": "binance",
+            "open": 7929.87,
+            "high": 8149.0,
+            "low": 7728.01,
+            "close": 7894.56
+          },
+          {
+            "date": "2020-03-10",
+            "source": "coinbase",
+            "open": 7934.56,
+            "high": 8158.25,
+            "low": 7733.56,
+            "close": 7894.68
+          },
+          {
+            "date": "2020-03-10",
+            "source": "bitstamp",
+            "open": 7937.2,
+            "high": 8158.42,
+            "low": 7733.99,
+            "close": 7885.92
+          },
+          {
+            "date": "2020-03-11",
+            "source": "binance",
+            "open": 7894.57,
+            "high": 7980.0,
+            "low": 7590.0,
+            "close": 7934.52
+          },
+          {
+            "date": "2020-03-11",
+            "source": "coinbase",
+            "open": 7894.68,
+            "high": 7987.97,
+            "low": 7583.27,
+            "close": 7938.05
+          },
+          {
+            "date": "2020-03-11",
+            "source": "bitstamp",
+            "open": 7893.63,
+            "high": 7988.78,
+            "low": 7591.99,
+            "close": 7934.57
+          },
+          {
+            "date": "2020-03-12",
+            "source": "binance",
+            "open": 7934.58,
+            "high": 7966.17,
+            "low": 4410.0,
+            "close": 4800.0
+          },
+          {
+            "date": "2020-03-12",
+            "source": "coinbase",
+            "open": 7938.05,
+            "high": 7969.45,
+            "low": 4644.0,
+            "close": 4857.1
+          },
+          {
+            "date": "2020-03-12",
+            "source": "bitstamp",
+            "open": 7956.29,
+            "high": 7969.9,
+            "low": 4776.59,
+            "close": 4841.67
+          },
+          {
+            "date": "2020-03-13",
+            "source": "binance",
+            "open": 4800.01,
+            "high": 5955.0,
+            "low": 3782.13,
+            "close": 5578.6
+          },
+          {
+            "date": "2020-03-13",
+            "source": "coinbase",
+            "open": 4857.1,
+            "high": 5995.0,
+            "low": 3858.0,
+            "close": 5637.6
+          },
+          {
+            "date": "2020-03-13",
+            "source": "bitstamp",
+            "open": 4841.67,
+            "high": 5990.35,
+            "low": 3850.0,
+            "close": 5622.74
+          },
+          {
+            "date": "2020-03-14",
+            "source": "binance",
+            "open": 5576.05,
+            "high": 5640.52,
+            "low": 5055.13,
+            "close": 5172.06
+          },
+          {
+            "date": "2020-03-14",
+            "source": "coinbase",
+            "open": 5630.93,
+            "high": 5669.0,
+            "low": 5050.0,
+            "close": 5165.25
+          },
+          {
+            "date": "2020-03-14",
+            "source": "bitstamp",
+            "open": 5623.16,
+            "high": 5663.01,
+            "low": 5051.0,
+            "close": 5169.37
+          }
+        ],
+        "coinbase": {
+          "open_diff_pct": -0.04371350646569239,
+          "close_diff_pct": -1.1755986082230163,
+          "high_diff_pct": -0.041157168938876776,
+          "low_diff_pct": -5.038759689922479,
+          "binance_return_pct": -39.50484717412017,
+          "other_return_pct": -38.81242874509483,
+          "return_gap_pp": -0.692418429025345,
+          "agrees": true
+        },
+        "bitstamp": {
+          "open_diff_pct": -0.2728658709021392,
+          "close_diff_pct": -0.8606534522179299,
+          "high_diff_pct": -0.04680108909772551,
+          "low_diff_pct": -7.674721925055328,
+          "binance_return_pct": -39.50484717412017,
+          "other_return_pct": -38.980058150599206,
+          "return_gap_pp": -0.5247890235209667,
+          "agrees": true
+        },
+        "verdict": "CONFIRMED (approximate: USD is not USDT)"
+      }
+    ]
+  },
+  "sensitivity": {
+    "removed": [
+      "2020-03-12"
+    ],
+    "selection": {
+      "rows": [
+        {
+          "n": 50,
+          "train": {
+            "total_return": 3.664495141961792,
+            "max_drawdown": 0.6135528554063127,
+            "closed_trades": 49,
+            "open_position": true,
+            "win_rate": 0.14285714285714285,
+            "profit_factor": 1.3421430906440992,
+            "gross_profit": 8544.506110893128,
+            "gross_loss": -6366.31531351295,
+            "exposure": 0.4809707666850524,
+            "bars": 1813,
+            "rejected_orders": 0,
+            "total_fees": 1042.2269995386248,
+            "final_equity": 4664.495141961792
+          },
+          "validation": {
+            "total_return": 1.5985983860746318,
+            "max_drawdown": 0.2899750582816826,
+            "closed_trades": 16,
+            "open_position": true,
+            "win_rate": 0.25,
+            "profit_factor": 2.102588136077217,
+            "gross_profit": 1363.553174343902,
+            "gross_loss": -648.5117798143164,
+            "exposure": 0.6557377049180327,
+            "bars": 671,
+            "rejected_orders": 0,
+            "total_fees": 189.514329885521,
+            "final_equity": 2598.598386074632
+          },
+          "eligible": true,
+          "score": 5.51288236839235
+        },
+        {
+          "n": 100,
+          "train": {
+            "total_return": 6.233601800943094,
+            "max_drawdown": 0.40779820576363074,
+            "closed_trades": 28,
+            "open_position": true,
+            "win_rate": 0.17857142857142858,
+            "profit_factor": 2.0909896453174737,
+            "gross_profit": 8142.268553164814,
+            "gross_loss": -3893.9784189742263,
+            "exposure": 0.4677330391616106,
+            "bars": 1813,
+            "rejected_orders": 0,
+            "total_fees": 707.8769665369172,
+            "final_equity": 7233.6018009430945
+          },
+          "validation": {
+            "total_return": 0.9857139875926162,
+            "max_drawdown": 0.3981922511573524,
+            "closed_trades": 15,
+            "open_position": true,
+            "win_rate": 0.13333333333333333,
+            "profit_factor": 1.393549832951403,
+            "gross_profit": 1099.7764147231496,
+            "gross_loss": -789.1905899008507,
+            "exposure": 0.7526080476900149,
+            "bars": 671,
+            "rejected_orders": 0,
+            "total_fees": 157.5893929362864,
+            "final_equity": 1985.7139875926161
+          },
+          "eligible": true,
+          "score": 2.4754725505773205
+        },
+        {
+          "n": 150,
+          "train": {
+            "total_return": 6.039346097837561,
+            "max_drawdown": 0.4633925012449348,
+            "closed_trades": 15,
+            "open_position": true,
+            "win_rate": 0.2,
+            "profit_factor": 2.371700894096671,
+            "gross_profit": 7546.283138675416,
+            "gross_loss": -3181.8022067869692,
+            "exposure": 0.4335355763927192,
+            "bars": 1813,
+            "rejected_orders": 0,
+            "total_fees": 494.8861183650436,
+            "final_equity": 7039.3460978375615
+          },
+          "validation": {
+            "total_return": 1.7138191298212604,
+            "max_drawdown": 0.2658265932312061,
+            "closed_trades": 8,
+            "open_position": true,
+            "win_rate": 0.375,
+            "profit_factor": 4.339933406404469,
+            "gross_profit": 1052.7547859967303,
+            "gross_loss": -242.57394927838595,
+            "exposure": 0.7883755588673621,
+            "bars": 671,
+            "rejected_orders": 0,
+            "total_fees": 96.8913821452914,
+            "final_equity": 2713.8191298212605
+          },
+          "eligible": true,
+          "score": 6.447131977990796
+        },
+        {
+          "n": 200,
+          "train": {
+            "total_return": 1.4601678546523273,
+            "max_drawdown": 0.6634104913188859,
+            "closed_trades": 16,
+            "open_position": true,
+            "win_rate": 0.125,
+            "profit_factor": 1.4920276038003812,
+            "gross_profit": 2979.639807809482,
+            "gross_loss": -1997.0406715130243,
+            "exposure": 0.42967457253171537,
+            "bars": 1813,
+            "rejected_orders": 0,
+            "total_fees": 250.7912467568764,
+            "final_equity": 2460.167854652327
+          },
+          "validation": {
+            "total_return": 1.7323389537920875,
+            "max_drawdown": 0.279801520884342,
+            "closed_trades": 7,
+            "open_position": true,
+            "win_rate": 0.42857142857142855,
+            "profit_factor": 5.328719362478436,
+            "gross_profit": 1114.8595008750249,
+            "gross_loss": -209.2171542613371,
+            "exposure": 0.8032786885245902,
+            "bars": 671,
+            "rejected_orders": 0,
+            "total_fees": 101.262052982014,
+            "final_equity": 2732.3389537920875
+          },
+          "eligible": true,
+          "score": 6.1913135722666865
+        }
+      ],
+      "selected_n": 150
+    },
+    "selected_n_changed": false,
+    "test_signals_identical_for_original_choice": true
+  },
+  "rules": {
+    "capital": 1000.0,
+    "fraction": 1.0,
+    "min_notional": 10.0,
+    "qty_step": 1e-05
+  },
+  "cost_grid": [
+    {
+      "name": "BASE: fee 0.40%, slippage 0.05%",
+      "fee": 0.004,
+      "slip": 0.0005
+    },
+    {
+      "name": "STRESS: fee 0.40%, slippage 0.20%",
+      "fee": 0.004,
+      "slip": 0.002
+    },
+    {
+      "name": "LOW FEE: fee 0.10%, slippage 0.05%",
+      "fee": 0.001,
+      "slip": 0.0005
+    },
+    {
+      "name": "LOW FEE + STRESS SLIPPAGE: fee 0.10%, slippage 0.20%",
+      "fee": 0.001,
+      "slip": 0.002
+    }
+  ]
+}
