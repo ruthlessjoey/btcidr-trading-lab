@@ -1,5 +1,5 @@
 # BTC/USDT trend-filter backtest (research only)
-Run `40669227958` · **READ-ONLY** · no keys, no orders, no live trading
+Run `40669485193` · **READ-ONLY** · no keys, no orders, no live trading
 
 > **This is a historical simulation on a proxy market. It does not show that the strategy is profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.
 
@@ -62,7 +62,8 @@ _Pre-registered before any test result was computed. Candidates: 50, 100, 150, 2
 | 150 | +603.9% | 46.3% | yes | +171.4% | 26.6% | 8 | 6.45 | **yes** |
 | 200 | +146.0% | 66.3% | yes | +173.2% | 28.0% | 7 | 6.19 |  |
 
-**Frozen choice: 150-day moving average.** Frozen record hash `00431d956bd4387b...` was written before the test window was evaluated.
+**Frozen choice: 150-day moving average.** Frozen record hash `7c677144b9ce3367...` was written before the test window was evaluated.
+It matches the choice recorded in the config before the final run (expected_selected_n = 150, set after the dry run).
 
 ## Results for the frozen choice
 
@@ -104,8 +105,24 @@ Train and validation were used to choose, so they are NOT independent evidence. 
 
 ### TEST (final, evaluated once): 2024-12-23 to 2026-10-26
 
-Not evaluated: dry run: the config says evaluate_test is false, so the test window was not computed or looked at.
-**DRY RUN: no test-window result exists yet.** The choice above is frozen; the final run will evaluate the test window once.
+Evaluation number 1 (first and only).
+
+| Costs | Row | Return | Max drawdown | Closed trades | Win rate | Profit factor | Exposure |
+|---|---|---|---|---|---|---|---|
+| BASE | Strategy | -11.0% | 30.4% | 10 (+1 open) | 10.0% | 0.36 | 49.0% |
+| BASE | Buy and hold | -16.2% | 52.9% | 0 (+1 open) | n/a | n/a | 100.0% |
+| BASE | Cash | +0.0% | 0.0% | 0 | n/a | n/a | 0.0% |
+| STRESS | Strategy | -13.8% | 32.3% | 10 (+1 open) | 10.0% | 0.33 | 49.0% |
+| STRESS | Buy and hold | -16.3% | 53.0% | 0 (+1 open) | n/a | n/a | 100.0% |
+| STRESS | Cash | +0.0% | 0.0% | 0 | n/a | n/a | 0.0% |
+| LOW FEE | Strategy | -5.3% | 26.3% | 10 (+1 open) | 10.0% | 0.43 | 49.0% |
+| LOW FEE | Buy and hold | -15.9% | 52.9% | 0 (+1 open) | n/a | n/a | 100.0% |
+| LOW FEE | Cash | +0.0% | 0.0% | 0 | n/a | n/a | 0.0% |
+| LOW FEE + STRESS SLIPPAGE | Strategy | -8.2% | 28.4% | 10 (+1 open) | 10.0% | 0.39 | 49.0% |
+| LOW FEE + STRESS SLIPPAGE | Buy and hold | -16.0% | 53.0% | 0 (+1 open) | n/a | n/a | 100.0% |
+| LOW FEE + STRESS SLIPPAGE | Cash | +0.0% | 0.0% | 0 | n/a | n/a | 0.0% |
+
+Base costs: strategy -11.0% vs buy-and-hold -16.2% vs cash +0.0%; strategy max drawdown 30.4% vs buy-and-hold 52.9%; 10 closed trade(s). **Too few trades to conclude anything.**
 
 ## How to read this
 

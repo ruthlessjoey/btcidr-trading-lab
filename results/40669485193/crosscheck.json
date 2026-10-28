@@ -1,0 +1,231 @@
+{
+  "dataset_version": "v20261027T102241Z_c11776a0",
+  "dataset_sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+  "rule": "open and close within 3.0%, and the day's return within 3.0 percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
+  "coinbase_error": null,
+  "bitstamp_error": null,
+  "http_log": [
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "/products/BTC-USD/candles",
+      "HTTP 200"
+    ],
+    [
+      "...",
+      "13 requests in total"
+    ]
+  ],
+  "common_days": 3358,
+  "binance_days": 3358,
+  "coinbase_days": 3359,
+  "summary": {
+    "median_abs_close_diff_pct": 0.05557663893300813,
+    "p95_abs_close_diff_pct": 0.926445649318075,
+    "p99_abs_close_diff_pct": 2.845912837303821,
+    "max_abs_close_diff_pct": 11.77966939265277,
+    "days_over_1pct": 157,
+    "days_over_2pct": 65,
+    "days_over_5pct": 8
+  },
+  "worst_days": [
+    {
+      "date": "2017-12-23",
+      "abs_close_diff_pct": 11.78
+    },
+    {
+      "date": "2017-09-04",
+      "abs_close_diff_pct": 8.851
+    },
+    {
+      "date": "2017-12-12",
+      "abs_close_diff_pct": 7.784
+    },
+    {
+      "date": "2017-12-22",
+      "abs_close_diff_pct": 6.22
+    },
+    {
+      "date": "2018-01-16",
+      "abs_close_diff_pct": 5.791
+    },
+    {
+      "date": "2018-11-14",
+      "abs_close_diff_pct": 5.654
+    },
+    {
+      "date": "2018-02-08",
+      "abs_close_diff_pct": 5.282
+    },
+    {
+      "date": "2017-12-24",
+      "abs_close_diff_pct": 5.076
+    }
+  ],
+  "flagged": [
+    {
+      "date": "2020-03-12",
+      "table": [
+        {
+          "date": "2020-03-10",
+          "source": "binance",
+          "open": 7929.87,
+          "high": 8149.0,
+          "low": 7728.01,
+          "close": 7894.56
+        },
+        {
+          "date": "2020-03-10",
+          "source": "coinbase",
+          "open": 7934.56,
+          "high": 8158.25,
+          "low": 7733.56,
+          "close": 7894.68
+        },
+        {
+          "date": "2020-03-10",
+          "source": "bitstamp",
+          "open": 7937.2,
+          "high": 8158.42,
+          "low": 7733.99,
+          "close": 7885.92
+        },
+        {
+          "date": "2020-03-11",
+          "source": "binance",
+          "open": 7894.57,
+          "high": 7980.0,
+          "low": 7590.0,
+          "close": 7934.52
+        },
+        {
+          "date": "2020-03-11",
+          "source": "coinbase",
+          "open": 7894.68,
+          "high": 7987.97,
+          "low": 7583.27,
+          "close": 7938.05
+        },
+        {
+          "date": "2020-03-11",
+          "source": "bitstamp",
+          "open": 7893.63,
+          "high": 7988.78,
+          "low": 7591.99,
+          "close": 7934.57
+        },
+        {
+          "date": "2020-03-12",
+          "source": "binance",
+          "open": 7934.58,
+          "high": 7966.17,
+          "low": 4410.0,
+          "close": 4800.0
+        },
+        {
+          "date": "2020-03-12",
+          "source": "coinbase",
+          "open": 7938.05,
+          "high": 7969.45,
+          "low": 4644.0,
+          "close": 4857.1
+        },
+        {
+          "date": "2020-03-12",
+          "source": "bitstamp",
+          "open": 7956.29,
+          "high": 7969.9,
+          "low": 4776.59,
+          "close": 4841.67
+        },
+        {
+          "date": "2020-03-13",
+          "source": "binance",
+          "open": 4800.01,
+          "high": 5955.0,
+          "low": 3782.13,
+          "close": 5578.6
+        },
+        {
+          "date": "2020-03-13",
+          "source": "coinbase",
+          "open": 4857.1,
+          "high": 5995.0,
+          "low": 3858.0,
+          "close": 5637.6
+        },
+        {
+          "date": "2020-03-13",
+          "source": "bitstamp",
+          "open": 4841.67,
+          "high": 5990.35,
+          "low": 3850.0,
+          "close": 5622.74
+        },
+        {
+          "date": "2020-03-14",
+          "source": "binance",
+          "open": 5576.05,
+          "high": 5640.52,
+          "low": 5055.13,
+          "close": 5172.06
+        },
+        {
+          "date": "2020-03-14",
+          "source": "coinbase",
+          "open": 5630.93,
+          "high": 5669.0,
+          "low": 5050.0,
+          "close": 5165.25
+        },
+        {
+          "date": "2020-03-14",
+          "source": "bitstamp",
+          "open": 5623.16,
+          "high": 5663.01,
+          "low": 5051.0,
+          "close": 5169.37
+        }
+      ],
+      "coinbase": {
+        "open_diff_pct": -0.04371350646569239,
+        "close_diff_pct": -1.1755986082230163,
+        "high_diff_pct": -0.041157168938876776,
+        "low_diff_pct": -5.038759689922479,
+        "binance_return_pct": -39.50484717412017,
+        "other_return_pct": -38.81242874509483,
+        "return_gap_pp": -0.692418429025345,
+        "agrees": true
+      },
+      "bitstamp": {
+        "open_diff_pct": -0.2728658709021392,
+        "close_diff_pct": -0.8606534522179299,
+        "high_diff_pct": -0.04680108909772551,
+        "low_diff_pct": -7.674721925055328,
+        "binance_return_pct": -39.50484717412017,
+        "other_return_pct": -38.980058150599206,
+        "return_gap_pp": -0.5247890235209667,
+        "agrees": true
+      },
+      "verdict": "CONFIRMED (approximate: USD is not USDT)"
+    }
+  ]
+}
