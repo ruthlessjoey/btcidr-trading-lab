@@ -1,0 +1,74 @@
+name: Research dataset (Step 1 gate)
+
+# READ-ONLY. Fetches public BTC/USDT daily candles, validates them, and keeps every
+# version on the 'research-data' branch (never overwritten, never force-pushed).
+on:
+  workflow_dispatch:
+  push:
+    branches: [milestone-3-data]   # lets the branch run before it is merged
+    paths: [fetch_history.py, research/history.py, research/dataset.py, research/data_report.py,
+            research_config.json, .github/workflows/research-data.yml]
+
+permissions:
+  contents: write                  # only used to append dataset versions and reports
+
+concurrency:
+  group: research-data
+  cancel-in-progress: false
+
+jobs:
+  dataset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run offline unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Load earlier dataset versions (if any)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads "$URL" research-data >/dev/null 2>&1; then
+            git fetch -q --depth=1 "$URL" research-data
+            git archive FETCH_HEAD datasets | tar -x -C prev || true
+          fi
+          ls -R prev | head -20 || true
+
+      - name: Fetch and validate history (hard gate)
+        run: python3 fetch_history.py --previous-root prev/datasets
+
+      - name: Keep the reports and dataset files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataset-report
+          path: out/
+          if-no-files-found: ignore
+
+      - name: Publish new version and report to the research-data branch (append only)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          rm -rf /tmp/pub
+          if git ls-remote --exit-code --heads "$URL" research-data >/dev/null 2>&1; then
+            git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
+          else
+            mkdir /tmp/pub && git -C /tmp/pub init -q -b research-data
+          fi
+          cd /tmp/pub
+          mkdir -p datasets reports/${{ github.run_id }}
+          if [ -d "$GITHUB_WORKSPACE/out/datasets" ]; then cp -rn "$GITHUB_WORKSPACE/out/datasets/." datasets/; fi
+          cp "$GITHUB_WORKSPACE"/out/dataset_report.* reports/${{ github.run_id }}/ 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE"/out/dataset_report.md LATEST_DATASET_REPORT.md 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q --allow-empty -m "Dataset run ${{ github.run_id }}"
+          git push -q "$URL" HEAD:research-data
