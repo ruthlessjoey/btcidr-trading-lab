@@ -8,5 +8,6 @@
   "flagged_dates": [
     "2020-03-12"
   ],
-  "evaluate_test": false
+  "evaluate_test": true,
+  "expected_selected_n": 150
 }

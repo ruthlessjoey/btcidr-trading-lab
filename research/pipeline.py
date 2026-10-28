@@ -128,6 +128,11 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
           "rows": manifest["row_count"], "first_open_utc": manifest["first_open_utc"],
           "last_open_utc": manifest["last_open_utc"], "market": manifest["market"]}
     sel = selection.select(candles, splits)
+    expected = cfg.get("expected_selected_n")
+    if expected is not None and sel["selected_n"] != expected:
+        result["error"] = (f"the selection now gives {sel['selected_n']}, but the choice recorded before "
+                           f"the final run was {expected}; the test window was NOT evaluated")
+        return finish(result, out_dir)
     frozen = selection.freeze(sel, splits, ds, candles, rules, code_rev=code_rev)
     with open(os.path.join(out_dir, "frozen_choice.json"), "w", encoding="utf-8") as f:
         json.dump(frozen, f, indent=2)                      # written BEFORE the test is evaluated
@@ -153,7 +158,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
                                                      "bars": b - a, "start_index": a, "end_index": b}
                                                  for k, (a, b) in splits.items()},
                   selection=sel, frozen=frozen, test=test, shown=shown, crosscheck=cross,
-                  sensitivity=sens, rules=rules.__dict__,
+                  sensitivity=sens, rules=rules.__dict__, expected_selected_n=expected,
                   cost_grid=[{"name": c.name, "fee": c.fee, "slip": c.slip} for c in selection.COST_GRID])
     return finish(result, out_dir)
 

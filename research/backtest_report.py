@@ -134,6 +134,9 @@ def build_markdown(r):
     else:
         L += ["", f"**Frozen choice: {sel['selected_n']}-day moving average.** Frozen record hash "
               f"`{fz['frozen_hash'][:16]}...` was written before the test window was evaluated."]
+        if r.get("expected_selected_n") is not None:
+            L.append(f"It matches the choice recorded in the config before the final run "
+                     f"(expected_selected_n = {r['expected_selected_n']}, set after the dry run).")
     # results
     shown = r.get("shown")
     if shown:

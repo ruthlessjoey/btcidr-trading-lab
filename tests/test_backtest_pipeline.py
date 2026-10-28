@@ -83,6 +83,18 @@ class PipelineTests(unittest.TestCase):
         _, b, _, _ = self.run_bt(out=os.path.join(self.tmp, "d2"))
         self.assertEqual(a["frozen"]["frozen_hash"], b["frozen"]["frozen_hash"])
 
+    def test_changed_selection_since_the_recorded_choice_stops_before_the_test(self):
+        _, a, _, _ = self.run_bt(dict(self.cfg, evaluate_test=False), out=os.path.join(self.tmp, "e1"))
+        n = a["selection"]["selected_n"]
+        wrong = 50 if n != 50 else 200
+        code, data, md, out = self.run_bt(dict(self.cfg, expected_selected_n=wrong), out=os.path.join(self.tmp, "e2"))
+        self.assertEqual(code, 1)
+        self.assertIn("test window was NOT evaluated", data["error"])
+        self.assertFalse(os.path.exists(os.path.join(out, "test_evaluations")))
+        code, data, md, out = self.run_bt(dict(self.cfg, expected_selected_n=n), out=os.path.join(self.tmp, "e3"))
+        self.assertEqual(code, 0)
+        self.assertIn("recorded in the config before the final run", md)
+
     def test_split_sizes_match_sixty_twenty_twenty(self):
         _, data, _, _ = self.run_bt()
         bars = {k: v["bars"] for k, v in data["splits"].items()}
