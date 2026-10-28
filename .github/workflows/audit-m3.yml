@@ -1,0 +1,38 @@
+name: Audit M3 (read-only)
+on:
+  push:
+    branches: [audit-m3]
+permissions:
+  contents: write
+concurrency:
+  group: research-data
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load preserved datasets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git fetch -q --depth=1 "$URL" research-data
+          git archive FETCH_HEAD datasets | tar -x -C prev
+      - name: Discrepancy audit
+        run: python3 tools/audit_discrepancy.py
+      - name: Publish audit output (append only)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          rm -rf /tmp/pub && git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
+          cd /tmp/pub && mkdir -p audit/${{ github.run_id }}
+          cp "$GITHUB_WORKSPACE"/out/audit_discrepancy.* audit/${{ github.run_id }}/ 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE"/out/audit_discrepancy.md LATEST_AUDIT_DISCREPANCY.md 2>/dev/null || true
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A; git commit -q --allow-empty -m "Audit run ${{ github.run_id }}"; git push -q "$URL" HEAD:research-data
