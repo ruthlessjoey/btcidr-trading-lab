@@ -6,6 +6,8 @@ on:
   workflow_dispatch:
   push:
     branches: [milestone-3-data]   # lets the branch run before it is merged
+    paths: [fetch_history.py, research/history.py, research/dataset.py, research/data_report.py,
+            research_config.json, .github/workflows/research-data.yml]
 
 permissions:
   contents: write                  # only used to append dataset versions and reports

@@ -1,0 +1,12 @@
+{
+  "provider": "binance-vision",
+  "symbol": "BTCUSDT",
+  "quote_asset": "USDT",
+  "timeframe": "1d",
+  "dataset_version": "v20261027T102241Z_c11776a0",
+  "warmup": 200,
+  "flagged_dates": [
+    "2020-03-12"
+  ],
+  "evaluate_test": false
+}
