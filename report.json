@@ -1,0 +1,26 @@
+{
+  "generated_utc": "2026-10-31 04:02:34 UTC",
+  "pair": "BTC_USDT",
+  "timeframe": "1h",
+  "mode": "read_only",
+  "lookback_days": 14,
+  "api_error": "all sources failed",
+  "requests_made": 0,
+  "checks": [],
+  "stats": {},
+  "attempts": [
+    {
+      "source": "tokocrypto-mbx",
+      "ok": false,
+      "detail": "https://www.tokocrypto.site/api/v3/time -> HTTP 451: <body><embed src='/not-support' type='text/html' style='width:100%;height:100vh;'/></body> (not retried)"
+    },
+    {
+      "source": "tokocrypto-open-v1",
+      "ok": false,
+      "detail": "https://www.tokocrypto.com/open/v1/common/time -> HTTP 451: <body><embed src='/not-support' type='text/html' style='width:100%;height:100vh;'/></body> (not retried)"
+    }
+  ],
+  "source": null,
+  "source_url": null,
+  "status": "API ERROR"
+}

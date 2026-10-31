@@ -1,0 +1,335 @@
+{
+  "generated_utc": "2026-10-31 04:02:31 UTC",
+  "timeframe": "1h",
+  "lookback_days": 14,
+  "mode": "read_only",
+  "min_verified": 1,
+  "verified": 3,
+  "status": "PASS",
+  "status_reason": "Enough providers passed every validation check.",
+  "providers": [
+    {
+      "provider": "kraken",
+      "pair": "BTC/USD",
+      "quote": "USD",
+      "docs": "https://docs.kraken.com/api-reference/market-data/get-ohlc-data",
+      "timeframe": "1h",
+      "reachability": "OK (exchange time 2026-10-31 04:02 UTC)",
+      "parsing": "OK (336 candles parsed)",
+      "validation": "PASS",
+      "verdict": "VERIFIED",
+      "detail": "",
+      "stats": {
+        "raw_candles": 336,
+        "closed_candles": 335,
+        "forming_dropped": 1,
+        "missing_candles": 0,
+        "zero_volume_candles": 0
+      },
+      "checks": [
+        {
+          "name": "has_data",
+          "status": "PASS",
+          "detail": "336 candles received"
+        },
+        {
+          "name": "order_and_duplicates",
+          "status": "PASS",
+          "detail": "sorted_as_received=True, exact_duplicates_removed=0, conflicting_duplicates=0"
+        },
+        {
+          "name": "closed_candles",
+          "status": "PASS",
+          "detail": "335 closed candles; 1 still-forming candle(s) excluded"
+        },
+        {
+          "name": "timestamp_grid",
+          "status": "PASS",
+          "detail": "all timestamps are exact multiples of 3600s"
+        },
+        {
+          "name": "missing_candles",
+          "status": "PASS",
+          "detail": "0 missing (0.00%)"
+        },
+        {
+          "name": "ohlc_sanity",
+          "status": "PASS",
+          "detail": "high/low/open/close are consistent and positive"
+        },
+        {
+          "name": "volume_sanity",
+          "status": "PASS",
+          "detail": "0 invalid volume(s); 0 zero-volume candle(s) of 335"
+        },
+        {
+          "name": "price_spikes",
+          "status": "PASS",
+          "detail": "0 close-to-close move(s) larger than 10%"
+        },
+        {
+          "name": "freshness",
+          "status": "PASS",
+          "detail": "newest closed candle ended 151s before exchange time (limit 7200s)"
+        },
+        {
+          "name": "history_coverage",
+          "status": "PASS",
+          "detail": "first candle 2026-10-17 05:00 UTC vs requested start 2026-10-17 04:02 UTC"
+        },
+        {
+          "name": "clock_skew",
+          "status": "PASS",
+          "detail": "runner clock differs from exchange clock by 0s"
+        }
+      ],
+      "first_candle": "2026-10-17 05:00",
+      "last_candle": "2026-10-31 03:00",
+      "last_close": 77018.2,
+      "requests": 2,
+      "http_log": [
+        [
+          "/0/public/Time",
+          "HTTP 200"
+        ],
+        [
+          "/0/public/OHLC",
+          "HTTP 200"
+        ]
+      ],
+      "seconds": 0.41
+    },
+    {
+      "provider": "coinbase",
+      "pair": "BTC/USD",
+      "quote": "USD",
+      "docs": "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles",
+      "timeframe": "1h",
+      "reachability": "OK (exchange time 2026-10-31 04:02 UTC)",
+      "parsing": "OK (336 candles parsed)",
+      "validation": "PASS",
+      "verdict": "VERIFIED",
+      "detail": "",
+      "stats": {
+        "raw_candles": 336,
+        "closed_candles": 335,
+        "forming_dropped": 1,
+        "missing_candles": 0,
+        "zero_volume_candles": 0
+      },
+      "checks": [
+        {
+          "name": "has_data",
+          "status": "PASS",
+          "detail": "336 candles received"
+        },
+        {
+          "name": "order_and_duplicates",
+          "status": "PASS",
+          "detail": "sorted_as_received=True, exact_duplicates_removed=0, conflicting_duplicates=0"
+        },
+        {
+          "name": "closed_candles",
+          "status": "PASS",
+          "detail": "335 closed candles; 1 still-forming candle(s) excluded"
+        },
+        {
+          "name": "timestamp_grid",
+          "status": "PASS",
+          "detail": "all timestamps are exact multiples of 3600s"
+        },
+        {
+          "name": "missing_candles",
+          "status": "PASS",
+          "detail": "0 missing (0.00%)"
+        },
+        {
+          "name": "ohlc_sanity",
+          "status": "PASS",
+          "detail": "high/low/open/close are consistent and positive"
+        },
+        {
+          "name": "volume_sanity",
+          "status": "PASS",
+          "detail": "0 invalid volume(s); 0 zero-volume candle(s) of 335"
+        },
+        {
+          "name": "price_spikes",
+          "status": "PASS",
+          "detail": "0 close-to-close move(s) larger than 10%"
+        },
+        {
+          "name": "freshness",
+          "status": "PASS",
+          "detail": "newest closed candle ended 151s before exchange time (limit 7200s)"
+        },
+        {
+          "name": "history_coverage",
+          "status": "PASS",
+          "detail": "first candle 2026-10-17 05:00 UTC vs requested start 2026-10-17 04:02 UTC"
+        },
+        {
+          "name": "clock_skew",
+          "status": "PASS",
+          "detail": "runner clock differs from exchange clock by 0s"
+        }
+      ],
+      "first_candle": "2026-10-17 05:00",
+      "last_candle": "2026-10-31 03:00",
+      "last_close": 77011.23,
+      "requests": 3,
+      "http_log": [
+        [
+          "/time",
+          "HTTP 200"
+        ],
+        [
+          "/products/BTC-USD/candles",
+          "HTTP 200"
+        ],
+        [
+          "/products/BTC-USD/candles",
+          "HTTP 200"
+        ]
+      ],
+      "seconds": 0.55
+    },
+    {
+      "provider": "binance-vision",
+      "pair": "BTC/USDT",
+      "quote": "USDT",
+      "docs": "https://developers.binance.com/docs/binance-spot-api-docs/faqs/market_data_only",
+      "timeframe": "1h",
+      "reachability": "OK (exchange time 2026-10-31 04:02 UTC)",
+      "parsing": "OK (336 candles parsed)",
+      "validation": "PASS",
+      "verdict": "VERIFIED",
+      "detail": "",
+      "stats": {
+        "raw_candles": 336,
+        "closed_candles": 335,
+        "forming_dropped": 1,
+        "missing_candles": 0,
+        "zero_volume_candles": 0
+      },
+      "checks": [
+        {
+          "name": "has_data",
+          "status": "PASS",
+          "detail": "336 candles received"
+        },
+        {
+          "name": "order_and_duplicates",
+          "status": "PASS",
+          "detail": "sorted_as_received=True, exact_duplicates_removed=0, conflicting_duplicates=0"
+        },
+        {
+          "name": "closed_candles",
+          "status": "PASS",
+          "detail": "335 closed candles; 1 still-forming candle(s) excluded"
+        },
+        {
+          "name": "timestamp_grid",
+          "status": "PASS",
+          "detail": "all timestamps are exact multiples of 3600s"
+        },
+        {
+          "name": "missing_candles",
+          "status": "PASS",
+          "detail": "0 missing (0.00%)"
+        },
+        {
+          "name": "ohlc_sanity",
+          "status": "PASS",
+          "detail": "high/low/open/close are consistent and positive"
+        },
+        {
+          "name": "volume_sanity",
+          "status": "PASS",
+          "detail": "0 invalid volume(s); 0 zero-volume candle(s) of 335"
+        },
+        {
+          "name": "price_spikes",
+          "status": "PASS",
+          "detail": "0 close-to-close move(s) larger than 10%"
+        },
+        {
+          "name": "freshness",
+          "status": "PASS",
+          "detail": "newest closed candle ended 152s before exchange time (limit 7200s)"
+        },
+        {
+          "name": "history_coverage",
+          "status": "PASS",
+          "detail": "first candle 2026-10-17 05:00 UTC vs requested start 2026-10-17 04:02 UTC"
+        },
+        {
+          "name": "clock_skew",
+          "status": "PASS",
+          "detail": "runner clock differs from exchange clock by 1s"
+        }
+      ],
+      "first_candle": "2026-10-17 05:00",
+      "last_candle": "2026-10-31 03:00",
+      "last_close": 77170.74,
+      "requests": 2,
+      "http_log": [
+        [
+          "/api/v3/time",
+          "HTTP 200"
+        ],
+        [
+          "/api/v3/klines",
+          "HTTP 200"
+        ]
+      ],
+      "seconds": 1.31
+    },
+    {
+      "provider": "tokocrypto",
+      "pair": "BTC/USDT",
+      "quote": "USDT",
+      "docs": "https://www.tokocrypto.com/apidocs/",
+      "timeframe": "1h",
+      "reachability": "FAIL",
+      "parsing": "not run",
+      "validation": "not run",
+      "verdict": "BLOCKED FROM RUNNER",
+      "detail": "https://www.tokocrypto.site/api/v3/time -> HTTP 451: <body><embed src='/not-support' type='text/html' style='width:100%;height:100vh;'/></body> (not retried)",
+      "stats": {},
+      "checks": [],
+      "first_candle": null,
+      "last_candle": null,
+      "last_close": null,
+      "requests": 1,
+      "http_log": [
+        [
+          "/api/v3/time",
+          "HTTP 451"
+        ]
+      ],
+      "seconds": 0.23
+    }
+  ],
+  "cross_check": {
+    "time": "2026-10-31 03:00",
+    "rows": [
+      [
+        "kraken",
+        "USD",
+        77018.2
+      ],
+      [
+        "coinbase",
+        "USD",
+        77011.23
+      ],
+      [
+        "binance-vision",
+        "USDT",
+        77170.74
+      ]
+    ],
+    "spread_pct": 0.20712563609230905
+  }
+}
