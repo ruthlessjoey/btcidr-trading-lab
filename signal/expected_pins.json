@@ -1,0 +1,18 @@
+{
+  "schema": 2,
+  "status": "PROVISIONAL. Values were taken on 2026-11-01 from the local manifest, the local scratch copy, and the committed research-data object store (origin/research-data), and all four agreed. A pin establishes SNAPSHOT INTEGRITY only: it shows the bytes match the value recorded here. It does NOT prove the source is authentic. This file is NOT a durable trust anchor until the owner has reviewed these values and they are committed. An uncommitted pin is not tamper-proof.",
+  "pins": {
+    "binance-vision_BTCUSDT_1d": [
+      {
+        "version_id": "v20261027T102241Z_c11776a0",
+        "csv_sha256": "c11776a0bbdcec4c1dbc0d0c556e2d8f9ec691968b31d61e2e2376d950dbad54",
+        "label": "Pinned in backtest_config.json. Taken from the committed research-data object store."
+      },
+      {
+        "version_id": "v20261101T084500Z_2c6ca86a",
+        "csv_sha256": "2c6ca86aacda7f07a2e0d6f67e6f680809f38b98b62b986ba84d255186345dab",
+        "label": "PROVISIONAL. USER-SUPPLIED / PROVISIONAL combined snapshot: 3,359 committed history rows plus 4 user-supplied completed candles (2026-10-28 to 2026-10-31). User-stated download time 2026-11-01 08:45:00 UTC. This pin establishes SNAPSHOT INTEGRITY only, not source authenticity, and is not an independent trust anchor."
+      }
+    ]
+  }
+}
