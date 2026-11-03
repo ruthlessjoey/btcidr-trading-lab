@@ -101,7 +101,7 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_live_run_uses_the_real_transport_and_is_labeled_live(self):
         body = syn.kraken_body(completed_plus_forming())
-        with mock.patch.object(cp, "live_transport", return_value=body) as live:
+        with mock.patch("markets.data_pipeline.live_transport", return_value=body) as live:
             r = cp.run_candle_pipeline(Kraken(), KRAKEN, DAY, NOW, data_source="live",
                                        time_source="runtime-clock", lookback=119)
         self.assertEqual(live.call_count, 1)
@@ -109,7 +109,7 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(r["gate"]["status"], "PASSED")
 
     def test_synthetic_and_replay_need_a_caller_transport_and_never_fall_back_to_the_network(self):
-        with mock.patch.object(cp, "live_transport", side_effect=AssertionError("network fallback")):
+        with mock.patch("markets.data_pipeline.live_transport", side_effect=AssertionError("network fallback")):
             for src in ("synthetic", "replay"):
                 with self.subTest(source=src):
                     with self.assertRaises(cp.PipelineError):
@@ -217,10 +217,13 @@ class RefusalTests(unittest.TestCase):
         self.assertIn("expected_missing", " ".join(r["gate"]["reasons"]))
 
     def test_stale_data_is_refused_by_the_gates(self):
-        # A series that ends ten days before the window: no collision with the window, so the gates must refuse.
+        # The series overlaps the window but stops ten days before its end, so the final slots are missing and the
+        # provider is overdue on its publication schedule. The gate must refuse, not call it a gap.
         old_rows = completed_plus_forming(start=START - 10 * DAY, now=NOW - 10 * DAY)
         r, _ = kraken_run(rows=old_rows)
         self.assertRefused(r, "gates")
+        self.assertEqual(r["freshness"]["state"], "overdue")
+        self.assertIn("provider overdue", " ".join(r["gate"]["reasons"]))
 
     def test_empty_provider_response_is_refused_at_fetch(self):
         body = json.dumps({"error": [], "result": {"XXBTZUSD": [], "last": 0}}).encode()
