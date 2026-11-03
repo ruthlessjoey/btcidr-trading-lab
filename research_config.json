@@ -1,0 +1,17 @@
+{
+  "mode": "read_only",
+  "provider": "binance-vision",
+  "host": "https://data-api.binance.vision",
+  "symbol": "BTCUSDT",
+  "base_asset": "BTC",
+  "quote_asset": "USDT",
+  "timeframe": "1d",
+  "fetch_from_utc_date": "2017-01-01",
+  "require_first_candle_on_or_before": "2017-09-30",
+  "min_rows": 3000,
+  "page_limit": 1000,
+  "max_pages": 30,
+  "max_spike_pct": 25,
+  "http_timeout_seconds": 20,
+  "http_retries": 3
+}
