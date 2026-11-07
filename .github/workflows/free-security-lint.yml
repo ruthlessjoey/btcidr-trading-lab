@@ -1,0 +1,33 @@
+name: Free workflow security checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-audit:
+    name: Static workflow security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository without persisting credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install and run actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$HOME/go/bin/actionlint" -color
+
+      - name: Install and run zizmor
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/zizmor-venv"
+          "$RUNNER_TEMP/zizmor-venv/bin/python" -m pip install --disable-pip-version-check "zizmor==1.32.0"
+          "$RUNNER_TEMP/zizmor-venv/bin/zizmor" --format=github .
