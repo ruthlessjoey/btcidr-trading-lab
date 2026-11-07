@@ -13,18 +13,12 @@
       "name": "tokocrypto-mbx",
       "style": "binance_style",
       "base_url": "https://www.tokocrypto.site"
-    },
-    {
-      "name": "tokocrypto-open-v1",
-      "style": "open_v1",
-      "base_url": "https://www.tokocrypto.com"
     }
   ],
   "live_providers": [
     "kraken",
     "coinbase",
-    "binance-vision",
-    "tokocrypto"
+    "binance-vision"
   ],
   "min_verified": 1
 }
