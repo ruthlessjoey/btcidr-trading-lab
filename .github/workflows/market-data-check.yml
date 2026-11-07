@@ -1,7 +1,7 @@
 name: Market data check
 
 on:
-  workflow_dispatch:        # manual diagnostics are available only when explicitly requested
+  workflow_dispatch:        # manual run for the non-Tokocrypto public-provider checks
   push:
     branches: [main]
   schedule:
@@ -23,16 +23,9 @@ jobs:
       - name: Run unit tests
         run: python3 -m unittest discover -s tests -v
 
-      - name: Live smoke test - real candles from each public provider (READ-ONLY)
-        # This is the REQUIRED live check. It fails the run if no provider delivers validated data.
+      - name: Live smoke test - approved public providers (READ-ONLY)
+        # Tokocrypto is intentionally excluded from scheduled and push-triggered checks.
         run: python3 live_check.py
-
-      - name: Manual Tokocrypto diagnostic
-        if: github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        run: |
-          python3 probe.py
-          python3 run.py
 
       - name: Keep the reports and candle file
         if: always()
