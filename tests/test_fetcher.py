@@ -180,6 +180,13 @@ class HttpTests(unittest.TestCase):
             fetcher.parse_klines([[float("inf"), "1", "2", "0", "1", "1"]])
         self.assertIn("invalid numeric fields", str(ctx.exception))
 
+    def test_timestamp_outside_supported_range_is_rejected(self):
+        for timestamp in (-1, 4_102_444_801, 4_102_444_801_000):
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaises(fetcher.ApiError) as ctx:
+                    fetcher.parse_klines([[timestamp, "1", "2", "0", "1", "1"]])
+                self.assertEqual(str(ctx.exception), "candle #0 has invalid numeric fields")
+
 
 if __name__ == "__main__":
     unittest.main()
