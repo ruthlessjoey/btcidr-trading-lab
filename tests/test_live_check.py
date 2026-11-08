@@ -114,6 +114,16 @@ class AdapterTests(unittest.TestCase):
             providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(op))
         self.assertNotIn("Unknown asset pair", str(ctx.exception))
 
+    def test_kraken_non_dict_result_is_a_safe_api_error(self):
+        for malformed in ([], ["unexpected"], "unexpected", None):
+            with self.subTest(malformed=malformed):
+                op = lambda url, t, value=malformed: (  # noqa: E731
+                    200, json.dumps({"error": [], "result": value}).encode())
+                with self.assertRaises(ApiError) as ctx:
+                    providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(op))
+                self.assertEqual(str(ctx.exception),
+                                 "Kraken response has an invalid result structure")
+
     def test_coinbase_non_list_is_an_error(self):
         op = lambda url, t: (200, json.dumps({"message": "NotFound"}).encode())  # noqa: E731
         with self.assertRaises(ApiError):
