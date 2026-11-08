@@ -78,7 +78,7 @@ class Kraken:
     def server_time(self, http):
         res = self._result(http.get(self.base + "/0/public/Time"))
         try:
-            return int(res["unixtime"])
+            return fetcher.to_seconds(res["unixtime"])
         except (KeyError, TypeError, ValueError, OverflowError):
             raise ApiError("Kraken response has no valid server timestamp")
 
@@ -97,7 +97,7 @@ class Kraken:
         for i, row in enumerate(res[keys[0]]):
             # [time, open, high, low, close, vwap, volume, count]
             try:
-                out.append(Candle(int(row[0]), float(row[1]), float(row[2]), float(row[3]),
+                out.append(Candle(fetcher.to_seconds(row[0]), float(row[1]), float(row[2]), float(row[3]),
                                   float(row[4]), float(row[6])))
             except (KeyError, TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError(f"Kraken candle #{i} has invalid numeric fields")
@@ -114,7 +114,7 @@ class Coinbase:
     def server_time(self, http):
         obj = http.get(self.base + "/time")
         try:
-            return int(float(obj["epoch"]))
+            return fetcher.to_seconds(float(obj["epoch"]))
         except (KeyError, TypeError, ValueError, OverflowError):
             raise ApiError("Coinbase response has no valid server timestamp")
 
@@ -133,7 +133,7 @@ class Coinbase:
             for i, row in enumerate(rows):
                 # [time, low, high, open, close, volume]
                 try:
-                    out.append(Candle(int(row[0]), float(row[3]), float(row[2]), float(row[1]),
+                    out.append(Candle(fetcher.to_seconds(row[0]), float(row[3]), float(row[2]), float(row[1]),
                                       float(row[4]), float(row[5])))
                 except (KeyError, TypeError, ValueError, IndexError, OverflowError):
                     raise ApiError(f"Coinbase candle #{i} has invalid numeric fields")
