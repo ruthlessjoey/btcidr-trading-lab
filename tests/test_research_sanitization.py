@@ -39,6 +39,47 @@ class ResearchSanitizationTests(unittest.TestCase):
         with self.assertRaisesRegex(ApiError, "Bitstamp response contains an invalid candle row"):
             crosscheck.fetch_bitstamp_window(bitstamp, 1_700_000_000, 1)
 
+    def test_crosscheck_rejects_non_finite_and_impossible_research_candles(self):
+        ts = 1_700_000_000
+        invalid_values = [
+            ("9", "12", "nan", "11", "1"),
+            ("9", "12", "10", "inf", "1"),
+            ("9", "12", "0", "11", "1"),
+            ("9", "12", "10", "11", "-1"),
+            ("9", "8", "10", "11", "1"),
+        ]
+        for low, high, open_, close, volume in invalid_values:
+            with self.subTest(provider="Coinbase", values=(low, high, open_, close, volume)):
+                http = StubHttp([[ts, low, high, open_, close, volume]])
+                with self.assertRaisesRegex(
+                    ApiError, "Coinbase response contains an invalid candle row"
+                ):
+                    crosscheck.fetch_coinbase_daily(http, ts, ts)
+
+            with self.subTest(provider="Bitstamp", values=(low, high, open_, close, volume)):
+                http = StubHttp({"data": {"ohlc": [{
+                    "timestamp": str(ts), "open": open_, "high": high, "low": low,
+                    "close": close, "volume": volume,
+                }]}})
+                with self.assertRaisesRegex(
+                    ApiError, "Bitstamp response contains an invalid candle row"
+                ):
+                    crosscheck.fetch_bitstamp_window(http, ts, 1)
+
+        valid_coinbase = StubHttp([[ts, "9", "12", "10", "11", "1"]])
+        self.assertEqual(
+            crosscheck.fetch_coinbase_daily(valid_coinbase, ts, ts)[ts],
+            Candle(ts, 10.0, 12.0, 9.0, 11.0, 1.0),
+        )
+        valid_bitstamp = StubHttp({"data": {"ohlc": [{
+            "timestamp": str(ts), "open": "10", "high": "12", "low": "9",
+            "close": "11", "volume": "1",
+        }]}})
+        self.assertEqual(
+            crosscheck.fetch_bitstamp_window(valid_bitstamp, ts, 1)[ts],
+            Candle(ts, 10.0, 12.0, 9.0, 11.0, 1.0),
+        )
+
     def test_crosscheck_coinbase_body_and_network_errors_are_sanitized(self):
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
         candles = [Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.5, 1.0)]
