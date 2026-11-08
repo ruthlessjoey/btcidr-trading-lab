@@ -129,6 +129,16 @@ class HttpTests(unittest.TestCase):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertEqual(len(op.calls), 1)
 
+    def test_http_error_with_success_status_is_rejected_without_body_access(self):
+        marker = "UNIQUE_HTTP_ERROR_REASON_MARKER"
+        error = urllib.error.HTTPError("u", 200, marker, {}, None)
+        op = scripted(error)
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        self.assertEqual(str(ctx.exception), "HTTP request failed: HTTP 200")
+        self.assertNotIn(marker, str(ctx.exception))
+        self.assertEqual(len(op.calls), 1)
+
     def test_network_errors_exhaust_retries(self):
         op = scripted(urllib.error.URLError("boom"))
         with self.assertRaises(fetcher.ApiError) as ctx:
