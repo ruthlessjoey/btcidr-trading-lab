@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from fetcher import Candle
+from fetcher import ApiError, Candle
 from research import crosscheck, history
 
 
@@ -29,14 +29,14 @@ class ResearchSanitizationTests(unittest.TestCase):
     def test_crosscheck_rejects_out_of_range_coinbase_and_bitstamp_timestamps(self):
         bad_ts = 4_102_444_801
         coinbase = StubHttp([[bad_ts, 9, 12, 10, 11, 3.5]])
-        with self.assertRaisesRegex(Exception, "Coinbase response contains an invalid candle row"):
+        with self.assertRaisesRegex(ApiError, "Coinbase response contains an invalid candle row"):
             crosscheck.fetch_coinbase_daily(coinbase, 1_700_000_000, 1_700_000_000)
 
         bitstamp = StubHttp({"data": {"ohlc": [{
             "timestamp": str(bad_ts), "open": "10", "high": "12", "low": "9",
             "close": "11", "volume": "3.5",
         }]}})
-        with self.assertRaisesRegex(Exception, "Bitstamp response contains an invalid candle row"):
+        with self.assertRaisesRegex(ApiError, "Bitstamp response contains an invalid candle row"):
             crosscheck.fetch_bitstamp_window(bitstamp, 1_700_000_000, 1)
 
     def test_crosscheck_coinbase_body_and_network_errors_are_sanitized(self):
