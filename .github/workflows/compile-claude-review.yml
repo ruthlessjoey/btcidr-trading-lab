@@ -1,0 +1,39 @@
+name: Compile Claude review workflow draft
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the isolated workflow draft only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: automation/claude-review-setup
+          sparse-checkout: .github/workflows
+          persist-credentials: false
+
+      - name: Install pinned GitHub Agentic Workflows compiler
+        uses: github/gh-aw/actions/setup-cli@18928ba35b7e374d394be6406c7213ed3f0d9454
+        with:
+          version: v1.2.0
+
+      - name: Compile and validate the Claude review workflow
+        run: |
+          set -euo pipefail
+          gh aw version
+          gh aw compile claude-review
+          test -s .github/workflows/claude-review.lock.yml
+
+      - name: Upload compiled lock file for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: claude-review-compiled-lock
+          path: .github/workflows/claude-review.lock.yml
+          if-no-files-found: error
+          retention-days: 1
