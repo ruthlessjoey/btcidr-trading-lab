@@ -43,7 +43,8 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
             raise ApiError("Coinbase response has an invalid candle structure")
         for r in rows:
             try:      # [time, low, high, open, close, volume]
-                out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
+                ts = fetcher.to_seconds(r[0])
+                out[ts] = Candle(ts, float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
             except (KeyError, TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError("Coinbase response contains an invalid candle row")
         cur = end
@@ -63,7 +64,7 @@ def fetch_bitstamp_window(http, first_ts, days):
         if not isinstance(row, dict):
             raise ApiError("Bitstamp response contains an invalid candle row")
         try:
-            ts = int(row["timestamp"])
+            ts = fetcher.to_seconds(row["timestamp"])
             out[ts] = Candle(ts, float(row["open"]), float(row["high"]),
                              float(row["low"]), float(row["close"]), float(row["volume"]))
         except (KeyError, TypeError, ValueError, OverflowError):
