@@ -124,6 +124,24 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual(str(ctx.exception),
                                  "Kraken response has an invalid result structure")
 
+    def test_kraken_and_coinbase_reject_out_of_range_candle_timestamps(self):
+        bad_ts = 4_102_444_801
+        kraken_payload = {"error": [], "result": {"XXBTZUSD": [
+            [bad_ts, "10", "12", "9", "11", "10", "3.5", 1]
+        ], "last": bad_ts}}
+        kraken_op = lambda url, t: (200, json.dumps(kraken_payload).encode())  # noqa: E731
+        with self.assertRaises(ApiError) as kraken_error:
+            providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(kraken_op))
+        self.assertEqual(str(kraken_error.exception),
+                         "Kraken candle #0 has invalid numeric fields")
+
+        coinbase_payload = [[bad_ts, 9, 12, 10, 11, 3.5]]
+        coinbase_op = lambda url, t: (200, json.dumps(coinbase_payload).encode())  # noqa: E731
+        with self.assertRaises(ApiError) as coinbase_error:
+            providers.Coinbase().candles("1h", NOW - 7200, NOW, self.http(coinbase_op))
+        self.assertEqual(str(coinbase_error.exception),
+                         "Coinbase candle #0 has invalid numeric fields")
+
     def test_coinbase_non_list_is_an_error(self):
         op = lambda url, t: (200, json.dumps({"message": "NotFound"}).encode())  # noqa: E731
         with self.assertRaises(ApiError):
