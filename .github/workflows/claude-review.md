@@ -4,37 +4,27 @@ description: Read-only independent critique of provider-response sanitization de
 on:
   issue_comment:
     types: [created]
-if: "github.event.issue.number == 3 && github.event.comment.user.login == 'ruthlessjoey' && startsWith(github.event.comment.body, '/claude-review')"
-roles: admin
+  roles: [admin]
+  status-comment: false
+if: github.event.issue.number == 3 && github.event.comment.user.login == 'ruthlessjoey' && startsWith(github.event.comment.body, '/claude-review')
 user-rate-limit:
   max-runs-per-window: 1
   window: 60
 permissions:
   contents: read
   issues: read
+  copilot-requests: write
 engine:
-  id: copilot
-  model: claude-haiku-4.5
+  id: claude
+  model-provider: github
+  model: copilot/claude-haiku-4.5
 max-turns: 12
-max-ai-credits: 10
 network:
   allowed: []
-checkout:
-  ref: cd451972e3a641ad6fa78e64abf3968655a4b82a
-  fetch-depth: 1
-  sparse-checkout: |
-    fetcher.py
-    providers.py
-    research/crosscheck.py
-    research/history.py
-    tests/test_fetcher.py
-    tests/test_live_check.py
-    tests/test_research_sanitization.py
 tools:
   bash: [cat, grep, sed, head, tail, wc]
   github:
     toolsets: [issues]
-    allowed-repos: current
     min-integrity: approved
 safe-outputs:
   add-comment:
@@ -46,7 +36,7 @@ safe-outputs:
 
 You are the independent reviewer. Do not implement changes and do not rubber-stamp the proposal.
 
-Review the actual checked-out repository files at commit `cd451972e3a641ad6fa78e64abf3968655a4b82a`, corresponding to branch `security/sanitize-provider-errors` at the time this workflow was prepared. The checkout is pinned to that exact commit and sparse-limited to the paths listed above.
+Review the actual checked-out repository files at commit `cd451972e3a641ad6fa78e64abf3968655a4b82a`, corresponding to branch `security/sanitize-provider-errors` at the time this workflow was prepared. The checkout is pinned to that exact commit and sparse-limited to the paths listed below.
 
 Read only these paths:
 - `fetcher.py`
@@ -70,7 +60,8 @@ Do not access, list, search, or traverse `P1` or `signal/data/`. Do not inspect 
 
 ## Hard boundaries
 
-- This is a design critique only. Do not edit, create, stage, commit, push, or open pull requests.
+- This is a design critique only. Do not implement changes and do not rubber-stamp the proposal.
+- Do not edit, create, stage, commit, push, or open pull requests.
 - Do not run tests, Python scripts, shell scripts, formatters, linters, builds, or any project code.
 - Use only the read-only shell commands allowed by the workflow to inspect the exact files.
 - No network or exchange requests, no live trading, no credentials, no private endpoints, no account access, and no orders.
