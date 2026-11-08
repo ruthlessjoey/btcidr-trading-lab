@@ -40,12 +40,12 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
                                     "end": datetime.fromtimestamp(end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
         rows = http.get(f"{COINBASE}/products/BTC-USD/candles?{q}")
         if not isinstance(rows, list):
-            raise ApiError(f"Coinbase did not return a list: {str(rows)[:200]}")
+            raise ApiError("Coinbase response has an invalid candle structure")
         for r in rows:
             try:      # [time, low, high, open, close, volume]
                 out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
-            except (TypeError, ValueError, IndexError):
-                raise ApiError(f"unexpected Coinbase candle: {str(r)[:200]}")
+            except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+                raise ApiError("Coinbase response contains an invalid candle row")
         cur = end
     return out
 
@@ -53,13 +53,22 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
 def fetch_bitstamp_window(http, first_ts, days):
     q = urllib.parse.urlencode({"step": DAY, "limit": days, "start": first_ts})
     obj = http.get(f"{BITSTAMP}/api/v2/ohlc/btcusd/?{q}")
-    try:
-        rows = obj["data"]["ohlc"]
-        return {int(r["timestamp"]): Candle(int(r["timestamp"]), float(r["open"]), float(r["high"]),
-                                            float(r["low"]), float(r["close"]), float(r["volume"]))
-                for r in rows}
-    except (KeyError, TypeError, ValueError):
-        raise ApiError(f"unexpected Bitstamp answer: {str(obj)[:200]}")
+    if not isinstance(obj, dict) or not isinstance(obj.get("data"), dict):
+        raise ApiError("Bitstamp response has an invalid candle structure")
+    rows = obj["data"].get("ohlc")
+    if not isinstance(rows, list):
+        raise ApiError("Bitstamp response has an invalid candle structure")
+    out = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ApiError("Bitstamp response contains an invalid candle row")
+        try:
+            ts = int(row["timestamp"])
+            out[ts] = Candle(ts, float(row["open"]), float(row["high"]),
+                             float(row["low"]), float(row["close"]), float(row["volume"]))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise ApiError("Bitstamp response contains an invalid candle row")
+    return out
 
 
 def pct(a, b):
