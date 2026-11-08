@@ -6,6 +6,7 @@ USD is not USDT, so small differences are normal; this checks that a flagged day
 The Binance candles are never changed.
 """
 import json
+import math
 import os
 import statistics
 import time
@@ -15,12 +16,21 @@ from datetime import datetime, timezone
 import fetcher
 import providers
 from fetcher import ApiError, Candle
+from validator import bad_ohlc
 
 DAY = 86400
 COINBASE = "https://api.exchange.coinbase.com"
 BITSTAMP = "https://www.bitstamp.net"
 # Pre-stated rule for a flagged day (written before looking at the answer):
 TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
+
+
+def _validated_research_candle(ts, open_, high, low, close, volume):
+    """Build a finite, positive-price research candle with a non-negative volume."""
+    candle = Candle(ts, float(open_), float(high), float(low), float(close), float(volume))
+    if bad_ohlc(candle) or not math.isfinite(candle.volume) or candle.volume < 0:
+        raise ValueError("invalid research candle values")
+    return candle
 
 
 def day(ts):
@@ -44,7 +54,7 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
         for r in rows:
             try:      # [time, low, high, open, close, volume]
                 ts = fetcher.to_seconds(r[0])
-                out[ts] = Candle(ts, float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
+                out[ts] = _validated_research_candle(ts, r[3], r[2], r[1], r[4], r[5])
             except (KeyError, TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError("Coinbase response contains an invalid candle row")
         cur = end
@@ -65,8 +75,9 @@ def fetch_bitstamp_window(http, first_ts, days):
             raise ApiError("Bitstamp response contains an invalid candle row")
         try:
             ts = fetcher.to_seconds(row["timestamp"])
-            out[ts] = Candle(ts, float(row["open"]), float(row["high"]),
-                             float(row["low"]), float(row["close"]), float(row["volume"]))
+            out[ts] = _validated_research_candle(
+                ts, row["open"], row["high"], row["low"], row["close"], row["volume"]
+            )
         except (KeyError, TypeError, ValueError, OverflowError):
             raise ApiError("Bitstamp response contains an invalid candle row")
     return out
