@@ -17,7 +17,28 @@ from research import crosscheck, history
 MARKER = "UNIQUE_PROVIDER_SECRET_MARKER"
 
 
+class StubHttp:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def get(self, url):
+        return self.payload
+
+
 class ResearchSanitizationTests(unittest.TestCase):
+    def test_crosscheck_rejects_out_of_range_coinbase_and_bitstamp_timestamps(self):
+        bad_ts = 4_102_444_801
+        coinbase = StubHttp([[bad_ts, 9, 12, 10, 11, 3.5]])
+        with self.assertRaisesRegex(Exception, "Coinbase response contains an invalid candle row"):
+            crosscheck.fetch_coinbase_daily(coinbase, 1_700_000_000, 1_700_000_000)
+
+        bitstamp = StubHttp({"data": {"ohlc": [{
+            "timestamp": str(bad_ts), "open": "10", "high": "12", "low": "9",
+            "close": "11", "volume": "3.5",
+        }]}})
+        with self.assertRaisesRegex(Exception, "Bitstamp response contains an invalid candle row"):
+            crosscheck.fetch_bitstamp_window(bitstamp, 1_700_000_000, 1)
+
     def test_crosscheck_coinbase_body_and_network_errors_are_sanitized(self):
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
         candles = [Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.5, 1.0)]
