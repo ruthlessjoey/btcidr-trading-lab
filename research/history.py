@@ -138,7 +138,7 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
         add("market_identity", PASS if identity_ok else FAIL,
             "exchange market identity validated" if identity_ok else
             "exchange market identity mismatch: " + ", ".join(mismatch_fields))
-        if not ok:
+        if not identity_ok:
             raise ApiError("market identity does not match the configuration")
 
         # 2. exchange clock and paged history
