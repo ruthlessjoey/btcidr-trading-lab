@@ -70,7 +70,10 @@ class Kraken:
             raise ApiError("Kraken response has an invalid structure")
         if obj.get("error"):
             raise ApiError("Kraken returned an error response")
-        return obj["result"]
+        result = obj["result"]
+        if not isinstance(result, dict):
+            raise ApiError("Kraken response has an invalid result structure")
+        return result
 
     def server_time(self, http):
         res = self._result(http.get(self.base + "/0/public/Time"))
