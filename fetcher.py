@@ -85,9 +85,11 @@ def http_get_json(url, timeout, retries, opener, sleep):
     for attempt in range(1, retries + 1):
         status = None
         network_error = False
+        http_error = False
         try:
             status, body = opener(url, timeout)
         except urllib.error.HTTPError as exc:
+            http_error = True
             status = _safe_http_status(exc.code)
         except Exception as exc:
             network_error = True
@@ -102,7 +104,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
                     continue
                 raise ApiError(f"HTTP request failed after {retries} attempts: {last}")
             raise ApiError("HTTP response had an invalid status")
-        if status == 200:
+        if status == 200 and not http_error:
             try:
                 return json.loads(body.decode("utf-8"))
             except (ValueError, UnicodeDecodeError, RecursionError, TypeError, AttributeError):
