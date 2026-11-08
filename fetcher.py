@@ -23,6 +23,11 @@ TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
 # Our own chunk size (kept well under the usual 1000-candle cap).
 CANDLES_PER_REQUEST = 500
 
+# Bound provider-controlled timestamps before datetime/report code consumes them.
+# 2000-01-01 through 2100-01-01 covers the supported crypto-market history horizon.
+MIN_UNIX_SECONDS = 946684800
+MAX_UNIX_SECONDS = 4102444800
+
 
 class ApiError(Exception):
     """Raised when the exchange gives no usable answer."""
@@ -120,7 +125,10 @@ def http_get_json(url, timeout, retries, opener, sleep):
 def to_seconds(t):
     """Exchange timestamps are milliseconds; accept seconds too. Returns seconds."""
     t = int(t)
-    return t // 1000 if t > 100_000_000_000 else t
+    seconds = t // 1000 if t > 100_000_000_000 else t
+    if not MIN_UNIX_SECONDS <= seconds <= MAX_UNIX_SECONDS:
+        raise ValueError("timestamp is outside the supported range")
+    return seconds
 
 
 def unwrap(obj):
