@@ -1,11 +1,9 @@
-"""fetcher.py - READ-ONLY client for Tokocrypto's public market-data endpoints.
+"""fetcher.py - READ-ONLY client for explicitly approved public crypto market-data routes.
 
-Only public GET addresses are used. There is no login, no key and no code
-that can place, cancel or change an order.
-
-Two "styles" of public endpoint are supported, because Tokocrypto publishes both:
-  binance_style  {base}/api/v3/time and {base}/api/v3/klines     (symbol BTCUSDT)
-  open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
+Provider origins come only from fixed provider IDs. This adapter supports the public
+Binance-style /api/v3/time and /api/v3/klines routes for Binance Vision and Tokocrypto.
+Tokocrypto is limited to www.tokocrypto.site; no open-v1 or symbol-metadata route is used.
+There is no login, key, account access, or order capability.
 """
 import http.client
 import json
