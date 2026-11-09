@@ -164,7 +164,7 @@ class TransportPolicyTests(unittest.TestCase):
     def test_real_http_response_with_content_length_is_accepted(self):
         client, server = socket.socketpair()
         try:
-            server.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nhello")
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")
             response = http.client.HTTPResponse(client)
             response.begin()
             self.assertEqual(transport_policy.read_bounded(response, 5, 1), b"hello")
@@ -176,7 +176,7 @@ class TransportPolicyTests(unittest.TestCase):
     def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
         client, server = socket.socketpair()
         try:
-            server.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Length: 3\\r\\n\\r\\na")
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\na")
             response = http.client.HTTPResponse(client)
             response.begin()
             started = time.monotonic()
