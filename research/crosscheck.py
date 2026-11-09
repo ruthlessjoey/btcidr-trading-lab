@@ -14,12 +14,13 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import fetcher
+import transport_policy
 import providers
 from fetcher import ApiError, Candle
 from validator import bad_ohlc
 
 DAY = 86400
-COINBASE = fetcher.provider_base_url("coinbase-research")
+COINBASE = transport_policy.provider_base_url("coinbase-research")
 # Pre-stated rule for a flagged day (written before looking at the answer):
 TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
 
