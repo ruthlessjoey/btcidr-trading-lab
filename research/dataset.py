@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import tempfile
 from datetime import datetime, timezone
 
 import validator
@@ -45,41 +46,114 @@ def dataset_name(market):
 
 
 def write_version(root_dir, market, candles, fetched_utc_ts, extra=None):
-    """Writes a NEW version. Raises if that version already exists. Returns (csv, manifest) paths."""
+    """Atomically publish a new CSV/manifest pair without overwriting existing files.
+
+    The manifest is the discoverability marker and is created only after the CSV
+    has been completely written and hashed. Any failed attempt removes only files
+    that this invocation successfully created.
+    """
+    if not isinstance(market, dict):
+        raise DatasetError("market must be an object")
+    for key in ("provider", "symbol", "timeframe"):
+        value = market.get(key)
+        if (not isinstance(value, str) or not value.strip()
+                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+            raise DatasetError(f"market {key} must be a safe, non-empty identifier")
+    if market["timeframe"] not in TF_SECONDS:
+        raise DatasetError("market timeframe is unsupported")
     if not candles:
         raise DatasetError("refusing to write an empty dataset")
-    folder = os.path.join(root_dir, dataset_name(market))
+    if type(fetched_utc_ts) is not int or fetched_utc_ts < 0:
+        raise DatasetError("fetch timestamp must be a non-negative integer")
+    if extra is not None and not isinstance(extra, dict):
+        raise DatasetError("extra manifest metadata must be an object")
+
+    reserved = {
+        "schema_version", "dataset_name", "version_id", "fetched_utc", "market",
+        "price_basis_warning", "candle_convention", "csv_file", "csv_sha256",
+        "row_count", "first_open_utc", "last_open_utc", "first_open_unix",
+        "last_open_unix", "timeframe_seconds",
+    }
+    if extra and reserved.intersection(extra):
+        raise DatasetError("extra metadata cannot override reserved manifest fields")
+
+    name = dataset_name(market)
+    folder = os.path.join(root_dir, name)
     os.makedirs(folder, exist_ok=True)
     stamp = datetime.fromtimestamp(fetched_utc_ts, tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    tmp = os.path.join(folder, f".tmp_{stamp}.csv")
-    with open(tmp, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f, lineterminator="\n")
-        w.writerow(CSV_COLUMNS)
-        for c in candles:
-            w.writerow([market["provider"], market["symbol"], market["timeframe"], c.time,
-                        utc_text(c.time), repr(c.open), repr(c.high), repr(c.low),
-                        repr(c.close), repr(c.volume)])
-    digest = sha256_file(tmp)
-    version = f"v{stamp}_{digest[:8]}"
-    csv_path = os.path.join(folder, version + ".csv")
-    man_path = os.path.join(folder, version + ".manifest.json")
-    if os.path.exists(csv_path) or os.path.exists(man_path):
-        os.remove(tmp)
-        raise DatasetError(f"version {version} already exists; versions are never overwritten")
-    os.rename(tmp, csv_path)
-    manifest = {"schema_version": 1, "dataset_name": dataset_name(market), "version_id": version,
-                "fetched_utc": utc_text(fetched_utc_ts) + " UTC", "market": market,
-                "price_basis_warning": PRICE_BASIS_WARNING, "candle_convention": CANDLE_CONVENTION,
-                "csv_file": os.path.basename(csv_path), "csv_sha256": digest,
-                "row_count": len(candles), "first_open_utc": utc_text(candles[0].time) + " UTC",
-                "last_open_utc": utc_text(candles[-1].time) + " UTC",
-                "first_open_unix": candles[0].time, "last_open_unix": candles[-1].time,
-                "timeframe_seconds": TF_SECONDS[market["timeframe"]]}
-    manifest.update(extra or {})
-    with open(man_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    return csv_path, man_path
+    fd, tmp = tempfile.mkstemp(prefix=f".tmp_{stamp}_", suffix=".csv", dir=folder)
+    csv_path = man_path = None
+    csv_created = manifest_created = False
+    try:
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f, lineterminator="\n")
+            w.writerow(CSV_COLUMNS)
+            for c in candles:
+                w.writerow([market["provider"], market["symbol"], market["timeframe"], c.time,
+                            utc_text(c.time), repr(c.open), repr(c.high), repr(c.low),
+                            repr(c.close), repr(c.volume)])
+            f.flush()
+            os.fsync(f.fileno())
+
+        digest = sha256_file(tmp)
+        version = f"v{stamp}_{digest[:8]}"
+        csv_path = os.path.join(folder, version + ".csv")
+        man_path = os.path.join(folder, version + ".manifest.json")
+
+        # A hard link is an atomic create-if-absent operation on this same
+        # filesystem. Unlike os.rename(), it cannot silently replace a file
+        # created by another process after an existence check.
+        try:
+            os.link(tmp, csv_path)
+        except FileExistsError:
+            raise DatasetError(f"version {version} already exists; versions are never overwritten")
+        csv_created = True
+        os.unlink(tmp)
+        tmp = None
+
+        manifest = {
+            "schema_version": 1, "dataset_name": name, "version_id": version,
+            "fetched_utc": utc_text(fetched_utc_ts) + " UTC", "market": market,
+            "price_basis_warning": PRICE_BASIS_WARNING, "candle_convention": CANDLE_CONVENTION,
+            "csv_file": os.path.basename(csv_path), "csv_sha256": digest,
+            "row_count": len(candles), "first_open_utc": utc_text(candles[0].time) + " UTC",
+            "last_open_utc": utc_text(candles[-1].time) + " UTC",
+            "first_open_unix": candles[0].time, "last_open_unix": candles[-1].time,
+            "timeframe_seconds": TF_SECONDS[market["timeframe"]],
+        }
+        manifest.update(extra or {})
+
+        # Exclusive creation prevents replacing an existing manifest. Mark
+        # ownership immediately after open so even a partial write is cleaned.
+        with open(man_path, "x", encoding="utf-8") as f:
+            manifest_created = True
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        return csv_path, man_path
+    except BaseException:
+        cleanup_errors = []
+        for path, owned in ((man_path, manifest_created), (csv_path, csv_created)):
+            if owned and path is not None:
+                try:
+                    os.unlink(path)
+                except FileNotFoundError:
+                    pass
+                except OSError as cleanup_error:
+                    cleanup_errors.append(type(cleanup_error).__name__)
+        if cleanup_errors:
+            raise DatasetError("publication failed and owned-file cleanup was incomplete: "
+                               + ", ".join(cleanup_errors))
+        raise
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+
+
 
 
 def load_verified(manifest_path, expect=None):
@@ -99,6 +173,18 @@ def load_verified(manifest_path, expect=None):
     mk = m["market"]
     if not isinstance(mk, dict):
         raise DatasetError("manifest market must be a JSON object")
+    for key in ("provider", "symbol", "timeframe"):
+        value = mk.get(key)
+        if (not isinstance(value, str) or not value.strip()
+                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+            raise DatasetError(f"manifest market {key} must be a safe, non-empty identifier")
+    if mk["timeframe"] not in TF_SECONDS:
+        raise DatasetError("manifest market timeframe is unsupported")
+    for key in ("first_open_unix", "last_open_unix"):
+        if type(m[key]) is not int or m[key] < 0:
+            raise DatasetError(f"manifest {key} must be a non-negative integer")
+    if m["last_open_unix"] < m["first_open_unix"]:
+        raise DatasetError("manifest last_open_unix precedes first_open_unix")
     csv_file = m["csv_file"]
     if (not isinstance(csv_file, str) or not csv_file or csv_file in (".", "..")
             or "/" in csv_file or "\\" in csv_file or "\x00" in csv_file
@@ -111,9 +197,13 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest row_count must be a positive integer")
     if type(m["timeframe_seconds"]) is not int or m["timeframe_seconds"] <= 0:
         raise DatasetError("manifest timeframe_seconds must be a positive integer")
-    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS
-            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
+    if m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]:
         raise DatasetError("manifest timeframe does not match its timeframe_seconds")
+    expected_rows = ((m["last_open_unix"] - m["first_open_unix"])
+                     // m["timeframe_seconds"]) + 1
+    if ((m["last_open_unix"] - m["first_open_unix"]) % m["timeframe_seconds"]
+            or expected_rows != m["row_count"]):
+        raise DatasetError("manifest timestamp range does not match row_count and timeframe")
     for key, want in (expect or {}).items():
         if mk.get(key) != want:
             raise DatasetError(f"market mismatch: dataset has {key}={mk.get(key)!r}, "
