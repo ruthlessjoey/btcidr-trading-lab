@@ -106,7 +106,7 @@ class Kraken:
 
 class Coinbase:
     name, label, quote = "coinbase", "BTC/USD", "USD"
-    product, base = "BTC-USD", "https://api.exchange.coinbase.com"
+    product, base = "BTC-USD", fetcher.provider_base_url("coinbase-research")
     docs = "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles"
     GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
     MAX_PER_REQUEST = 300      # docs: at most 300 candles per request
