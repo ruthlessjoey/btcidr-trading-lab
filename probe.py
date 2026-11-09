@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 from datetime import datetime, timezone
 
 import fetcher
@@ -22,6 +23,12 @@ def probe_get(url, timeout, opener):
         if not isinstance(body, (bytes, bytearray)) or len(body) > limit:
             raise transport_policy.PolicyError("response exceeds policy")
         return {"status": status, "bytes": len(body), "body": bytes(body), "error": None}
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except Exception:
+            pass
+        return {"status": None, "bytes": 0, "body": b"", "error": "request rejected or unavailable"}
     except Exception:
         return {"status": None, "bytes": 0, "body": b"", "error": "request rejected or unavailable"}
 
