@@ -213,7 +213,7 @@ class TransportPolicyTests(unittest.TestCase):
             sender = threading.Thread(target=drip, daemon=True)
             sender.start()
             started = time.monotonic()
-            with self.assertRaises(transport_policy.PolicyError):
+            with self.assertRaises(TimeoutError):
                 transport_policy.read_bounded(response, 4, 0.10)
             elapsed = time.monotonic() - started
             self.assertGreaterEqual(elapsed, 0.08)
@@ -262,7 +262,7 @@ class TransportPolicyTests(unittest.TestCase):
 
     def test_slow_drip_body_cannot_exceed_total_deadline(self):
         response = FakeResponse(b"12", delay=0.02)
-        with self.assertRaises(transport_policy.PolicyError):
+        with self.assertRaises(TimeoutError):
             transport_policy.read_bounded(response, 10, 0.005)
 
     def test_default_opener_disables_proxy_and_redirects_and_closes_response(self):
