@@ -88,6 +88,10 @@ class AdapterTests(unittest.TestCase):
     def http(self, opener):
         return providers.Http(5, 1, opener, NO_SLEEP)
 
+    def test_tokocrypto_is_not_registered_as_a_live_provider(self):
+        with self.assertRaises(ValueError):
+            providers.build("tokocrypto")
+
     def test_kraken_maps_fields_and_drops_nothing_itself(self):
         c = providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(fake(NOW)))
         self.assertEqual((c[0].open, c[0].high, c[0].low, c[0].close, c[0].volume),
