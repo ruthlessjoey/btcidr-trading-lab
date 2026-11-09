@@ -235,6 +235,14 @@ class TransportPolicyTests(unittest.TestCase):
         with self.assertRaises(transport_policy.PolicyError):
             transport_policy.read_bounded(FakeResponse(b"", duplicate), 10, 1)
 
+    def test_content_length_and_transfer_encoding_conflict_is_rejected(self):
+        from email.message import Message
+        headers = Message()
+        headers.add_header("Content-Length", "1")
+        headers.add_header("Transfer-Encoding", "chunked")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"x", headers), 10, 1)
+
     def test_response_limit_plus_one_is_rejected(self):
         response = FakeResponse(b"123456")
         with self.assertRaises(transport_policy.PolicyError):
@@ -289,6 +297,15 @@ class TransportPolicyTests(unittest.TestCase):
                     with self.assertRaises(market_transport.TransportFailure):
                         market_transport.live_transport(url)
                 build.assert_not_called()
+
+    def test_provider_neutral_transport_operational_success_path(self):
+        response = FakeResponse(b'{"result":{"unixtime":1700000000}}',
+                                {"Content-Length": "35"})
+        fake_opener = FakeOpener(response)
+        with patch("urllib.request.build_opener", return_value=fake_opener):
+            body = market_transport.live_transport("https://api.kraken.com/0/public/Time")
+        self.assertEqual(body, b'{"result":{"unixtime":1700000000}}')
+        self.assertTrue(response.closed)
 
     def test_query_values_reject_malformed_and_semicolon_values(self):
         for url in (
