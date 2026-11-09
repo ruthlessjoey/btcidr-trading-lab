@@ -188,7 +188,7 @@ class SafetyScanTests(unittest.TestCase):
             protected = os.path.join(root, "signal", "data", "must_not_read.py")
             os.makedirs(os.path.dirname(protected))
             with open(protected, "w", encoding="utf-8") as source:
-                source.write("client.password = value\\n")
+                source.write("client.password = value\n")
             self.assertEqual(scan_forbidden_source(root), [])
 
     def test_only_approved_public_market_paths_are_used(self):
