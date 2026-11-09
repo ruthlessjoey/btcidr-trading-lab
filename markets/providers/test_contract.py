@@ -181,6 +181,22 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual([c.open_time_s for c in candles], [START, START + 2 * DAY])
 
 
+class AdapterNumericOverflowTests(unittest.TestCase):
+    def test_binance_numeric_overflow_is_structured_bad_payload(self):
+        row = [START * 1000, 10 ** 400, 10 ** 400, 1, 2, 1, (START + DAY) * 1000 - 1]
+        body = __import__("json").dumps([row]).encode("utf-8")
+        with self.assertRaises(ProviderError) as cm:
+            BinanceVision().parse_chunk(body, DAY)
+        self.assertEqual(cm.exception.kind, "bad_payload")
+
+    def test_kraken_numeric_overflow_is_structured_bad_payload(self):
+        row = [START, 10 ** 400, 10 ** 400, 1, 2, 1, 1, 1]
+        body = __import__("json").dumps({"error": [], "result": {"XXBTZUSD": [row], "last": 0}}).encode("utf-8")
+        with self.assertRaises(ProviderError) as cm:
+            Kraken().parse_chunk(body, DAY)
+        self.assertEqual(cm.exception.kind, "bad_payload")
+
+
 class ListingAndIntervalTests(unittest.TestCase):
     def test_unmapped_listing_is_unsupported_even_if_derivable(self):
         k = Kraken()
