@@ -1,18 +1,20 @@
-"""markets/providers/transport.py - the only module that can reach the network.
+"""markets/providers/transport.py - policy-enforced public market-data GET transport.
 
-The live transport exists so the path can be reviewed, but no test and no fixture run calls it. Tests inject
-deterministic transports. The pipeline uses this transport only when a caller explicitly declares
-data_source='live' and passes no transport.
-
-Public, read-only GET requests only: no keys, no login, no retries, no sleeping.
+No credentials, account access, order APIs, redirects, environment proxies, or retries.
 """
+import http.client
+import socket
+import urllib.error
+import urllib.request
+
+import transport_policy
 
 TIMEOUT_SECONDS = 20
 USER_AGENT = "btcidr-lab-market-data/0.4 (public read-only, no trading)"
 
 
 class TransportFailure(Exception):
-    """A transport could not return a body. Adapters map this to ProviderError with the same kind."""
+    """A transport could not return a body. Adapters map this to ProviderError."""
 
     KINDS = ("rate_limited", "timeout", "unavailable")
 
@@ -25,32 +27,43 @@ class TransportFailure(Exception):
         super().__init__(f"{kind}: {detail}")
 
 
-def live_transport(url):
-    """One public GET. Returns the response body bytes. Maps every failure to TransportFailure."""
-    import http.client
-    import socket
-    import urllib.error
-    import urllib.request
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-                                 method="GET")
+
+def live_transport(url):
+    """One exact-policy public GET. Response bytes are capped and deadline-bounded."""
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+        limit = transport_policy.validate_request(url, "GET")
+    except transport_policy.PolicyError:
+        raise TransportFailure("unavailable", "request rejected by transport policy")
+    req = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}, method="GET")
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirectHandler())
+    try:
+        with opener.open(req, timeout=TIMEOUT_SECONDS) as resp:
             status = getattr(resp, "status", 200)
-            body = resp.read()
-    except urllib.error.HTTPError as e:
-        if e.code == 429:
+            if status != 200:
+                raise TransportFailure("unavailable", "unexpected HTTP status", status)
+            return transport_policy.read_bounded(resp, limit, TIMEOUT_SECONDS)
+    except urllib.error.HTTPError as exc:
+        status = exc.code if type(exc.code) is int and 100 <= exc.code <= 599 else None
+        try:
+            exc.close()
+        except Exception:
+            pass
+        if status == 429:
             raise TransportFailure("rate_limited", "HTTP 429", 429)
-        raise TransportFailure("unavailable", f"HTTP {e.code}", e.code)
-    except (socket.timeout, TimeoutError) as e:
-        raise TransportFailure("timeout", f"timed out: {e}")
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, (socket.timeout, TimeoutError)):
-            raise TransportFailure("timeout", f"timed out: {e.reason}")
-        raise TransportFailure("unavailable", f"network error: {type(e.reason).__name__}")
-    except (OSError, http.client.HTTPException) as e:
-        # Connection resets, dropped sockets, TLS errors, truncated bodies. Reported, never allowed to escape.
-        raise TransportFailure("unavailable", f"connection failed: {type(e).__name__}")
-    if status != 200:
-        raise TransportFailure("unavailable", f"HTTP {status}", status)
-    return body
+        raise TransportFailure("unavailable", "HTTP request rejected", status)
+    except transport_policy.PolicyError:
+        raise TransportFailure("unavailable", "response rejected by transport policy")
+    except (socket.timeout, TimeoutError):
+        raise TransportFailure("timeout", "request deadline exceeded")
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, (socket.timeout, TimeoutError)):
+            raise TransportFailure("timeout", "request deadline exceeded")
+        raise TransportFailure("unavailable", "network request failed")
+    except (OSError, http.client.HTTPException):
+        raise TransportFailure("unavailable", "connection failed")
