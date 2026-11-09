@@ -31,7 +31,7 @@ import fetcher
 import transport_policy
 import btc_signal as bs
 
-HOST = "https://data-api.binance.vision"
+HOST = transport_policy.provider_base_url("binance-vision")
 PATH = "/api/v3/klines"
 SYMBOL = "BTCUSDT"
 INTERVAL = "1d"
