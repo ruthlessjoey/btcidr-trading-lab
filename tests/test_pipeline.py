@@ -93,6 +93,24 @@ def python_source_files(root):
                     yield os.path.join(current, name)
 
 
+def source_scan_findings(root, forbidden):
+    """Return scanner findings for every file in the approved source set."""
+    findings = []
+    for path in python_source_files(root):
+        name = os.path.relpath(path, root)
+        text = read(path).lower()
+        for word in forbidden:
+            if word in text:
+                findings.append((name, f"forbidden text {word!r}"))
+        if re.search(r"(?<![.\\w])pass" + r"word(?!\\w)", text):
+            findings.append((name, "forbidden credential identifier"))
+        password_attributes = re.findall(r"\\b([a-z_]\\w*)\\.password\\b", text)
+        allowed_attributes = ["parts"] if name == "transport_policy.py" else []
+        if password_attributes != allowed_attributes:
+            findings.append((name, "unapproved password attribute reference"))
+    return findings
+
+
 class PipelineTests(unittest.TestCase):
     def test_full_run_uses_only_approved_tokocrypto_source(self):
         opener = fake_exchange(NOW)
@@ -176,27 +194,14 @@ class SafetyScanTests(unittest.TestCase):
                 os.sep + "tests" + os.sep in path for path in scanned
             ))
 
-            nested_text = read(nested).lower()
-            self.assertRegex(nested_text, r"\b([a-z_]\w*)\.password\b")
+            findings = source_scan_findings(root, self.FORBIDDEN)
+            self.assertIn(
+                ("markets/providers/nested.py", "unapproved password attribute reference"),
+                findings,
+            )
 
     def test_no_trading_or_credential_code(self):
-        for path in python_source_files(ROOT):
-            name = os.path.relpath(path, ROOT)
-            text = read(path).lower()
-            for word in self.FORBIDDEN:
-                self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
-            self.assertNotRegex(
-                text,
-                r"(?<![.\w])pass" + r"word(?!\w)",
-                f"{name} contains a forbidden credential identifier",
-            )
-            password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
-            allowed_attributes = ["parts"] if name == "transport_policy.py" else []
-            self.assertEqual(
-                password_attributes,
-                allowed_attributes,
-                f"{name} contains an unapproved password attribute reference",
-            )
+        self.assertEqual(source_scan_findings(ROOT, self.FORBIDDEN), [])
         transport_policy = read(ROOT, "transport_policy.py").lower()
         self.assertIn("parts.password is not none", transport_policy)
 
