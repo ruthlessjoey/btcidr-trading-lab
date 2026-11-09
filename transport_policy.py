@@ -183,7 +183,10 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
         read1 = getattr(response, "read1", None)
         if not callable(read1):
             raise PolicyError("response does not support bounded single-read operation")
-        chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+        try:
+            chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+        except (TimeoutError, socket.timeout, OSError):
+            raise PolicyError("response deadline exceeded")
         if time.monotonic() > deadline:
             raise PolicyError("response deadline exceeded")
         if not isinstance(chunk, (bytes, bytearray)):
