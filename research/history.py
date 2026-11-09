@@ -252,22 +252,39 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     gate = FAIL if any(c["status"] == FAIL for c in checks) else PASS
     result["gate"] = gate
     if gate == PASS:
-        csv_path, man_path = dataset.write_version(
-            os.path.join(out_dir, "datasets"), market, candles, local_now,
-            extra={"exchange_info": result["exchange_info"], "coverage": result["coverage"],
-                   "gate_checks": checks})
-        # round trip: reload from disk exactly as later code will
-        m, again = dataset.load_verified(man_path, expect={
-            "provider": market["provider"], "symbol": market["symbol"],
-            "quote_asset": market["quote_asset"], "timeframe": market["timeframe"]})
-        same = again == candles
-        add("csv_hash_roundtrip", PASS if same else FAIL,
-            f"re-read from disk: {len(again)} rows, sha256 {m['csv_sha256']}, identical to fetched: {same}")
-        result["dataset"] = {"version_id": m["version_id"], "csv": os.path.basename(csv_path),
-                             "manifest": os.path.basename(man_path), "sha256": m["csv_sha256"],
-                             "rows": m["row_count"]}
-        if not same:
+        csv_path = man_path = None
+        try:
+            csv_path, man_path = dataset.write_version(
+                os.path.join(out_dir, "datasets"), market, candles, local_now,
+                extra={"exchange_info": result["exchange_info"], "coverage": result["coverage"],
+                       "gate_checks": checks})
+            # Round trip: reload from disk exactly as later code will. A version is
+            # not accepted until this verification succeeds.
+            m, again = dataset.load_verified(man_path, expect={
+                "provider": market["provider"], "symbol": market["symbol"],
+                "quote_asset": market["quote_asset"], "timeframe": market["timeframe"]})
+            same = again == candles
+            if not same:
+                raise dataset.DatasetError("round-trip candles differ from the fetched sequence")
+        except (dataset.DatasetError, OSError, TypeError, ValueError, OverflowError) as e:
+            # A failed publication must not leave a discoverable dataset version behind.
+            # These paths are returned only by write_version for this exact attempt.
+            for path in (man_path, csv_path):
+                if path is not None:
+                    try:
+                        os.remove(path)
+                    except FileNotFoundError:
+                        pass
+            add("csv_hash_roundtrip", FAIL,
+                f"dataset publication verification failed ({type(e).__name__})")
             result["gate"] = FAIL
+            result["dataset"] = None
+        else:
+            add("csv_hash_roundtrip", PASS,
+                f"re-read from disk: {len(again)} rows, sha256 {m['csv_sha256']}, identical to fetched: True")
+            result["dataset"] = {"version_id": m["version_id"], "csv": os.path.basename(csv_path),
+                                 "manifest": os.path.basename(man_path), "sha256": m["csv_sha256"],
+                                 "rows": m["row_count"]}
     result["backtest_allowed"] = result["gate"] == PASS
     text = build_markdown(result)
     with open(os.path.join(out_dir, "dataset_report.md"), "w", encoding="utf-8") as f:
