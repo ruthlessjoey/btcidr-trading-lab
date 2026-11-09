@@ -5,6 +5,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,7 +130,12 @@ def iter_production_python_files(root):
         start = os.path.join(root, relative_dir)
         if not os.path.isdir(start) or os.path.islink(start):
             continue
-        for current, dirs, files in os.walk(start, topdown=True, followlinks=False):
+        def raise_walk_error(error):
+            raise error
+
+        for current, dirs, files in os.walk(
+            start, topdown=True, followlinks=False, onerror=raise_walk_error
+        ):
             dirs[:] = sorted(
                 name for name in dirs
                 if name not in PRUNED_DIRS
@@ -184,6 +190,18 @@ class SafetyScanTests(unittest.TestCase):
             findings = scan_forbidden_source(root)
             self.assertTrue(any("markets/providers/nested.py" in item for item in findings))
             self.assertTrue(any("password attribute" in item for item in findings))
+
+    def test_scanner_fails_closed_on_walk_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            os.mkdir(os.path.join(root, "markets"))
+
+            def walk_with_error(*args, **kwargs):
+                kwargs["onerror"](PermissionError("simulated traversal failure"))
+                return iter(())
+
+            with mock.patch("os.walk", side_effect=walk_with_error):
+                with self.assertRaisesRegex(PermissionError, "simulated traversal failure"):
+                    list(iter_production_python_files(root))
 
     def test_protected_signal_data_tree_is_not_scanned(self):
         with tempfile.TemporaryDirectory() as root:
