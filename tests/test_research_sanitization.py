@@ -134,7 +134,6 @@ class ResearchSanitizationTests(unittest.TestCase):
             "http_timeout_seconds": 1,
             "http_retries": 1,
             "provider": "binance-vision",
-            "host": "https://data-api.binance.vision",
             "symbol": "BTCUSDT",
             "base_asset": "BTC",
             "quote_asset": "USDT",
