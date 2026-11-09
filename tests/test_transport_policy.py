@@ -1,5 +1,7 @@
 """Offline tests for the exact public transport policy. No sockets or DNS are used."""
+import http.client
 import os
+import socket
 import sys
 import time
 import unittest
@@ -38,7 +40,7 @@ class FakeResponse:
         self.read_sizes = []
         self.closed = False
 
-    def read(self, size=-1):
+    def read1(self, size=-1):
         self.read_sizes.append(size)
         if self.delay:
             time.sleep(self.delay)
@@ -46,6 +48,12 @@ class FakeResponse:
             return b""
         part, self.body = self.body[:size], self.body[size:]
         return part
+
+    def isclosed(self):
+        return not self.body
+
+    def read(self, size=-1):
+        return self.read1(size)
 
     def close(self):
         self.closed = True
@@ -152,6 +160,44 @@ class TransportPolicyTests(unittest.TestCase):
     def test_response_exactly_at_limit_is_accepted(self):
         response = FakeResponse(b"12345", {"Content-Length": "5"})
         self.assertEqual(transport_policy.read_bounded(response, 5, 1), b"12345")
+
+    def test_real_http_response_with_content_length_is_accepted(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nhello")
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            self.assertEqual(transport_policy.read_bounded(response, 5, 1), b"hello")
+            self.assertTrue(response.isclosed())
+        finally:
+            client.close()
+            server.close()
+
+    def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Length: 3\\r\\n\\r\\na")
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            started = time.monotonic()
+            with self.assertRaises(transport_policy.PolicyError):
+                transport_policy.read_bounded(response, 3, 0.08)
+            self.assertLess(time.monotonic() - started, 0.25)
+        finally:
+            client.close()
+            server.close()
+
+    def test_non_ascii_and_duplicate_content_length_are_rejected(self):
+        from email.message import Message
+        bad = Message()
+        bad.add_header("Content-Length", "²")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"", bad), 10, 1)
+        duplicate = Message()
+        duplicate.add_header("Content-Length", "1")
+        duplicate.add_header("Content-Length", "1")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"", duplicate), 10, 1)
 
     def test_response_limit_plus_one_is_rejected(self):
         response = FakeResponse(b"123456")
