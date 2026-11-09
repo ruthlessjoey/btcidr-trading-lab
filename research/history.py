@@ -27,10 +27,16 @@ def _day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
+def _research_base_url(cfg):
+    if cfg.get("provider") != "binance-vision":
+        raise ApiError("research history provider is not approved")
+    return fetcher.provider_base_url("binance-vision")
+
+
 def fetch_exchange_info(http, cfg):
     """Asks the exchange what this symbol is. Returns the symbol entry."""
     q = urllib.parse.urlencode({"symbol": cfg["symbol"]})
-    base_url = fetcher.provider_base_url(cfg["provider"])
+    base_url = _research_base_url(cfg)
     obj = http.get(f"{base_url}/api/v3/exchangeInfo?{q}")
     entries = obj.get("symbols") if isinstance(obj, dict) else None
     if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
