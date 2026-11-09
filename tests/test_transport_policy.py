@@ -319,5 +319,72 @@ class TransportPolicyTests(unittest.TestCase):
                     transport_policy.validate_request(url)
 
 
+    def test_transfer_encoding_without_content_length_is_rejected_before_body_read(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(
+                b"HTTP/1.1 200 OK\\r\\n"
+                b"Transfer-Encoding: chunked\\r\\n\\r\\n"
+                b"-1\\r\\nUNBOUNDED-TAIL\\r\\n0\\r\\n\\r\\n"
+            )
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            with self.assertRaises(transport_policy.PolicyError):
+                transport_policy.read_bounded(response, 64, 1)
+            self.assertIsNotNone(response.fp)
+        finally:
+            client.close()
+            server.close()
+
+    def test_duplicate_transfer_encoding_headers_are_rejected_before_read(self):
+        from email.message import Message
+        headers = Message()
+        headers.add_header("Transfer-Encoding", "chunked")
+        headers.add_header("Transfer-Encoding", "chunked")
+        response = FakeResponse(b"4\\r\\nWiki\\r\\n0\\r\\n\\r\\n", headers)
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(response, 64, 1)
+        self.assertEqual(response.read_sizes, [])
+
+    def test_body_timeout_remains_a_timeout_exception(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+            with self.assertRaises(TimeoutError):
+                transport_policy.read_bounded(response, 10, 1)
+
+    def test_non_timeout_socket_error_is_not_reclassified_as_deadline(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=ConnectionResetError("peer reset")):
+            with self.assertRaises(ConnectionResetError):
+                transport_policy.read_bounded(response, 10, 1)
+
+    def test_fetcher_retries_a_timeout_from_the_real_bounded_reader_path(self):
+        url = "https://api.kraken.com/0/public/Time"
+        timed_out = FakeResponse(b"x")
+        recovered = FakeResponse(b'{"ok":true}', {"Content-Length": "11"})
+        responses = [timed_out, recovered]
+
+        def opener(request_url, timeout):
+            response = responses.pop(0)
+            if response is timed_out:
+                with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+                    with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                        return fetcher.default_opener(request_url, timeout)
+            with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                return fetcher.default_opener(request_url, timeout)
+
+        result = fetcher.http_get_json(url, 1, 2, opener, lambda _: None)
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(responses, [])
+
+    def test_provider_transport_classifies_bounded_reader_timeout_as_timeout(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+            with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                with self.assertRaises(market_transport.TransportFailure) as ctx:
+                    market_transport.live_transport("https://api.kraken.com/0/public/Time")
+        self.assertEqual(ctx.exception.kind, "timeout")
+
+
 if __name__ == "__main__":
     unittest.main()
