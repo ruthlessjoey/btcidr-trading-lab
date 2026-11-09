@@ -10,6 +10,7 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import fetcher
+import transport_policy
 import providers
 import validator
 from fetcher import ApiError, TF_SECONDS
@@ -30,7 +31,7 @@ def _day(ts):
 def _research_base_url(cfg):
     if cfg.get("provider") != "binance-vision":
         raise ApiError("research history provider is not approved")
-    return fetcher.provider_base_url("binance-vision")
+    return transport_policy.provider_base_url("binance-vision")
 
 
 def fetch_exchange_info(http, cfg):
@@ -52,7 +53,7 @@ def fetch_pages(http, cfg, from_s, now_s):
         q = urllib.parse.urlencode({"symbol": cfg["symbol"], "interval": cfg["timeframe"],
                                     "startTime": cursor * 1000, "endTime": now_s * 1000,
                                     "limit": limit})
-        base_url = fetcher.provider_base_url(cfg["provider"])
+        base_url = transport_policy.provider_base_url(cfg["provider"])
         page = fetcher.parse_klines(http.get(f"{base_url}/api/v3/klines?{q}"))
         ev = {"requested_from": _day(cursor), "rows": len(page),
               "first": _day(page[0].time) if page else None,
@@ -105,7 +106,7 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     def add(name, status, detail):
         checks.append({"name": name, "status": status, "detail": detail})
 
-    base_url = fetcher.provider_base_url(cfg["provider"])
+    base_url = transport_policy.provider_base_url(cfg["provider"])
     market = {"provider": cfg["provider"], "host": base_url, "symbol": cfg["symbol"],
               "base_asset": cfg["base_asset"], "quote_asset": cfg["quote_asset"],
               "pair_label": f"{cfg['base_asset']}/{cfg['quote_asset']}",
