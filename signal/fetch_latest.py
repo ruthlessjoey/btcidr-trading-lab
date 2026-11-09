@@ -75,6 +75,12 @@ def fetch_body(url, opener=None):
         if status != 200 or not isinstance(body, (bytes, bytearray)) or len(body) > limit:
             raise FetchError("request rejected or unavailable; nothing written")
         return bytes(body)
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except Exception:
+            pass
+        raise FetchError("request rejected or unavailable; nothing written")
     except (fetcher.ApiError, transport_policy.PolicyError, urllib.error.URLError, TimeoutError, OSError, ValueError):
         raise FetchError("request rejected or unavailable; nothing written")
 
