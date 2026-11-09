@@ -7,7 +7,7 @@ import hashlib
 import json
 import os
 
-from research import engine, strategy
+from research import engine, splits as split_tools, strategy
 from research.engine import Costs, Rules
 
 CANDIDATES = (50, 100, 150, 200)
@@ -30,6 +30,7 @@ RULE_TEXT = (
 
 def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=Rules()):
     """Uses bars inside the train and validation windows only (plus earlier bars for warm-up)."""
+    splits = split_tools.validate_splits(len(candles), splits)
     rows = []
     for n in candidates:
         sig = strategy.ma_trend(n)(candles)
@@ -60,6 +61,7 @@ def _verify_frozen_inputs(candles, frozen, splits):
         raise engine.EngineError("frozen record has invalid split metadata")
     if not isinstance(splits, dict) or set(splits) != set(expected):
         raise engine.EngineError("evaluation split windows differ from the frozen record")
+    frozen_ranges = {}
     for name, item in expected.items():
         if not isinstance(item, dict):
             raise engine.EngineError(f"frozen {name} split metadata is invalid")
@@ -72,12 +74,15 @@ def _verify_frozen_inputs(candles, frozen, splits):
             raise engine.EngineError(f"{name} split window differs from the frozen record")
         if candles[start].time != item.get("first_open_unix") or candles[end - 1].time != item.get("last_open_unix"):
             raise engine.EngineError(f"{name} candle boundaries differ from the frozen record")
+        frozen_ranges[name] = (start, end)
+    split_tools.validate_splits(len(candles), frozen_ranges)
     if _candles_sha256(candles) != frozen.get("candles_sha256"):
         raise engine.EngineError("candle content differs from the dataset frozen before test evaluation")
 
 
 def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_COSTS, code_rev=None):
     """The record that fixes the choice before the test is looked at."""
+    splits = split_tools.validate_splits(len(candles), splits)
     body = {"selected_n": selection["selected_n"], "candidates": [r["n"] for r in selection["rows"]],
             "rule_text": RULE_TEXT, "selection_costs": costs.name,
             "splits": {k: {"start_index": a, "end_index": b,
