@@ -35,6 +35,14 @@ ROUTES = {
         {"granularity", "start", "end"}, 1024 * 1024),
 }
 
+OPERATIONAL_ROUTES = {
+    ("api.kraken.com", "GET", "/0/public/Time"),
+    ("api.kraken.com", "GET", "/0/public/OHLC"),
+    ("data-api.binance.vision", "GET", "/api/v3/time"),
+    ("data-api.binance.vision", "GET", "/api/v3/klines"),
+    ("data-api.binance.vision", "GET", "/api/v3/exchangeInfo"),
+}
+
 REQUIRED_QUERY_KEYS = {
     ("api.kraken.com", "GET", "/0/public/OHLC"): {"pair", "interval"},
     ("data-api.binance.vision", "GET", "/api/v3/klines"): {"symbol", "interval", "limit"},
@@ -54,8 +62,10 @@ def provider_base_url(provider_id: str) -> str:
         raise PolicyError("provider is not approved")
 
 
-def validate_request(url: str, method: str = "GET") -> int:
-    """Validate the raw URL before any opener (including an injected opener) is called."""
+def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
+    """Validate a raw URL against all approved routes or operational live routes."""
+    if tier not in ("any", "operational"):
+        raise PolicyError("transport tier is invalid")
     if not isinstance(url, str) or not url or len(url) > MAX_URL_LENGTH:
         raise PolicyError("request URL is invalid")
     if method != "GET":
@@ -89,8 +99,11 @@ def validate_request(url: str, method: str = "GET") -> int:
     if host == "localhost" or host.endswith(".localhost") or "xn--" in host:
         raise PolicyError("host is not approved")
     route = ROUTES.get((host, method, parts.path))
+    route_key = (host, method, parts.path)
     if route is None:
         raise PolicyError("host, method, or path is not approved")
+    if tier == "operational" and route_key not in OPERATIONAL_ROUTES:
+        raise PolicyError("route is not approved for operational live transport")
     if "%" in parts.path or any(seg in (".", "..") for seg in parts.path.split("/")):
         raise PolicyError("URL path is not canonical")
     allowed_keys, max_bytes = route
@@ -108,8 +121,33 @@ def validate_request(url: str, method: str = "GET") -> int:
         raise PolicyError("request query is incomplete")
     if any(not k.isascii() or not v.isascii()
            or any(ord(ch) < 0x20 or ord(ch) == 0x7f for ch in k + v)
+           or ";" in k or ";" in v
            for k, v in pairs):
         raise PolicyError("request query contains invalid characters")
+    for key, value in pairs:
+        if key in ("symbol", "pair"):
+            import re
+            if not re.fullmatch(r"[A-Z0-9]{3,30}", value):
+                raise PolicyError("instrument query value is invalid")
+        elif key == "interval":
+            if value not in {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}:
+                raise PolicyError("candle interval is not approved")
+        elif key == "limit":
+            if not value.isascii() or not value.isdecimal() or not 1 <= int(value) <= 1000:
+                raise PolicyError("candle limit is invalid")
+        elif key in ("startTime", "endTime"):
+            if not value.isascii() or not value.isdecimal() or not 946684800000 <= int(value) <= 4102444800000:
+                raise PolicyError("candle timestamp is invalid")
+        elif key == "since":
+            if not value.isascii() or not value.isdecimal() or not 946684800 <= int(value) <= 4102444800:
+                raise PolicyError("history cursor is invalid")
+        elif key == "granularity":
+            if value not in {"60", "300", "900", "3600", "21600", "86400"}:
+                raise PolicyError("candle granularity is not approved")
+        elif key in ("start", "end"):
+            import re
+            if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z", value):
+                raise PolicyError("research time value is invalid")
     return max_bytes
 
 
