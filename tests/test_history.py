@@ -283,6 +283,41 @@ class LoaderTests(unittest.TestCase):
             shutil.rmtree(self.root)
             self.root = tempfile.mkdtemp()
 
+    def test_manifest_cannot_escape_dataset_folder(self):
+        path = self.write(self.good())
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        manifest["csv_file"] = "../outside.csv"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f)
+        with self.assertRaises(dataset.DatasetError) as cm:
+            dataset.load_verified(path)
+        self.assertIn("plain file name", str(cm.exception))
+
+    def test_manifest_symlink_is_rejected(self):
+        path = self.write(self.good())
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        csv_path = os.path.join(os.path.dirname(path), manifest["csv_file"])
+        target = os.path.join(self.root, "outside.csv")
+        shutil.copyfile(csv_path, target)
+        os.remove(csv_path)
+        os.symlink(target, csv_path)
+        with self.assertRaises(dataset.DatasetError) as cm:
+            dataset.load_verified(path)
+        self.assertIn("symlink", str(cm.exception))
+
+    def test_empty_manifest_row_count_is_rejected(self):
+        path = self.write(self.good())
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        manifest["row_count"] = 0
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f)
+        with self.assertRaises(dataset.DatasetError) as cm:
+            dataset.load_verified(path)
+        self.assertIn("positive integer", str(cm.exception))
+
     def test_impossible_prices_rejected(self):
         bad = self.good() + [Candle(5 * DAY, 10.0, 8.0, 9.0, 11.0, 5.0)]      # high below low
         with self.assertRaises(dataset.DatasetError):

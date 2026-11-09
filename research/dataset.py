@@ -90,18 +90,40 @@ def load_verified(manifest_path, expect=None):
             m = json.load(f)
     except (OSError, ValueError) as e:
         raise DatasetError(f"cannot read manifest {manifest_path}: {e}")
+    if not isinstance(m, dict):
+        raise DatasetError("manifest must be a JSON object")
     for key in ("market", "csv_file", "csv_sha256", "row_count", "first_open_unix",
                 "last_open_unix", "timeframe_seconds"):
         if key not in m:
             raise DatasetError(f"manifest lacks {key!r}")
     mk = m["market"]
+    if not isinstance(mk, dict):
+        raise DatasetError("manifest market must be a JSON object")
+    csv_file = m["csv_file"]
+    if (not isinstance(csv_file, str) or not csv_file or csv_file in (".", "..")
+            or "/" in csv_file or "\\" in csv_file or "\x00" in csv_file
+            or os.path.basename(csv_file) != csv_file):
+        raise DatasetError("manifest CSV filename must be a plain file name inside its dataset folder")
+    if (not isinstance(m["csv_sha256"], str) or len(m["csv_sha256"]) != 64
+            or any(ch not in "0123456789abcdef" for ch in m["csv_sha256"])):
+        raise DatasetError("manifest CSV SHA-256 is malformed")
+    if type(m["row_count"]) is not int or m["row_count"] < 1:
+        raise DatasetError("manifest row_count must be a positive integer")
+    if type(m["timeframe_seconds"]) is not int or m["timeframe_seconds"] <= 0:
+        raise DatasetError("manifest timeframe_seconds must be a positive integer")
+    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS
+            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
+        raise DatasetError("manifest timeframe does not match its timeframe_seconds")
     for key, want in (expect or {}).items():
         if mk.get(key) != want:
             raise DatasetError(f"market mismatch: dataset has {key}={mk.get(key)!r}, "
                                f"but {want!r} was requested. Markets are never mixed.")
-    csv_path = os.path.join(os.path.dirname(manifest_path), m["csv_file"])
-    if not os.path.exists(csv_path):
-        raise DatasetError(f"CSV file {m['csv_file']} is missing")
+    folder = os.path.realpath(os.path.dirname(manifest_path))
+    csv_path = os.path.join(folder, csv_file)
+    if os.path.islink(csv_path) or os.path.commonpath((folder, os.path.realpath(csv_path))) != folder:
+        raise DatasetError("manifest CSV path must remain inside the dataset folder and must not be a symlink")
+    if not os.path.isfile(csv_path):
+        raise DatasetError(f"CSV file {csv_file} is missing")
     if sha256_file(csv_path) != m["csv_sha256"]:
         raise DatasetError("CSV hash does not match the manifest: the file was changed")
     step = m["timeframe_seconds"]
@@ -118,7 +140,7 @@ def load_verified(manifest_path, expect=None):
             try:
                 t = int(row[3])
                 c = Candle(t, *[float(x) for x in row[5:10]])
-            except ValueError:
+            except (TypeError, ValueError, OverflowError):
                 raise DatasetError(f"line {n}: non-numeric value")
             if row[4] != utc_text(t):
                 raise DatasetError(f"line {n}: open_time_utc does not match open_time_unix")
@@ -130,6 +152,8 @@ def load_verified(manifest_path, expect=None):
                                    f"(step {t - out[-1].time}s, expected {step}s): "
                                    "unsorted, duplicated or missing data")
             out.append(c)
+    if not out:
+        raise DatasetError("dataset CSV contains no candle rows")
     if len(out) != m["row_count"]:
         raise DatasetError(f"row count {len(out)} differs from manifest {m['row_count']}")
     if out[0].time != m["first_open_unix"] or out[-1].time != m["last_open_unix"]:
