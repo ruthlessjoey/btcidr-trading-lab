@@ -206,8 +206,9 @@ def _content_length(headers):
 def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
     """Read a bounded body; enforce the deadline across individual body socket reads.
 
-    The urllib opener's timeout separately bounds connect/TLS/header socket operations;
-    this absolute deadline begins when body reading starts.
+    The absolute deadline begins when body reading starts. urllib's opener timeout is
+    separate and applies per socket operation during connect/TLS/headers; it is not
+    a whole-request deadline, so slow-drip headers may take longer than one timeout.
     """
     if type(max_bytes) is not int or max_bytes < 0:
         raise PolicyError("response size limit is invalid")
