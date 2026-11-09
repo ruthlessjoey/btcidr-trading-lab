@@ -42,7 +42,7 @@ def normalize_rows(rows, start_s, end_s, now_s, timeframe_s, provider_name):
         try:
             candle = mc.Candle(*raw)
             mc.check_alignment(candle, timeframe_s)
-        except mc.CandleError as e:
+        except (mc.CandleError, TypeError, OverflowError) as e:
             raise ProviderError("bad_payload", provider_name, f"invalid candle in row #{row_index}: {e}")
         previous = by_time.get(candle.open_time_s)
         if previous is None:
