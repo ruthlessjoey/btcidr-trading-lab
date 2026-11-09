@@ -7,12 +7,15 @@ Two "styles" of public endpoint are supported, because Tokocrypto publishes both
   binance_style  {base}/api/v3/time and {base}/api/v3/klines     (symbol BTCUSDT)
   open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
 """
+import http.client
 import json
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+
+import transport_policy
 
 USER_AGENT = "tokocrypto-btcusdt-lab/0.1 (read-only market data)"
 
@@ -46,37 +49,60 @@ class Candle:
 @dataclass(frozen=True)
 class Source:
     name: str
-    style: str       # "binance_style" or "open_v1"
-    base_url: str
+    provider_id: str
+    style: str = "binance_style"
 
     def __post_init__(self):
-        if self.style not in ("binance_style", "open_v1"):
-            raise ValueError(f"unknown source style {self.style!r}")
+        if self.style != "binance_style":
+            raise ValueError("only the approved Binance-style public market-data interface is supported")
+        # Resolve the origin from a fixed provider ID; config cannot supply or extend a host.
+        transport_policy.provider_base_url(self.provider_id)
+
+    @property
+    def base_url(self):
+        return transport_policy.provider_base_url(self.provider_id)
 
     def symbol(self, pair):
-        return pair.replace("_", "") if self.style == "binance_style" else pair
+        return pair.replace("_", "")
 
     def time_url(self):
-        path = "/api/v3/time" if self.style == "binance_style" else "/open/v1/common/time"
-        return self.base_url + path
+        return self.base_url + "/api/v3/time"
 
     def klines_url(self):
-        path = "/api/v3/klines" if self.style == "binance_style" else "/open/v1/market/klines"
-        return self.base_url + path
+        return self.base_url + "/api/v3/klines"
 
     def symbols_url(self, pair):
-        if self.style == "binance_style":
-            return (self.base_url + "/api/v3/exchangeInfo?"
-                    + urllib.parse.urlencode({"symbol": self.symbol(pair)}))
-        return self.base_url + "/open/v1/common/symbols"
+        if self.provider_id != "binance-vision":
+            raise ApiError("market metadata route is not approved for this provider")
+        return (self.base_url + "/api/v3/exchangeInfo?"
+                + urllib.parse.urlencode({"symbol": self.symbol(pair)}))
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def default_opener(url, timeout):
-    """Do one real HTTPS GET. Returns (status_code, body_bytes)."""
+    """One policy-checked public GET; proxies and redirects are disabled."""
+    limit = transport_policy.validate_request(url, "GET")
     req = urllib.request.Request(
-        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read()
+        url, method="GET",
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirectHandler())
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            status = getattr(resp, "status", 200)
+            body = transport_policy.read_bounded(resp, limit, timeout)
+            return status, body
+    except urllib.error.HTTPError as exc:
+        # HTTPError is a response object too; close it without reading its body.
+        try:
+            exc.close()
+        except Exception:
+            pass
+        raise
 
 
 def _safe_http_status(status):
@@ -85,7 +111,11 @@ def _safe_http_status(status):
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET JSON without exposing provider bodies, URLs, or exception messages."""
+    """GET JSON only after exact route validation; never expose provider-controlled bodies."""
+    try:
+        max_bytes = transport_policy.validate_request(url, "GET")
+    except transport_policy.PolicyError:
+        raise ApiError("request rejected by transport policy")
     last = "request failed"
     for attempt in range(1, retries + 1):
         status = None
@@ -96,16 +126,22 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as exc:
             http_error = True
             status = _safe_http_status(exc.code)
-            # HTTPError is also a response object; close it without reading its body.
             try:
                 exc.close()
             except Exception:
                 pass
-        except Exception as exc:
+        except transport_policy.PolicyError:
+            raise ApiError("HTTP response rejected by transport policy")
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
+        except Exception:
+            # Unexpected programming errors are not transport retries.
+            raise ApiError("HTTP request failed unexpectedly")
         else:
             status = _safe_http_status(status)
+            if not isinstance(body, (bytes, bytearray)) or len(body) > max_bytes:
+                raise ApiError("HTTP response rejected by transport policy")
 
         if status is None:
             if network_error:

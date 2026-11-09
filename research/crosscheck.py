@@ -19,7 +19,7 @@ from fetcher import ApiError, Candle
 from validator import bad_ohlc
 
 DAY = 86400
-COINBASE = "https://api.exchange.coinbase.com"
+COINBASE = fetcher.provider_base_url("coinbase-research")
 BITSTAMP = "https://www.bitstamp.net"
 # Pre-stated rule for a flagged day (written before looking at the answer):
 TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
@@ -150,7 +150,7 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.def
     http = providers.Http(timeout, retries, opener, sleep)
     result = {"dataset_version": manifest["version_id"], "dataset_sha256": manifest["csv_sha256"],
               "rule": f"open and close within {TOLERANCE_PCT}%, and the day's return within "
-                      f"{TOLERANCE_PCT} percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
+                      f"{TOLERANCE_PCT} percentage points, on Coinbase BTC/USD; Bitstamp is excluded by policy",
               "coinbase_error": None, "bitstamp_error": None, "http_log": []}
     coinbase, bitstamp = {}, {}
     try:
@@ -158,11 +158,8 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.def
     except ApiError as e:
         result["coinbase_error"] = str(e)
     if flagged_dates:
-        try:
-            first = to_ts(min(flagged_dates)) - 3 * DAY
-            bitstamp = fetch_bitstamp_window(http, first, 8 + (to_ts(max(flagged_dates)) - to_ts(min(flagged_dates))) // DAY)
-        except ApiError as e:
-            result["bitstamp_error"] = str(e)
+        # Bitstamp is excluded from the approved transport matrix; do not attempt a request.
+        result["bitstamp_error"] = "Bitstamp source is excluded by policy"
     result.update(compare(candles, coinbase, bitstamp, flagged_dates))
     result["http_log"] = http.log[:6] + ([("...", f"{len(http.log)} requests in total")] if len(http.log) > 6 else [])
     with open(os.path.join(out_dir, "crosscheck.json"), "w", encoding="utf-8") as f:
@@ -179,7 +176,7 @@ def build_markdown(r):
          f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The Binance candles "
          "were **not changed**.", "",
          "Sources: **Coinbase BTC/USD** daily candles (official docs read; USD is not USDT) and "
-         "**Bitstamp BTC/USD** around flagged days (official docs NOT read this session, so unverified).",
+         "Bitstamp is excluded from this cross-check pending separate source authorization.",
          f"Pre-stated rule: {r['rule']}.", ""]
     if r["coinbase_error"]:
         L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")

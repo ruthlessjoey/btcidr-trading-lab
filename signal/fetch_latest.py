@@ -22,12 +22,16 @@ import math
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import fetcher
+import transport_policy
 import btc_signal as bs
 
-HOST = "https://data-api.binance.vision"
+HOST = transport_policy.provider_base_url("binance-vision")
 PATH = "/api/v3/klines"
 SYMBOL = "BTCUSDT"
 INTERVAL = "1d"
@@ -55,20 +59,30 @@ def build_url(limit=DEFAULT_LIMIT):
     return f"{HOST}{PATH}?{query}"
 
 
-def fetch_body(url, opener=urllib.request.urlopen):
-    """Single GET. Any error stops the run. Returns the response body bytes."""
-    req = urllib.request.Request(url, method="GET",
-                                 headers={"User-Agent": USER_AGENT,
-                                          "Accept": "application/json"})
+def fetch_body(url, opener=None):
+    """One approved public GET. Uses shared proxy-free, no-redirect bounded transport."""
     try:
-        with opener(req, timeout=TIMEOUT_SECONDS) as resp:
-            status = getattr(resp, "status", 200)
-            body = resp.read()
-    except Exception as e:
-        raise FetchError(f"request failed, nothing written: {type(e).__name__}: {e}")
-    if status != 200:
-        raise FetchError(f"unexpected HTTP status {status}, nothing written")
-    return body
+        limit = transport_policy.validate_request(url, "GET")
+        if opener is None:
+            status, body = fetcher.default_opener(url, TIMEOUT_SECONDS)
+        else:
+            req = urllib.request.Request(url, method="GET",
+                                         headers={"User-Agent": USER_AGENT,
+                                                  "Accept": "application/json"})
+            with opener(req, timeout=TIMEOUT_SECONDS) as resp:
+                status = getattr(resp, "status", 200)
+                body = transport_policy.read_bounded(resp, limit, TIMEOUT_SECONDS)
+        if status != 200 or not isinstance(body, (bytes, bytearray)) or len(body) > limit:
+            raise FetchError("request rejected or unavailable; nothing written")
+        return bytes(body)
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except Exception:
+            pass
+        raise FetchError("request rejected or unavailable; nothing written")
+    except (fetcher.ApiError, transport_policy.PolicyError, urllib.error.URLError, TimeoutError, OSError, ValueError):
+        raise FetchError("request rejected or unavailable; nothing written")
 
 
 def parse_klines(body, fetch_s):
@@ -230,7 +244,7 @@ def write_snapshot(out_dir, data, manifest):
     return man_path
 
 
-def main(argv=None, opener=urllib.request.urlopen, now=None):
+def main(argv=None, opener=None, now=None):
     p = argparse.ArgumentParser(description="ONE manual, read-only BTCUSDT daily fetch.")
     p.add_argument("--history-manifest", required=True,
                    help="committed history manifest to cross-check against")

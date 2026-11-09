@@ -27,10 +27,17 @@ def _day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
+def _research_base_url(cfg):
+    if cfg.get("provider") != "binance-vision":
+        raise ApiError("research history provider is not approved")
+    return fetcher.provider_base_url("binance-vision")
+
+
 def fetch_exchange_info(http, cfg):
     """Asks the exchange what this symbol is. Returns the symbol entry."""
     q = urllib.parse.urlencode({"symbol": cfg["symbol"]})
-    obj = http.get(f"{cfg['host']}/api/v3/exchangeInfo?{q}")
+    base_url = _research_base_url(cfg)
+    obj = http.get(f"{base_url}/api/v3/exchangeInfo?{q}")
     entries = obj.get("symbols") if isinstance(obj, dict) else None
     if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
         raise ApiError("exchangeInfo response has an invalid symbol structure")
@@ -45,7 +52,8 @@ def fetch_pages(http, cfg, from_s, now_s):
         q = urllib.parse.urlencode({"symbol": cfg["symbol"], "interval": cfg["timeframe"],
                                     "startTime": cursor * 1000, "endTime": now_s * 1000,
                                     "limit": limit})
-        page = fetcher.parse_klines(http.get(f"{cfg['host']}/api/v3/klines?{q}"))
+        base_url = fetcher.provider_base_url(cfg["provider"])
+        page = fetcher.parse_klines(http.get(f"{base_url}/api/v3/klines?{q}"))
         ev = {"requested_from": _day(cursor), "rows": len(page),
               "first": _day(page[0].time) if page else None,
               "last": _day(page[-1].time) if page else None,
@@ -97,7 +105,8 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     def add(name, status, detail):
         checks.append({"name": name, "status": status, "detail": detail})
 
-    market = {"provider": cfg["provider"], "host": cfg["host"], "symbol": cfg["symbol"],
+    base_url = fetcher.provider_base_url(cfg["provider"])
+    market = {"provider": cfg["provider"], "host": base_url, "symbol": cfg["symbol"],
               "base_asset": cfg["base_asset"], "quote_asset": cfg["quote_asset"],
               "pair_label": f"{cfg['base_asset']}/{cfg['quote_asset']}",
               "timeframe": cfg["timeframe"], "market_type": "spot"}
@@ -142,7 +151,7 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
             raise ApiError("market identity does not match the configuration")
 
         # 2. exchange clock and paged history
-        server_now = fetcher.extract_server_time(http.get(cfg["host"] + "/api/v3/time"))
+        server_now = fetcher.extract_server_time(http.get(base_url + "/api/v3/time"))
         add("clock", PASS if abs(server_now - local_now) <= 120 else WARN,
             f"exchange time {dataset.utc_text(server_now)} UTC; runner differs by "
             f"{abs(server_now - local_now)}s")

@@ -8,6 +8,8 @@ from unittest.mock import Mock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
 
+URL = "https://api.kraken.com/0/public/Time"
+
 NO_SLEEP = lambda seconds: None  # noqa: E731
 MS = 1_700_000_000_000
 
@@ -31,19 +33,21 @@ def row(t_ms=MS, o="10", h="12", low="9", c="11", v="5"):
 
 
 class SourceTests(unittest.TestCase):
-    def test_urls_and_symbols(self):
-        a = fetcher.Source("a", "binance_style", "https://x.test")
-        b = fetcher.Source("b", "open_v1", "https://y.test")
-        self.assertEqual(a.klines_url(), "https://x.test/api/v3/klines")
-        self.assertEqual(a.time_url(), "https://x.test/api/v3/time")
+    def test_urls_and_symbols_resolve_from_provider_ids(self):
+        a = fetcher.Source("a", "binance-vision")
+        b = fetcher.Source("b", "tokocrypto")
+        self.assertEqual(a.klines_url(), "https://data-api.binance.vision/api/v3/klines")
+        self.assertEqual(a.time_url(), "https://data-api.binance.vision/api/v3/time")
         self.assertEqual(a.symbol("BTC_USDT"), "BTCUSDT")
-        self.assertEqual(b.klines_url(), "https://y.test/open/v1/market/klines")
-        self.assertEqual(b.time_url(), "https://y.test/open/v1/common/time")
-        self.assertEqual(b.symbol("BTC_USDT"), "BTC_USDT")
+        self.assertEqual(b.klines_url(), "https://www.tokocrypto.site/api/v3/klines")
+        self.assertEqual(b.time_url(), "https://www.tokocrypto.site/api/v3/time")
+        self.assertEqual(b.symbol("BTC_USDT"), "BTCUSDT")
 
-    def test_unknown_style_is_rejected(self):
+    def test_unapproved_provider_or_style_is_rejected(self):
         with self.assertRaises(ValueError):
-            fetcher.Source("z", "mystery", "https://z.test")
+            fetcher.Source("z", "unapproved-provider")
+        with self.assertRaises(ValueError):
+            fetcher.Source("z", "binance-vision", "open_v1")
 
 
 class ParseTests(unittest.TestCase):
@@ -96,21 +100,21 @@ class ParseTests(unittest.TestCase):
 class HttpTests(unittest.TestCase):
     def test_success_returns_json(self):
         op = scripted((200, b'{"ok": 1}'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), {"ok": 1})
+        self.assertEqual(fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP), {"ok": 1})
 
     def test_retries_server_error_then_succeeds(self):
         op = scripted((500, b""), (200, b'[1]'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
+        self.assertEqual(fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP), [1])
         self.assertEqual(len(op.calls), 2)
 
     def test_429_is_retried(self):
         op = scripted((429, b""), (200, b'[1]'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
+        self.assertEqual(fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP), [1])
 
     def test_403_is_not_retried_and_sanitizes_body(self):
         op = scripted((403, b"<html>Access denied by firewall</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertIn("403", str(ctx.exception))
         self.assertNotIn("Access denied", str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
@@ -119,32 +123,32 @@ class HttpTests(unittest.TestCase):
         marker = "UNIQUE_451_BODY_MARKER"
         op = scripted((451, marker.encode()))
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertIn("451", str(ctx.exception))
         self.assertNotIn(marker, str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
     def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
+        op = scripted(urllib.error.HTTPError(URL, 404, "Not Found", {}, None))
         with self.assertRaises(fetcher.ApiError):
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertEqual(len(op.calls), 1)
 
     def test_http_error_response_is_closed_without_reading_body(self):
         response = Mock()
-        error = urllib.error.HTTPError("u", 404, "Not Found", {}, response)
+        error = urllib.error.HTTPError(URL, 404, "Not Found", {}, response)
         op = scripted(error)
         with self.assertRaises(fetcher.ApiError):
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         response.read.assert_not_called()
         response.close.assert_called_once_with()
 
     def test_http_error_with_success_status_is_rejected_without_body_access(self):
         marker = "UNIQUE_HTTP_ERROR_REASON_MARKER"
-        error = urllib.error.HTTPError("u", 200, marker, {}, None)
+        error = urllib.error.HTTPError(URL, 200, marker, {}, None)
         op = scripted(error)
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertEqual(str(ctx.exception), "HTTP request failed: HTTP 200")
         self.assertNotIn(marker, str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
@@ -152,21 +156,27 @@ class HttpTests(unittest.TestCase):
     def test_network_errors_exhaust_retries(self):
         op = scripted(urllib.error.URLError("boom"))
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertIn("failed after 3 attempts", str(ctx.exception))
         self.assertNotIn("boom", str(ctx.exception))
         self.assertEqual(len(op.calls), 3)
 
+    def test_unexpected_programming_error_is_not_retried(self):
+        op = scripted(AssertionError("programming bug"))
+        with self.assertRaisesRegex(fetcher.ApiError, "failed unexpectedly"):
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
     def test_timeout_is_handled(self):
         op = scripted(TimeoutError("slow"))
         with self.assertRaises(fetcher.ApiError):
-            fetcher.http_get_json("u", 5, 2, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 2, op, NO_SLEEP)
 
     def test_invalid_json_is_an_error_without_body_or_url_content(self):
         marker = "UNIQUE_PROVIDER_BODY_MARKER"
         op = scripted((200, f"<html>{marker}</html>".encode()))
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("https://private.example/path?token=UNIQUE_URL_MARKER", 5, 3, op, NO_SLEEP)
+            fetcher.http_get_json(URL, 5, 3, op, NO_SLEEP)
         self.assertNotIn(marker, str(ctx.exception))
         self.assertNotIn("UNIQUE_URL_MARKER", str(ctx.exception))
         self.assertNotIn("private.example", str(ctx.exception))
@@ -175,14 +185,14 @@ class HttpTests(unittest.TestCase):
         from unittest.mock import patch
         with patch.object(fetcher.json, "loads", side_effect=RecursionError):
             with self.assertRaises(fetcher.ApiError) as ctx:
-                fetcher.http_get_json("u", 5, 1, scripted((200, b"{}")), NO_SLEEP)
+                fetcher.http_get_json(URL, 5, 1, scripted((200, b"{}")), NO_SLEEP)
         self.assertEqual(str(ctx.exception), "HTTP 200 returned invalid JSON")
 
     def test_only_standard_integer_http_status_is_preserved(self):
         for status in (True, 99, 600, "403"):
             with self.subTest(status=status):
                 with self.assertRaises(fetcher.ApiError) as ctx:
-                    fetcher.http_get_json("u", 5, 1, scripted((status, b"")), NO_SLEEP)
+                    fetcher.http_get_json(URL, 5, 1, scripted((status, b"")), NO_SLEEP)
                 self.assertNotIn(str(status), str(ctx.exception))
 
     def test_timestamp_overflow_is_sanitized(self):
