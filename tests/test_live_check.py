@@ -202,6 +202,23 @@ class LiveCheckTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertNotIn("candles_kraken.csv", files)
 
+    def test_warning_validation_remains_exportable(self):
+        def zero_volume(url, timeout):
+            status, body = fake(NOW)(url, timeout)
+            if urllib.parse.urlparse(url).path == "/0/public/OHLC":
+                payload = json.loads(body)
+                for row in payload["result"]["XXBTZUSD"]:
+                    row[6] = "0"
+                return status, json.dumps(payload).encode()
+            return status, body
+
+        code, data, md, files = run(dict(CFG, live_providers=["kraken"]), zero_volume)
+        result = data["providers"][0]
+        self.assertEqual(code, 0)
+        self.assertEqual(result["validation"], "WARN")
+        self.assertEqual(result["verdict"], "USABLE WITH WARNINGS")
+        self.assertIn("candles_kraken.csv", files)
+
     def test_invalid_ohlc_is_not_exported_as_candles(self):
         def invalid_ohlc(url, timeout):
             status, body = fake(NOW)(url, timeout)
