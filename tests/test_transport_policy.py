@@ -1,6 +1,9 @@
-"""Offline tests for the exact public transport policy. No sockets or DNS are used."""
+"""Offline transport-policy tests using synthetic responses and local socketpairs."""
+import http.client
 import os
+import socket
 import sys
+import threading
 import time
 import unittest
 import urllib.request
@@ -38,7 +41,7 @@ class FakeResponse:
         self.read_sizes = []
         self.closed = False
 
-    def read(self, size=-1):
+    def read1(self, size=-1):
         self.read_sizes.append(size)
         if self.delay:
             time.sleep(self.delay)
@@ -46,6 +49,12 @@ class FakeResponse:
             return b""
         part, self.body = self.body[:size], self.body[size:]
         return part
+
+    def isclosed(self):
+        return not self.body
+
+    def read(self, size=-1):
+        return self.read1(size)
 
     def close(self):
         self.closed = True
@@ -153,6 +162,87 @@ class TransportPolicyTests(unittest.TestCase):
         response = FakeResponse(b"12345", {"Content-Length": "5"})
         self.assertEqual(transport_policy.read_bounded(response, 5, 1), b"12345")
 
+    def test_real_http_response_with_content_length_is_accepted(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            self.assertEqual(transport_policy.read_bounded(response, 5, 1), b"hello")
+            self.assertTrue(response.isclosed())
+        finally:
+            client.close()
+            server.close()
+
+    def test_real_http_response_rejects_truncated_content_length(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhey")
+            server.close()
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            with self.assertRaises(transport_policy.PolicyError):
+                transport_policy.read_bounded(response, 5, 1)
+        finally:
+            client.close()
+
+    def test_non_finite_body_deadline_is_rejected(self):
+        response = FakeResponse(b"")
+        for timeout in (float("nan"), float("inf"), 0, -1, True):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(transport_policy.PolicyError):
+                    transport_policy.read_bounded(response, 10, timeout)
+
+    def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
+        client, server = socket.socketpair()
+        stop = threading.Event()
+
+        def drip():
+            try:
+                for byte in (b"b", b"c", b"d"):
+                    if stop.wait(0.04):
+                        return
+                    server.sendall(byte)
+            except OSError:
+                return
+
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\na")
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            sender = threading.Thread(target=drip, daemon=True)
+            sender.start()
+            started = time.monotonic()
+            with self.assertRaises(TimeoutError):
+                transport_policy.read_bounded(response, 4, 0.10)
+            elapsed = time.monotonic() - started
+            self.assertGreaterEqual(elapsed, 0.08)
+            self.assertLess(elapsed, 0.25)
+        finally:
+            stop.set()
+            client.close()
+            server.close()
+
+    def test_non_ascii_and_duplicate_content_length_are_rejected(self):
+        from email.message import Message
+        bad = Message()
+        bad.add_header("Content-Length", "²")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"", bad), 10, 1)
+        duplicate = Message()
+        duplicate.add_header("Content-Length", "1")
+        duplicate.add_header("Content-Length", "1")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"", duplicate), 10, 1)
+
+    def test_content_length_and_transfer_encoding_conflict_is_rejected(self):
+        from email.message import Message
+        headers = Message()
+        headers.add_header("Content-Length", "1")
+        headers.add_header("Transfer-Encoding", "chunked")
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(FakeResponse(b"x", headers), 10, 1)
+
     def test_response_limit_plus_one_is_rejected(self):
         response = FakeResponse(b"123456")
         with self.assertRaises(transport_policy.PolicyError):
@@ -172,7 +262,7 @@ class TransportPolicyTests(unittest.TestCase):
 
     def test_slow_drip_body_cannot_exceed_total_deadline(self):
         response = FakeResponse(b"12", delay=0.02)
-        with self.assertRaises(transport_policy.PolicyError):
+        with self.assertRaises(TimeoutError):
             transport_policy.read_bounded(response, 10, 0.005)
 
     def test_default_opener_disables_proxy_and_redirects_and_closes_response(self):
@@ -196,6 +286,104 @@ class TransportPolicyTests(unittest.TestCase):
             with self.assertRaises(market_transport.TransportFailure):
                 market_transport.live_transport("https://api.binance.com/api/v3/time")
         build.assert_not_called()
+
+    def test_provider_neutral_transport_rejects_manual_and_research_tiers(self):
+        for url in (
+            "https://www.tokocrypto.site/api/v3/time",
+            "https://api.exchange.coinbase.com/time",
+        ):
+            with self.subTest(url=url):
+                with patch("urllib.request.build_opener") as build:
+                    with self.assertRaises(market_transport.TransportFailure):
+                        market_transport.live_transport(url)
+                build.assert_not_called()
+
+    def test_provider_neutral_transport_operational_success_path(self):
+        response = FakeResponse(b'{"result":{"unixtime":1700000000}}',
+                                {"Content-Length": "34"})
+        fake_opener = FakeOpener(response)
+        with patch("urllib.request.build_opener", return_value=fake_opener):
+            body = market_transport.live_transport("https://api.kraken.com/0/public/Time")
+        self.assertEqual(body, b'{"result":{"unixtime":1700000000}}')
+        self.assertTrue(response.closed)
+
+    def test_query_values_reject_malformed_and_semicolon_values(self):
+        for url in (
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT;admin=true&interval=1h&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=btc-usdt&interval=1h&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=999999999999999999999999999",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(transport_policy.PolicyError):
+                    transport_policy.validate_request(url)
+
+
+    def test_transfer_encoding_without_content_length_is_rejected_before_body_read(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(
+                b"HTTP/1.1 200 OK\r\n"
+                b"Transfer-Encoding: chunked\r\n\r\n"
+                b"-1\r\nUNBOUNDED-TAIL\r\n0\r\n\r\n"
+            )
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            with self.assertRaises(transport_policy.PolicyError):
+                transport_policy.read_bounded(response, 64, 1)
+            self.assertIsNotNone(response.fp)
+        finally:
+            client.close()
+            server.close()
+
+    def test_duplicate_transfer_encoding_headers_are_rejected_before_read(self):
+        from email.message import Message
+        headers = Message()
+        headers.add_header("Transfer-Encoding", "chunked")
+        headers.add_header("Transfer-Encoding", "chunked")
+        response = FakeResponse(b"4\r\nWiki\r\n0\r\n\r\n", headers)
+        with self.assertRaises(transport_policy.PolicyError):
+            transport_policy.read_bounded(response, 64, 1)
+        self.assertEqual(response.read_sizes, [])
+
+    def test_body_timeout_remains_a_timeout_exception(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+            with self.assertRaises(TimeoutError):
+                transport_policy.read_bounded(response, 10, 1)
+
+    def test_non_timeout_socket_error_is_not_reclassified_as_deadline(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=ConnectionResetError("peer reset")):
+            with self.assertRaises(ConnectionResetError):
+                transport_policy.read_bounded(response, 10, 1)
+
+    def test_fetcher_retries_a_timeout_from_the_real_bounded_reader_path(self):
+        url = "https://api.kraken.com/0/public/Time"
+        timed_out = FakeResponse(b"x")
+        recovered = FakeResponse(b'{"ok":true}', {"Content-Length": "11"})
+        responses = [timed_out, recovered]
+
+        def opener(request_url, timeout):
+            response = responses.pop(0)
+            if response is timed_out:
+                with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+                    with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                        return fetcher.default_opener(request_url, timeout)
+            with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                return fetcher.default_opener(request_url, timeout)
+
+        result = fetcher.http_get_json(url, 1, 2, opener, lambda _: None)
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(responses, [])
+
+    def test_provider_transport_classifies_bounded_reader_timeout_as_timeout(self):
+        response = FakeResponse(b"x")
+        with patch.object(response, "read1", side_effect=TimeoutError("socket timed out")):
+            with patch("urllib.request.build_opener", return_value=FakeOpener(response)):
+                with self.assertRaises(market_transport.TransportFailure) as ctx:
+                    market_transport.live_transport("https://api.kraken.com/0/public/Time")
+        self.assertEqual(ctx.exception.kind, "timeout")
 
 
 if __name__ == "__main__":

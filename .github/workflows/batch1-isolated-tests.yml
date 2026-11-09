@@ -25,8 +25,21 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /fetcher.py
+            /transport_policy.py
+            /markets/__init__.py
+            /markets/candles.py
+            /markets/providers/__init__.py
+            /markets/providers/errors.py
+            /markets/providers/normalize.py
+            /markets/providers/transport.py
             /providers.py
             /live_check.py
+            /run.py
+            /probe.py
+            /signal/btc_signal.py
+            /signal/fetch_latest.py
+            /signal/test_btc_signal.py
+            /signal/test_fetch_latest.py
             /report.py
             /validator.py
             /research/__init__.py
@@ -34,8 +47,11 @@ jobs:
             /research/history.py
             /research/dataset.py
             /research/data_report.py
+            /tests/test_transport_policy.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
+            /tests/test_probe.py
+            /tests/test_pipeline.py
             /tests/test_research_sanitization.py
 
       - name: Set up Python 3.11
@@ -48,6 +64,10 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
           PYTHONPATH: .
         run: |
+          python -m unittest discover -s tests -p 'test_transport_policy.py' -v
           python -m unittest discover -s tests -p 'test_fetcher.py' -v
           python -m unittest discover -s tests -p 'test_live_check.py' -v
+          python -m unittest discover -s tests -p 'test_probe.py' -v
+          python -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python -m unittest discover -s signal -p 'test_fetch_latest.py' -v
           python -m unittest discover -s tests -p 'test_research_sanitization.py' -v

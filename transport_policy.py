@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import ipaddress
+import math
+import re
 import socket
 import time
 from urllib.parse import parse_qsl, urlsplit
@@ -9,6 +11,10 @@ from urllib.parse import parse_qsl, urlsplit
 
 class PolicyError(ValueError):
     """A request is outside the explicitly approved public read-only route matrix."""
+
+
+class ResponseDeadlineError(TimeoutError):
+    """The bounded response-body read exceeded its absolute deadline."""
 
 
 # Provider IDs resolve to fixed origins; configuration must never add an origin.
@@ -35,6 +41,14 @@ ROUTES = {
         {"granularity", "start", "end"}, 1024 * 1024),
 }
 
+OPERATIONAL_ROUTES = {
+    ("api.kraken.com", "GET", "/0/public/Time"),
+    ("api.kraken.com", "GET", "/0/public/OHLC"),
+    ("data-api.binance.vision", "GET", "/api/v3/time"),
+    ("data-api.binance.vision", "GET", "/api/v3/klines"),
+    ("data-api.binance.vision", "GET", "/api/v3/exchangeInfo"),
+}
+
 REQUIRED_QUERY_KEYS = {
     ("api.kraken.com", "GET", "/0/public/OHLC"): {"pair", "interval"},
     ("data-api.binance.vision", "GET", "/api/v3/klines"): {"symbol", "interval", "limit"},
@@ -54,8 +68,19 @@ def provider_base_url(provider_id: str) -> str:
         raise PolicyError("provider is not approved")
 
 
-def validate_request(url: str, method: str = "GET") -> int:
-    """Validate the raw URL before any opener (including an injected opener) is called."""
+def _bounded_uint(value: str, max_digits: int, minimum: int, maximum: int, label: str) -> int:
+    if not value.isascii() or not value.isdecimal() or len(value) > max_digits:
+        raise PolicyError(f"{label} is invalid")
+    number = int(value, 10)
+    if not minimum <= number <= maximum:
+        raise PolicyError(f"{label} is invalid")
+    return number
+
+
+def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
+    """Validate a raw URL against all approved routes or operational live routes."""
+    if tier not in ("any", "operational"):
+        raise PolicyError("transport tier is invalid")
     if not isinstance(url, str) or not url or len(url) > MAX_URL_LENGTH:
         raise PolicyError("request URL is invalid")
     if method != "GET":
@@ -89,8 +114,11 @@ def validate_request(url: str, method: str = "GET") -> int:
     if host == "localhost" or host.endswith(".localhost") or "xn--" in host:
         raise PolicyError("host is not approved")
     route = ROUTES.get((host, method, parts.path))
+    route_key = (host, method, parts.path)
     if route is None:
         raise PolicyError("host, method, or path is not approved")
+    if tier == "operational" and route_key not in OPERATIONAL_ROUTES:
+        raise PolicyError("route is not approved for operational live transport")
     if "%" in parts.path or any(seg in (".", "..") for seg in parts.path.split("/")):
         raise PolicyError("URL path is not canonical")
     allowed_keys, max_bytes = route
@@ -108,41 +136,130 @@ def validate_request(url: str, method: str = "GET") -> int:
         raise PolicyError("request query is incomplete")
     if any(not k.isascii() or not v.isascii()
            or any(ord(ch) < 0x20 or ord(ch) == 0x7f for ch in k + v)
+           or ";" in k or ";" in v
            for k, v in pairs):
         raise PolicyError("request query contains invalid characters")
+    for key, value in pairs:
+        if key in ("symbol", "pair"):
+            if not re.fullmatch(r"[A-Z0-9]{3,30}", value):
+                raise PolicyError("instrument query value is invalid")
+        elif key == "interval":
+            allowed_intervals = ({"1", "5", "15", "30", "60", "240", "1440"}
+                                 if host == "api.kraken.com"
+                                 else {"1m", "5m", "15m", "30m", "1h", "4h", "1d"})
+            if value not in allowed_intervals:
+                raise PolicyError("candle interval is not approved")
+        elif key == "limit":
+            _bounded_uint(value, 4, 1, 1000, "candle limit")
+        elif key in ("startTime", "endTime"):
+            _bounded_uint(value, 13, 946684800000, 4102444800000, "candle timestamp")
+        elif key == "since":
+            _bounded_uint(value, 10, 946684800, 4102444800, "history cursor")
+        elif key == "granularity":
+            if value not in {"60", "300", "900", "3600", "21600", "86400"}:
+                raise PolicyError("candle granularity is not approved")
+        elif key in ("start", "end"):
+            from datetime import datetime
+            if not value.isascii() or not value.endswith("Z"):
+                raise PolicyError("research time value is invalid")
+            try:
+                datetime.fromisoformat(value[:-1] + "+00:00")
+            except ValueError:
+                raise PolicyError("research time value is invalid")
     return max_bytes
 
 
-def _set_socket_timeout(response, remaining: float) -> None:
-    """Require a real socket so a slow-drip peer cannot defeat the total deadline."""
+def _capture_response_socket(response):
+    """Capture the underlying socket before HTTPResponse may clear its fp."""
     try:
-        sock = response.fp.raw._sock
-        sock.settimeout(max(0.001, remaining))
-    except (AttributeError, OSError, TypeError):
+        return response.fp.raw._sock
+    except (AttributeError, TypeError):
         raise PolicyError("cannot enforce response deadline")
 
 
+def _set_socket_timeout(sock, remaining: float) -> None:
+    """Bound the next socket read by the remaining body-read budget."""
+    try:
+        sock.settimeout(remaining)
+    except (AttributeError, OSError, TypeError, ValueError):
+        raise PolicyError("cannot enforce response deadline")
+
+
+def _content_length(headers):
+    """Return a single ASCII decimal Content-Length, or None when absent."""
+    if headers is None:
+        return None
+    get_all = getattr(headers, "get_all", None)
+    values = get_all("Content-Length") if callable(get_all) else None
+    if values is None:
+        value = headers.get("Content-Length")
+        values = [] if value is None else [value]
+    transfer_get_all = getattr(headers, "get_all", None)
+    transfer_values = transfer_get_all("Transfer-Encoding") if callable(transfer_get_all) else None
+    if transfer_values is None:
+        transfer_value = headers.get("Transfer-Encoding")
+        transfer_values = [] if transfer_value is None else [transfer_value]
+    # Chunked framing is deliberately unsupported; reject it before read1() parses it.
+    if transfer_values:
+        raise PolicyError("response transfer encoding is not approved")
+    if not values:
+        return None
+    if len(values) != 1:
+        raise PolicyError("response length header is duplicated")
+    value = str(values[0])
+    if not value or not value.isascii() or not value.isdecimal():
+        raise PolicyError("response length header is invalid")
+    try:
+        return int(value, 10)
+    except (ValueError, OverflowError):
+        raise PolicyError("response length header is invalid")
+
+
 def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
-    """Read at most max_bytes, enforce a wall-clock deadline, and reject overflow."""
+    """Read a bounded body; enforce the deadline across individual body socket reads.
+
+    The absolute deadline begins when body reading starts. urllib's opener timeout is
+    separate and applies per socket operation during connect/TLS/headers; it is not
+    a whole-request deadline, so slow-drip headers may take longer than one timeout.
+    """
+    if type(max_bytes) is not int or max_bytes < 0:
+        raise PolicyError("response size limit is invalid")
+    if type(timeout_seconds) not in (int, float):
+        raise PolicyError("response deadline is invalid")
+    try:
+        timeout_value = float(timeout_seconds)
+    except (ValueError, OverflowError):
+        raise PolicyError("response deadline is invalid")
+    if not math.isfinite(timeout_value) or timeout_value <= 0:
+        raise PolicyError("response deadline is invalid")
     headers = getattr(response, "headers", None)
-    if headers is not None:
-        declared = headers.get("Content-Length")
-        if declared is not None:
-            if not str(declared).isdigit():
-                raise PolicyError("response length header is invalid")
-            if int(declared) > max_bytes:
-                raise PolicyError("response exceeds the approved size limit")
-    deadline = time.monotonic() + timeout_seconds
+    declared = _content_length(headers)
+    if declared is not None and declared > max_bytes:
+        raise PolicyError("response exceeds the approved size limit")
+
+    # Capture once: http.client.HTTPResponse clears response.fp when Content-Length
+    # is fully consumed, but the captured socket remains available for final checks.
+    sock = _capture_response_socket(response)
+    deadline = time.monotonic() + timeout_value
     chunks = []
     total = 0
     while True:
+        isclosed = getattr(response, "isclosed", None)
+        if callable(isclosed) and isclosed():
+            break
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise PolicyError("response deadline exceeded")
-        _set_socket_timeout(response, remaining)
-        chunk = response.read(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+            raise ResponseDeadlineError("response deadline exceeded")
+        _set_socket_timeout(sock, remaining)
+        read1 = getattr(response, "read1", None)
+        if not callable(read1):
+            raise PolicyError("response does not support bounded single-read operation")
+        try:
+            chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+        except (TimeoutError, socket.timeout) as exc:
+            raise ResponseDeadlineError("response deadline exceeded") from exc
         if time.monotonic() > deadline:
-            raise PolicyError("response deadline exceeded")
+            raise ResponseDeadlineError("response deadline exceeded")
         if not isinstance(chunk, (bytes, bytearray)):
             raise PolicyError("response body is invalid")
         if not chunk:
@@ -151,4 +268,6 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
         if total > max_bytes:
             raise PolicyError("response exceeds the approved size limit")
         chunks.append(bytes(chunk))
+    if declared is not None and total != declared:
+        raise PolicyError("response body length does not match Content-Length")
     return b"".join(chunks)

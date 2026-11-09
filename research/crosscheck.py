@@ -1,8 +1,8 @@
-"""research/crosscheck.py - compare the preserved Binance daily candles with independent sources.
+"""research/crosscheck.py - compare preserved Binance daily candles with Coinbase research data.
 
-READ-ONLY. Coinbase BTC/USD (docs read) is compared over the whole history. Bitstamp BTC/USD
-(docs NOT read this session, so treated as unverified) is compared only around flagged days.
-USD is not USDT, so small differences are normal; this checks that a flagged day really happened.
+READ-ONLY. Coinbase BTC/USD is research-only and compared over the whole history.
+Bitstamp is excluded pending separate source authorization. USD is not USDT, so small
+differences are normal; this checks whether a flagged day appears on an independent venue.
 The Binance candles are never changed.
 """
 import json
@@ -14,13 +14,13 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import fetcher
+import transport_policy
 import providers
 from fetcher import ApiError, Candle
 from validator import bad_ohlc
 
 DAY = 86400
-COINBASE = fetcher.provider_base_url("coinbase-research")
-BITSTAMP = "https://www.bitstamp.net"
+COINBASE = transport_policy.provider_base_url("coinbase-research")
 # Pre-stated rule for a flagged day (written before looking at the answer):
 TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
 
@@ -58,28 +58,6 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
             except (KeyError, TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError("Coinbase response contains an invalid candle row")
         cur = end
-    return out
-
-
-def fetch_bitstamp_window(http, first_ts, days):
-    q = urllib.parse.urlencode({"step": DAY, "limit": days, "start": first_ts})
-    obj = http.get(f"{BITSTAMP}/api/v2/ohlc/btcusd/?{q}")
-    if not isinstance(obj, dict) or not isinstance(obj.get("data"), dict):
-        raise ApiError("Bitstamp response has an invalid candle structure")
-    rows = obj["data"].get("ohlc")
-    if not isinstance(rows, list):
-        raise ApiError("Bitstamp response has an invalid candle structure")
-    out = {}
-    for row in rows:
-        if not isinstance(row, dict):
-            raise ApiError("Bitstamp response contains an invalid candle row")
-        try:
-            ts = fetcher.to_seconds(row["timestamp"])
-            out[ts] = _validated_research_candle(
-                ts, row["open"], row["high"], row["low"], row["close"], row["volume"]
-            )
-        except (KeyError, TypeError, ValueError, OverflowError):
-            raise ApiError("Bitstamp response contains an invalid candle row")
     return out
 
 

@@ -1,8 +1,4 @@
-"""End-to-end tests against a FAKE exchange. All prices are SYNTHETIC test data.
-
-These prove the pipeline logic works. They do NOT prove Tokocrypto is reachable
-from GitHub; only a real run of the workflow can show that.
-"""
+"""End-to-end tests against a FAKE exchange. All prices are SYNTHETIC test data."""
 import json
 import os
 import sys
@@ -16,36 +12,50 @@ import fetcher  # noqa: E402
 import run  # noqa: E402
 
 NO_SLEEP = lambda seconds: None  # noqa: E731
-NOW = 1_700_000_000 + 120        # arbitrary fixed "exchange time"
-CFG = {"exchange": "tokocrypto", "pair": "BTC_USDT", "timeframe": "1h", "lookback_days": 30,
-       "mode": "read_only", "max_missing_ratio": 0.02, "max_spike_pct": 10,
-       "http_timeout_seconds": 5, "http_retries": 2,
-       "sources": [{"name": "src-a", "style": "binance_style", "base_url": "https://a.test"},
-                   {"name": "src-b", "style": "open_v1", "base_url": "https://b.test"}]}
+NOW = 1_700_000_000 + 120
+CFG = {
+    "exchange": "tokocrypto",
+    "pair": "BTC_USDT",
+    "timeframe": "1h",
+    "lookback_days": 30,
+    "mode": "read_only",
+    "max_missing_ratio": 0.02,
+    "max_spike_pct": 10,
+    "http_timeout_seconds": 5,
+    "http_retries": 2,
+    "sources": [{"name": "tokocrypto-mbx", "provider_id": "tokocrypto"}],
+}
 
 
-def fake_exchange(now_s, blocked_hosts=()):
-    """Pretends to be both endpoint styles. Hosts in blocked_hosts answer 403."""
+def fake_exchange(now_s, blocked=False):
+    """Synthetic Tokocrypto-compatible responses for the two approved public routes."""
+    calls = []
+
     def opener(url, timeout):
-        p = urllib.parse.urlparse(url)
-        if p.hostname in blocked_hosts:
-            return 403, b"<html>Access denied</html>"
-        q = urllib.parse.parse_qs(p.query)
-        if p.path == "/api/v3/time":
+        calls.append(url)
+        parsed = urllib.parse.urlparse(url)
+        if blocked:
+            return 403, b"unavailable"
+        query = urllib.parse.parse_qs(parsed.query)
+        if parsed.hostname != "www.tokocrypto.site":
+            raise AssertionError("unexpected provider host")
+        if parsed.path == "/api/v3/time":
             return 200, json.dumps({"serverTime": now_s * 1000}).encode()
-        if p.path == "/open/v1/common/time":
-            return 200, json.dumps({"code": 0, "msg": "success", "data": now_s * 1000}).encode()
-        if p.path in ("/api/v3/klines", "/open/v1/market/klines"):
-            step = fetcher.TF_SECONDS[q["interval"][0]]
-            start, end = int(q["startTime"][0]) // 1000, int(q["endTime"][0]) // 1000
+        if parsed.path == "/api/v3/klines":
+            step = fetcher.TF_SECONDS[query["interval"][0]]
+            start = int(query["startTime"][0]) // 1000
+            end = int(query["endTime"][0]) // 1000
             first = -(-start // step) * step
-            rows = [[t * 1000, str(60000 + t % 97), str(60100 + t % 97), str(59900 + t % 97),
-                     str(60001 + t % 97), "5.0", t * 1000 + step * 1000 - 1, "300000", 10]
-                    for t in range(first, end + 1, step)][:int(q["limit"][0])]
-            if p.path == "/open/v1/market/klines":
-                return 200, json.dumps({"code": 0, "msg": "success", "data": rows}).encode()
+            rows = [
+                [t * 1000, str(60000 + t % 97), str(60100 + t % 97),
+                 str(59900 + t % 97), str(60001 + t % 97), "5.0",
+                 t * 1000 + step * 1000 - 1, "300000", 10]
+                for t in range(first, end + 1, step)
+            ][:int(query["limit"][0])]
             return 200, json.dumps(rows).encode()
-        return 404, b""
+        raise AssertionError("probe attempted an unapproved path")
+
+    opener.calls = calls
     return opener
 
 
@@ -55,39 +65,39 @@ def read(*parts):
 
 
 class PipelineTests(unittest.TestCase):
-    def test_full_run_uses_first_source(self):
+    def test_full_run_uses_only_approved_tokocrypto_source(self):
+        opener = fake_exchange(NOW)
         with tempfile.TemporaryDirectory() as out:
-            code = run.run_pipeline(CFG, out, fake_exchange(NOW), NO_SLEEP, NOW)
+            code = run.run_pipeline(CFG, out, opener, NO_SLEEP, NOW)
             self.assertEqual(code, 0)
             result = json.loads(read(out, "report.json"))
             self.assertEqual(result["status"], "PASS")
-            self.assertEqual(result["source"], "src-a")
-            self.assertEqual(result["requests_made"], 2)          # 720 candles / 500 per request
+            self.assertEqual(result["source"], "tokocrypto-mbx")
+            self.assertEqual(result["requests_made"], 2)
             self.assertEqual(result["stats"]["forming_dropped"], 1)
+            self.assertEqual(len(opener.calls), 3)  # time + two candle pages
+            self.assertTrue(all(urllib.parse.urlparse(url).hostname == "www.tokocrypto.site"
+                                for url in opener.calls))
+            self.assertTrue(all(urllib.parse.urlparse(url).path in
+                                ("/api/v3/time", "/api/v3/klines") for url in opener.calls))
             lines = read(out, "candles.csv").strip().splitlines()
             self.assertEqual(len(lines) - 1, result["stats"]["closed_candles"])
             self.assertIn("READ-ONLY", read(out, "report.md"))
 
-    def test_falls_back_to_second_source_and_says_so(self):
+    def test_unapproved_provider_is_rejected_before_any_request(self):
+        opener = fake_exchange(NOW)
+        bad_cfg = dict(CFG, sources=[{"name": "bad", "provider_id": "coinbase-research"}])
         with tempfile.TemporaryDirectory() as out:
-            code = run.run_pipeline(CFG, out, fake_exchange(NOW, {"a.test"}), NO_SLEEP, NOW)
-            self.assertEqual(code, 0)
-            result = json.loads(read(out, "report.json"))
-            self.assertEqual(result["source"], "src-b")
-            self.assertFalse(result["attempts"][0]["ok"])
-            self.assertIn("403", result["attempts"][0]["detail"])
-            self.assertTrue(result["attempts"][1]["ok"])
-            self.assertIn("src-a", read(out, "report.md"))
+            with self.assertRaises(ValueError):
+                run.run_pipeline(bad_cfg, out, opener, NO_SLEEP, NOW)
+        self.assertEqual(opener.calls, [])
 
-    def test_all_sources_blocked_gives_error_report_and_no_data(self):
+    def test_blocked_source_gives_error_report_and_no_data(self):
         with tempfile.TemporaryDirectory() as out:
-            code = run.run_pipeline(CFG, out, fake_exchange(NOW, {"a.test", "b.test"}),
-                                    NO_SLEEP, NOW)
+            code = run.run_pipeline(CFG, out, fake_exchange(NOW, blocked=True), NO_SLEEP, NOW)
             self.assertEqual(code, 1)
             text = read(out, "report.md")
             self.assertIn("API ERROR", text)
-            self.assertIn("src-a", text)
-            self.assertIn("src-b", text)
             self.assertIn("Nothing is made up", text)
             self.assertFalse(os.path.exists(os.path.join(out, "candles.csv")))
 
@@ -104,7 +114,6 @@ class PipelineTests(unittest.TestCase):
 
 
 class SafetyScanTests(unittest.TestCase):
-    """The program files must contain nothing that can trade or hold credentials."""
     FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
                  "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
                  "hmac", "api_key", "apikey", "secret", "withdraw", "password"]
@@ -116,11 +125,11 @@ class SafetyScanTests(unittest.TestCase):
                 for word in self.FORBIDDEN:
                     self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
 
-    def test_only_public_market_urls_are_used(self):
+    def test_only_approved_public_market_paths_are_used(self):
         text = read(ROOT, "fetcher.py")
-        for allowed in ("/api/v3/time", "/api/v3/klines", "/open/v1/common/time",
-                        "/open/v1/market/klines", "/open/v1/common/symbols"):
-            self.assertIn(allowed, text)
+        self.assertIn("/api/v3/time", text)
+        self.assertIn("/api/v3/klines", text)
+        self.assertNotIn("/open/v1/", text)
 
 
 if __name__ == "__main__":

@@ -26,18 +26,11 @@ class StubHttp:
 
 
 class ResearchSanitizationTests(unittest.TestCase):
-    def test_crosscheck_rejects_out_of_range_coinbase_and_bitstamp_timestamps(self):
+    def test_crosscheck_rejects_out_of_range_coinbase_timestamps(self):
         bad_ts = 4_102_444_801
         coinbase = StubHttp([[bad_ts, 9, 12, 10, 11, 3.5]])
         with self.assertRaisesRegex(ApiError, "Coinbase response contains an invalid candle row"):
             crosscheck.fetch_coinbase_daily(coinbase, 1_700_000_000, 1_700_000_000)
-
-        bitstamp = StubHttp({"data": {"ohlc": [{
-            "timestamp": str(bad_ts), "open": "10", "high": "12", "low": "9",
-            "close": "11", "volume": "3.5",
-        }]}})
-        with self.assertRaisesRegex(ApiError, "Bitstamp response contains an invalid candle row"):
-            crosscheck.fetch_bitstamp_window(bitstamp, 1_700_000_000, 1)
 
     def test_crosscheck_rejects_non_finite_and_impossible_research_candles(self):
         ts = 1_700_000_000
@@ -56,27 +49,11 @@ class ResearchSanitizationTests(unittest.TestCase):
                 ):
                     crosscheck.fetch_coinbase_daily(http, ts, ts)
 
-            with self.subTest(provider="Bitstamp", values=(low, high, open_, close, volume)):
-                http = StubHttp({"data": {"ohlc": [{
-                    "timestamp": str(ts), "open": open_, "high": high, "low": low,
-                    "close": close, "volume": volume,
-                }]}})
-                with self.assertRaisesRegex(
-                    ApiError, "Bitstamp response contains an invalid candle row"
-                ):
-                    crosscheck.fetch_bitstamp_window(http, ts, 1)
+
 
         valid_coinbase = StubHttp([[ts, "9", "12", "10", "11", "1"]])
         self.assertEqual(
             crosscheck.fetch_coinbase_daily(valid_coinbase, ts, ts)[ts],
-            Candle(ts, 10.0, 12.0, 9.0, 11.0, 1.0),
-        )
-        valid_bitstamp = StubHttp({"data": {"ohlc": [{
-            "timestamp": str(ts), "open": "10", "high": "12", "low": "9",
-            "close": "11", "volume": "1",
-        }]}})
-        self.assertEqual(
-            crosscheck.fetch_bitstamp_window(valid_bitstamp, ts, 1)[ts],
             Candle(ts, 10.0, 12.0, 9.0, 11.0, 1.0),
         )
 
@@ -109,23 +86,23 @@ class ResearchSanitizationTests(unittest.TestCase):
                 timeout=1, retries=1)
             self.assertNotIn(MARKER, json.dumps(result))
 
-    def test_bitstamp_crosscheck_error_is_sanitized(self):
+    def test_bitstamp_is_excluded_without_network_request(self):
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
         candles = [Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.5, 1.0)]
+        requested = []
 
         def opener(url, timeout):
-            if "coinbase" in url:
-                return 200, b"[]"
-            return 200, json.dumps({"error": MARKER}).encode()
+            requested.append(url)
+            return 200, b"[]"
 
         with tempfile.TemporaryDirectory() as out:
             result = crosscheck.run_crosscheck(
                 manifest, candles, ["2023-11-14"], out, opener=opener, sleep=lambda _: None,
                 timeout=1, retries=1)
-            self.assertIsNotNone(result["bitstamp_error"])
-            self.assertNotIn(MARKER, json.dumps(result))
-            with open(os.path.join(out, "crosscheck.md"), encoding="utf-8") as f:
-                self.assertNotIn(MARKER, f.read())
+            self.assertEqual(result["bitstamp_error"], "Bitstamp source is excluded by policy")
+            self.assertTrue(requested)
+            self.assertTrue(all("coinbase" in url for url in requested))
+            self.assertFalse(any("bitstamp" in url for url in requested))
 
     def test_history_report_and_step_summary_do_not_leak_exchange_identity(self):
         cfg = {

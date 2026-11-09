@@ -17,13 +17,39 @@ from test_btc_signal import candles_from_closes, wave, write_dataset
 BASE_URL = "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=40"
 
 
+class FakeSocket:
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+
+class FakeRaw:
+    def __init__(self):
+        self._sock = FakeSocket()
+
+
+class FakeFile:
+    def __init__(self):
+        self.raw = FakeRaw()
+
+
 class FakeResp:
     def __init__(self, body, status=200):
         self._body = body
+        self._offset = 0
         self.status = status
+        self.headers = {"Content-Length": str(len(body))}
+        self.fp = FakeFile()
+
+    def read1(self, size=-1):
+        chunk = self._body[self._offset:self._offset + size]
+        self._offset += len(chunk)
+        return chunk
+
+    def isclosed(self):
+        return self._offset >= len(self._body)
 
     def read(self):
-        return self._body
+        return self.read1()
 
     def __enter__(self):
         return self

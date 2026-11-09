@@ -88,6 +88,10 @@ class AdapterTests(unittest.TestCase):
     def http(self, opener):
         return providers.Http(5, 1, opener, NO_SLEEP)
 
+    def test_tokocrypto_is_not_registered_as_a_live_provider(self):
+        with self.assertRaises(ValueError):
+            providers.build("tokocrypto")
+
     def test_kraken_maps_fields_and_drops_nothing_itself(self):
         c = providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(fake(NOW)))
         self.assertEqual((c[0].open, c[0].high, c[0].low, c[0].close, c[0].volume),
@@ -166,24 +170,24 @@ class LiveCheckTests(unittest.TestCase):
         code, data, md, files = run(CFG, fake(NOW))
         self.assertEqual(code, 0)
         self.assertEqual(data["status"], "PASS")
-        self.assertEqual([r["verdict"] for r in data["providers"]], ["VERIFIED"] * 4)
+        self.assertEqual([r["provider"] for r in data["providers"]], ["kraken", "binance-vision"])
+        self.assertEqual([r["verdict"] for r in data["providers"]], ["VERIFIED"] * 2)
         self.assertIn("candles_kraken.csv", files)
         self.assertIn("HTTP evidence", md)
         self.assertEqual(data["cross_check"]["spread_pct"], 0.0)
 
     def test_one_blocked_provider_does_not_break_the_others(self):
-        code, data, md, files = run(CFG, fake(NOW, blocked={"www.tokocrypto.site"}))
+        code, data, md, files = run(CFG, fake(NOW, blocked={"data-api.binance.vision"}))
         by = {r["provider"]: r for r in data["providers"]}
-        self.assertEqual(by["tokocrypto"]["verdict"], "BLOCKED FROM RUNNER")
-        self.assertIn("HTTP 451", by["tokocrypto"]["detail"])
+        self.assertEqual(by["binance-vision"]["verdict"], "BLOCKED FROM RUNNER")
+        self.assertIn("HTTP 451", by["binance-vision"]["detail"])
         self.assertEqual(by["kraken"]["verdict"], "VERIFIED")
         self.assertEqual(data["status"], "PASS")
-        self.assertNotIn("candles_tokocrypto.csv", files)
+        self.assertNotIn("candles_binance-vision.csv", files)
         self.assertIn("BLOCKED FROM RUNNER", md)
 
     def test_everything_blocked_is_FAIL_and_shows_no_prices(self):
-        hosts = {"api.kraken.com", "api.exchange.coinbase.com", "data-api.binance.vision",
-                 "www.tokocrypto.site"}
+        hosts = {"api.kraken.com", "data-api.binance.vision"}
         code, data, md, files = run(CFG, fake(NOW, blocked=hosts))
         self.assertEqual(code, 1)
         self.assertEqual(data["status"], "FAIL")
