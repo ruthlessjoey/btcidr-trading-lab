@@ -360,6 +360,35 @@ class SplitTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             splits_mod.make_splits(300)
 
+    def test_invalid_split_fractions_and_types_are_refused(self):
+        for kwargs in (
+            {"train": 0}, {"train": 1}, {"train": float("nan")},
+            {"train": float("inf")}, {"train": True}, {"val": 0},
+            {"val": 1}, {"val": float("nan")}, {"val": True},
+            {"train": 0.7, "val": 0.3}, {"warmup": True}, {"warmup": 0},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(EngineError):
+                splits_mod.make_splits(1000, **kwargs)
+
+    def test_split_validator_rejects_gaps_overlaps_and_non_integer_bounds(self):
+        good = splits_mod.make_splits(1000, warmup=60)
+        bad_windows = []
+        bad = dict(good)
+        bad["validation"] = (good["validation"][0] + 1, good["validation"][1])
+        bad_windows.append(bad)
+        bad = dict(good)
+        bad["validation"] = (good["validation"][0] - 1, good["validation"][1])
+        bad_windows.append(bad)
+        bad = dict(good)
+        bad["test"] = (good["test"][0], 1001)
+        bad_windows.append(bad)
+        bad = dict(good)
+        bad["train"] = (True, good["train"][1])
+        bad_windows.append(bad)
+        for windows in bad_windows:
+            with self.subTest(windows=windows), self.assertRaises(EngineError):
+                splits_mod.validate_splits(1000, windows)
+
     def test_validation_run_ignores_the_test_window(self):
         c = toy.toy_candles(1000)
         sp = splits_mod.make_splits(1000, warmup=60)
@@ -435,6 +464,23 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(EngineError) as ctx:
             selection.evaluate_test(self.c, frozen, altered)
         self.assertIn("split window differs", str(ctx.exception))
+
+    def test_selection_and_freeze_refuse_invalid_split_layouts(self):
+        bad = dict(self.sp)
+        bad["validation"] = (self.sp["validation"][0] + 1, self.sp["validation"][1])
+        with self.assertRaises(EngineError):
+            selection.select(self.c, bad)
+        selected = selection.select(self.c, self.sp)
+        with self.assertRaises(EngineError):
+            selection.freeze(selected, bad, {"sha256": "c" * 64}, self.c)
+
+    def test_evaluation_rejects_invalid_frozen_split_layout(self):
+        frozen = self.freeze()
+        frozen["splits"]["validation"]["start_index"] += 1
+        body = {k: v for k, v in frozen.items() if k != "frozen_hash"}
+        frozen["frozen_hash"] = selection.hashlib.sha256(selection._canon(body).encode()).hexdigest()
+        with self.assertRaises(EngineError):
+            selection.evaluate_test(self.c, frozen, self.sp)
 
     def test_test_window_is_evaluated_once_and_a_second_look_is_refused(self):
         f = self.freeze()
