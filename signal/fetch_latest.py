@@ -22,6 +22,7 @@ import math
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -74,7 +75,7 @@ def fetch_body(url, opener=None):
         if status != 200 or not isinstance(body, (bytes, bytearray)) or len(body) > limit:
             raise FetchError("request rejected or unavailable; nothing written")
         return bytes(body)
-    except (transport_policy.PolicyError, urllib.error.URLError, TimeoutError, OSError, ValueError):
+    except (fetcher.ApiError, transport_policy.PolicyError, urllib.error.URLError, TimeoutError, OSError, ValueError):
         raise FetchError("request rejected or unavailable; nothing written")
 
 
