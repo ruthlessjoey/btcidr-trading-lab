@@ -1,4 +1,4 @@
-"""Regression tests for the M4a review fixes. Offline only: fixture responders and a patched urlopen. No network.
+"""Regression tests for the M4a review fixes. Offline only: fixture responders and a patched urllib opener. No network.
 
 Covers: Kraken since-boundary tolerance, Kraken's 720-most-recent history limit, live-transport connection errors,
 and empty intermediate pages.
