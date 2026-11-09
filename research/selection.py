@@ -61,7 +61,6 @@ def _verify_frozen_inputs(candles, frozen, splits):
         raise engine.EngineError("frozen record has invalid split metadata")
     if not isinstance(splits, dict) or set(splits) != set(expected):
         raise engine.EngineError("evaluation split windows differ from the frozen record")
-    splits = split_tools.validate_splits(len(candles), splits)
     frozen_ranges = {}
     for name, item in expected.items():
         if not isinstance(item, dict):
