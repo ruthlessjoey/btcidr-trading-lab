@@ -30,12 +30,20 @@ def normalize_rows(rows, start_s, end_s, now_s, timeframe_s, provider_name):
     """Returns (candles tuple, stats dict). Raises ProviderError for any unusable row set."""
     by_time = {}
     duplicates_removed = 0
-    for raw in rows:
+    try:
+        row_iterator = iter(rows)
+    except TypeError:
+        raise ProviderError("bad_payload", provider_name, "candle rows must be iterable")
+
+    for row_index, raw in enumerate(row_iterator):
+        if not isinstance(raw, (list, tuple)) or len(raw) != 6:
+            raise ProviderError("bad_payload", provider_name,
+                                f"candle row #{row_index} must contain exactly 6 fields")
         try:
-            candle = mc.Candle(raw[0], raw[1], raw[2], raw[3], raw[4], raw[5])
+            candle = mc.Candle(*raw)
             mc.check_alignment(candle, timeframe_s)
-        except mc.CandleError as e:
-            raise ProviderError("bad_payload", provider_name, f"invalid candle at {raw[0]}: {e}")
+        except (mc.CandleError, TypeError, OverflowError) as e:
+            raise ProviderError("bad_payload", provider_name, f"invalid candle in row #{row_index}: {e}")
         previous = by_time.get(candle.open_time_s)
         if previous is None:
             by_time[candle.open_time_s] = candle
