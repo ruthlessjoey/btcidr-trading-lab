@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ipaddress
+import math
 import re
 import socket
 import time
@@ -139,7 +140,10 @@ def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
             if not re.fullmatch(r"[A-Z0-9]{3,30}", value):
                 raise PolicyError("instrument query value is invalid")
         elif key == "interval":
-            if value not in {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}:
+            allowed_intervals = ({"1", "5", "15", "30", "60", "240", "1440"}
+                                 if host == "api.kraken.com"
+                                 else {"1m", "5m", "15m", "30m", "1h", "4h", "1d"})
+            if value not in allowed_intervals:
                 raise PolicyError("candle interval is not approved")
         elif key == "limit":
             _bounded_uint(value, 4, 1, 1000, "candle limit")
@@ -207,7 +211,13 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
     """
     if type(max_bytes) is not int or max_bytes < 0:
         raise PolicyError("response size limit is invalid")
-    if not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
+    if type(timeout_seconds) not in (int, float):
+        raise PolicyError("response deadline is invalid")
+    try:
+        timeout_value = float(timeout_seconds)
+    except (ValueError, OverflowError):
+        raise PolicyError("response deadline is invalid")
+    if not math.isfinite(timeout_value) or timeout_value <= 0:
         raise PolicyError("response deadline is invalid")
     headers = getattr(response, "headers", None)
     declared = _content_length(headers)
@@ -217,7 +227,7 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
     # Capture once: http.client.HTTPResponse clears response.fp when Content-Length
     # is fully consumed, but the captured socket remains available for final checks.
     sock = _capture_response_socket(response)
-    deadline = time.monotonic() + float(timeout_seconds)
+    deadline = time.monotonic() + timeout_value
     chunks = []
     total = 0
     while True:
@@ -245,4 +255,6 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
         if total > max_bytes:
             raise PolicyError("response exceeds the approved size limit")
         chunks.append(bytes(chunk))
+    if declared is not None and total != declared:
+        raise PolicyError("response body length does not match Content-Length")
     return b"".join(chunks)
