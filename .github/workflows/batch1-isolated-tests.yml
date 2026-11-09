@@ -25,6 +25,13 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /fetcher.py
+            /transport_policy.py
+            /markets/__init__.py
+            /markets/candles.py
+            /markets/providers/__init__.py
+            /markets/providers/errors.py
+            /markets/providers/normalize.py
+            /markets/providers/transport.py
             /providers.py
             /live_check.py
             /report.py
@@ -48,6 +55,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
           PYTHONPATH: .
         run: |
+          python -m unittest discover -s tests -p 'test_transport_policy.py' -v
           python -m unittest discover -s tests -p 'test_fetcher.py' -v
           python -m unittest discover -s tests -p 'test_live_check.py' -v
           python -m unittest discover -s tests -p 'test_research_sanitization.py' -v
