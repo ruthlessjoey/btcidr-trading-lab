@@ -68,6 +68,14 @@ class DatasetPublicationTests(unittest.TestCase):
             with open(manifest_path, "rb") as f:
                 self.assertEqual(f.read(), original_manifest)
 
+    def test_writer_rejects_market_identifiers_that_escape_dataset_folder(self):
+        with tempfile.TemporaryDirectory() as root:
+            bad_market = dict(MARKET)
+            bad_market["provider"] = "../outside"
+            with self.assertRaises(dataset.DatasetError):
+                dataset.write_version(root, bad_market, candles(), 1_700_200_000)
+            self.assertEqual(os.listdir(root), [])
+
     def test_manifest_market_identity_requires_nonempty_strings(self):
         with tempfile.TemporaryDirectory() as root:
             _, manifest_path = dataset.write_version(
