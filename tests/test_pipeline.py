@@ -172,6 +172,8 @@ def scan_forbidden_source(root):
 class SafetyScanTests(unittest.TestCase):
     def test_no_trading_or_credential_code(self):
         self.assertEqual(scan_forbidden_source(ROOT), [])
+        transport_policy = read(ROOT, "transport_policy.py").lower()
+        self.assertIn("parts.password is not none", transport_policy)
 
     def test_nested_production_module_is_scanned(self):
         with tempfile.TemporaryDirectory() as root:
