@@ -482,6 +482,16 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             selection.evaluate_test(self.c, frozen, self.sp)
 
+    def test_evaluation_rejects_boolean_indices_in_supplied_split_windows(self):
+        small_warmup_splits = splits_mod.make_splits(1000, warmup=1)
+        selected = selection.select(self.c, small_warmup_splits)
+        frozen = selection.freeze(selected, small_warmup_splits,
+                                  {"sha256": "d" * 64}, self.c)
+        supplied = dict(small_warmup_splits)
+        supplied["train"] = (True, supplied["train"][1])
+        with self.assertRaises(EngineError):
+            selection.evaluate_test(self.c, frozen, supplied)
+
     def test_evaluation_rejects_malformed_frozen_boundary_timestamps(self):
         for bad_value in (True, 1.5, "1700000000"):
             with self.subTest(value=bad_value):
