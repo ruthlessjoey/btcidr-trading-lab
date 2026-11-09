@@ -59,7 +59,7 @@ def _iso(ts):
 
 class Kraken:
     name, label, quote = "kraken", "BTC/USD", "USD"
-    symbol, base = "XBTUSD", "https://api.kraken.com"
+    symbol, base = "XBTUSD", fetcher.provider_base_url("kraken")
     docs = "https://docs.kraken.com/api-reference/market-data/get-ohlc-data"
     INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
     MAX_CANDLES = 720          # docs: only the most recent 720 entries are available
@@ -174,7 +174,4 @@ def build(name):
         return BinanceStyle("binance-vision", "BTC/USDT", "USDT", "BTC_USDT",
                             "binance-vision",
                             "https://developers.binance.com/docs/binance-spot-api-docs/faqs/market_data_only")
-    if name == "tokocrypto":
-        return BinanceStyle("tokocrypto", "BTC/USDT", "USDT", "BTC_USDT",
-                            "tokocrypto", "https://www.tokocrypto.com/apidocs/")
     raise ValueError(f"unknown provider {name!r}")
