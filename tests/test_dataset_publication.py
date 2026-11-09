@@ -43,10 +43,13 @@ class DatasetPublicationTests(unittest.TestCase):
                              sorted([os.path.basename(csv_path),
                                      os.path.basename(manifest_path)]))
 
-    def test_manifest_write_failure_removes_only_this_attempts_csv(self):
+    def test_partial_manifest_write_failure_removes_only_this_attempts_files(self):
+        def partial_dump(obj, stream, **kwargs):
+            stream.write('{"partial":')
+            raise OSError("synthetic partial manifest write failure")
+
         with tempfile.TemporaryDirectory() as root:
-            with mock.patch.object(dataset.json, "dump",
-                                   side_effect=OSError("synthetic manifest write failure")):
+            with mock.patch.object(dataset.json, "dump", side_effect=partial_dump):
                 with self.assertRaises(OSError):
                     dataset.write_version(root, MARKET, candles(), 1_700_200_000)
             folder = os.path.join(root, dataset.dataset_name(MARKET))
