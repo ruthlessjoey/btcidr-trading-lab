@@ -36,6 +36,10 @@ jobs:
             /live_check.py
             /run.py
             /probe.py
+            /signal/btc_signal.py
+            /signal/fetch_latest.py
+            /signal/test_btc_signal.py
+            /signal/test_fetch_latest.py
             /report.py
             /validator.py
             /research/__init__.py
@@ -62,4 +66,5 @@ jobs:
           python -m unittest discover -s tests -p 'test_fetcher.py' -v
           python -m unittest discover -s tests -p 'test_live_check.py' -v
           python -m unittest discover -s tests -p 'test_probe.py' -v
+          python -m unittest discover -s signal -p 'test_fetch_latest.py' -v
           python -m unittest discover -s tests -p 'test_research_sanitization.py' -v
