@@ -98,8 +98,7 @@ def validate(raw, tf_sec, server_now_s, local_now_s, start_s, end_s, cfg):
     add("closed_candles", PASS,
         f"{len(closed)} closed candles; {forming} still-forming candle(s) excluded")
 
-    t0 = closed[0].time
-    off_grid = sum(1 for c in closed if (c.time - t0) % tf_sec != 0)
+    off_grid = sum(1 for c in closed if c.time % tf_sec != 0)
     add("timestamp_grid", FAIL if off_grid else PASS,
         f"{off_grid} candle(s) not on the {tf_sec}s grid" if off_grid
         else f"all timestamps are exact multiples of {tf_sec}s")

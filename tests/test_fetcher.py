@@ -3,6 +3,7 @@ import os
 import sys
 import unittest
 import urllib.error
+from unittest.mock import Mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
@@ -128,6 +129,15 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertEqual(len(op.calls), 1)
+
+    def test_http_error_response_is_closed_without_reading_body(self):
+        response = Mock()
+        error = urllib.error.HTTPError("u", 404, "Not Found", {}, response)
+        op = scripted(error)
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        response.read.assert_not_called()
+        response.close.assert_called_once_with()
 
     def test_http_error_with_success_status_is_rejected_without_body_access(self):
         marker = "UNIQUE_HTTP_ERROR_REASON_MARKER"

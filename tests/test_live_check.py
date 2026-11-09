@@ -15,7 +15,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import live_check  # noqa: E402
 import providers  # noqa: E402
-from fetcher import ApiError  # noqa: E402
+import validator  # noqa: E402
+from fetcher import ApiError, Candle  # noqa: E402
 
 NO_SLEEP = lambda s: None  # noqa: E731
 NOW = 1_700_003_700          # 1h candles end exactly on multiples of 3600 before this
@@ -199,6 +200,55 @@ class LiveCheckTests(unittest.TestCase):
         self.assertEqual(r["validation"], "FAIL")
         self.assertEqual(data["status"], "FAIL")
         self.assertEqual(code, 1)
+        self.assertNotIn("candles_kraken.csv", files)
+
+    def test_warning_validation_remains_exportable(self):
+        def zero_volume(url, timeout):
+            status, body = fake(NOW)(url, timeout)
+            if urllib.parse.urlparse(url).path == "/0/public/OHLC":
+                payload = json.loads(body)
+                for row in payload["result"]["XXBTZUSD"]:
+                    row[6] = "0"
+                return status, json.dumps(payload).encode()
+            return status, body
+
+        code, data, md, files = run(dict(CFG, live_providers=["kraken"]), zero_volume)
+        result = data["providers"][0]
+        self.assertEqual(code, 0)
+        self.assertEqual(result["validation"], "WARN")
+        self.assertEqual(result["verdict"], "USABLE WITH WARNINGS")
+        self.assertIn("candles_kraken.csv", files)
+
+    def test_invalid_ohlc_is_not_exported_as_candles(self):
+        def invalid_ohlc(url, timeout):
+            status, body = fake(NOW)(url, timeout)
+            if urllib.parse.urlparse(url).path == "/0/public/OHLC":
+                payload = json.loads(body)
+                payload["result"]["XXBTZUSD"][0][2] = "1"
+                return status, json.dumps(payload).encode()
+            return status, body
+
+        code, data, md, files = run(dict(CFG, live_providers=["kraken"]), invalid_ohlc)
+        result = data["providers"][0]
+        self.assertEqual(code, 1)
+        self.assertEqual(result["validation"], "FAIL")
+        self.assertEqual(result["verdict"], "FAILED")
+        self.assertNotIn("candles_kraken.csv", files)
+
+    def test_consistently_shifted_timestamps_fail_epoch_alignment(self):
+        tf_sec = 3600
+        aligned_now = NOW - (NOW % tf_sec)
+        first = aligned_now - 9 * tf_sec + 7
+        candles = [
+            Candle(first + i * tf_sec, 1000.0, 1002.0, 998.0, 1001.0, 1.0)
+            for i in range(10)
+        ]
+        server_now = aligned_now + tf_sec + 60
+        result = validator.validate(
+            candles, tf_sec, server_now, server_now, first, server_now, CFG
+        )
+        checks = {check.name: check.status for check in result.checks}
+        self.assertEqual(checks["timestamp_grid"], "FAIL")
 
     def test_stale_data_fails(self):
         def stale(url, timeout):
