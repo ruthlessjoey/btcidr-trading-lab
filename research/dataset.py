@@ -101,7 +101,7 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest market must be a JSON object")
     csv_file = m["csv_file"]
     if (not isinstance(csv_file, str) or not csv_file or csv_file in (".", "..")
-            or "/" in csv_file or "\\" in csv_file or os.path.basename(csv_file) != csv_file):
+            or "/" in csv_file or "\\" in csv_file or "\x00" in csv_file\n            or os.path.basename(csv_file) != csv_file):
         raise DatasetError("manifest CSV filename must be a plain file name inside its dataset folder")
     if (not isinstance(m["csv_sha256"], str) or len(m["csv_sha256"]) != 64
             or any(ch not in "0123456789abcdef" for ch in m["csv_sha256"])):
