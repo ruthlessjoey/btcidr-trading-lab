@@ -19,7 +19,7 @@ from fetcher import ApiError, Candle
 from validator import bad_ohlc
 
 DAY = 86400
-COINBASE = "https://api.exchange.coinbase.com"
+COINBASE = fetcher.provider_base_url("coinbase-research")
 BITSTAMP = "https://www.bitstamp.net"
 # Pre-stated rule for a flagged day (written before looking at the answer):
 TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
