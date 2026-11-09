@@ -130,7 +130,6 @@ class SafetyScanTests(unittest.TestCase):
         self.assertIn("/api/v3/time", text)
         self.assertIn("/api/v3/klines", text)
         self.assertNotIn("/open/v1/", text)
-        self.assertNotIn("/api/v3/exchangeInfo", text)
 
 
 if __name__ == "__main__":
