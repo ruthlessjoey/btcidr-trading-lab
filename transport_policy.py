@@ -145,8 +145,12 @@ def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
             if value not in {"60", "300", "900", "3600", "21600", "86400"}:
                 raise PolicyError("candle granularity is not approved")
         elif key in ("start", "end"):
-            import re
-            if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z", value):
+            from datetime import datetime
+            if not value.isascii() or not value.endswith("Z"):
+                raise PolicyError("research time value is invalid")
+            try:
+                datetime.fromisoformat(value[:-1] + "+00:00")
+            except ValueError:
                 raise PolicyError("research time value is invalid")
     return max_bytes
 
