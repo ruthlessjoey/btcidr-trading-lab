@@ -5,6 +5,7 @@ Run from the repository root with:
     python3 -B -m unittest discover -s markets -p "test_*.py"
 """
 import ast
+import json
 import os
 import unittest
 import urllib.error
@@ -184,14 +185,14 @@ class NormalizeTests(unittest.TestCase):
 class AdapterNumericOverflowTests(unittest.TestCase):
     def test_binance_numeric_overflow_is_structured_bad_payload(self):
         row = [START * 1000, 10 ** 400, 10 ** 400, 1, 2, 1, (START + DAY) * 1000 - 1]
-        body = __import__("json").dumps([row]).encode("utf-8")
+        body = json.dumps([row]).encode("utf-8")
         with self.assertRaises(ProviderError) as cm:
             BinanceVision().parse_chunk(body, DAY)
         self.assertEqual(cm.exception.kind, "bad_payload")
 
     def test_kraken_numeric_overflow_is_structured_bad_payload(self):
         row = [START, 10 ** 400, 10 ** 400, 1, 2, 1, 1, 1]
-        body = __import__("json").dumps({"error": [], "result": {"XXBTZUSD": [row], "last": 0}}).encode("utf-8")
+        body = json.dumps({"error": [], "result": {"XXBTZUSD": [row], "last": 0}}).encode("utf-8")
         with self.assertRaises(ProviderError) as cm:
             Kraken().parse_chunk(body, DAY)
         self.assertEqual(cm.exception.kind, "bad_payload")
