@@ -37,6 +37,13 @@ class CandidateLookbackTests(unittest.TestCase):
         with self.assertRaisesRegex(EngineError, "longest candidate lookback"):
             selection.freeze(result, short, {"sha256": "a" * 64}, self.candles)
 
+    def test_custom_candidate_freeze_records_its_actual_lookback(self):
+        windows = splits.make_splits(1000, warmup=50)
+        result = selection.select(self.candles, windows, candidates=(20, 50))
+        frozen = selection.freeze(result, windows, {"sha256": "c" * 64}, self.candles)
+        self.assertIn("Candidates: 20, 50", frozen["rule_text"])
+        self.assertIn("starts at index 50", frozen["rule_text"])
+
     def test_evaluation_rejects_boolean_frozen_boundary_timestamps(self):
         windows = splits.make_splits(1000, warmup=200)
         result = selection.select(self.candles, windows)
