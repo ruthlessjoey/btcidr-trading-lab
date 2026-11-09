@@ -1,4 +1,4 @@
-"""Offline tests for the exact public transport policy. No sockets or DNS are used."""
+"""Offline transport-policy tests using synthetic responses and local socketpairs."""
 import http.client
 import os
 import socket
