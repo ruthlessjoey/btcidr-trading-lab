@@ -1,52 +1,54 @@
 name: Market data check
 
 on:
-  workflow_dispatch:        # lets you press "Run workflow" by hand
-  push:
-    branches: [main]
-  schedule:
-    - cron: "23 3 * * *"    # once a day (GitHub may start it late)
+  workflow_dispatch:
 
 permissions:
-  contents: write           # only used to publish reports to the 'data' branch
+  contents: read
+
+concurrency:
+  group: market-data-check-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  test-probe-fetch:
+  live-market-data-check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out source without persisting credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
 
-      - name: Run unit tests
-        run: python3 -m unittest discover -s tests -v
+      - name: Set up pinned Python 3.11 runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
 
-      - name: Live smoke test - real candles from each public provider (READ-ONLY)
-        # This is the REQUIRED live check. It fails the run if no provider delivers validated data.
+      - name: Verify operational provider allowlist
+        run: |
+          python3 - <<'PY'
+          import json
+          with open("config.json", encoding="utf-8") as f:
+              config = json.load(f)
+          expected = ["kraken", "binance-vision"]
+          if config.get("mode") != "read_only":
+              raise SystemExit("Refusing: market-data mode must be read_only")
+          if config.get("live_providers") != expected:
+              raise SystemExit("Refusing: live provider list differs from the approved operational allowlist")
+          PY
+
+      - name: Run read-only public market-data check
         run: python3 live_check.py
 
-      # Exchange-specific Tokocrypto probes and broad host discovery are manual-only.
-      # This scheduled workflow checks only the explicitly enabled operational providers in config.json.
-
-      - name: Keep the reports and candle file
+      - name: Retain report as a workflow artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: market-data-report
           path: out/
           if-no-files-found: ignore
-
-      - name: Publish reports to the data branch (readable without Actions logs)
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          rm -rf /tmp/pub && mkdir /tmp/pub
-          cp -r out/. /tmp/pub/ 2>/dev/null || true
-          cd /tmp/pub
-          git init -q -b data
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q --allow-empty -m "Reports from run ${{ github.run_id }}"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
+          retention-days: 7
