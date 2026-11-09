@@ -96,8 +96,12 @@ def default_opener(url, timeout):
             status = getattr(resp, "status", 200)
             body = transport_policy.read_bounded(resp, limit, timeout)
             return status, body
-    except urllib.error.HTTPError:
-        # HTTPError is a response object too; never read its provider-controlled body.
+    except urllib.error.HTTPError as exc:
+        # HTTPError is a response object too; close it without reading its body.
+        try:
+            exc.close()
+        except Exception:
+            pass
         raise
 
 
