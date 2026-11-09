@@ -84,7 +84,7 @@ def write_version(root_dir, market, candles, fetched_utc_ts, extra=None):
     csv_created = manifest_created = False
     try:
         with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, lineterminator="\\n")
+            w = csv.writer(f, lineterminator="\n")
             w.writerow(CSV_COLUMNS)
             for c in candles:
                 w.writerow([market["provider"], market["symbol"], market["timeframe"], c.time,
@@ -126,7 +126,7 @@ def write_version(root_dir, market, candles, fetched_utc_ts, extra=None):
         with open(man_path, "x", encoding="utf-8") as f:
             manifest_created = True
             json.dump(manifest, f, indent=2)
-            f.write("\\n")
+            f.write("\n")
             f.flush()
             os.fsync(f.fileno())
         return csv_path, man_path
