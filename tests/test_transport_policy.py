@@ -300,7 +300,7 @@ class TransportPolicyTests(unittest.TestCase):
 
     def test_provider_neutral_transport_operational_success_path(self):
         response = FakeResponse(b'{"result":{"unixtime":1700000000}}',
-                                {"Content-Length": "35"})
+                                {"Content-Length": "34"})
         fake_opener = FakeOpener(response)
         with patch("urllib.request.build_opener", return_value=fake_opener):
             body = market_transport.live_transport("https://api.kraken.com/0/public/Time")
