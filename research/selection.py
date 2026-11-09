@@ -64,8 +64,11 @@ def _verify_frozen_inputs(candles, frozen, splits):
         if not isinstance(item, dict):
             raise engine.EngineError(f"frozen {name} split metadata is invalid")
         start, end = item.get("start_index"), item.get("end_index")
-        if (type(start) is not int or type(end) is not int or not 0 <= start < end <= len(candles)
-                or tuple(splits[name]) != (start, end)):
+        supplied = splits[name]
+        if (not isinstance(supplied, (tuple, list)) or len(supplied) != 2
+                or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(candles)
+                or tuple(supplied) != (start, end)):
             raise engine.EngineError(f"{name} split window differs from the frozen record")
         if candles[start].time != item.get("first_open_unix") or candles[end - 1].time != item.get("last_open_unix"):
             raise engine.EngineError(f"{name} candle boundaries differ from the frozen record")
