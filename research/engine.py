@@ -101,8 +101,8 @@ def _validate_costs_and_rules(costs, rules):
         raise EngineError("fraction must be in (0, 1]: no leverage")
     if min_notional < 0:
         raise EngineError("minimum notional must not be negative")
-    if qty_step <= 0:
-        raise EngineError("quantity step must be positive")
+    if qty_step < 1e-12 or round(qty_step, 12) != qty_step:
+        raise EngineError("quantity step must be at least 1e-12 and representable to 12 decimal places")
 
 
 def _floor_step(x, step):
