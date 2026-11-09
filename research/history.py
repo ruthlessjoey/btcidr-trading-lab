@@ -266,17 +266,23 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
             same = again == candles
             if not same:
                 raise dataset.DatasetError("round-trip candles differ from the fetched sequence")
-        except (dataset.DatasetError, OSError, TypeError, ValueError, OverflowError) as e:
+        except (dataset.DatasetError, OSError, TypeError, ValueError, OverflowError,
+                KeyError, IndexError, AttributeError) as e:
             # A failed publication must not leave a discoverable dataset version behind.
             # These paths are returned only by write_version for this exact attempt.
+            cleanup_failed = False
             for path in (man_path, csv_path):
                 if path is not None:
                     try:
                         os.remove(path)
                     except FileNotFoundError:
                         pass
-            add("csv_hash_roundtrip", FAIL,
-                f"dataset publication verification failed ({type(e).__name__})")
+                    except OSError:
+                        cleanup_failed = True
+            detail = f"dataset publication verification failed ({type(e).__name__})"
+            if cleanup_failed:
+                detail += "; cleanup was incomplete and requires manual inspection"
+            add("csv_hash_roundtrip", FAIL, detail)
             result["gate"] = FAIL
             result["dataset"] = None
         else:
