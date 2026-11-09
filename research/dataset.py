@@ -55,8 +55,10 @@ def write_version(root_dir, market, candles, fetched_utc_ts, extra=None):
     if not isinstance(market, dict):
         raise DatasetError("market must be an object")
     for key in ("provider", "symbol", "timeframe"):
-        if not isinstance(market.get(key), str) or not market[key].strip():
-            raise DatasetError(f"market {key} must be a non-empty string")
+        value = market.get(key)
+        if (not isinstance(value, str) or not value.strip()
+                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+            raise DatasetError(f"market {key} must be a safe, non-empty identifier")
     if market["timeframe"] not in TF_SECONDS:
         raise DatasetError("market timeframe is unsupported")
     if not candles:
@@ -172,8 +174,10 @@ def load_verified(manifest_path, expect=None):
     if not isinstance(mk, dict):
         raise DatasetError("manifest market must be a JSON object")
     for key in ("provider", "symbol", "timeframe"):
-        if not isinstance(mk.get(key), str) or not mk[key].strip():
-            raise DatasetError(f"manifest market {key} must be a non-empty string")
+        value = mk.get(key)
+        if (not isinstance(value, str) or not value.strip()
+                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+            raise DatasetError(f"manifest market {key} must be a safe, non-empty identifier")
     if mk["timeframe"] not in TF_SECONDS:
         raise DatasetError("manifest market timeframe is unsupported")
     for key in ("first_open_unix", "last_open_unix"):
