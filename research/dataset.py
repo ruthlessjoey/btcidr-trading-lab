@@ -171,6 +171,16 @@ def load_verified(manifest_path, expect=None):
     mk = m["market"]
     if not isinstance(mk, dict):
         raise DatasetError("manifest market must be a JSON object")
+    for key in ("provider", "symbol", "timeframe"):
+        if not isinstance(mk.get(key), str) or not mk[key].strip():
+            raise DatasetError(f"manifest market {key} must be a non-empty string")
+    if mk["timeframe"] not in TF_SECONDS:
+        raise DatasetError("manifest market timeframe is unsupported")
+    for key in ("first_open_unix", "last_open_unix"):
+        if type(m[key]) is not int or m[key] < 0:
+            raise DatasetError(f"manifest {key} must be a non-negative integer")
+    if m["last_open_unix"] < m["first_open_unix"]:
+        raise DatasetError("manifest last_open_unix precedes first_open_unix")
     csv_file = m["csv_file"]
     if (not isinstance(csv_file, str) or not csv_file or csv_file in (".", "..")
             or "/" in csv_file or "\\" in csv_file or "\x00" in csv_file
@@ -183,9 +193,13 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest row_count must be a positive integer")
     if type(m["timeframe_seconds"]) is not int or m["timeframe_seconds"] <= 0:
         raise DatasetError("manifest timeframe_seconds must be a positive integer")
-    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS
-            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
+    if m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]:
         raise DatasetError("manifest timeframe does not match its timeframe_seconds")
+    expected_rows = ((m["last_open_unix"] - m["first_open_unix"])
+                     // m["timeframe_seconds"]) + 1
+    if ((m["last_open_unix"] - m["first_open_unix"]) % m["timeframe_seconds"]
+            or expected_rows != m["row_count"]):
+        raise DatasetError("manifest timestamp range does not match row_count and timeframe")
     for key, want in (expect or {}).items():
         if mk.get(key) != want:
             raise DatasetError(f"market mismatch: dataset has {key}={mk.get(key)!r}, "
