@@ -418,6 +418,24 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             selection.evaluate_test(self.c, f, self.sp)
 
+    def test_test_evaluation_refuses_changed_candle_content(self):
+        frozen = self.freeze()
+        changed = list(self.c)
+        original = changed[500]
+        changed[500] = Candle(original.time, original.open, original.high, original.low,
+                              original.close + 0.25, original.volume)
+        with self.assertRaises(EngineError) as ctx:
+            selection.evaluate_test(changed, frozen, self.sp)
+        self.assertIn("candle content differs", str(ctx.exception))
+
+    def test_test_evaluation_refuses_changed_split_windows(self):
+        frozen = self.freeze()
+        altered = dict(self.sp)
+        altered["test"] = (self.sp["test"][0] + 1, self.sp["test"][1])
+        with self.assertRaises(EngineError) as ctx:
+            selection.evaluate_test(self.c, frozen, altered)
+        self.assertIn("split window differs", str(ctx.exception))
+
     def test_test_window_is_evaluated_once_and_a_second_look_is_refused(self):
         f = self.freeze()
         with tempfile.TemporaryDirectory() as reg, tempfile.TemporaryDirectory() as out:

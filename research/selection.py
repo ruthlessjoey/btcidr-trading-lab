@@ -47,6 +47,35 @@ def _canon(obj):
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
+def _candles_sha256(candles):
+    """Stable content fingerprint for the exact candle sequence used by a frozen evaluation."""
+    rows = [[c.time, repr(c.open), repr(c.high), repr(c.low), repr(c.close), repr(c.volume)]
+            for c in candles]
+    return hashlib.sha256(_canon(rows).encode()).hexdigest()
+
+
+def _verify_frozen_inputs(candles, frozen, splits):
+    expected = frozen.get("splits")
+    if not isinstance(expected, dict) or set(expected) != {"train", "validation", "test"}:
+        raise engine.EngineError("frozen record has invalid split metadata")
+    if not isinstance(splits, dict) or set(splits) != set(expected):
+        raise engine.EngineError("evaluation split windows differ from the frozen record")
+    for name, item in expected.items():
+        if not isinstance(item, dict):
+            raise engine.EngineError(f"frozen {name} split metadata is invalid")
+        start, end = item.get("start_index"), item.get("end_index")
+        supplied = splits[name]
+        if (not isinstance(supplied, (tuple, list)) or len(supplied) != 2
+                or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(candles)
+                or tuple(supplied) != (start, end)):
+            raise engine.EngineError(f"{name} split window differs from the frozen record")
+        if candles[start].time != item.get("first_open_unix") or candles[end - 1].time != item.get("last_open_unix"):
+            raise engine.EngineError(f"{name} candle boundaries differ from the frozen record")
+    if _candles_sha256(candles) != frozen.get("candles_sha256"):
+        raise engine.EngineError("candle content differs from the dataset frozen before test evaluation")
+
+
 def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_COSTS, code_rev=None):
     """The record that fixes the choice before the test is looked at."""
     body = {"selected_n": selection["selected_n"], "candidates": [r["n"] for r in selection["rows"]],
@@ -54,7 +83,8 @@ def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_C
             "splits": {k: {"start_index": a, "end_index": b,
                            "first_open_unix": candles[a].time, "last_open_unix": candles[b - 1].time}
                        for k, (a, b) in splits.items()},
-            "dataset": dataset, "rules_assumed": rules.__dict__, "code_revision": code_rev,
+            "dataset": dataset, "candles_sha256": _candles_sha256(candles),
+            "rules_assumed": rules.__dict__, "code_revision": code_rev,
             "scores": [{"n": r["n"], "eligible": r["eligible"], "score": r["score"],
                         "train_return": r["train"]["total_return"],
                         "validation_return": r["validation"]["total_return"]} for r in selection["rows"]]}
@@ -87,6 +117,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     """Evaluates the frozen choice on the test window ONCE. A second look at the same frozen
     choice on the same dataset is refused unless allow_reeval is set (and then it is labelled)."""
     verify_frozen(frozen)
+    _verify_frozen_inputs(candles, frozen, splits)
     if frozen["selected_n"] is None:
         return {"status": "not_evaluated", "reason": "no candidate passed the training screen"}
     prior = find_prior_test(registry_dir, frozen)
