@@ -145,9 +145,9 @@ class BinanceStyle:
     """Binance-layout klines. Used for Binance's market-data-only host and for Tokocrypto."""
     MAX_PER_REQUEST = 500
 
-    def __init__(self, name, label, quote, pair, base_url, docs, style="binance_style"):
+    def __init__(self, name, label, quote, pair, provider_id, docs, style="binance_style"):
         self.name, self.label, self.quote, self.docs = name, label, quote, docs
-        self.pair, self.src = pair, fetcher.Source(name, style, base_url)
+        self.pair, self.src = pair, fetcher.Source(name, provider_id, style)
 
     def server_time(self, http):
         return fetcher.extract_server_time(http.get(self.src.time_url()))
@@ -174,9 +174,9 @@ def build(name):
         return Coinbase()
     if name == "binance-vision":
         return BinanceStyle("binance-vision", "BTC/USDT", "USDT", "BTC_USDT",
-                            "https://data-api.binance.vision",
+                            "binance-vision",
                             "https://developers.binance.com/docs/binance-spot-api-docs/faqs/market_data_only")
     if name == "tokocrypto":
         return BinanceStyle("tokocrypto", "BTC/USDT", "USDT", "BTC_USDT",
-                            "https://www.tokocrypto.site", "https://www.tokocrypto.com/apidocs/")
+                            "tokocrypto", "https://www.tokocrypto.com/apidocs/")
     raise ValueError(f"unknown provider {name!r}")
