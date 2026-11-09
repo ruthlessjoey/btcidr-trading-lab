@@ -169,6 +169,12 @@ class NormalizeTests(unittest.TestCase):
                     nz.normalize_rows(rows, START, START, NOW, DAY, "p")
                 self.assertEqual(cm.exception.kind, "bad_payload")
 
+    def test_numeric_conversion_errors_are_structured_bad_payload_errors(self):
+        rows = [(START, 10 ** 10000, 2, 1, 1.5, 1)]
+        with self.assertRaises(ProviderError) as cm:
+            nz.normalize_rows(rows, START, START, NOW, DAY, "p")
+        self.assertEqual(cm.exception.kind, "bad_payload")
+
     def test_gaps_are_never_filled(self):
         rows = [self.row(START), self.row(START + 2 * DAY)]
         candles, _ = nz.normalize_rows(rows, START, START + 2 * DAY, NOW, DAY, "p")
