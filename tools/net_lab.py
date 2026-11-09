@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.parse
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher
 
 
