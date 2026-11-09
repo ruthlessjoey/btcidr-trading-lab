@@ -101,7 +101,7 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest market must be a JSON object")
     csv_file = m["csv_file"]
     if (not isinstance(csv_file, str) or not csv_file or csv_file in (".", "..")
-            or "/" in csv_file or "\\\\" in csv_file or os.path.basename(csv_file) != csv_file):
+            or "/" in csv_file or "\\" in csv_file or os.path.basename(csv_file) != csv_file):
         raise DatasetError("manifest CSV filename must be a plain file name inside its dataset folder")
     if (not isinstance(m["csv_sha256"], str) or len(m["csv_sha256"]) != 64
             or any(ch not in "0123456789abcdef" for ch in m["csv_sha256"])):
@@ -110,7 +110,7 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest row_count must be a positive integer")
     if type(m["timeframe_seconds"]) is not int or m["timeframe_seconds"] <= 0:
         raise DatasetError("manifest timeframe_seconds must be a positive integer")
-    if mk.get("timeframe") not in TF_SECONDS or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]:
+    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS\n            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
         raise DatasetError("manifest timeframe does not match its timeframe_seconds")
     for key, want in (expect or {}).items():
         if mk.get(key) != want:
