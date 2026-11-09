@@ -174,6 +174,25 @@ class TransportPolicyTests(unittest.TestCase):
             client.close()
             server.close()
 
+    def test_real_http_response_rejects_truncated_content_length(self):
+        client, server = socket.socketpair()
+        try:
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhey")
+            server.close()
+            response = http.client.HTTPResponse(client)
+            response.begin()
+            with self.assertRaises(transport_policy.PolicyError):
+                transport_policy.read_bounded(response, 5, 1)
+        finally:
+            client.close()
+
+    def test_non_finite_body_deadline_is_rejected(self):
+        response = FakeResponse(b"")
+        for timeout in (float("nan"), float("inf"), 0, -1, True):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(transport_policy.PolicyError):
+                    transport_policy.read_bounded(response, 10, timeout)
+
     def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
         client, server = socket.socketpair()
         stop = threading.Event()
