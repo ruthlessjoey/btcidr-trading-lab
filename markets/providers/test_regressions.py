@@ -1,4 +1,4 @@
-"""Regression tests for the M4a review fixes. Offline only: fixture responders and a patched urlopen. No network.
+"""Regression tests for the M4a review fixes. Offline only: fixture responders and a patched urllib opener. No network.
 
 Covers: Kraken since-boundary tolerance, Kraken's 720-most-recent history limit, live-transport connection errors,
 and empty intermediate pages.
@@ -32,6 +32,13 @@ LOOKBACK = 1500
 FIRST = END - (LOOKBACK - 1) * DAY
 LISTING = parse_listing("crypto:kraken-spot:BTC-USD")
 FORMING_T = (NOW // DAY) * DAY
+
+
+def patched_live_opener(exc):
+    """Patch the opener actually used by live_transport; never permit a socket in these tests."""
+    opener = mock.Mock()
+    opener.open.side_effect = exc
+    return mock.patch("urllib.request.build_opener", return_value=opener)
 
 
 def all_rows():
@@ -157,7 +164,7 @@ class EmptyPageTests(unittest.TestCase):
 
 class LiveTransportTests(unittest.TestCase):
     def test_remote_disconnected_becomes_unavailable(self):
-        with mock.patch("urllib.request.urlopen", side_effect=http.client.RemoteDisconnected("closed by peer")):
+        with patched_live_opener(http.client.RemoteDisconnected("closed by peer")):
             with self.assertRaises(TransportFailure) as cm:
                 live_transport("https://api.kraken.com/0/public/OHLC?pair=XBTUSD")
         self.assertEqual(cm.exception.kind, "unavailable")
@@ -165,20 +172,20 @@ class LiveTransportTests(unittest.TestCase):
     def test_other_connection_errors_become_unavailable(self):
         for exc in (ConnectionResetError("reset"), http.client.IncompleteRead(b""), OSError("tls failure")):
             with self.subTest(exc=type(exc).__name__):
-                with mock.patch("urllib.request.urlopen", side_effect=exc):
+                with patched_live_opener(exc):
                     with self.assertRaises(TransportFailure) as cm:
                         live_transport("https://api.kraken.com/0/public/OHLC?pair=XBTUSD")
                 self.assertEqual(cm.exception.kind, "unavailable")
 
     def test_timeouts_still_map_to_timeout(self):
-        with mock.patch("urllib.request.urlopen", side_effect=socket.timeout("timed out")):
+        with patched_live_opener(socket.timeout("timed out")):
             with self.assertRaises(TransportFailure) as cm:
                 live_transport("https://api.kraken.com/0/public/OHLC?pair=XBTUSD")
         self.assertEqual(cm.exception.kind, "timeout")
 
     def test_pipeline_refuses_with_a_structured_report_when_the_connection_drops(self):
         # No exception may escape the pipeline. The run is refused with a structured error and no signal.
-        with mock.patch("urllib.request.urlopen", side_effect=http.client.RemoteDisconnected("closed by peer")):
+        with patched_live_opener(http.client.RemoteDisconnected("closed by peer")):
             report = cp.run_candle_pipeline(Kraken(), LISTING, DAY, NOW, data_source="live",
                                             time_source="runtime-clock", lookback=119)
         self.assertEqual(report["gate"]["status"], "REFUSED")
