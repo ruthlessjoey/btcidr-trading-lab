@@ -44,6 +44,11 @@ class CandidateLookbackTests(unittest.TestCase):
         self.assertIn("Candidates: 20, 50", frozen["rule_text"])
         self.assertIn("starts at index 50", frozen["rule_text"])
 
+    def test_evaluation_rejects_non_object_frozen_record(self):
+        windows = splits.make_splits(1000, warmup=200)
+        with self.assertRaisesRegex(EngineError, "frozen record must be an object"):
+            selection.evaluate_test(self.candles, [], windows)
+
     def test_evaluation_rejects_boolean_frozen_boundary_timestamps(self):
         windows = splits.make_splits(1000, warmup=200)
         result = selection.select(self.candles, windows)
