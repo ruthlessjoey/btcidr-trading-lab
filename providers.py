@@ -12,6 +12,7 @@ import urllib.parse
 from datetime import datetime, timezone
 
 import fetcher
+import transport_policy
 from fetcher import ApiError, Candle, TF_SECONDS
 
 
@@ -59,7 +60,7 @@ def _iso(ts):
 
 class Kraken:
     name, label, quote = "kraken", "BTC/USD", "USD"
-    symbol, base = "XBTUSD", fetcher.provider_base_url("kraken")
+    symbol, base = "XBTUSD", transport_policy.provider_base_url("kraken")
     docs = "https://docs.kraken.com/api-reference/market-data/get-ohlc-data"
     INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
     MAX_CANDLES = 720          # docs: only the most recent 720 entries are available
@@ -106,7 +107,7 @@ class Kraken:
 
 class Coinbase:
     name, label, quote = "coinbase", "BTC/USD", "USD"
-    product, base = "BTC-USD", fetcher.provider_base_url("coinbase-research")
+    product, base = "BTC-USD", transport_policy.provider_base_url("coinbase-research")
     docs = "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles"
     GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
     MAX_PER_REQUEST = 300      # docs: at most 300 candles per request
