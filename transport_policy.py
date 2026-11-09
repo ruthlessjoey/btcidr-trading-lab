@@ -176,8 +176,8 @@ def _capture_response_socket(response):
 def _set_socket_timeout(sock, remaining: float) -> None:
     """Bound the next socket read by the remaining body-read budget."""
     try:
-        sock.settimeout(max(0.001, remaining))
-    except (AttributeError, OSError, TypeError):
+        sock.settimeout(remaining)
+    except (AttributeError, OSError, TypeError, ValueError):
         raise PolicyError("cannot enforce response deadline")
 
 
@@ -192,6 +192,9 @@ def _content_length(headers):
         values = [] if value is None else [value]
     if not values:
         return None
+    transfer_encoding = getattr(headers, "get_all", lambda _name: None)("Transfer-Encoding")
+    if transfer_encoding:
+        raise PolicyError("response uses conflicting transfer encoding and content length")
     if len(values) != 1:
         raise PolicyError("response length header is duplicated")
     value = str(values[0])
