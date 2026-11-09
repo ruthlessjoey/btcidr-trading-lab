@@ -66,7 +66,8 @@ def check_provider(name, cfg, opener, sleep, local_now):
             raise ApiError("zero candles")
         r["parsing"] = f"OK ({len(raw)} candles parsed)"
         v = validator.validate(raw, tf_sec, server_now, local_now, start_s, server_now, cfg)
-        clean = v.clean
+        # Failed validation data is diagnostic only; never export it as trusted candles.
+        clean = v.clean if v.status != validator.FAIL else []
         r.update(validation=v.status, stats=v.stats, checks=[asdict(c) for c in v.checks])
         r["verdict"] = {"PASS": "VERIFIED", "WARN": "USABLE WITH WARNINGS"}.get(v.status, "FAILED")
         if clean:
