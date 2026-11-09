@@ -3,6 +3,7 @@ import http.client
 import os
 import socket
 import sys
+import threading
 import time
 import unittest
 import urllib.request
@@ -175,15 +176,31 @@ class TransportPolicyTests(unittest.TestCase):
 
     def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
         client, server = socket.socketpair()
+        stop = threading.Event()
+
+        def drip():
+            try:
+                for byte in (b"b", b"c", b"d"):
+                    if stop.wait(0.04):
+                        return
+                    server.sendall(byte)
+            except OSError:
+                return
+
         try:
-            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\na")
+            server.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\na")
             response = http.client.HTTPResponse(client)
             response.begin()
+            sender = threading.Thread(target=drip, daemon=True)
+            sender.start()
             started = time.monotonic()
             with self.assertRaises(transport_policy.PolicyError):
-                transport_policy.read_bounded(response, 3, 0.08)
-            self.assertLess(time.monotonic() - started, 0.25)
+                transport_policy.read_bounded(response, 4, 0.10)
+            elapsed = time.monotonic() - started
+            self.assertGreaterEqual(elapsed, 0.08)
+            self.assertLess(elapsed, 0.25)
         finally:
+            stop.set()
             client.close()
             server.close()
 
