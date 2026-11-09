@@ -243,6 +243,28 @@ class TransportPolicyTests(unittest.TestCase):
                 market_transport.live_transport("https://api.binance.com/api/v3/time")
         build.assert_not_called()
 
+    def test_provider_neutral_transport_rejects_manual_and_research_tiers(self):
+        for url in (
+            "https://www.tokocrypto.site/api/v3/time",
+            "https://api.exchange.coinbase.com/time",
+        ):
+            with self.subTest(url=url):
+                with patch("urllib.request.build_opener") as build:
+                    with self.assertRaises(market_transport.TransportFailure):
+                        market_transport.live_transport(url)
+                build.assert_not_called()
+
+    def test_query_values_reject_malformed_and_semicolon_values(self):
+        for url in (
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT;admin=true&interval=1h&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=btc-usdt&interval=1h&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=5",
+            "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=999999999999999999999999999",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(transport_policy.PolicyError):
+                    transport_policy.validate_request(url)
+
 
 if __name__ == "__main__":
     unittest.main()
