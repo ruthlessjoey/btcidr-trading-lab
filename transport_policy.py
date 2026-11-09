@@ -74,9 +74,10 @@ def validate_request(url: str, method: str = "GET") -> int:
         raise PolicyError("URL authority is not canonical")
     try:
         ipaddress.ip_address(host)
-        raise PolicyError("IP-literal hosts are not allowed")
     except ValueError:
         pass
+    else:
+        raise PolicyError("IP-literal hosts are not allowed")
     if host == "localhost" or host.endswith(".localhost") or "xn--" in host:
         raise PolicyError("host is not approved")
     route = ROUTES.get((host, method, parts.path))
