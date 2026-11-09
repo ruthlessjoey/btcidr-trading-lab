@@ -57,7 +57,7 @@ def write_version(root_dir, market, candles, fetched_utc_ts, extra=None):
     for key in ("provider", "symbol", "timeframe"):
         value = market.get(key)
         if (not isinstance(value, str) or not value.strip()
-                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+                or value != value.strip() or any(ch in value for ch in ("/", "\\", "\x00"))):
             raise DatasetError(f"market {key} must be a safe, non-empty identifier")
     if market["timeframe"] not in TF_SECONDS:
         raise DatasetError("market timeframe is unsupported")
@@ -176,7 +176,7 @@ def load_verified(manifest_path, expect=None):
     for key in ("provider", "symbol", "timeframe"):
         value = mk.get(key)
         if (not isinstance(value, str) or not value.strip()
-                or value != value.strip() or any(ch in value for ch in ("/", "\\\\", "\\x00"))):
+                or value != value.strip() or any(ch in value for ch in ("/", "\\", "\x00"))):
             raise DatasetError(f"manifest market {key} must be a safe, non-empty identifier")
     if mk["timeframe"] not in TF_SECONDS:
         raise DatasetError("manifest market timeframe is unsupported")
