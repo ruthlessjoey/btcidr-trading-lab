@@ -42,10 +42,12 @@ def make_splits(n, train=0.6, val=0.2, warmup=200):
     if type(n) is not int or n < 1:
         raise EngineError("series length must be a positive integer")
     if (isinstance(train, bool) or not isinstance(train, (int, float))
-            or not math.isfinite(train) or not 0 < train < 1):
+            or (isinstance(train, float) and not math.isfinite(train))
+            or not 0 < train < 1):
         raise EngineError("training fraction must be finite and between zero and one")
     if (isinstance(val, bool) or not isinstance(val, (int, float))
-            or not math.isfinite(val) or not 0 < val < 1):
+            or (isinstance(val, float) and not math.isfinite(val))
+            or not 0 < val < 1):
         raise EngineError("validation fraction must be finite and between zero and one")
     if train + val >= 1:
         raise EngineError("training and validation fractions must leave a non-empty test window")
