@@ -436,6 +436,18 @@ class SelectionTests(unittest.TestCase):
             selection.evaluate_test(self.c, frozen, altered)
         self.assertIn("split window differs", str(ctx.exception))
 
+    def test_evaluation_rejects_malformed_frozen_boundary_timestamps(self):
+        for bad_value in (True, 1.5, "1700000000"):
+            with self.subTest(value=bad_value):
+                frozen = self.freeze()
+                frozen["splits"]["train"]["first_open_unix"] = bad_value
+                body = {k: v for k, v in frozen.items() if k != "frozen_hash"}
+                frozen["frozen_hash"] = selection.hashlib.sha256(
+                    selection._canon(body).encode()
+                ).hexdigest()
+                with self.assertRaises(EngineError):
+                    selection.evaluate_test(self.c, frozen, self.sp)
+
     def test_test_window_is_evaluated_once_and_a_second_look_is_refused(self):
         f = self.freeze()
         with tempfile.TemporaryDirectory() as reg, tempfile.TemporaryDirectory() as out:
