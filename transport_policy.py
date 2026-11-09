@@ -35,6 +35,14 @@ ROUTES = {
         {"granularity", "start", "end"}, 1024 * 1024),
 }
 
+REQUIRED_QUERY_KEYS = {
+    ("api.kraken.com", "GET", "/0/public/OHLC"): {"pair", "interval"},
+    ("data-api.binance.vision", "GET", "/api/v3/klines"): {"symbol", "interval", "limit"},
+    ("data-api.binance.vision", "GET", "/api/v3/exchangeInfo"): {"symbol"},
+    ("www.tokocrypto.site", "GET", "/api/v3/klines"): {"symbol", "interval", "limit"},
+    ("api.exchange.coinbase.com", "GET", "/products/BTC-USD/candles"): {"granularity"},
+}
+
 MAX_URL_LENGTH = 8192
 READ_CHUNK_BYTES = 64 * 1024
 
@@ -95,7 +103,12 @@ def validate_request(url: str, method: str = "GET") -> int:
     keys = [key for key, _ in pairs]
     if len(keys) != len(set(keys)) or not set(keys).issubset(allowed_keys):
         raise PolicyError("request query is not approved")
-    if any(not k.isascii() or not v.isascii() for k, v in pairs):
+    required = REQUIRED_QUERY_KEYS.get((host, method, parts.path), set())
+    if not required.issubset(set(keys)):
+        raise PolicyError("request query is incomplete")
+    if any(not k.isascii() or not v.isascii()
+           or any(ord(ch) < 0x20 or ord(ch) == 0x7f for ch in k + v)
+           for k, v in pairs):
         raise PolicyError("request query contains invalid characters")
     return max_bytes
 
@@ -132,6 +145,8 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
             raise PolicyError("response deadline exceeded")
         _set_socket_timeout(response, remaining)
         chunk = response.read(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+        if time.monotonic() > deadline:
+            raise PolicyError("response deadline exceeded")
         if not isinstance(chunk, (bytes, bytearray)):
             raise PolicyError("response body is invalid")
         if not chunk:
