@@ -70,7 +70,13 @@ def _verify_frozen_inputs(candles, frozen, splits):
                 or not 0 <= start < end <= len(candles)
                 or tuple(supplied) != (start, end)):
             raise engine.EngineError(f"{name} split window differs from the frozen record")
-        if candles[start].time != item.get("first_open_unix") or candles[end - 1].time != item.get("last_open_unix"):
+        first_open = item.get("first_open_unix")
+        last_open = item.get("last_open_unix")
+        if (type(first_open) is not int or first_open < 0
+                or type(last_open) is not int or last_open < 0):
+            raise engine.EngineError(f"{name} frozen candle boundaries must be non-negative integers")
+        if (type(candles[start].time) is not int or type(candles[end - 1].time) is not int
+                or candles[start].time != first_open or candles[end - 1].time != last_open):
             raise engine.EngineError(f"{name} candle boundaries differ from the frozen record")
     if _candles_sha256(candles) != frozen.get("candles_sha256"):
         raise engine.EngineError("candle content differs from the dataset frozen before test evaluation")
