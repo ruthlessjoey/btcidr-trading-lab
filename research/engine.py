@@ -66,12 +66,52 @@ def assert_completed(candles, as_of_ts, tf_sec=DAY):
         raise EngineError("the last candle is still forming (incomplete); it must not be used")
 
 
+def _finite_real(value, label):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise EngineError(f"{label} must be a finite real number")
+    try:
+        finite = math.isfinite(value)
+    except OverflowError:
+        finite = False
+    if not finite:
+        raise EngineError(f"{label} must be a finite real number")
+    return float(value)
+
+
+def _validate_costs_and_rules(costs, rules):
+    if not isinstance(costs, Costs):
+        raise EngineError("costs must be a Costs instance")
+    if not isinstance(rules, Rules):
+        raise EngineError("rules must be a Rules instance")
+
+    fee = _finite_real(costs.fee, "fee")
+    slip = _finite_real(costs.slip, "slippage")
+    capital = _finite_real(rules.capital, "capital")
+    fraction = _finite_real(rules.fraction, "fraction")
+    min_notional = _finite_real(rules.min_notional, "minimum notional")
+    qty_step = _finite_real(rules.qty_step, "quantity step")
+
+    if not 0 <= fee < 1:
+        raise EngineError("fee must be in [0, 1)")
+    if not 0 <= slip < 1:
+        raise EngineError("slippage must be in [0, 1)")
+    if capital <= 0:
+        raise EngineError("capital must be positive")
+    if not 0 < fraction <= 1:
+        raise EngineError("fraction must be in (0, 1]: no leverage")
+    if min_notional < 0:
+        raise EngineError("minimum notional must not be negative")
+    if qty_step < 1e-12 or round(qty_step, 12) != qty_step:
+        raise EngineError("quantity step must be at least 1e-12 and representable to 12 decimal places")
+
+
 def _floor_step(x, step):
     return round(math.floor(x / step + 1e-9) * step, 12)
 
 
 def simulate(candles, signals, start, end, costs, rules=Rules()):
     """Runs bars [start, end). Bar i trades at its open using signals[i-1]."""
+    _validate_costs_and_rules(costs, rules)
     if len(signals) != len(candles):
         raise EngineError("signals and candles differ in length")
     if not 1 <= start < end <= len(candles):

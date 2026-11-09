@@ -102,6 +102,35 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(rets, sorted(rets, reverse=True))
 
 
+class InputValidationTests(unittest.TestCase):
+    def test_negative_or_nonfinite_costs_are_refused(self):
+        for costs in (Costs("negative-fee", -0.001, 0.0),
+                      Costs("negative-slip", 0.0, -0.001),
+                      Costs("nan-fee", float("nan"), 0.0),
+                      Costs("infinite-slip", 0.0, float("inf")),
+                      Costs("fee-at-or-above-one", 1.0, 0.0),
+                      Costs("slippage-at-one", 0.0, 1.0)):
+            with self.subTest(costs=costs):
+                with self.assertRaises(EngineError):
+                    engine.simulate(gappy(), sig(12, []), 1, 5, costs, EXACT)
+
+    def test_invalid_capital_fraction_minimum_and_quantity_step_are_refused(self):
+        for rules in (Rules(capital=0.0), Rules(capital=-1.0), Rules(capital=float("inf")),
+                      Rules(fraction=float("nan")), Rules(min_notional=-1.0),
+                      Rules(min_notional=float("nan")), Rules(qty_step=0.0),
+                      Rules(qty_step=-0.01), Rules(qty_step=float("inf")),
+                      Rules(qty_step=1e-13), Rules(qty_step=1.5e-12)):
+            with self.subTest(rules=rules):
+                with self.assertRaises(EngineError):
+                    engine.simulate(gappy(), sig(12, []), 1, 5, ZERO, rules)
+
+    def test_non_numeric_cost_or_rule_values_are_refused(self):
+        with self.assertRaises(EngineError):
+            engine.simulate(gappy(), sig(12, []), 1, 5, Costs("bad", "0.01", 0.0), EXACT)
+        with self.assertRaises(EngineError):
+            engine.simulate(gappy(), sig(12, []), 1, 5, ZERO, Rules(capital=True))
+
+
 class SizingTests(unittest.TestCase):
     def test_fraction_limits_the_amount_invested(self):
         c = gappy()
