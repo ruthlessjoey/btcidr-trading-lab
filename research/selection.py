@@ -28,11 +28,26 @@ RULE_TEXT = (
     "period is not evaluated. The test period is never used to choose anything.")
 
 
+def _validated_candidates(candidates):
+    try:
+        periods = tuple(candidates)
+    except TypeError:
+        raise engine.EngineError("candidates must be an iterable of integer periods")
+    if not periods or any(type(n) is not int or n < 2 for n in periods):
+        raise engine.EngineError("candidates must contain positive integer periods of at least 2")
+    if len(set(periods)) != len(periods):
+        raise engine.EngineError("candidate periods must be unique")
+    return periods
+
+
 def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=Rules()):
-    """Uses bars inside the train and validation windows only (plus earlier bars for warm-up)."""
+    """Uses identical, fully warmed training bars for every candidate."""
     splits = split_tools.validate_splits(len(candles), splits)
+    periods = _validated_candidates(candidates)
+    if splits["train"][0] < max(periods):
+        raise engine.EngineError("training split must start after the longest candidate lookback")
     rows = []
-    for n in candidates:
+    for n in periods:
         sig = strategy.ma_trend(n)(candles)
         tr = engine.metrics(engine.simulate(candles, sig, *splits["train"], costs, rules))
         va = engine.metrics(engine.simulate(candles, sig, *splits["validation"], costs, rules))
@@ -56,6 +71,12 @@ def _candles_sha256(candles):
 
 
 def _verify_frozen_inputs(candles, frozen, splits):
+    if not isinstance(frozen, dict):
+        raise engine.EngineError("frozen record must be an object")
+    periods = _validated_candidates(frozen.get("candidates"))
+    selected = frozen.get("selected_n")
+    if selected is not None and (type(selected) is not int or selected not in periods):
+        raise engine.EngineError("frozen selected period is not one of its candidates")
     expected = frozen.get("splits")
     if not isinstance(expected, dict) or set(expected) != {"train", "validation", "test"}:
         raise engine.EngineError("frozen record has invalid split metadata")
@@ -72,10 +93,16 @@ def _verify_frozen_inputs(candles, frozen, splits):
                 or not 0 <= start < end <= len(candles)
                 or tuple(supplied) != (start, end)):
             raise engine.EngineError(f"{name} split window differs from the frozen record")
-        if candles[start].time != item.get("first_open_unix") or candles[end - 1].time != item.get("last_open_unix"):
+        first_ts, last_ts = item.get("first_open_unix"), item.get("last_open_unix")
+        if (type(first_ts) is not int or first_ts < 0
+                or type(last_ts) is not int or last_ts < 0):
+            raise engine.EngineError(f"{name} frozen candle timestamps must be non-negative integers")
+        if candles[start].time != first_ts or candles[end - 1].time != last_ts:
             raise engine.EngineError(f"{name} candle boundaries differ from the frozen record")
         frozen_ranges[name] = (start, end)
     split_tools.validate_splits(len(candles), frozen_ranges)
+    if frozen_ranges["train"][0] < max(periods):
+        raise engine.EngineError("frozen training split does not cover the longest candidate lookback")
     if _candles_sha256(candles) != frozen.get("candles_sha256"):
         raise engine.EngineError("candle content differs from the dataset frozen before test evaluation")
 
@@ -83,7 +110,17 @@ def _verify_frozen_inputs(candles, frozen, splits):
 def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_COSTS, code_rev=None):
     """The record that fixes the choice before the test is looked at."""
     splits = split_tools.validate_splits(len(candles), splits)
-    body = {"selected_n": selection["selected_n"], "candidates": [r["n"] for r in selection["rows"]],
+    if not isinstance(selection, dict) or not isinstance(selection.get("rows"), list):
+        raise engine.EngineError("selection result must contain a rows list")
+    periods = _validated_candidates([r.get("n") for r in selection["rows"] if isinstance(r, dict)])
+    if len(periods) != len(selection["rows"]):
+        raise engine.EngineError("selection rows are malformed")
+    if splits["train"][0] < max(periods):
+        raise engine.EngineError("training split must start after the longest candidate lookback")
+    selected = selection.get("selected_n")
+    if selected is not None and (type(selected) is not int or selected not in periods):
+        raise engine.EngineError("selected period is not one of the evaluated candidates")
+    body = {"selected_n": selected, "candidates": list(periods),
             "rule_text": RULE_TEXT, "selection_costs": costs.name,
             "splits": {k: {"start_index": a, "end_index": b,
                            "first_open_unix": candles[a].time, "last_open_unix": candles[b - 1].time}
