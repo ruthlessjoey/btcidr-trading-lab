@@ -96,6 +96,11 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as exc:
             http_error = True
             status = _safe_http_status(exc.code)
+            # HTTPError is also a response object; close it without reading its body.
+            try:
+                exc.close()
+            except Exception:
+                pass
         except Exception as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
