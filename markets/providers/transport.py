@@ -57,10 +57,10 @@ def live_transport(url):
         if status == 429:
             raise TransportFailure("rate_limited", "HTTP 429", 429)
         raise TransportFailure("unavailable", "HTTP request rejected", status)
-    except transport_policy.PolicyError:
-        raise TransportFailure("unavailable", "response rejected by transport policy")
     except (socket.timeout, TimeoutError):
         raise TransportFailure("timeout", "request deadline exceeded")
+    except transport_policy.PolicyError:
+        raise TransportFailure("unavailable", "response rejected by transport policy")
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, (socket.timeout, TimeoutError)):
             raise TransportFailure("timeout", "request deadline exceeded")

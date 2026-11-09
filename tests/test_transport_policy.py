@@ -323,9 +323,9 @@ class TransportPolicyTests(unittest.TestCase):
         client, server = socket.socketpair()
         try:
             server.sendall(
-                b"HTTP/1.1 200 OK\r\n"
-                b"Transfer-Encoding: chunked\r\n\r\n"
-                b"-1\r\nUNBOUNDED-TAIL\r\n0\r\n\r\n"
+                b"HTTP/1.1 200 OK\\r\\n"
+                b"Transfer-Encoding: chunked\\r\\n\\r\\n"
+                b"-1\\r\\nUNBOUNDED-TAIL\\r\\n0\\r\\n\\r\\n"
             )
             response = http.client.HTTPResponse(client)
             response.begin()
@@ -341,7 +341,7 @@ class TransportPolicyTests(unittest.TestCase):
         headers = Message()
         headers.add_header("Transfer-Encoding", "chunked")
         headers.add_header("Transfer-Encoding", "chunked")
-        response = FakeResponse(b"4\r\nWiki\r\n0\r\n\r\n", headers)
+        response = FakeResponse(b"4\\r\\nWiki\\r\\n0\\r\\n\\r\\n", headers)
         with self.assertRaises(transport_policy.PolicyError):
             transport_policy.read_bounded(response, 64, 1)
         self.assertEqual(response.read_sizes, [])

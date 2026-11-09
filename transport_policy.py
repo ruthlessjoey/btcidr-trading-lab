@@ -13,6 +13,10 @@ class PolicyError(ValueError):
     """A request is outside the explicitly approved public read-only route matrix."""
 
 
+class ResponseDeadlineError(TimeoutError):
+    """The bounded response-body read exceeded its absolute deadline."""
+
+
 # Provider IDs resolve to fixed origins; configuration must never add an origin.
 PROVIDER_BASE_URLS = {
     "kraken": "https://api.kraken.com",
@@ -190,11 +194,16 @@ def _content_length(headers):
     if values is None:
         value = headers.get("Content-Length")
         values = [] if value is None else [value]
+    transfer_get_all = getattr(headers, "get_all", None)
+    transfer_values = transfer_get_all("Transfer-Encoding") if callable(transfer_get_all) else None
+    if transfer_values is None:
+        transfer_value = headers.get("Transfer-Encoding")
+        transfer_values = [] if transfer_value is None else [transfer_value]
+    # Chunked framing is deliberately unsupported; reject it before read1() parses it.
+    if transfer_values:
+        raise PolicyError("response transfer encoding is not approved")
     if not values:
         return None
-    transfer_encoding = getattr(headers, "get_all", lambda _name: None)("Transfer-Encoding")
-    if transfer_encoding:
-        raise PolicyError("response uses conflicting transfer encoding and content length")
     if len(values) != 1:
         raise PolicyError("response length header is duplicated")
     value = str(values[0])
@@ -240,17 +249,17 @@ def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
             break
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise PolicyError("response deadline exceeded")
+            raise ResponseDeadlineError("response deadline exceeded")
         _set_socket_timeout(sock, remaining)
         read1 = getattr(response, "read1", None)
         if not callable(read1):
             raise PolicyError("response does not support bounded single-read operation")
         try:
             chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
-        except (TimeoutError, socket.timeout, OSError):
-            raise PolicyError("response deadline exceeded")
+        except (TimeoutError, socket.timeout) as exc:
+            raise ResponseDeadlineError("response deadline exceeded") from exc
         if time.monotonic() > deadline:
-            raise PolicyError("response deadline exceeded")
+            raise ResponseDeadlineError("response deadline exceeded")
         if not isinstance(chunk, (bytes, bytearray)):
             raise PolicyError("response body is invalid")
         if not chunk:
