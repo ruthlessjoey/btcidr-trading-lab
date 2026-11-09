@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import unittest
+import urllib.request
 from unittest.mock import Mock, patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -165,7 +166,7 @@ class TransportPolicyTests(unittest.TestCase):
             status, body = fetcher.default_opener("https://api.kraken.com/0/public/Time", 1)
         self.assertEqual((status, body), (200, b'{"ok":true}'))
         handlers = build.call_args.args
-        self.assertTrue(any(isinstance(h, __import__("urllib.request").request.ProxyHandler)
+        self.assertTrue(any(isinstance(h, urllib.request.ProxyHandler)
                             for h in handlers))
         self.assertTrue(any(isinstance(h, fetcher._NoRedirectHandler) for h in handlers))
         self.assertTrue(response.closed)
