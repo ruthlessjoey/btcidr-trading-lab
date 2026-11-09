@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 import socket
 import time
 from urllib.parse import parse_qsl, urlsplit
@@ -126,7 +127,6 @@ def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
         raise PolicyError("request query contains invalid characters")
     for key, value in pairs:
         if key in ("symbol", "pair"):
-            import re
             if not re.fullmatch(r"[A-Z0-9]{3,30}", value):
                 raise PolicyError("instrument query value is invalid")
         elif key == "interval":
