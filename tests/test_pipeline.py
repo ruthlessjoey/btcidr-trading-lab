@@ -48,7 +48,7 @@ def fake_exchange(now_s, blocked=False):
             end = int(query["endTime"][0]) // 1000
             first = -(-start // step) * step
             rows = [
-                [t * 1000, str(60000 + t % 97), str(60100 + t % 97), 
+                [t * 1000, str(60000 + t % 97), str(60100 + t % 97),
                  str(59900 + t % 97), str(60001 + t % 97), "5.0",
                  t * 1000 + step * 1000 - 1, "300000", 10]
                 for t in range(first, end + 1, step)
@@ -63,6 +63,34 @@ def fake_exchange(now_s, blocked=False):
 def read(*parts):
     with open(os.path.join(*parts), encoding="utf-8") as f:
         return f.read()
+
+
+def python_source_files(root):
+    """Yield root modules and Python files under explicitly approved source trees."""
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if name.endswith(".py") and os.path.isfile(path) and not os.path.islink(path):
+            yield path
+
+    for relative_dir in ("markets", "pipeline", "research", "tools"):
+        start = os.path.join(root, relative_dir)
+        if not os.path.isdir(start) or os.path.islink(start):
+            continue
+
+        for current, dirs, files in os.walk(start, followlinks=False):
+            dirs[:] = sorted(
+                name for name in dirs
+                if name != "__pycache__"
+                and not os.path.islink(os.path.join(current, name))
+            )
+            for name in sorted(files):
+                if (
+                    name.endswith(".py")
+                    and not name.startswith("test_")
+                    and not name.endswith("_test.py")
+                    and not os.path.islink(os.path.join(current, name))
+                ):
+                    yield os.path.join(current, name)
 
 
 class PipelineTests(unittest.TestCase):
@@ -119,24 +147,56 @@ class SafetyScanTests(unittest.TestCase):
                  "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
                  "hmac", "api_key", "apikey", "secret", "withdraw"]
 
+    def test_scanner_finds_nested_source_and_stays_in_approved_trees(self):
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "markets", "providers"))
+            os.makedirs(os.path.join(root, "P1"))
+            os.makedirs(os.path.join(root, "signal", "data"))
+            os.makedirs(os.path.join(root, "tests", "fixtures"))
+            nested = os.path.join(root, "markets", "providers", "nested.py")
+            with open(nested, "w", encoding="utf-8") as f:
+                f.write("client.password = value\n")
+            with open(os.path.join(root, "P1", "untouched.py"), "w",
+                      encoding="utf-8") as f:
+                f.write("must_not_be_opened = True\n")
+            with open(os.path.join(root, "signal", "data", "untouched.py"), "w",
+                      encoding="utf-8") as f:
+                f.write("must_not_be_opened = True\n")
+            with open(os.path.join(root, "tests", "fixtures", "test_fixture.py"), "w",
+                      encoding="utf-8") as f:
+                f.write("test_only = True\n")
+
+            scanned = list(python_source_files(root))
+            self.assertIn(nested, scanned)
+            self.assertFalse(any(os.sep + "P1" + os.sep in path for path in scanned))
+            self.assertFalse(any(
+                os.sep + "signal" + os.sep in path for path in scanned
+            ))
+            self.assertFalse(any(
+                os.sep + "tests" + os.sep in path for path in scanned
+            ))
+
+            nested_text = read(nested).lower()
+            self.assertRegex(nested_text, r"\b([a-z_]\w*)\.password\b")
+
     def test_no_trading_or_credential_code(self):
-        for name in sorted(os.listdir(ROOT)):
-            if name.endswith(".py"):
-                text = read(ROOT, name).lower()
-                for word in self.FORBIDDEN:
-                    self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
-                self.assertNotRegex(
-                    text,
-                    r"(?<![.\w])pass" + r"word(?!\w)",
-                    f"{name} contains a forbidden credential identifier",
-                )
-                password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
-                allowed_attributes = ["parts"] if name == "transport_policy.py" else []
-                self.assertEqual(
-                    password_attributes,
-                    allowed_attributes,
-                    f"{name} contains an unapproved password attribute reference",
-                )
+        for path in python_source_files(ROOT):
+            name = os.path.relpath(path, ROOT)
+            text = read(path).lower()
+            for word in self.FORBIDDEN:
+                self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
+            self.assertNotRegex(
+                text,
+                r"(?<![.\w])pass" + r"word(?!\w)",
+                f"{name} contains a forbidden credential identifier",
+            )
+            password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
+            allowed_attributes = ["parts"] if name == "transport_policy.py" else []
+            self.assertEqual(
+                password_attributes,
+                allowed_attributes,
+                f"{name} contains an unapproved password attribute reference",
+            )
         transport_policy = read(ROOT, "transport_policy.py").lower()
         self.assertIn("parts.password is not none", transport_policy)
 
