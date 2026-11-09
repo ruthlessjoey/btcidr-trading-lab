@@ -118,7 +118,8 @@ class InputValidationTests(unittest.TestCase):
         for rules in (Rules(capital=0.0), Rules(capital=-1.0), Rules(capital=float("inf")),
                       Rules(fraction=float("nan")), Rules(min_notional=-1.0),
                       Rules(min_notional=float("nan")), Rules(qty_step=0.0),
-                      Rules(qty_step=-0.01), Rules(qty_step=float("inf"))):
+                      Rules(qty_step=-0.01), Rules(qty_step=float("inf")),
+                      Rules(qty_step=1e-13), Rules(qty_step=1.5e-12)):
             with self.subTest(rules=rules):
                 with self.assertRaises(EngineError):
                     engine.simulate(gappy(), sig(12, []), 1, 5, ZERO, rules)
