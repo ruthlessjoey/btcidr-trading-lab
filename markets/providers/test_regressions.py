@@ -47,8 +47,11 @@ def patched_live_opener(exc):
         stack.enter_context(mock.patch("socket.create_connection", side_effect=blocked))
         stack.enter_context(mock.patch("socket.socket.connect", side_effect=blocked))
         stack.enter_context(mock.patch("socket.socket.connect_ex", side_effect=blocked))
-        yield opener
-        opener.open.assert_called()
+        try:
+            yield opener
+        finally:
+            # Must run even when the expected mocked transport exception escapes.
+            opener.open.assert_called()
 
 
 def all_rows():
@@ -202,6 +205,15 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(report["gate"]["stage"], "fetch")
         self.assertEqual(report["error"]["kind"], "unavailable")
         self.assertIsNone(report["signal"])
+
+
+class OfflineOpenerGuardTests(unittest.TestCase):
+    def test_mock_opener_assertion_runs_when_open_raises(self):
+        expected = OSError("synthetic connection failure")
+        with patched_live_opener(expected) as opener:
+            with self.assertRaises(OSError):
+                opener.open("https://offline.invalid/")
+        opener.open.assert_called_once_with("https://offline.invalid/")
 
 
 if __name__ == "__main__":
