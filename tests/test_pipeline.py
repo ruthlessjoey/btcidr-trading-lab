@@ -102,9 +102,9 @@ def source_scan_findings(root, forbidden):
         for word in forbidden:
             if word in text:
                 findings.append((name, f"forbidden text {word!r}"))
-        if re.search(r"(?<![.\\w])pass" + r"word(?!\\w)", text):
+        if re.search(r"(?<![.\w])pass" + r"word(?!\w)", text):
             findings.append((name, "forbidden credential identifier"))
-        password_attributes = re.findall(r"\\b([a-z_]\\w*)\\.password\\b", text)
+        password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
         allowed_attributes = ["parts"] if name == "transport_policy.py" else []
         if password_attributes != allowed_attributes:
             findings.append((name, "unapproved password attribute reference"))
