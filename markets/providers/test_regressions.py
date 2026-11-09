@@ -4,6 +4,7 @@ Covers: Kraken since-boundary tolerance, Kraken's 720-most-recent history limit,
 and empty intermediate pages.
 """
 import http.client
+from contextlib import ExitStack, contextmanager
 import json
 import os
 import socket
@@ -34,11 +35,20 @@ LISTING = parse_listing("crypto:kraken-spot:BTC-USD")
 FORMING_T = (NOW // DAY) * DAY
 
 
+@contextmanager
 def patched_live_opener(exc):
-    """Patch the opener actually used by live_transport; never permit a socket in these tests."""
+    """Use a deterministic opener and hard-deny every standard socket connection path."""
     opener = mock.Mock()
     opener.open.side_effect = exc
-    return mock.patch("urllib.request.build_opener", return_value=opener)
+    blocked = AssertionError("network access is forbidden in this offline regression test")
+    with ExitStack() as stack:
+        stack.enter_context(mock.patch("urllib.request.build_opener", return_value=opener))
+        stack.enter_context(mock.patch("urllib.request.urlopen", side_effect=blocked))
+        stack.enter_context(mock.patch("socket.create_connection", side_effect=blocked))
+        stack.enter_context(mock.patch("socket.socket.connect", side_effect=blocked))
+        stack.enter_context(mock.patch("socket.socket.connect_ex", side_effect=blocked))
+        yield opener
+        opener.open.assert_called()
 
 
 def all_rows():
