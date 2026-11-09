@@ -34,6 +34,8 @@ jobs:
             /markets/providers/transport.py
             /providers.py
             /live_check.py
+            /run.py
+            /probe.py
             /report.py
             /validator.py
             /research/__init__.py
@@ -43,6 +45,7 @@ jobs:
             /research/data_report.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
+            /tests/test_probe.py
             /tests/test_research_sanitization.py
 
       - name: Set up Python 3.11
@@ -58,4 +61,5 @@ jobs:
           python -m unittest discover -s tests -p 'test_transport_policy.py' -v
           python -m unittest discover -s tests -p 'test_fetcher.py' -v
           python -m unittest discover -s tests -p 'test_live_check.py' -v
+          python -m unittest discover -s tests -p 'test_probe.py' -v
           python -m unittest discover -s tests -p 'test_research_sanitization.py' -v
