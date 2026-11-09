@@ -22,7 +22,7 @@ NO_SLEEP = lambda s: None  # noqa: E731
 NOW = 1_700_003_700          # 1h candles end exactly on multiples of 3600 before this
 CFG = {"mode": "read_only", "timeframe": "1h", "lookback_days": 2, "max_missing_ratio": 0.02,
        "max_spike_pct": 10, "http_timeout_seconds": 5, "http_retries": 1, "min_verified": 1,
-       "live_providers": ["kraken", "coinbase", "binance-vision", "tokocrypto"]}
+       "live_providers": ["kraken", "binance-vision"]}
 
 
 def grid(start, end, step=3600):
