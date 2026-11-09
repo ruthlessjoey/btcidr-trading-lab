@@ -59,6 +59,22 @@ def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=
     return {"rows": rows, "selected_n": chosen}
 
 
+def _selection_rule_text(periods, training_start):
+    if periods == CANDIDATES and training_start == 200:
+        return RULE_TEXT
+    candidate_text = ", ".join(str(period) for period in periods)
+    return (
+        "Pre-registered before any test result was computed. "
+        f"Candidates: {candidate_text}. Costs for selection: the BASE scenario. "
+        f"Training evaluation starts at index {training_start}, after the longest candidate "
+        "lookback, and all candidates are scored on identical bars. A candidate is eligible "
+        "only if its training total return is above zero. Validation chooses the highest score "
+        "= total return / max(max drawdown, 5%). Ties: fewer validation trades, then the larger "
+        "period. If no candidate is eligible, nothing is selected and the test period is not "
+        "evaluated. The test period is never used to choose anything."
+    )
+
+
 def _canon(obj):
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
@@ -121,7 +137,7 @@ def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_C
     if selected is not None and (type(selected) is not int or selected not in periods):
         raise engine.EngineError("selected period is not one of the evaluated candidates")
     body = {"selected_n": selected, "candidates": list(periods),
-            "rule_text": RULE_TEXT, "selection_costs": costs.name,
+            "rule_text": _selection_rule_text(periods, splits["train"][0]), "selection_costs": costs.name,
             "splits": {k: {"start_index": a, "end_index": b,
                            "first_open_unix": candles[a].time, "last_open_unix": candles[b - 1].time}
                        for k, (a, b) in splits.items()},
