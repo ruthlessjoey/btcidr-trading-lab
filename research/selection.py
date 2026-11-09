@@ -68,6 +68,7 @@ def _verify_frozen_inputs(candles, frozen, splits):
         start, end = item.get("start_index"), item.get("end_index")
         supplied = splits[name]
         if (not isinstance(supplied, (tuple, list)) or len(supplied) != 2
+                or type(supplied[0]) is not int or type(supplied[1]) is not int
                 or type(start) is not int or type(end) is not int
                 or not 0 <= start < end <= len(candles)
                 or tuple(supplied) != (start, end)):
