@@ -114,31 +114,82 @@ class PipelineTests(unittest.TestCase):
                              fake_exchange(NOW), NO_SLEEP, NOW)
 
 
-class SafetyScanTests(unittest.TestCase):
-    FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
-                 "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
-                 "hmac", "api_key", "apikey", "secret", "withdraw"]
+SOURCE_DIRS = ("markets", "research", "signal")
+PRUNED_DIRS = {"data", "P1", "tests", ".git", "__pycache__"}
 
+
+def iter_production_python_files(root):
+    """Yield approved Python source files without entering protected/test trees."""
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if name.endswith(".py") and os.path.isfile(path) and not os.path.islink(path):
+            yield name, path
+
+    for relative_dir in SOURCE_DIRS:
+        start = os.path.join(root, relative_dir)
+        if not os.path.isdir(start) or os.path.islink(start):
+            continue
+        for current, dirs, files in os.walk(start, topdown=True, followlinks=False):
+            dirs[:] = sorted(
+                name for name in dirs
+                if name not in PRUNED_DIRS
+                and not os.path.islink(os.path.join(current, name))
+            )
+            for name in sorted(files):
+                path = os.path.join(current, name)
+                if (
+                    name.endswith(".py")
+                    and not name.startswith("test_")
+                    and not name.endswith("_test.py")
+                    and not os.path.islink(path)
+                ):
+                    yield os.path.relpath(path, root), path
+
+
+def scan_forbidden_source(root):
+    """Return scanner findings from root modules and explicitly approved source trees."""
+    forbidden = [
+        "/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
+        "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
+        "hmac", "api_key", "apikey", "secret", "withdraw",
+    ]
+    findings = []
+    for relative_path, path in iter_production_python_files(root):
+        with open(path, encoding="utf-8") as source:
+            content = source.read().lower()
+        for word in forbidden:
+            if word in content:
+                findings.append(f"{relative_path} contains forbidden text {word!r}")
+        if re.search(r"(?<![.\\w])password(?!\\w)", content):
+            findings.append(f"{relative_path} contains a forbidden credential identifier")
+        password_attributes = re.findall(r"\\b([a-z_]\\w*)\\.password\\b", content)
+        allowed_attributes = ["parts"] if relative_path == "transport_policy.py" else []
+        if password_attributes != allowed_attributes:
+            findings.append(f"{relative_path} contains an unapproved password attribute reference")
+    return findings
+
+
+class SafetyScanTests(unittest.TestCase):
     def test_no_trading_or_credential_code(self):
-        for name in sorted(os.listdir(ROOT)):
-            if name.endswith(".py"):
-                text = read(ROOT, name).lower()
-                for word in self.FORBIDDEN:
-                    self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
-                self.assertNotRegex(
-                    text,
-                    r"(?<![.\w])pass" + r"word(?!\w)",
-                    f"{name} contains a forbidden credential identifier",
-                )
-                password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
-                allowed_attributes = ["parts"] if name == "transport_policy.py" else []
-                self.assertEqual(
-                    password_attributes,
-                    allowed_attributes,
-                    f"{name} contains an unapproved password attribute reference",
-                )
-        transport_policy = read(ROOT, "transport_policy.py").lower()
-        self.assertIn("parts.password is not none", transport_policy)
+        self.assertEqual(scan_forbidden_source(ROOT), [])
+
+    def test_nested_production_module_is_scanned(self):
+        with tempfile.TemporaryDirectory() as root:
+            nested = os.path.join(root, "markets", "providers", "nested.py")
+            os.makedirs(os.path.dirname(nested))
+            with open(nested, "w", encoding="utf-8") as source:
+                source.write("client.password = value\\n")
+            findings = scan_forbidden_source(root)
+            self.assertTrue(any("markets/providers/nested.py" in item for item in findings))
+            self.assertTrue(any("password attribute" in item for item in findings))
+
+    def test_protected_signal_data_tree_is_not_scanned(self):
+        with tempfile.TemporaryDirectory() as root:
+            protected = os.path.join(root, "signal", "data", "must_not_read.py")
+            os.makedirs(os.path.dirname(protected))
+            with open(protected, "w", encoding="utf-8") as source:
+                source.write("client.password = value\\n")
+            self.assertEqual(scan_forbidden_source(root), [])
 
     def test_only_approved_public_market_paths_are_used(self):
         text = read(ROOT, "fetcher.py")
