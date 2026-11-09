@@ -113,34 +113,77 @@ def validate_request(url: str, method: str = "GET") -> int:
     return max_bytes
 
 
-def _set_socket_timeout(response, remaining: float) -> None:
-    """Require a real socket so a slow-drip peer cannot defeat the total deadline."""
+def _capture_response_socket(response):
+    """Capture the underlying socket before HTTPResponse may clear its fp."""
     try:
-        sock = response.fp.raw._sock
+        return response.fp.raw._sock
+    except (AttributeError, TypeError):
+        raise PolicyError("cannot enforce response deadline")
+
+
+def _set_socket_timeout(sock, remaining: float) -> None:
+    """Bound the next socket read by the remaining body-read budget."""
+    try:
         sock.settimeout(max(0.001, remaining))
     except (AttributeError, OSError, TypeError):
         raise PolicyError("cannot enforce response deadline")
 
 
+def _content_length(headers):
+    """Return a single ASCII decimal Content-Length, or None when absent."""
+    if headers is None:
+        return None
+    get_all = getattr(headers, "get_all", None)
+    values = get_all("Content-Length") if callable(get_all) else None
+    if values is None:
+        value = headers.get("Content-Length")
+        values = [] if value is None else [value]
+    if not values:
+        return None
+    if len(values) != 1:
+        raise PolicyError("response length header is duplicated")
+    value = str(values[0])
+    if not value or not value.isascii() or not value.isdecimal():
+        raise PolicyError("response length header is invalid")
+    try:
+        return int(value, 10)
+    except (ValueError, OverflowError):
+        raise PolicyError("response length header is invalid")
+
+
 def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
-    """Read at most max_bytes, enforce a wall-clock deadline, and reject overflow."""
+    """Read a bounded body; enforce the deadline across individual body socket reads.
+
+    The urllib opener's timeout separately bounds connect/TLS/header socket operations;
+    this absolute deadline begins when body reading starts.
+    """
+    if type(max_bytes) is not int or max_bytes < 0:
+        raise PolicyError("response size limit is invalid")
+    if not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
+        raise PolicyError("response deadline is invalid")
     headers = getattr(response, "headers", None)
-    if headers is not None:
-        declared = headers.get("Content-Length")
-        if declared is not None:
-            if not str(declared).isdigit():
-                raise PolicyError("response length header is invalid")
-            if int(declared) > max_bytes:
-                raise PolicyError("response exceeds the approved size limit")
-    deadline = time.monotonic() + timeout_seconds
+    declared = _content_length(headers)
+    if declared is not None and declared > max_bytes:
+        raise PolicyError("response exceeds the approved size limit")
+
+    # Capture once: http.client.HTTPResponse clears response.fp when Content-Length
+    # is fully consumed, but the captured socket remains available for final checks.
+    sock = _capture_response_socket(response)
+    deadline = time.monotonic() + float(timeout_seconds)
     chunks = []
     total = 0
     while True:
+        isclosed = getattr(response, "isclosed", None)
+        if callable(isclosed) and isclosed():
+            break
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise PolicyError("response deadline exceeded")
-        _set_socket_timeout(response, remaining)
-        chunk = response.read(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
+        _set_socket_timeout(sock, remaining)
+        read1 = getattr(response, "read1", None)
+        if not callable(read1):
+            raise PolicyError("response does not support bounded single-read operation")
+        chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - total))
         if time.monotonic() > deadline:
             raise PolicyError("response deadline exceeded")
         if not isinstance(chunk, (bytes, bytearray)):
