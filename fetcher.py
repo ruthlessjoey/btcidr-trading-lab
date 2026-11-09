@@ -14,6 +14,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+import transport_policy
+
 USER_AGENT = "tokocrypto-btcusdt-lab/0.1 (read-only market data)"
 
 # Interval names -> seconds (Binance-style names).
@@ -71,12 +73,27 @@ class Source:
         return self.base_url + "/open/v1/common/symbols"
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def default_opener(url, timeout):
-    """Do one real HTTPS GET. Returns (status_code, body_bytes)."""
+    """One policy-checked public GET; proxies and redirects are disabled."""
+    limit = transport_policy.validate_request(url, "GET")
     req = urllib.request.Request(
-        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read()
+        url, method="GET",
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirectHandler())
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            status = getattr(resp, "status", 200)
+            body = transport_policy.read_bounded(resp, limit, timeout)
+            return status, body
+    except urllib.error.HTTPError:
+        # HTTPError is a response object too; never read its provider-controlled body.
+        raise
 
 
 def _safe_http_status(status):
@@ -85,7 +102,11 @@ def _safe_http_status(status):
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET JSON without exposing provider bodies, URLs, or exception messages."""
+    """GET JSON only after exact route validation; never expose provider-controlled bodies."""
+    try:
+        max_bytes = transport_policy.validate_request(url, "GET")
+    except transport_policy.PolicyError:
+        raise ApiError("request rejected by transport policy")
     last = "request failed"
     for attempt in range(1, retries + 1):
         status = None
@@ -96,16 +117,19 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as exc:
             http_error = True
             status = _safe_http_status(exc.code)
-            # HTTPError is also a response object; close it without reading its body.
             try:
                 exc.close()
             except Exception:
                 pass
+        except transport_policy.PolicyError:
+            raise ApiError("HTTP response rejected by transport policy")
         except Exception as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
         else:
             status = _safe_http_status(status)
+            if not isinstance(body, (bytes, bytearray)) or len(body) > max_bytes:
+                raise ApiError("HTTP response rejected by transport policy")
 
         if status is None:
             if network_error:
