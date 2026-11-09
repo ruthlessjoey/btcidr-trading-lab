@@ -35,7 +35,7 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 def live_transport(url):
     """One exact-policy public GET. Response bytes are capped and deadline-bounded."""
     try:
-        limit = transport_policy.validate_request(url, "GET")
+        limit = transport_policy.validate_request(url, "GET", tier="operational")
     except transport_policy.PolicyError:
         raise TransportFailure("unavailable", "request rejected by transport policy")
     req = urllib.request.Request(
