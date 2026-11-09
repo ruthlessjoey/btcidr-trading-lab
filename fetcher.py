@@ -55,7 +55,9 @@ class Source:
     def __post_init__(self):
         if self.style != "binance_style":
             raise ValueError("only the approved Binance-style public market-data interface is supported")
-        # Resolve the origin from a fixed provider ID; config cannot supply or extend a host.
+        # Source is an operational/manual crypto market-data adapter, not a research registry.
+        if self.provider_id not in {"kraken", "binance-vision", "tokocrypto"}:
+            raise ValueError("provider is not enabled for this market-data client")
         transport_policy.provider_base_url(self.provider_id)
 
     @property
