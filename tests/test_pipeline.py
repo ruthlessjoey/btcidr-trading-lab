@@ -160,9 +160,9 @@ def scan_forbidden_source(root):
         for word in forbidden:
             if word in content:
                 findings.append(f"{relative_path} contains forbidden text {word!r}")
-        if re.search(r"(?<![.\\w])password(?!\\w)", content):
+        if re.search(r"(?<![.\w])password(?!\w)", content):
             findings.append(f"{relative_path} contains a forbidden credential identifier")
-        password_attributes = re.findall(r"\\b([a-z_]\\w*)\\.password\\b", content)
+        password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", content)
         allowed_attributes = ["parts"] if relative_path == "transport_policy.py" else []
         if password_attributes != allowed_attributes:
             findings.append(f"{relative_path} contains an unapproved password attribute reference")
@@ -178,7 +178,7 @@ class SafetyScanTests(unittest.TestCase):
             nested = os.path.join(root, "markets", "providers", "nested.py")
             os.makedirs(os.path.dirname(nested))
             with open(nested, "w", encoding="utf-8") as source:
-                source.write("client.password = value\\n")
+                source.write("client.password = value\n")
             findings = scan_forbidden_source(root)
             self.assertTrue(any("markets/providers/nested.py" in item for item in findings))
             self.assertTrue(any("password attribute" in item for item in findings))
