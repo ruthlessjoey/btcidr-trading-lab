@@ -88,7 +88,7 @@ class Kraken(MarketDataProvider):
                 raise ProviderError("bad_payload", name, f"candle {index} time is not an integer")
             try:
                 o, h, lo, c, v = float(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[6])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 raise ProviderError("bad_payload", name, f"candle {index} has a non-numeric price or volume")
             rows.append((t, o, h, lo, c, v))
         return rows
