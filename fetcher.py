@@ -7,6 +7,7 @@ Two "styles" of public endpoint are supported, because Tokocrypto publishes both
   binance_style  {base}/api/v3/time and {base}/api/v3/klines     (symbol BTCUSDT)
   open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
 """
+import http.client
 import json
 import time
 import urllib.error
@@ -127,9 +128,12 @@ def http_get_json(url, timeout, retries, opener, sleep):
                 pass
         except transport_policy.PolicyError:
             raise ApiError("HTTP response rejected by transport policy")
-        except Exception as exc:
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
+        except Exception:
+            # Unexpected programming errors are not transport retries.
+            raise ApiError("HTTP request failed unexpectedly")
         else:
             status = _safe_http_status(status)
             if not isinstance(body, (bytes, bytearray)) or len(body) > max_bytes:
