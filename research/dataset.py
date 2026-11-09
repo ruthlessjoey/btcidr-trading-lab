@@ -110,7 +110,8 @@ def load_verified(manifest_path, expect=None):
         raise DatasetError("manifest row_count must be a positive integer")
     if type(m["timeframe_seconds"]) is not int or m["timeframe_seconds"] <= 0:
         raise DatasetError("manifest timeframe_seconds must be a positive integer")
-    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS\n            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
+    if (not isinstance(mk.get("timeframe"), str) or mk["timeframe"] not in TF_SECONDS
+            or m["timeframe_seconds"] != TF_SECONDS[mk["timeframe"]]):
         raise DatasetError("manifest timeframe does not match its timeframe_seconds")
     for key, want in (expect or {}).items():
         if mk.get(key) != want:
