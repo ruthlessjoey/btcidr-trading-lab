@@ -151,8 +151,17 @@ def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_C
 
 
 def verify_frozen(frozen):
+    if not isinstance(frozen, dict):
+        raise engine.EngineError("frozen record must be an object")
+    expected_hash = frozen.get("frozen_hash")
+    if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+        raise engine.EngineError("frozen record has no valid integrity hash")
     body = {k: v for k, v in frozen.items() if k != "frozen_hash"}
-    if hashlib.sha256(_canon(body).encode()).hexdigest() != frozen.get("frozen_hash"):
+    try:
+        actual_hash = hashlib.sha256(_canon(body).encode()).hexdigest()
+    except (TypeError, ValueError):
+        raise engine.EngineError("frozen record contains non-canonical data")
+    if actual_hash != expected_hash:
         raise engine.EngineError("frozen choice was altered after it was frozen")
 
 
