@@ -48,29 +48,33 @@ class Candle:
 @dataclass(frozen=True)
 class Source:
     name: str
-    style: str       # "binance_style" or "open_v1"
-    base_url: str
+    provider_id: str
+    style: str = "binance_style"
 
     def __post_init__(self):
-        if self.style not in ("binance_style", "open_v1"):
-            raise ValueError(f"unknown source style {self.style!r}")
+        if self.style != "binance_style":
+            raise ValueError("only the approved Binance-style public market-data interface is supported")
+        # Resolve the origin from a fixed provider ID; config cannot supply or extend a host.
+        transport_policy.provider_base_url(self.provider_id)
+
+    @property
+    def base_url(self):
+        return transport_policy.provider_base_url(self.provider_id)
 
     def symbol(self, pair):
-        return pair.replace("_", "") if self.style == "binance_style" else pair
+        return pair.replace("_", "")
 
     def time_url(self):
-        path = "/api/v3/time" if self.style == "binance_style" else "/open/v1/common/time"
-        return self.base_url + path
+        return self.base_url + "/api/v3/time"
 
     def klines_url(self):
-        path = "/api/v3/klines" if self.style == "binance_style" else "/open/v1/market/klines"
-        return self.base_url + path
+        return self.base_url + "/api/v3/klines"
 
     def symbols_url(self, pair):
-        if self.style == "binance_style":
-            return (self.base_url + "/api/v3/exchangeInfo?"
-                    + urllib.parse.urlencode({"symbol": self.symbol(pair)}))
-        return self.base_url + "/open/v1/common/symbols"
+        if self.provider_id != "binance-vision":
+            raise ApiError("market metadata route is not approved for this provider")
+        return (self.base_url + "/api/v3/exchangeInfo?"
+                + urllib.parse.urlencode({"symbol": self.symbol(pair)}))
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
