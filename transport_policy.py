@@ -63,6 +63,15 @@ def provider_base_url(provider_id: str) -> str:
         raise PolicyError("provider is not approved")
 
 
+def _bounded_uint(value: str, max_digits: int, minimum: int, maximum: int, label: str) -> int:
+    if not value.isascii() or not value.isdecimal() or len(value) > max_digits:
+        raise PolicyError(f"{label} is invalid")
+    number = int(value, 10)
+    if not minimum <= number <= maximum:
+        raise PolicyError(f"{label} is invalid")
+    return number
+
+
 def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
     """Validate a raw URL against all approved routes or operational live routes."""
     if tier not in ("any", "operational"):
@@ -133,14 +142,11 @@ def validate_request(url: str, method: str = "GET", tier: str = "any") -> int:
             if value not in {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}:
                 raise PolicyError("candle interval is not approved")
         elif key == "limit":
-            if not value.isascii() or not value.isdecimal() or not 1 <= int(value) <= 1000:
-                raise PolicyError("candle limit is invalid")
+            _bounded_uint(value, 4, 1, 1000, "candle limit")
         elif key in ("startTime", "endTime"):
-            if not value.isascii() or not value.isdecimal() or not 946684800000 <= int(value) <= 4102444800000:
-                raise PolicyError("candle timestamp is invalid")
+            _bounded_uint(value, 13, 946684800000, 4102444800000, "candle timestamp")
         elif key == "since":
-            if not value.isascii() or not value.isdecimal() or not 946684800 <= int(value) <= 4102444800:
-                raise PolicyError("history cursor is invalid")
+            _bounded_uint(value, 10, 946684800, 4102444800, "history cursor")
         elif key == "granularity":
             if value not in {"60", "300", "900", "3600", "21600", "86400"}:
                 raise PolicyError("candle granularity is not approved")
