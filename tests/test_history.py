@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 import urllib.parse
+from unittest import mock
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -117,6 +118,18 @@ class GateTests(unittest.TestCase):
         self.assertIn("NOT Tokocrypto", m["price_basis_warning"])
         self.assertIn("GATE: ✅ PASS", md)
         self.assertIn("not** Tokocrypto", md)
+
+    def test_failed_dataset_roundtrip_removes_unverified_version(self):
+        with mock.patch.object(dataset, "load_verified",
+                               side_effect=dataset.DatasetError("synthetic verification failure")):
+            code, data, md, out = self.go(fake())
+        self.assertEqual(code, 1)
+        self.assertEqual(data["gate"], "FAIL")
+        self.assertFalse(data["backtest_allowed"])
+        self.assertIsNone(data["dataset"])
+        self.assertEqual(status(data, "csv_hash_roundtrip"), "FAIL")
+        folder = os.path.join(out, "datasets", "binance-vision_BTCUSDT_1d")
+        self.assertEqual(os.listdir(folder), [])
 
     def test_short_history_fails_reports_actual_start_and_writes_nothing(self):
         code, data, md, out = self.go(fake(listing=ts(2019, 1, 1)))
