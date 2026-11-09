@@ -55,7 +55,7 @@ class BinanceVision(MarketDataProvider):
                 raise ProviderError("bad_payload", name, f"row {index} close time does not match its interval")
             try:
                 o, h, lo, c, v = (float(row[k]) for k in (1, 2, 3, 4, 5))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 raise ProviderError("bad_payload", name, f"row {index} has a non-numeric price or volume")
             rows.append((open_s, o, h, lo, c, v))
         return rows
