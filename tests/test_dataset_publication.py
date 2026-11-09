@@ -71,6 +71,15 @@ class DatasetPublicationTests(unittest.TestCase):
             with open(manifest_path, "rb") as f:
                 self.assertEqual(f.read(), original_manifest)
 
+    def test_extra_metadata_cannot_override_reserved_manifest_fields(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(dataset.DatasetError):
+                dataset.write_version(
+                    root, MARKET, candles(), 1_700_200_000,
+                    extra={"csv_sha256": "0" * 64},
+                )
+            self.assertEqual(os.listdir(root), [])
+
     def test_writer_rejects_market_identifiers_that_escape_dataset_folder(self):
         with tempfile.TemporaryDirectory() as root:
             bad_market = dict(MARKET)
