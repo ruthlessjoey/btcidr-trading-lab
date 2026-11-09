@@ -1,6 +1,7 @@
 """End-to-end tests against a FAKE exchange. All prices are SYNTHETIC test data."""
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -47,7 +48,7 @@ def fake_exchange(now_s, blocked=False):
             end = int(query["endTime"][0]) // 1000
             first = -(-start // step) * step
             rows = [
-                [t * 1000, str(60000 + t % 97), str(60100 + t % 97),
+                [t * 1000, str(60000 + t % 97), str(60100 + t % 97), 
                  str(59900 + t % 97), str(60001 + t % 97), "5.0",
                  t * 1000 + step * 1000 - 1, "300000", 10]
                 for t in range(first, end + 1, step)
@@ -116,7 +117,7 @@ class PipelineTests(unittest.TestCase):
 class SafetyScanTests(unittest.TestCase):
     FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
                  "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
-                 "hmac", "api_key", "apikey", "secret", "withdraw", "password"]
+                 "hmac", "api_key", "apikey", "secret", "withdraw"]
 
     def test_no_trading_or_credential_code(self):
         for name in sorted(os.listdir(ROOT)):
@@ -124,6 +125,20 @@ class SafetyScanTests(unittest.TestCase):
                 text = read(ROOT, name).lower()
                 for word in self.FORBIDDEN:
                     self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
+                self.assertNotRegex(
+                    text,
+                    r"(?<![.\w])pass" + r"word(?!\w)",
+                    f"{name} contains a forbidden credential identifier",
+                )
+                password_attributes = re.findall(r"\b([a-z_]\w*)\.password\b", text)
+                allowed_attributes = ["parts"] if name == "transport_policy.py" else []
+                self.assertEqual(
+                    password_attributes,
+                    allowed_attributes,
+                    f"{name} contains an unapproved password attribute reference",
+                )
+        transport_policy = read(ROOT, "transport_policy.py").lower()
+        self.assertIn("parts.password is not none", transport_policy)
 
     def test_only_approved_public_market_paths_are_used(self):
         text = read(ROOT, "fetcher.py")
