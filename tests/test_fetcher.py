@@ -49,6 +49,11 @@ class SourceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fetcher.Source("z", "binance-vision", "open_v1")
 
+    def test_tokocrypto_metadata_route_is_not_available(self):
+        source = fetcher.Source("tokocrypto-mbx", "tokocrypto")
+        with self.assertRaises(fetcher.ApiError):
+            source.symbols_url("BTC_USDT")
+
 
 class ParseTests(unittest.TestCase):
     def test_parses_candle_rows_and_converts_ms(self):
