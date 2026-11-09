@@ -114,16 +114,12 @@ def validate_request(url: str, method: str = "GET") -> int:
 
 
 def _set_socket_timeout(response, remaining: float) -> None:
-    """Best-effort per-read socket timeout so slow-drip bodies cannot reset the total deadline."""
-    sock = None
+    """Require a real socket so a slow-drip peer cannot defeat the total deadline."""
     try:
         sock = response.fp.raw._sock
-    except (AttributeError, TypeError):
-        return
-    try:
         sock.settimeout(max(0.001, remaining))
     except (AttributeError, OSError, TypeError):
-        return
+        raise PolicyError("cannot enforce response deadline")
 
 
 def read_bounded(response, max_bytes: int, timeout_seconds: float) -> bytes:
