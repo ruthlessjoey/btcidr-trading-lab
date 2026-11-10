@@ -48,7 +48,9 @@ def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=
         raise engine.EngineError("training split must start after the longest candidate lookback")
     rows = []
     for n in periods:
-        sig = strategy.ma_trend(n)(candles)
+        # Signals are generated only through VALIDATION; TEST remains untouched until reservation.
+        selection_candles = candles[:splits["validation"][1]]
+        sig = strategy.ma_trend(n)(selection_candles)
         tr = engine.metrics(engine.simulate(candles, sig, *splits["train"], costs, rules))
         va = engine.metrics(engine.simulate(candles, sig, *splits["validation"], costs, rules))
         rows.append({"n": n, "train": tr, "validation": va,
