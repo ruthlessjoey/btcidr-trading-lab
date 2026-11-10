@@ -144,6 +144,10 @@ jobs:
             exit 1
           fi
           R=results/${{ github.run_id }}-${{ github.run_attempt }}
+          if [ -L "$R" ] || { [ -e "$R" ] && [ ! -d "$R" ]; }; then
+            echo "This run's results path must be a real directory."
+            exit 1
+          fi
           mkdir -p "$R" test_evaluations
           cp "$GITHUB_WORKSPACE"/out/*.md "$GITHUB_WORKSPACE"/out/*.json "$GITHUB_WORKSPACE"/out/*.csv "$R"/ 2>/dev/null || true
           if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then
