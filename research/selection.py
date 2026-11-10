@@ -254,8 +254,9 @@ def _reservation_context(run_id, run_attempt, workflow_ref, repository):
         "workflow_ref": workflow_ref,
         "repository": repository,
     }
-    if (not isinstance(run_id, str) or not run_id or len(run_id) > 128
-            or not isinstance(run_attempt, str) or not run_attempt.isdigit()
+    if (not isinstance(run_id, str) or not run_id.isascii() or not run_id.isdigit() or len(run_id) > 20
+            or not isinstance(run_attempt, str) or not run_attempt.isascii()
+            or not run_attempt.isdigit() or len(run_attempt) > 7
             or int(run_attempt) < 1 or int(run_attempt) > 1000000
             or not isinstance(workflow_ref, str) or not workflow_ref or len(workflow_ref) > 512
             or not isinstance(repository, str) or len(repository) > 256
