@@ -189,6 +189,8 @@ def test_key(frozen):
 
 def _load_test_record(path, frozen):
     """Load and minimally authenticate a completed record for this exact frozen choice."""
+    if os.path.islink(path) or not os.path.isfile(path):
+        raise engine.EngineError("existing test registry record must be a regular, non-symlink file")
     try:
         with open(path, encoding="utf-8") as f:
             record = json.load(f)
