@@ -14,7 +14,7 @@ from unittest import mock
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from fetcher import Candle  # noqa: E402
-from research import engine, selection, splits as splits_mod, strategy, toy  # noqa: E402
+from research import engine, pipeline, selection, splits as splits_mod, strategy, toy  # noqa: E402
 from research.engine import Costs, EngineError, Rules  # noqa: E402
 
 DAY = 86400
@@ -772,6 +772,15 @@ class DurableReservationTests(unittest.TestCase):
                         committed_reservation=self.context
                     )
                 make_signal.assert_not_called()
+
+
+    def test_trade_log_generation_never_resimulates_test_window(self):
+        with tempfile.TemporaryDirectory() as root:
+            with mock.patch.object(pipeline.engine, "simulate", wraps=engine.simulate) as simulate:
+                pipeline.write_logs(self.c, 50, self.sp, root, Rules(), include_test=True)
+            ranges = [(call.args[2], call.args[3]) for call in simulate.call_args_list]
+            self.assertEqual(ranges, [self.sp["train"], self.sp["validation"]])
+            self.assertNotIn(self.sp["test"], ranges)
 
 
 class ToyTests(unittest.TestCase):
