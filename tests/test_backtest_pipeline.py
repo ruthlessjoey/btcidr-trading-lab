@@ -231,34 +231,42 @@ class CrossCheckTests(unittest.TestCase):
         self.b = toy.toy_candles(60)
         self.fd = pipeline.utc_day(self.b[30].time)
 
-    def test_matching_sources_confirm_the_day(self):
-        r = crosscheck.compare(self.b, coinbase_candles(self.b, 1.002), coinbase_candles(self.b, 0.999), [self.fd])
+    def test_matching_coinbase_data_confirms_the_day(self):
+        r = crosscheck.compare(
+            self.b, coinbase_candles(self.b, 1.002), [self.fd]
+        )
         self.assertTrue(r["flagged"][0]["verdict"].startswith("CONFIRMED"))
         self.assertEqual(r["common_days"], 60)
+        self.assertEqual(r["coinbase_days"], 60)
 
     def test_a_day_that_disagrees_is_not_confirmed(self):
         cb = coinbase_candles(self.b)
         t = self.b[30].time
-        cb[t] = Candle(t, cb[t].open, cb[t].high, cb[t].low, cb[t].close * 1.25, 1.0)
-        r = crosscheck.compare(self.b, cb, {}, [self.fd])
+        cb[t] = Candle(
+            t, cb[t].open, cb[t].high, cb[t].low, cb[t].close * 1.25, 1.0
+        )
+        r = crosscheck.compare(self.b, cb, [self.fd])
         self.assertEqual(r["flagged"][0]["verdict"], "NOT CONFIRMED")
         self.assertEqual(r["worst_days"][0]["date"], self.fd)
 
-    def test_other_source_disagreeing_blocks_confirmation(self):
-        bs = coinbase_candles(self.b)
-        t = self.b[30].time
-        bs[t] = Candle(t, bs[t].open * 1.3, bs[t].high, bs[t].low, bs[t].close, 1.0)
-        r = crosscheck.compare(self.b, coinbase_candles(self.b), bs, [self.fd])
-        self.assertEqual(r["flagged"][0]["verdict"], "NOT CONFIRMED")
-
-    def test_missing_second_source_data_is_unavailable_not_confirmed(self):
-        r = crosscheck.compare(self.b, coinbase_candles(self.b, drop={self.b[30].time}), {}, [self.fd])
+    def test_missing_coinbase_data_is_unavailable_not_confirmed(self):
+        r = crosscheck.compare(
+            self.b,
+            coinbase_candles(self.b, drop={self.b[30].time}),
+            [self.fd],
+        )
         self.assertEqual(r["flagged"][0]["verdict"], "UNAVAILABLE")
 
     def test_binance_candles_are_never_modified(self):
         before = list(self.b)
-        crosscheck.compare(self.b, coinbase_candles(self.b, 1.5), {}, [self.fd])
+        crosscheck.compare(self.b, coinbase_candles(self.b, 1.5), [])
         self.assertEqual(before, self.b)
+
+    def test_coinbase_comparison_reports_common_days(self):
+        r = crosscheck.compare(self.b, coinbase_candles(self.b), [])
+        self.assertEqual(r["common_days"], 60)
+        self.assertEqual(r["binance_days"], 60)
+        self.assertEqual(r["coinbase_days"], 60)
 
     def test_coinbase_paging_respects_the_300_candle_limit_and_parses_fields(self):
         calls = []
@@ -268,30 +276,52 @@ class CrossCheckTests(unittest.TestCase):
             q = urllib.parse.parse_qs(u.query)
             calls.append(q)
             from datetime import datetime, timezone
-            f = lambda s: int(datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())  # noqa: E731
+            f = lambda s: int(
+                datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")
+                .replace(tzinfo=timezone.utc).timestamp()
+            )
             lo, hi = f(q["start"][0]), f(q["end"][0])
             assert (hi - lo) // DAY <= 300
-            rows = [[t, 90.0, 110.0, 100.0, 105.0, 1.0] for t in range(lo, hi, DAY)]     # [time, low, high, open, close, vol]
+            rows = [
+                [t, 90.0, 110.0, 100.0, 105.0, 1.0]
+                for t in range(lo, hi, DAY)
+            ]
             return 200, json.dumps(rows[::-1]).encode()
+
         import providers
         http = providers.Http(5, 1, opener, lambda s: None)
-        out = crosscheck.fetch_coinbase_daily(http, toy.START, toy.START + 700 * DAY)
+        out = crosscheck.fetch_coinbase_daily(
+            http, toy.START, toy.START + 700 * DAY
+        )
         self.assertGreater(len(calls), 2)
         c = out[toy.START]
-        self.assertEqual((c.open, c.high, c.low, c.close), (100.0, 110.0, 90.0, 105.0))
+        self.assertEqual(
+            (c.open, c.high, c.low, c.close),
+            (100.0, 110.0, 90.0, 105.0),
+        )
 
     def test_run_crosscheck_reports_a_fetch_failure_instead_of_crashing(self):
         def blocked(url, timeout):
             return 403, b"denied"
+
         with tempfile.TemporaryDirectory() as d:
             root = os.path.join(d, "ds")
             _, man = write_toy(root, self.b)
             manifest, candles = dataset.load_verified(man)
-            res = crosscheck.run_crosscheck(manifest, candles, [self.fd], os.path.join(d, "o"),
-                                            opener=blocked, sleep=lambda s: None, retries=1)
+            res = crosscheck.run_crosscheck(
+                manifest,
+                candles,
+                [self.fd],
+                os.path.join(d, "o"),
+                opener=blocked,
+                sleep=lambda s: None,
+                retries=1,
+            )
             self.assertIn("403", res["coinbase_error"])
             self.assertEqual(res["flagged"][0]["verdict"], "UNAVAILABLE")
-            with open(os.path.join(d, "o", "crosscheck.md"), encoding="utf-8") as f:
+            with open(
+                os.path.join(d, "o", "crosscheck.md"), encoding="utf-8"
+            ) as f:
                 self.assertIn("UNAVAILABLE", f.read())
 
 
