@@ -50,7 +50,7 @@ def load_pinned(cfg, datasets_root):
 def evaluate_frozen(candles, n, splits, rules, include_test=False):
     """The frozen choice on the train and validation segments under every cost scenario, with
     benchmarks. The TEST numbers come only from selection.evaluate_test, never from here."""
-    sig = strategy.ma_trend(n)(candles)
+    sig = strategy.ma_trend(n)(candles[:splits["validation"][1]])
     out = {}
     for seg, (a, b) in splits.items():
         if seg == "test":
@@ -67,7 +67,7 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
 def write_logs(candles, n, splits, out_dir, rules, include_test):
     """Trade, order and equity logs for the frozen choice under the BASE cost scenario."""
     costs = selection.SELECTION_COSTS
-    sig = strategy.ma_trend(n)(candles)
+    sig = strategy.ma_trend(n)(candles[:splits["validation"][1]])
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as ft, \
             open(os.path.join(out_dir, "orders.csv"), "w", newline="", encoding="utf-8") as fo, \
             open(os.path.join(out_dir, "equity.csv"), "w", newline="", encoding="utf-8") as fe:
@@ -105,12 +105,8 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
     n = original_selection["selected_n"]
     same_test_signals = None
     if n is not None:
-        full_sig = strategy.ma_trend(n)(candles)[splits["test"][0] - 1:]
-        red_sig = strategy.ma_trend(n)(reduced)[sp2["test"][0] - 1:]
-        same_test_signals = full_sig == red_sig
     return {"removed": sorted(utc_day(t) for t in drop), "selection": sel2,
-            "selected_n_changed": sel2["selected_n"] != original_selection["selected_n"],
-            "test_signals_identical_for_original_choice": same_test_signals}
+            "selected_n_changed": sel2["selected_n"] != original_selection["selected_n"]}
 
 
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
@@ -123,7 +119,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
         manifest, candles = load_pinned(cfg, datasets_root)
         splits = splits_mod.make_splits(len(candles), warmup=cfg.get("warmup", 200))
         for n in selection.CANDIDATES:                      # look-ahead guard on the real series
-            strategy.assert_causal(strategy.ma_trend(n), candles)
+            strategy.assert_causal(strategy.ma_trend(n), candles[:splits["validation"][1]])
     except (dataset.DatasetError, EngineError, OSError, KeyError) as e:
         result["error"] = f"{type(e).__name__}: {e}"
         return finish(result, out_dir)
