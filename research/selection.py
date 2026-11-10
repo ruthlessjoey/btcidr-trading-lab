@@ -203,6 +203,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     choice on the same dataset is refused unless allow_reeval is set (and then it is labelled)."""
     verify_frozen(frozen)
     _verify_frozen_inputs(candles, frozen, splits)
+    if run_id is not None and (not isinstance(run_id, str) or not run_id or len(run_id) > 128):
+        raise engine.EngineError("run_id must be a non-empty string of at most 128 characters")
     if frozen["selected_n"] is None:
         return {"status": "not_evaluated", "reason": "no candidate passed the training screen"}
     prior = find_prior_test(registry_dir, frozen)
@@ -228,7 +230,12 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
         else:
-            alt = path.replace(".json", f"_reeval_{run_id or 'x'}.json")
-            with open(alt, "w", encoding="utf-8") as f:
+            # Never interpolate caller-controlled run_id into a filesystem path.
+            # A fixed-length digest preserves traceability without path separators.
+            suffix = hashlib.sha256((run_id or "x").encode("utf-8")).hexdigest()[:12]
+            alt = path[:-5] + f"_reeval_{suffix}.json"
+            if os.path.exists(alt):
+                raise engine.EngineError("re-evaluation record already exists for this run_id")
+            with open(alt, "x", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
     return record

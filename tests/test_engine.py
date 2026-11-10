@@ -524,6 +524,27 @@ class SelectionTests(unittest.TestCase):
                 kept = json.load(fh)
             self.assertEqual(kept["run_id"], "1")                       # original record not overwritten
 
+    def test_reevaluation_run_id_cannot_escape_registry_directory(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "registry")
+            os.mkdir(registry)
+            first = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry,
+                out_registry_dir=registry, run_id="initial"
+            )
+            self.assertEqual(first["status"], "evaluated")
+            reevaluated = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry,
+                out_registry_dir=registry, allow_reeval=True,
+                run_id="../../outside"
+            )
+            self.assertTrue(reevaluated["re_evaluation"])
+            names = os.listdir(registry)
+            self.assertEqual(len(names), 2)
+            self.assertTrue(all(os.path.basename(name) == name for name in names))
+            self.assertFalse(os.path.exists(os.path.join(root, "outside.json")))
+
     def test_all_four_cost_scenarios_are_present_with_benchmarks(self):
         f = self.freeze()
         r = selection.evaluate_test(self.c, f, self.sp)["results"]
