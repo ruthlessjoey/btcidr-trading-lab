@@ -336,13 +336,17 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         if prior:
             # Never interpolate caller-controlled run_id into a path.
             suffix = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:12]
-            final_path = os.path.join(store_dir, key + f"_reeval_{suffix}.json")
+            final_name = key + f"_reeval_{suffix}.json"
             record["evaluation_number"] = 2
             record["re_evaluation"] = True
         else:
-            final_path = os.path.join(store_dir, key + ".json")
+            final_name = key + ".json"
 
-        _publish_record(store_dir, final_path, record)
+        # Publish to the run output (which the workflow preserves) and mirror into
+        # the shared registry so another caller in this workspace sees the result.
+        _publish_record(store_dir, os.path.join(store_dir, final_name), record)
+        if registry_dir and os.path.abspath(registry_dir) != os.path.abspath(store_dir):
+            _publish_record(registry_dir, os.path.join(registry_dir, final_name), record)
         published = True
         return record
     finally:
