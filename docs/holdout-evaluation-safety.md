@@ -30,17 +30,33 @@ For a frozen dataset/choice key, evaluation:
    markers only after both publications succeed.
 
 An ordinary validation failure before TEST calculation releases the reservation. If TEST
-calculation begins and then raises, or the process is forcibly terminated, the reservation is
-left in place. This is intentional fail-closed behavior.
+calculation begins and then raises, the Python process leaves its local reservation in place.
+A hard process termination also leaves local files only if the operating system and runner
+remain available long enough for those files to persist.
+
+**Important durability limitation:** the GitHub Actions runner workspace is temporary. The
+workflow publisher copies out/test_evaluations to the preserved research-data branch only
+when the publisher step actually runs and its Git push succeeds. The publisher does not copy
+the separate prev/test_evaluations working registry. Therefore, a force-cancellation,
+runner loss, or other termination before successful publication can destroy local pending
+markers. The workflow's if: always() condition does not guarantee execution after every
+force-cancellation. The current design does **not** guarantee durable reservation before TEST
+calculation begins and must not be described as hard-cancellation-safe.
 
 ## Interrupted-run recovery
 
-A preserved `.pending` marker means the run may have started looking at the TEST window.
-Do not delete it automatically and do not rerun the holdout. An operator must inspect the
-workflow logs, output artifacts, preserved registry, frozen hash, and run ID to determine
-whether a completed result was published. If that cannot be established, retain the marker
-and treat the holdout result as unavailable. Recovery must be an explicit, documented human
-decision; there is no automatic stale-lock timeout.
+A .pending marker in the preserved research-data registry means the run may have started
+looking at the TEST window. Do not delete it automatically and do not rerun the holdout.
+An operator must inspect the workflow logs, output artifacts, preserved registry, frozen hash,
+and run ID to determine whether a completed result was published. If that cannot be
+established, retain the marker and treat the holdout result as unavailable.
+
+If the runner is lost before publication, there may be no preserved marker even though local
+calculation began. In that case, the absence of a marker is **not proof** that the TEST window
+was not evaluated. Treat the evaluation state as uncertain and require explicit human review
+before any retry. A durable pre-evaluation reservation must be implemented before claiming
+hard-cancellation safety. Recovery must be an explicit, documented human decision; there is no
+automatic stale-lock timeout.
 
 ## Re-evaluation
 
