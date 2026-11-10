@@ -46,6 +46,13 @@ class HoldoutPublicationTests(unittest.TestCase):
     def publish(self):
         return publish_completed_reservations(self.root, self.output, self.report)
 
+    def test_failed_run_with_only_pending_marker_keeps_it_without_completion_report(self):
+        pending = self.root / (self.key + ".pending")
+        self.write_json(pending, self.reservation)
+        self.write_json(self.report, {"status": "FAILED", "error": "synthetic failure"})
+        self.assertEqual(self.publish(), 0)
+        self.assertTrue(pending.is_file())
+
     def test_removes_only_exact_matching_durable_reservation(self):
         self.install_pair()
         self.assertEqual(self.publish(), 1)
