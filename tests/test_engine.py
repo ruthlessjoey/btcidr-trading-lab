@@ -724,6 +724,16 @@ class DurableReservationTests(unittest.TestCase):
             with self.assertRaises(EngineError):
                 selection.prepare_test_reservation(self.frozen, root, **self.context)
 
+    def test_low_level_evaluator_requires_committed_reservation_by_default(self):
+        with tempfile.TemporaryDirectory() as root:
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                with self.assertRaisesRegex(EngineError, "exact committed reservation"):
+                    selection.evaluate_test(
+                        self.c, self.frozen, self.sp, registry_dir=root,
+                        out_registry_dir=os.path.join(root, "out")
+                    )
+                make_signal.assert_not_called()
+
     def test_committed_reservation_must_match_attempt_before_signal_generation(self):
         with tempfile.TemporaryDirectory() as root:
             selection.prepare_test_reservation(self.frozen, root, **self.context)
