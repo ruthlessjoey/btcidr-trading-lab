@@ -91,9 +91,7 @@ def build_markdown(r):
         L += ["", f"Sensitivity: the same selection with the candle **removed** ({', '.join(sv['removed'])}); "
               "the original candle is kept in the data.",
               f"- Selected period with the candle: **{r['selection']['selected_n']}**; without it: "
-              f"**{sel2['selected_n']}** ({'CHANGED' if sv['selected_n_changed'] else 'unchanged'}).",
-              f"- Test-window signals for the chosen period identical with and without the candle: "
-              f"**{sv['test_signals_identical_for_original_choice']}**."]
+              f"**{sel2['selected_n']}** ({'CHANGED' if sv['selected_n_changed'] else 'unchanged'})."]
         L += ["", "| MA | Train return (with / without) | Validation return (with / without) |", "|---|---|---|"]
         for a, b in zip(r["selection"]["rows"], sel2["rows"]):
             L.append(f"| {a['n']} | {pct(a['train']['total_return'])} / {pct(b['train']['total_return'])} | "
