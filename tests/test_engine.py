@@ -806,6 +806,21 @@ class DurableReservationTests(unittest.TestCase):
         self.assertEqual(seen_lengths, [self.sp["validation"][1]] * len(selection.CANDIDATES))
 
 
+    def test_preparation_report_does_not_require_test_metrics(self):
+        report = pipeline.build_markdown({
+            "status": "RESERVATION_PREPARED",
+            "run_id": "123456",
+            "reservation": {
+                "status": "reserved", "key": "a" * 25,
+                "frozen_hash": "b" * 64, "run_id": "123456",
+                "run_attempt": "2"
+            }
+        })
+        self.assertIn("Reservation prepared", report)
+        self.assertIn("TEST window was **not evaluated**", report)
+        self.assertIn("attempt `2`", report)
+
+
 class ToyTests(unittest.TestCase):
     def test_toy_series_is_deterministic_and_labelled(self):
         self.assertEqual(toy.toy_candles(50), toy.toy_candles(50))
