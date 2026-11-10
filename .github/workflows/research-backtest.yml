@@ -153,39 +153,7 @@ jobs:
           if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then
             cp -n "$GITHUB_WORKSPACE"/out/test_evaluations/*.json test_evaluations/ 2>/dev/null || true
           fi
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          root = Path("test_evaluations")
-          import os
-          output = Path(os.environ["GITHUB_WORKSPACE"]) / "out" / "test_evaluations"
-          if output.is_dir():
-              for completed in output.glob("*.json"):
-                  pending = root / (completed.stem + ".pending")
-                  if not pending.exists() and not pending.is_symlink():
-                      raise SystemExit("durable reservation is missing; refusing to publish completion")
-                  if pending.is_symlink() or not pending.is_file():
-                      raise SystemExit("durable reservation is not a regular file")
-                  if completed.is_symlink() or not completed.is_file():
-                      raise SystemExit("local completed record is not a regular file")
-                  branch_completed = root / completed.name
-                  if branch_completed.is_symlink() or not branch_completed.is_file():
-                      raise SystemExit("branch completed record is missing or not a regular file")
-                  reservation_record = json.loads(pending.read_text(encoding="utf-8"))
-                  completed_record = json.loads(completed.read_text(encoding="utf-8"))
-                  branch_record = json.loads(branch_completed.read_text(encoding="utf-8"))
-                  if branch_record != completed_record:
-                      raise SystemExit("branch completed record differs from this run's result")
-                  fields = ("key", "frozen_hash", "run_id", "run_attempt", "workflow_ref", "repository")
-                  if reservation_record.get("status") != "reserved" or completed_record.get("status") != "evaluated":
-                      raise SystemExit("reservation/completion status mismatch")
-                  if reservation_record.get("key") != completed.stem or completed_record.get("key") != completed.stem:
-                      raise SystemExit("reservation/completion filename does not match its key")
-                  if any(reservation_record.get(k) != completed_record.get(k) for k in fields):
-                      raise SystemExit("completed record does not match its durable reservation")
-                  pending.unlink()
-          PY
+          python3 -m research.holdout_publish --registry test_evaluations --output "$GITHUB_WORKSPACE/out/test_evaluations"
           cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
           cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
           git config user.name "github-actions[bot]"
