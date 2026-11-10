@@ -117,19 +117,19 @@ class SafetyScanTests(unittest.TestCase):
     FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
                  "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
                  "hmac", "api_key", "apikey", "secret", "withdraw", "password"]
-    
-           def test_no_trading_or_credential_code(self):
+
+    def test_no_trading_or_credential_code(self):
         for name in sorted(os.listdir(ROOT)):
             if name.endswith(".py"):
                 text = read(ROOT, name).lower()
                 if name == "transport_policy.py":
-                    # Permit only the existing defensive URL-password property check.
+                    # Permit only the existing defensive URL user-info property check.
                     allowed = "parts.password"
                     self.assertEqual(text.count(allowed), 1)
                     text = text.replace(allowed, "")
                 for word in self.FORBIDDEN:
-                    self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")                  
-                    
+                    self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
+
     def test_only_approved_public_market_paths_are_used(self):
         text = read(ROOT, "fetcher.py")
         self.assertIn("/api/v3/time", text)
