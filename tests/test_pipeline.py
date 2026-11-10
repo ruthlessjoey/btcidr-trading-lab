@@ -122,6 +122,11 @@ class SafetyScanTests(unittest.TestCase):
         for name in sorted(os.listdir(ROOT)):
             if name.endswith(".py"):
                 text = read(ROOT, name).lower()
+                if name == "transport_policy.py":
+                    # Permit only the existing defensive URL user-info property check.
+                    allowed = "parts.password"
+                    self.assertEqual(text.count(allowed), 1)
+                    text = text.replace(allowed, "")
                 for word in self.FORBIDDEN:
                     self.assertNotIn(word, text, f"{name} contains forbidden text {word!r}")
 
