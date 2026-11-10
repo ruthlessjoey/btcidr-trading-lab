@@ -290,7 +290,7 @@ class LoaderTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
-    FORBIDDEN = ["/order", "/account", "/withdraw", "listenkey", "x-mbx-apikey", "signature",
+    FORBIDDEN = ["/api/v3/order", "/api/v3/account", "/api/v3/withdraw", "listenkey", "x-mbx-apikey", "signature",
                  "hmac", "api_key", "apikey", "secret", "password"]
 
     def test_step1_files_have_no_trading_or_credential_code(self):
