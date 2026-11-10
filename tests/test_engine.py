@@ -7,7 +7,9 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -524,6 +526,115 @@ class SelectionTests(unittest.TestCase):
                 kept = json.load(fh)
             self.assertEqual(kept["run_id"], "1")                       # original record not overwritten
 
+    def test_output_registry_is_checked_when_prior_registry_is_absent(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as out:
+            first = selection.evaluate_test(
+                self.c, frozen, self.sp, out_registry_dir=out, run_id="first"
+            )
+            self.assertEqual(first["status"], "evaluated")
+            second = selection.evaluate_test(
+                self.c, frozen, self.sp, out_registry_dir=out, run_id="second"
+            )
+            self.assertEqual(second["status"], "already_evaluated")
+
+    def test_completed_result_is_visible_to_another_output_directory(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "shared-registry")
+            output_one = os.path.join(root, "run-one")
+            output_two = os.path.join(root, "run-two")
+            os.mkdir(registry)
+            first = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_one
+            )
+            self.assertEqual(first["status"], "evaluated")
+            second = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_two
+            )
+            self.assertEqual(second["status"], "already_evaluated")
+            self.assertTrue(os.path.exists(os.path.join(registry, selection.test_key(frozen) + ".json")))
+
+    def test_holdout_requires_a_persistent_registry(self):
+        frozen = self.freeze()
+        with self.assertRaises(EngineError):
+            selection.evaluate_test(self.c, frozen, self.sp)
+
+    def test_existing_reservation_blocks_a_second_evaluation(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as out:
+            pending = os.path.join(out, selection.test_key(frozen) + ".pending")
+            with open(pending, "x", encoding="utf-8") as f:
+                f.write('{"status":"in_progress"}')
+            with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
+                selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+
+    def test_shared_registry_reservation_blocks_new_output_directory(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "shared-registry")
+            output = os.path.join(root, "new-run-output")
+            os.mkdir(registry)
+            os.mkdir(output)
+            pending = os.path.join(registry, selection.test_key(frozen) + ".pending")
+            with open(pending, "x", encoding="utf-8") as f:
+                f.write('{"status":"in_progress"}')
+            with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
+                selection.evaluate_test(
+                    self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output
+                )
+
+    def test_concurrent_holdout_call_cannot_pass_existing_reservation(self):
+        frozen = self.freeze()
+        original_ma = selection.strategy.ma_trend
+        entered = threading.Event()
+        release = threading.Event()
+        first_result = []
+        first_error = []
+
+        def blocking_ma(period):
+            entered.set()
+            if not release.wait(5):
+                raise AssertionError("test synchronization timed out")
+            return original_ma(period)
+
+        with tempfile.TemporaryDirectory() as out:
+            def first_call():
+                try:
+                    first_result.append(selection.evaluate_test(
+                        self.c, frozen, self.sp, out_registry_dir=out, run_id="thread-1"
+                    ))
+                except Exception as exc:
+                    first_error.append(exc)
+
+            with mock.patch.object(selection.strategy, "ma_trend", side_effect=blocking_ma):
+                worker = threading.Thread(target=first_call)
+                worker.start()
+                self.assertTrue(entered.wait(5), "first evaluation did not acquire its reservation")
+                with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
+                    selection.evaluate_test(
+                        self.c, frozen, self.sp, out_registry_dir=out, run_id="thread-2"
+                    )
+                release.set()
+                worker.join(10)
+                self.assertFalse(worker.is_alive(), "first evaluation thread did not finish")
+            self.assertEqual(first_error, [])
+            self.assertEqual(len(first_result), 1)
+            self.assertEqual(first_result[0]["status"], "evaluated")
+            self.assertTrue(os.path.exists(os.path.join(out, selection.test_key(frozen) + ".json")))
+            self.assertFalse(os.path.exists(os.path.join(out, selection.test_key(frozen) + ".pending")))
+
+    def test_interrupted_calculation_leaves_reservation_fail_closed(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as out:
+            with mock.patch.object(selection.strategy, "ma_trend", side_effect=RuntimeError("synthetic failure")):
+                with self.assertRaisesRegex(RuntimeError, "synthetic failure"):
+                    selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+            pending = os.path.join(out, selection.test_key(frozen) + ".pending")
+            self.assertTrue(os.path.exists(pending))
+            with self.assertRaisesRegex(EngineError, "interrupted reservation"):
+                selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+
     def test_reevaluation_run_id_cannot_escape_registry_directory(self):
         frozen = self.freeze()
         with tempfile.TemporaryDirectory() as root:
@@ -547,7 +658,8 @@ class SelectionTests(unittest.TestCase):
 
     def test_all_four_cost_scenarios_are_present_with_benchmarks(self):
         f = self.freeze()
-        r = selection.evaluate_test(self.c, f, self.sp)["results"]
+        with tempfile.TemporaryDirectory() as out:
+            r = selection.evaluate_test(self.c, f, self.sp, out_registry_dir=out)["results"]
         self.assertEqual(len(r), 4)
         for name, block in r.items():
             self.assertEqual(set(block), {"strategy", "buy_and_hold", "cash"})

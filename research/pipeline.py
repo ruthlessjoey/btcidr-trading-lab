@@ -138,6 +138,10 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
         json.dump(frozen, f, indent=2)                      # written BEFORE the test is evaluated
     registry = os.path.join(prev_results_root, "test_evaluations") if prev_results_root else None
     if cfg.get("evaluate_test", False):
+        if not registry:
+            result["error"] = ("holdout evaluation requires prev_results_root so the persistent "
+                               "test registry and exclusive reservation are shared across runs")
+            return finish(result, out_dir)
         test = selection.evaluate_test(candles, frozen, splits, registry_dir=registry,
                                        out_registry_dir=os.path.join(out_dir, "test_evaluations"),
                                        allow_reeval=allow_reeval, run_id=run_id)
