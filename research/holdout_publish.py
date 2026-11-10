@@ -75,7 +75,8 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
                 or type(completed_record.get("evaluation_number")) is not int
                 or completed_record.get("evaluation_number") != 1
                 or completed_record.get("re_evaluation") is not False
-                or not isinstance(completed_record.get("results"), dict)):
+                or not isinstance(completed_record.get("results"), dict)
+                or not completed_record.get("results")):
             raise RuntimeError("reservation/completion status or shape mismatch")
         if reservation_record.get("key") != completed.stem or completed_record.get("key") != completed.stem:
             raise RuntimeError("reservation/completion filename does not match its key")
