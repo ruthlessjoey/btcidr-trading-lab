@@ -133,6 +133,8 @@ jobs:
                   fields = ("key", "frozen_hash", "run_id", "run_attempt", "workflow_ref", "repository")
                   if reservation_record.get("status") != "reserved" or completed_record.get("status") != "evaluated":
                       raise SystemExit("reservation/completion status mismatch")
+                  if reservation_record.get("key") != completed.stem or completed_record.get("key") != completed.stem:
+                      raise SystemExit("reservation/completion filename does not match its key")
                   if any(reservation_record.get(k) != completed_record.get(k) for k in fields):
                       raise SystemExit("completed record does not match its durable reservation")
                   pending.unlink()
