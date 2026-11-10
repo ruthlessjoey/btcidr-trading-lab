@@ -99,6 +99,16 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_empty_completed_results_refuse_cleanup(self):
+        self.install_pair()
+        empty = dict(self.completed, results={})
+        self.write_json(self.output / (self.key + ".json"), empty)
+        self.write_json(self.root / (self.key + ".json"), empty)
+        self.write_json(self.report, {"status": "OK", "test": empty})
+        with self.assertRaisesRegex(RuntimeError, "status or shape mismatch"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_dangling_pending_symlink_fails_closed(self):
         self.write_json(self.output / (self.key + ".json"), self.completed)
         self.write_json(self.root / (self.key + ".json"), self.completed)
