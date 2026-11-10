@@ -70,6 +70,13 @@ class HoldoutPublicationTests(unittest.TestCase):
             publish_completed_reservations(self.root, self.output)
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_unexpected_reservation_fields_refuse_cleanup(self):
+        self.install_pair()
+        self.write_json(self.root / (self.key + ".pending"), dict(self.reservation, unexpected="extra"))
+        with self.assertRaisesRegex(RuntimeError, "unexpected or missing fields"):
+            publish_completed_reservations(self.root, self.output)
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_dangling_pending_symlink_fails_closed(self):
         self.write_json(self.output / (self.key + ".json"), self.completed)
         self.write_json(self.root / (self.key + ".json"), self.completed)
