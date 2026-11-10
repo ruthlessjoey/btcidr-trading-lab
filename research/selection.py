@@ -51,8 +51,8 @@ def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=
         # Signals are generated only through VALIDATION; TEST remains untouched until reservation.
         selection_candles = candles[:splits["validation"][1]]
         sig = strategy.ma_trend(n)(selection_candles)
-        tr = engine.metrics(engine.simulate(candles, sig, *splits["train"], costs, rules))
-        va = engine.metrics(engine.simulate(candles, sig, *splits["validation"], costs, rules))
+        tr = engine.metrics(engine.simulate(selection_candles, sig, *splits["train"], costs, rules))
+        va = engine.metrics(engine.simulate(selection_candles, sig, *splits["validation"], costs, rules))
         rows.append({"n": n, "train": tr, "validation": va,
                      "eligible": tr["total_return"] > 0,
                      "score": va["total_return"] / max(va["max_drawdown"], DD_FLOOR)})
