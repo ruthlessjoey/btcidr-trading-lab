@@ -17,6 +17,13 @@ from fetcher import Candle  # noqa: E402
 from research import engine, pipeline, selection, splits as splits_mod, strategy, toy  # noqa: E402
 from research.engine import Costs, EngineError, Rules  # noqa: E402
 
+
+def local_evaluate_test(*args, **kwargs):
+    """Explicit offline-test adapter for the legacy local reservation implementation."""
+    kwargs["allow_local_reservation"] = True
+    return local_evaluate_test(*args, **kwargs)
+
+
 DAY = 86400
 T0 = toy.START
 ZERO = Costs("zero", 0.0, 0.0)
@@ -432,7 +439,7 @@ class SelectionTests(unittest.TestCase):
         res = selection.select(falling, self.sp)
         self.assertIsNone(res["selected_n"])
         frozen = selection.freeze(res, self.sp, {"sha256": "a" * 64}, falling)
-        self.assertEqual(selection.evaluate_test(falling, frozen, self.sp)["status"], "not_evaluated")
+        self.assertEqual(local_evaluate_test(falling, frozen, self.sp)["status"], "not_evaluated")
 
     def freeze(self):
         res = selection.select(self.c, self.sp)
@@ -447,7 +454,7 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             selection.verify_frozen(f)
         with self.assertRaises(EngineError):
-            selection.evaluate_test(self.c, f, self.sp)
+            local_evaluate_test(self.c, f, self.sp)
 
     def test_test_evaluation_refuses_changed_candle_content(self):
         frozen = self.freeze()
@@ -456,7 +463,7 @@ class SelectionTests(unittest.TestCase):
         changed[500] = Candle(original.time, original.open, original.high, original.low,
                               original.close + 0.25, original.volume)
         with self.assertRaises(EngineError) as ctx:
-            selection.evaluate_test(changed, frozen, self.sp)
+            local_evaluate_test(changed, frozen, self.sp)
         self.assertIn("candle content differs", str(ctx.exception))
 
     def test_test_evaluation_refuses_changed_split_windows(self):
@@ -464,7 +471,7 @@ class SelectionTests(unittest.TestCase):
         altered = dict(self.sp)
         altered["test"] = (self.sp["test"][0] + 1, self.sp["test"][1])
         with self.assertRaises(EngineError) as ctx:
-            selection.evaluate_test(self.c, frozen, altered)
+            local_evaluate_test(self.c, frozen, altered)
         self.assertIn("split window differs", str(ctx.exception))
 
     def test_selection_and_freeze_refuse_invalid_split_layouts(self):
@@ -482,7 +489,7 @@ class SelectionTests(unittest.TestCase):
         body = {k: v for k, v in frozen.items() if k != "frozen_hash"}
         frozen["frozen_hash"] = selection.hashlib.sha256(selection._canon(body).encode()).hexdigest()
         with self.assertRaises(EngineError):
-            selection.evaluate_test(self.c, frozen, self.sp)
+            local_evaluate_test(self.c, frozen, self.sp)
 
     def test_registry_key_rejects_malformed_dataset_sha256(self):
         frozen = self.freeze()
@@ -510,15 +517,15 @@ class SelectionTests(unittest.TestCase):
     def test_test_window_is_evaluated_once_and_a_second_look_is_refused(self):
         f = self.freeze()
         with tempfile.TemporaryDirectory() as reg, tempfile.TemporaryDirectory() as out:
-            first = selection.evaluate_test(self.c, f, self.sp, registry_dir=reg, out_registry_dir=out, run_id="1")
+            first = local_evaluate_test(self.c, f, self.sp, registry_dir=reg, out_registry_dir=out, run_id="1")
             self.assertEqual(first["status"], "evaluated")
             self.assertEqual(first["evaluation_number"], 1)
             self.assertEqual(len(first["results"]), 4)
             # the published record from run 1 becomes the registry of run 2
-            second = selection.evaluate_test(self.c, f, self.sp, registry_dir=out, run_id="2")
+            second = local_evaluate_test(self.c, f, self.sp, registry_dir=out, run_id="2")
             self.assertEqual(second["status"], "already_evaluated")
             self.assertNotIn("results", second)
-            third = selection.evaluate_test(self.c, f, self.sp, registry_dir=out,
+            third = local_evaluate_test(self.c, f, self.sp, registry_dir=out,
                                             out_registry_dir=out, allow_reeval=True, run_id="3")
             self.assertTrue(third["re_evaluation"])
             self.assertEqual(third["evaluation_number"], 2)
@@ -529,11 +536,11 @@ class SelectionTests(unittest.TestCase):
     def test_output_registry_is_checked_when_prior_registry_is_absent(self):
         frozen = self.freeze()
         with tempfile.TemporaryDirectory() as out:
-            first = selection.evaluate_test(
+            first = local_evaluate_test(
                 self.c, frozen, self.sp, out_registry_dir=out, run_id="first"
             )
             self.assertEqual(first["status"], "evaluated")
-            second = selection.evaluate_test(
+            second = local_evaluate_test(
                 self.c, frozen, self.sp, out_registry_dir=out, run_id="second"
             )
             self.assertEqual(second["status"], "already_evaluated")
@@ -545,7 +552,7 @@ class SelectionTests(unittest.TestCase):
             os.symlink(os.path.join(out, "missing-record.json"), record)
             with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
                 with self.assertRaisesRegex(EngineError, "regular, non-symlink"):
-                    selection.evaluate_test(
+                    local_evaluate_test(
                         self.c, frozen, self.sp, out_registry_dir=out, run_id="must-not-run"
                     )
                 make_signal.assert_not_called()
@@ -558,11 +565,11 @@ class SelectionTests(unittest.TestCase):
             output_one = os.path.join(root, "run-one")
             output_two = os.path.join(root, "run-two")
             os.mkdir(registry)
-            first = selection.evaluate_test(
+            first = local_evaluate_test(
                 self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_one
             )
             self.assertEqual(first["status"], "evaluated")
-            second = selection.evaluate_test(
+            second = local_evaluate_test(
                 self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_two
             )
             self.assertEqual(second["status"], "already_evaluated")
@@ -571,7 +578,7 @@ class SelectionTests(unittest.TestCase):
     def test_holdout_requires_a_persistent_registry(self):
         frozen = self.freeze()
         with self.assertRaises(EngineError):
-            selection.evaluate_test(self.c, frozen, self.sp)
+            local_evaluate_test(self.c, frozen, self.sp)
 
     def test_existing_reservation_blocks_a_second_evaluation(self):
         frozen = self.freeze()
@@ -580,7 +587,7 @@ class SelectionTests(unittest.TestCase):
             with open(pending, "x", encoding="utf-8") as f:
                 f.write('{"status":"in_progress"}')
             with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
-                selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+                local_evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
 
     def test_shared_registry_reservation_blocks_new_output_directory(self):
         frozen = self.freeze()
@@ -593,7 +600,7 @@ class SelectionTests(unittest.TestCase):
             with open(pending, "x", encoding="utf-8") as f:
                 f.write('{"status":"in_progress"}')
             with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
-                selection.evaluate_test(
+                local_evaluate_test(
                     self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output
                 )
 
@@ -614,7 +621,7 @@ class SelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as out:
             def first_call():
                 try:
-                    first_result.append(selection.evaluate_test(
+                    first_result.append(local_evaluate_test(
                         self.c, frozen, self.sp, out_registry_dir=out, run_id="thread-1"
                     ))
                 except Exception as exc:
@@ -625,7 +632,7 @@ class SelectionTests(unittest.TestCase):
                 worker.start()
                 self.assertTrue(entered.wait(5), "first evaluation did not acquire its reservation")
                 with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
-                    selection.evaluate_test(
+                    local_evaluate_test(
                         self.c, frozen, self.sp, out_registry_dir=out, run_id="thread-2"
                     )
                 release.set()
@@ -642,23 +649,23 @@ class SelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as out:
             with mock.patch.object(selection.strategy, "ma_trend", side_effect=RuntimeError("synthetic failure")):
                 with self.assertRaisesRegex(RuntimeError, "synthetic failure"):
-                    selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+                    local_evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
             pending = os.path.join(out, selection.test_key(frozen) + ".pending")
             self.assertTrue(os.path.exists(pending))
             with self.assertRaisesRegex(EngineError, "interrupted reservation"):
-                selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
+                local_evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
 
     def test_reevaluation_run_id_cannot_escape_registry_directory(self):
         frozen = self.freeze()
         with tempfile.TemporaryDirectory() as root:
             registry = os.path.join(root, "registry")
             os.mkdir(registry)
-            first = selection.evaluate_test(
+            first = local_evaluate_test(
                 self.c, frozen, self.sp, registry_dir=registry,
                 out_registry_dir=registry, run_id="initial"
             )
             self.assertEqual(first["status"], "evaluated")
-            reevaluated = selection.evaluate_test(
+            reevaluated = local_evaluate_test(
                 self.c, frozen, self.sp, registry_dir=registry,
                 out_registry_dir=registry, allow_reeval=True,
                 run_id="../../outside"
@@ -672,7 +679,7 @@ class SelectionTests(unittest.TestCase):
     def test_all_four_cost_scenarios_are_present_with_benchmarks(self):
         f = self.freeze()
         with tempfile.TemporaryDirectory() as out:
-            r = selection.evaluate_test(self.c, f, self.sp, out_registry_dir=out)["results"]
+            r = local_evaluate_test(self.c, f, self.sp, out_registry_dir=out)["results"]
         self.assertEqual(len(r), 4)
         for name, block in r.items():
             self.assertEqual(set(block), {"strategy", "buy_and_hold", "cash"})
