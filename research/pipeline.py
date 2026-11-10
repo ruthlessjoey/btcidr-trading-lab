@@ -152,6 +152,10 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
         result.update(status="OK", reservation=reservation or {"status": "not_required"})
         return finish(result, out_dir)
     if cfg.get("evaluate_test", False):
+        if not require_committed_reservation:
+            result["error"] = ("TEST evaluation requires --require-committed-reservation; "
+                               "prepare and persist the exact reservation first")
+            return finish(result, out_dir)
         if not registry:
             result["error"] = ("holdout evaluation requires prev_results_root so the persistent "
                                "test registry and exclusive reservation are shared across runs")
