@@ -136,7 +136,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     registry = os.path.join(prev_results_root, "test_evaluations") if prev_results_root else None
     if prepare_reservation:
         if not cfg.get("evaluate_test", False):
-            result.update(status="OK", reservation={"status": "not_required", "reason": "evaluate_test is false"})
+            result.update(status="RESERVATION_PREPARED", reservation={"status": "not_required", "reason": "evaluate_test is false"})
             return finish(result, out_dir)
         try:
             reservation = selection.prepare_test_reservation(
@@ -145,7 +145,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
         except Exception as e:
             result["error"] = f"{type(e).__name__}: {e}"
             return finish(result, out_dir)
-        result.update(status="OK", reservation=reservation or {"status": "not_required"})
+        result.update(status="RESERVATION_PREPARED", reservation=reservation or {"status": "not_required"})
         return finish(result, out_dir)
     if cfg.get("evaluate_test", False):
         if not require_committed_reservation:
@@ -203,4 +203,4 @@ def finish(result, out_dir):
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
             f.write(text)
-    return 0 if result["status"] == "OK" else 1
+    return 0 if result["status"] in ("OK", "RESERVATION_PREPARED") else 1
