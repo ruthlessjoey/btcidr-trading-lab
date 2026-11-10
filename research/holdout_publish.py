@@ -42,6 +42,10 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
     if output.is_symlink() or not output.is_dir():
         raise RuntimeError("run output test registry must be a real directory")
 
+    completed_files = sorted(output.glob("*.json"))
+    if not completed_files:
+        return 0
+
     report = _read_object(Path(report_path), "backtest report")
     report_test = report.get("test")
     if (report.get("status") not in ("OK", "POST_EVALUATION_FAILED")
@@ -50,7 +54,7 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         raise RuntimeError("backtest report does not confirm a completed TEST evaluation")
 
     pending_to_remove = []
-    for completed in sorted(output.glob("*.json")):
+    for completed in completed_files:
         _regular_file(completed, "local completed record")
         pending = root / (completed.stem + ".pending")
         if not os.path.lexists(pending):
