@@ -348,7 +348,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         # Publish to the run output (which the workflow preserves) and mirror into
         # the shared registry so another caller in this workspace sees the result.
         _publish_record(store_dir, os.path.join(store_dir, final_name), record)
-        if registry_dir and os.path.abspath(registry_dir) != os.path.abspath(store_dir):
+        if registry_dir and not os.path.samefile(registry_dir, store_dir):
             _publish_record(registry_dir, os.path.join(registry_dir, final_name), record)
         published = True
         return record
