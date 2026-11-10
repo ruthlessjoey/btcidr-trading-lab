@@ -276,6 +276,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
 
     key = test_key(frozen)
     reservation = os.path.join(reservation_dir, key + ".pending")
+    output_reservation = os.path.join(store_dir, key + ".pending")
     try:
         lock_fd = os.open(reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
@@ -283,14 +284,31 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
             "a holdout evaluation is already in progress or has an interrupted reservation"
         )
 
+    output_lock_fd = None
+    if output_reservation != reservation:
+        try:
+            output_lock_fd = os.open(output_reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            os.close(lock_fd)
+            os.unlink(reservation)
+            raise engine.EngineError(
+                "an output reservation already exists; refusing to repeat the holdout evaluation"
+            )
+
     published = False
     calculation_started = False
     try:
+        lock_record = {"key": key, "frozen_hash": frozen["frozen_hash"],
+                       "run_id": run_id, "status": "in_progress"}
         with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
-            json.dump({"key": key, "frozen_hash": frozen["frozen_hash"],
-                       "run_id": run_id, "status": "in_progress"}, lock_file)
+            json.dump(lock_record, lock_file)
             lock_file.flush()
             os.fsync(lock_file.fileno())
+        if output_lock_fd is not None:
+            with os.fdopen(output_lock_fd, "w", encoding="utf-8") as lock_file:
+                json.dump(lock_record, lock_file)
+                lock_file.flush()
+                os.fsync(lock_file.fileno())
 
         # Recheck while holding the exclusive reservation. This closes the race
         # where two callers both observed no prior record before either acquired it.
@@ -331,7 +349,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         # Ordinary exceptions release the reservation. A hard kill leaves it behind,
         # forcing deliberate manual recovery rather than silently repeating the test.
         if published or not calculation_started:
-            try:
-                os.unlink(reservation)
-            except FileNotFoundError:
-                pass
+            for pending_path in {reservation, output_reservation}:
+                try:
+                    os.unlink(pending_path)
+                except FileNotFoundError:
+                    pass
