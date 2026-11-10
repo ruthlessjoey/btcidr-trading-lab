@@ -1,9 +1,7 @@
 name: Research backtest (Step 2)
 
-# READ-ONLY research. Uses the pinned dataset version stored on the 'research-data' branch.
-# Whether the TEST window is evaluated is set in backtest_config.json ("evaluate_test"), so the
-# decision is a visible, reviewable commit. Results are appended to 'research-data'; nothing is
-# overwritten or force-pushed.
+# READ-ONLY research. TEST evaluation requires a reservation committed to research-data first.
+# Results are append-only; no force-push is used.
 on:
   workflow_dispatch:
   push:
@@ -23,7 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require the approved research branch
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/milestone-3-data" ]; then
+            echo "Research backtests are restricted to milestone-3-data."
+            exit 1
+          fi
 
       - name: Offline unit tests (must pass before anything runs on real data)
         run: python3 -m unittest discover -s tests -v
@@ -32,46 +40,132 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           mkdir -p prev
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git fetch -q --depth=1 "$URL" research-data
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
+          git fetch -q --depth=1 "$REMOTE_URL" research-data
           git archive FETCH_HEAD datasets | tar -x -C prev
           git archive FETCH_HEAD test_evaluations 2>/dev/null | tar -x -C prev || true
-          ls -R prev | head -30
+          if [ -L prev/test_evaluations ] || { [ -e prev/test_evaluations ] && [ ! -d prev/test_evaluations ]; }; then
+            echo "Prior test registry must be a real directory, not a symlink or file."
+            exit 1
+          fi
+          mkdir -p prev/test_evaluations
 
       - name: Cross-check flagged candles against independent sources
         continue-on-error: true
         run: python3 run_crosscheck.py --datasets-root prev/datasets
 
-      - name: Backtest on the pinned dataset
-        run: python3 run_backtest.py --datasets-root prev/datasets --prev-results prev --crosscheck out/crosscheck.json
+      - name: Prepare holdout reservation (does not evaluate TEST)
+        run: |
+          set -euo pipefail
+          python3 run_backtest.py --datasets-root prev/datasets --prev-results prev --crosscheck out/crosscheck.json --prepare-reservation
+
+      - name: Persist reservation before TEST evaluation
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          markers=("$GITHUB_WORKSPACE"/out/test_evaluations/*.pending)
+          if [ "${#markers[@]}" -eq 0 ]; then
+            echo "No TEST reservation was prepared; TEST will not be evaluated."
+            exit 0
+          fi
+          if [ "${#markers[@]}" -ne 1 ]; then
+            echo "Expected exactly one prepared reservation; refusing."
+            exit 1
+          fi
+          marker="${markers[0]}"
+          if [ -L "$marker" ] || [ ! -f "$marker" ]; then
+            echo "Prepared reservation must be a regular non-symlink file."
+            exit 1
+          fi
+          name="$(basename "$marker")"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
+          rm -rf /tmp/reservation-pub
+          git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/reservation-pub
+          cd /tmp/reservation-pub
+          if [ -L test_evaluations ] || { [ -e test_evaluations ] && [ ! -d test_evaluations ]; }; then
+            echo "Remote test registry must be a real directory."
+            exit 1
+          fi
+          mkdir -p test_evaluations
+          key="${name%.pending}"
+          if [ -e "test_evaluations/$name" ] || [ -L "test_evaluations/$name" ] || [ -e "test_evaluations/$key.json" ] || [ -L "test_evaluations/$key.json" ]; then
+            echo "A completed record or reservation already exists; refusing TEST evaluation."
+            exit 1
+          fi
+          cp "$marker" "test_evaluations/$name"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "test_evaluations/$name"
+          git commit -m "Reserve holdout evaluation $key"
+          git push "$REMOTE_URL" HEAD:research-data
+          mkdir -p "$GITHUB_WORKSPACE/prev/test_evaluations"
+          git show "HEAD:test_evaluations/$name" > "$GITHUB_WORKSPACE/prev/test_evaluations/$name"
+
+      - name: Evaluate TEST only with the committed reservation
+        if: success()
+        run: |
+          set -euo pipefail
+          python3 run_backtest.py --datasets-root prev/datasets --prev-results prev --crosscheck out/crosscheck.json --require-committed-reservation
 
       - name: Keep the reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backtest-report
           path: out/
           if-no-files-found: ignore
 
-      - name: Publish results to the research-data branch (append only)
+      - name: Publish results and clear only matching completed reservations
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -e
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          set -euo pipefail
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
           rm -rf /tmp/pub
-          git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
+          git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/pub
           cd /tmp/pub
-          R=results/${{ github.run_id }}
+          if [ -L results ] || { [ -e results ] && [ ! -d results ]; }; then
+            echo "Remote results path must be a real directory."
+            exit 1
+          fi
+          if [ -L test_evaluations ] || { [ -e test_evaluations ] && [ ! -d test_evaluations ]; }; then
+            echo "Remote test registry must be a real directory."
+            exit 1
+          fi
+          if [ -L LATEST_BACKTEST_REPORT.md ] || [ -L LATEST_CROSSCHECK.md ]; then
+            echo "Remote latest-report paths must not be symlinks."
+            exit 1
+          fi
+          R=results/${{ github.run_id }}-${{ github.run_attempt }}
+          if [ -L "$R" ] || { [ -e "$R" ] && [ ! -d "$R" ]; }; then
+            echo "This run's results path must be a real directory."
+            exit 1
+          fi
           mkdir -p "$R" test_evaluations
           cp "$GITHUB_WORKSPACE"/out/*.md "$GITHUB_WORKSPACE"/out/*.json "$GITHUB_WORKSPACE"/out/*.csv "$R"/ 2>/dev/null || true
-          if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then cp -rn "$GITHUB_WORKSPACE/out/test_evaluations/." test_evaluations/; fi
+          if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then
+            cp -n "$GITHUB_WORKSPACE"/out/test_evaluations/*.json test_evaluations/ 2>/dev/null || true
+          fi
+          PYTHONPATH="$GITHUB_WORKSPACE" python3 -m research.holdout_publish --registry test_evaluations --output "$GITHUB_WORKSPACE/out/test_evaluations" --report "$GITHUB_WORKSPACE/out/backtest_report.json"
           cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
           cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q --allow-empty -m "Backtest run ${{ github.run_id }}"
-          git push -q "$URL" HEAD:research-data
+          git commit --allow-empty -m "Backtest run ${{ github.run_id }} attempt ${{ github.run_attempt }}"
+          git push "$REMOTE_URL" HEAD:research-data
