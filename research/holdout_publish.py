@@ -55,8 +55,17 @@ def publish_completed_reservations(registry_dir, output_dir):
 
         if branch_record != completed_record:
             raise RuntimeError("branch completed record differs from this run's result")
-        if reservation_record.get("status") != "reserved" or completed_record.get("status") != "evaluated":
-            raise RuntimeError("reservation/completion status mismatch")
+        reservation_fields = {"status", *IDENTITY_FIELDS}
+        completion_fields = reservation_fields | {"evaluation_number", "re_evaluation", "results"}
+        if set(reservation_record) != reservation_fields or set(completed_record) != completion_fields:
+            raise RuntimeError("reservation/completion record has unexpected or missing fields")
+        if (reservation_record.get("status") != "reserved"
+                or completed_record.get("status") != "evaluated"
+                or type(completed_record.get("evaluation_number")) is not int
+                or completed_record.get("evaluation_number") != 1
+                or completed_record.get("re_evaluation") is not False
+                or not isinstance(completed_record.get("results"), dict)):
+            raise RuntimeError("reservation/completion status or shape mismatch")
         if reservation_record.get("key") != completed.stem or completed_record.get("key") != completed.stem:
             raise RuntimeError("reservation/completion filename does not match its key")
         if any(reservation_record.get(field) != completed_record.get(field)
