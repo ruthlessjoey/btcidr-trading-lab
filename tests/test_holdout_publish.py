@@ -31,7 +31,7 @@ class HoldoutPublicationTests(unittest.TestCase):
             "status": "evaluated",
             "evaluation_number": 1,
             "re_evaluation": False,
-            "results": {},
+            "results": {"BASE": {}},
         }
 
     def write_json(self, path, value):
