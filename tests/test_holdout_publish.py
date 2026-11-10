@@ -15,6 +15,7 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.output = Path(self.temp.name) / "out" / "test_evaluations"
         self.root.mkdir(parents=True)
         self.output.mkdir(parents=True)
+        self.report = Path(self.temp.name) / "backtest_report.json"
         self.key = "a" * 25
         self.reservation = {
             "status": "reserved",
@@ -40,18 +41,23 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.write_json(self.root / (self.key + ".pending"), self.reservation)
         self.write_json(self.output / (self.key + ".json"), self.completed)
         self.write_json(self.root / (self.key + ".json"), self.completed)
+        self.write_json(self.report, {"status": "OK", "test": self.completed})
+
+    def publish(self):
+        return publish_completed_reservations(self.root, self.output, self.report)
 
     def test_removes_only_exact_matching_durable_reservation(self):
         self.install_pair()
-        self.assertEqual(publish_completed_reservations(self.root, self.output), 1)
+        self.assertEqual(self.publish(), 1)
         self.assertFalse((self.root / (self.key + ".pending")).exists())
         self.assertTrue((self.root / (self.key + ".json")).is_file())
 
     def test_missing_durable_reservation_refuses_publication(self):
         self.write_json(self.output / (self.key + ".json"), self.completed)
         self.write_json(self.root / (self.key + ".json"), self.completed)
+        self.write_json(self.report, {"status": "OK", "test": self.completed})
         with self.assertRaisesRegex(RuntimeError, "reservation is missing"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
         self.assertTrue((self.root / (self.key + ".json")).is_file())
 
     def test_conflicting_existing_branch_completion_refuses_cleanup(self):
@@ -59,30 +65,40 @@ class HoldoutPublicationTests(unittest.TestCase):
         conflict = dict(self.completed, run_attempt="3")
         self.write_json(self.root / (self.key + ".json"), conflict)
         with self.assertRaisesRegex(RuntimeError, "differs from this run"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
     def test_identity_mismatch_refuses_cleanup(self):
         self.install_pair()
-        self.write_json(self.output / (self.key + ".json"), dict(self.completed, run_attempt="3"))
-        self.write_json(self.root / (self.key + ".json"), dict(self.completed, run_attempt="3"))
+        mismatched = dict(self.completed, run_attempt="3")
+        self.write_json(self.output / (self.key + ".json"), mismatched)
+        self.write_json(self.root / (self.key + ".json"), mismatched)
+        self.write_json(self.report, {"status": "OK", "test": mismatched})
         with self.assertRaisesRegex(RuntimeError, "does not match"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_preparation_report_cannot_clear_completed_reservation(self):
+        self.install_pair()
+        self.write_json(self.report, {"status": "RESERVATION_PREPARED", "test": {"status": "reserved"}})
+        with self.assertRaisesRegex(RuntimeError, "does not confirm a completed TEST"):
+            self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
     def test_unexpected_reservation_fields_refuse_cleanup(self):
         self.install_pair()
         self.write_json(self.root / (self.key + ".pending"), dict(self.reservation, unexpected="extra"))
         with self.assertRaisesRegex(RuntimeError, "unexpected or missing fields"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
     def test_dangling_pending_symlink_fails_closed(self):
         self.write_json(self.output / (self.key + ".json"), self.completed)
         self.write_json(self.root / (self.key + ".json"), self.completed)
+        self.write_json(self.report, {"status": "OK", "test": self.completed})
         os.symlink(self.root / "missing-target", self.root / (self.key + ".pending"))
         with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
 
     def test_valid_first_record_is_not_removed_if_later_record_is_invalid(self):
         self.install_pair()
@@ -92,8 +108,9 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.write_json(self.root / (other_key + ".pending"), other_reservation)
         self.write_json(self.output / (other_key + ".json"), other_completed)
         self.write_json(self.root / (other_key + ".json"), dict(other_completed, run_attempt="9"))
+        self.write_json(self.report, {"status": "OK", "test": self.completed})
         with self.assertRaisesRegex(RuntimeError, "differs from this run"):
-            publish_completed_reservations(self.root, self.output)
+            self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
         self.assertTrue((self.root / (other_key + ".pending")).is_file())
 
