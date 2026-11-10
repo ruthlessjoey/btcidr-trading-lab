@@ -187,14 +187,60 @@ def test_key(frozen):
     return f"{digest[:12]}_{frozen_hash[:12]}"
 
 
-def find_prior_test(registry_dir, frozen):
-    if not registry_dir:
-        return None
-    path = os.path.join(registry_dir, test_key(frozen) + ".json")
-    if os.path.exists(path):
+def _load_test_record(path, frozen):
+    """Load and minimally authenticate a completed record for this exact frozen choice."""
+    try:
         with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+            record = json.load(f)
+    except (OSError, ValueError) as exc:
+        raise engine.EngineError(f"existing test registry record is unreadable: {type(exc).__name__}")
+    if (not isinstance(record, dict) or record.get("status") != "evaluated"
+            or record.get("key") != test_key(frozen)
+            or record.get("frozen_hash") != frozen["frozen_hash"]
+            or not isinstance(record.get("results"), dict)):
+        raise engine.EngineError("existing test registry record is malformed or belongs to another frozen choice")
+    return record
+
+
+def find_prior_test(registry_dir, frozen, out_registry_dir=None):
+    """Find a completed evaluation in either the prior registry or this run's output registry."""
+    paths = []
+    for directory in (registry_dir, out_registry_dir):
+        if directory:
+            path = os.path.join(directory, test_key(frozen) + ".json")
+            if path not in paths:
+                paths.append(path)
+    records = []
+    for path in paths:
+        if os.path.exists(path):
+            records.append(_load_test_record(path, frozen))
+    if not records:
+        return None
+    first = records[0]
+    first_digest = hashlib.sha256(_canon(first).encode()).hexdigest()
+    if any(hashlib.sha256(_canon(item).encode()).hexdigest() != first_digest for item in records[1:]):
+        raise engine.EngineError("conflicting completed test records exist across registry directories")
+    return first
+
+
+def _publish_record(directory, final_path, record):
+    """Publish without clobbering: hard-link a fully written temp file to the final name."""
+    import tempfile
+    fd, temporary = tempfile.mkstemp(prefix=".holdout-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(record, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            os.link(temporary, final_path)
+        except FileExistsError:
+            raise engine.EngineError("test evaluation record already exists; refusing to overwrite it")
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
 
 
 def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=None,
@@ -207,12 +253,46 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         raise engine.EngineError("run_id must be a non-empty string of at most 128 characters")
     if frozen["selected_n"] is None:
         return {"status": "not_evaluated", "reason": "no candidate passed the training screen"}
-    prior = find_prior_test(registry_dir, frozen)
+    store_dir = out_registry_dir or registry_dir
+    if not store_dir:
+        raise engine.EngineError("a persistent registry directory is required for holdout evaluation")
+    os.makedirs(store_dir, exist_ok=True)
+
+    # Fast path also recovers a completed publication if the process crashed before
+    # removing its reservation file. The second lookup below closes the race after locking.
+    prior = find_prior_test(registry_dir, frozen, out_registry_dir)
     if prior and not allow_reeval:
         return {"status": "already_evaluated", "prior": prior,
                 "reason": "the test window was already evaluated for this frozen choice; "
                           "a second look is refused"}
-    sig = strategy.ma_trend(frozen["selected_n"])(candles)
+    if prior and allow_reeval and run_id is None:
+        raise engine.EngineError("run_id is required for an explicitly labelled re-evaluation")
+
+    key = test_key(frozen)
+    reservation = os.path.join(store_dir, key + ".pending")
+    try:
+        lock_fd = os.open(reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        raise engine.EngineError("a holdout evaluation is already in progress or has an interrupted reservation")
+    published = False
+    try:
+        with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
+            json.dump({"key": key, "frozen_hash": frozen["frozen_hash"],
+                       "run_id": run_id, "status": "in_progress"}, lock_file)
+            lock_file.flush()
+            os.fsync(lock_file.fileno())
+
+        # Recheck while holding the exclusive reservation. This prevents two callers
+        # that both passed the fast-path lookup from both evaluating the holdout.
+        prior = find_prior_test(registry_dir, frozen, out_registry_dir)
+        if prior and not allow_reeval:
+            return {"status": "already_evaluated", "prior": prior,
+                    "reason": "the test window was already evaluated for this frozen choice; "
+                              "a second look is refused"}
+        if prior and allow_reeval and run_id is None:
+            raise engine.EngineError("run_id is required for an explicitly labelled re-evaluation")
+
+        sig = strategy.ma_trend(frozen["selected_n"])(candles)
     a, b = splits["test"]
     results = {}
     for costs in cost_grid:
@@ -223,19 +303,28 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     record = {"status": "evaluated", "key": test_key(frozen), "run_id": run_id,
               "evaluation_number": 2 if prior else 1, "re_evaluation": bool(prior),
               "frozen_hash": frozen["frozen_hash"], "results": results}
-    if out_registry_dir:
-        os.makedirs(out_registry_dir, exist_ok=True)
-        path = os.path.join(out_registry_dir, test_key(frozen) + ".json")
-        if not os.path.exists(path):          # an existing record is never overwritten
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(record, f, indent=2)
+        # The canonical first result and every re-evaluation are immutable records.
+        # Re-evaluations use a deterministic, path-safe suffix and exclusive publication.
+        if prior:
+            suffix = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:12]
+            final_path = os.path.join(store_dir, key + f"_reeval_{suffix}.json")
+            record["evaluation_number"] = 2
+            record["re_evaluation"] = True
         else:
-            # Never interpolate caller-controlled run_id into a filesystem path.
-            # A fixed-length digest preserves traceability without path separators.
-            suffix = hashlib.sha256((run_id or "x").encode("utf-8")).hexdigest()[:12]
-            alt = path[:-5] + f"_reeval_{suffix}.json"
-            if os.path.exists(alt):
-                raise engine.EngineError("re-evaluation record already exists for this run_id")
-            with open(alt, "x", encoding="utf-8") as f:
-                json.dump(record, f, indent=2)
-    return record
+            final_path = os.path.join(store_dir, key + ".json")
+        _publish_record(store_dir, final_path, record)
+        published = True
+        return record
+    finally:
+        # Ordinary exceptions release the reservation. A hard process termination
+        # leaves it behind and fails closed; recovery requires deliberate manual review.
+        if not published:
+            try:
+                os.unlink(reservation)
+            except FileNotFoundError:
+                pass
+        else:
+            try:
+                os.unlink(reservation)
+            except FileNotFoundError:
+                pass
