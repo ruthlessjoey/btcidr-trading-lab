@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -34,8 +34,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p prev
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git fetch -q --depth=1 "$URL" research-data
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
+          git fetch -q --depth=1 "$REMOTE_URL" research-data
           git archive FETCH_HEAD datasets | tar -x -C prev
           git archive FETCH_HEAD test_evaluations 2>/dev/null | tar -x -C prev || true
           mkdir -p prev/test_evaluations
@@ -67,9 +70,12 @@ jobs:
           fi
           marker="${markers[0]}"
           name="$(basename "$marker")"
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
           rm -rf /tmp/reservation-pub
-          git clone -q --depth 1 --branch research-data "$URL" /tmp/reservation-pub
+          git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/reservation-pub
           cd /tmp/reservation-pub
           mkdir -p test_evaluations
           key="${name%.pending}"
@@ -82,7 +88,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- "test_evaluations/$name"
           git commit -m "Reserve holdout evaluation $key"
-          git push "$URL" HEAD:research-data
+          git push "$REMOTE_URL" HEAD:research-data
           mkdir -p "$GITHUB_WORKSPACE/prev/test_evaluations"
           git show "HEAD:test_evaluations/$name" > "$GITHUB_WORKSPACE/prev/test_evaluations/$name"
 
@@ -94,7 +100,7 @@ jobs:
 
       - name: Keep the reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backtest-report
           path: out/
@@ -106,9 +112,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          REMOTE_URL="https://github.com/${{ github.repository }}.git"
           rm -rf /tmp/pub
-          git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
+          git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/pub
           cd /tmp/pub
           R=results/${{ github.run_id }}-${{ github.run_attempt }}
           mkdir -p "$R" test_evaluations
@@ -147,4 +156,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit --allow-empty -m "Backtest run ${{ github.run_id }} attempt ${{ github.run_attempt }}"
-          git push "$URL" HEAD:research-data
+          git push "$REMOTE_URL" HEAD:research-data
