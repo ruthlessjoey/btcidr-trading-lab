@@ -317,7 +317,7 @@ def verify_committed_test_reservation(frozen, registry_dir, run_id, run_attempt,
 
 def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=None,
                   allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules(),
-                  committed_reservation=None):
+                  committed_reservation=None, allow_local_reservation=False):
     """Evaluate a frozen holdout once, using an exclusive persistent reservation.
 
     A hard process termination leaves the reservation in place and blocks retries until
@@ -370,6 +370,9 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
                   "frozen_hash": frozen["frozen_hash"], "results": results}
         _publish_record(store_dir, os.path.join(store_dir, key + ".json"), record)
         return record
+
+    if not allow_local_reservation:
+        raise engine.EngineError("TEST evaluation requires an exact committed reservation")
 
     # Fast path permits recovery of a completed publication if the process stopped
     # after publishing the record but before removing its reservation.
