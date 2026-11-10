@@ -79,6 +79,9 @@ class PipelineTests(unittest.TestCase):
                 published = os.path.join(registry, key + ".json")
                 if os.path.isfile(produced) and not os.path.lexists(published):
                     shutil.copyfile(produced, published)
+                    pending = os.path.join(registry, key + ".pending")
+                    if os.path.isfile(pending):
+                        os.unlink(pending)  # model the publisher's atomic completed-record publication
         else:
             code = pipeline.run_backtest(cfg, self.root, out, run_id="r1", **kw)
         with open(os.path.join(out, "backtest_report.json"), encoding="utf-8") as f:
@@ -156,8 +159,9 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(before, (dataset.sha256_file(csv_path), os.listdir(os.path.dirname(csv_path))))
 
     def test_run_is_reproducible(self):
-        _, a, _, _ = self.run_bt(out=os.path.join(self.tmp, "o1"))
-        _, b, _, _ = self.run_bt(out=os.path.join(self.tmp, "o2"))
+        cfg = dict(self.cfg, evaluate_test=False)
+        _, a, _, _ = self.run_bt(cfg, out=os.path.join(self.tmp, "o1"))
+        _, b, _, _ = self.run_bt(cfg, out=os.path.join(self.tmp, "o2"))
         self.assertEqual(a["selection"], b["selection"])
         self.assertEqual(a["frozen"]["frozen_hash"], b["frozen"]["frozen_hash"])
         self.assertEqual(a["shown"], b["shown"])
@@ -221,9 +225,11 @@ class PipelineTests(unittest.TestCase):
         if a["selection"]["selected_n"] is None:
             self.skipTest("toy data produced no eligible candidate")
         self.assertEqual(a["test"]["status"], "evaluated")
-        _, b, md2, _ = self.run_bt(out=os.path.join(self.tmp, "r2"), prev_results_root=out1)
-        self.assertEqual(b["test"]["status"], "already_evaluated")
-        self.assertIn("Refused", md2)
+        code, b, md2, out2 = self.run_bt(out=os.path.join(self.tmp, "r2"), prev_results_root=out1)
+        self.assertEqual(code, 1)
+        self.assertIn("committed holdout reservation is missing", b["error"])
+        self.assertFalse(os.path.exists(os.path.join(out2, "test_evaluations", selection.test_key(
+            json.load(open(os.path.join(out2, "frozen_choice.json"), encoding="utf-8"))) + ".json")))
         code, c, md3, _ = self.run_bt(out=os.path.join(self.tmp, "r3"), prev_results_root=out1, allow_reeval=True)
         self.assertEqual(code, 1)
         self.assertIn("separate reservation", c["error"])
