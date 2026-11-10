@@ -41,6 +41,10 @@ jobs:
           git fetch -q --depth=1 "$REMOTE_URL" research-data
           git archive FETCH_HEAD datasets | tar -x -C prev
           git archive FETCH_HEAD test_evaluations 2>/dev/null | tar -x -C prev || true
+          if [ -L prev/test_evaluations ] || { [ -e prev/test_evaluations ] && [ ! -d prev/test_evaluations ]; }; then
+            echo "Prior test registry must be a real directory, not a symlink or file."
+            exit 1
+          fi
           mkdir -p prev/test_evaluations
 
       - name: Cross-check flagged candles against independent sources
@@ -69,6 +73,10 @@ jobs:
             exit 1
           fi
           marker="${markers[0]}"
+          if [ -L "$marker" ] || [ ! -f "$marker" ]; then
+            echo "Prepared reservation must be a regular non-symlink file."
+            exit 1
+          fi
           name="$(basename "$marker")"
           export GIT_CONFIG_COUNT=1
           export GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
@@ -77,6 +85,10 @@ jobs:
           rm -rf /tmp/reservation-pub
           git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/reservation-pub
           cd /tmp/reservation-pub
+          if [ -L test_evaluations ] || { [ -e test_evaluations ] && [ ! -d test_evaluations ]; }; then
+            echo "Remote test registry must be a real directory."
+            exit 1
+          fi
           mkdir -p test_evaluations
           key="${name%.pending}"
           if [ -e "test_evaluations/$name" ] || [ -L "test_evaluations/$name" ] || [ -e "test_evaluations/$key.json" ] || [ -L "test_evaluations/$key.json" ]; then
@@ -119,6 +131,18 @@ jobs:
           rm -rf /tmp/pub
           git clone -q --depth 1 --branch research-data "$REMOTE_URL" /tmp/pub
           cd /tmp/pub
+          if [ -L results ] || { [ -e results ] && [ ! -d results ]; }; then
+            echo "Remote results path must be a real directory."
+            exit 1
+          fi
+          if [ -L test_evaluations ] || { [ -e test_evaluations ] && [ ! -d test_evaluations ]; }; then
+            echo "Remote test registry must be a real directory."
+            exit 1
+          fi
+          if [ -L LATEST_BACKTEST_REPORT.md ] || [ -L LATEST_CROSSCHECK.md ]; then
+            echo "Remote latest-report paths must not be symlinks."
+            exit 1
+          fi
           R=results/${{ github.run_id }}-${{ github.run_attempt }}
           mkdir -p "$R" test_evaluations
           cp "$GITHUB_WORKSPACE"/out/*.md "$GITHUB_WORKSPACE"/out/*.json "$GITHUB_WORKSPACE"/out/*.csv "$R"/ 2>/dev/null || true
