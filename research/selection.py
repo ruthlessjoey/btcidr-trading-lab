@@ -246,8 +246,77 @@ def _publish_record(directory, final_path, record):
             pass
 
 
+
+def _reservation_context(run_id, run_attempt, workflow_ref, repository):
+    values = {
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "workflow_ref": workflow_ref,
+        "repository": repository,
+    }
+    if (not isinstance(run_id, str) or not run_id or len(run_id) > 128
+            or not isinstance(run_attempt, str) or not run_attempt.isdigit()
+            or int(run_attempt) < 1 or int(run_attempt) > 1000000
+            or not isinstance(workflow_ref, str) or not workflow_ref or len(workflow_ref) > 512
+            or not isinstance(repository, str) or len(repository) > 256
+            or repository.count("/") != 1):
+        raise engine.EngineError("invalid GitHub reservation context")
+    return values
+
+
+def prepare_test_reservation(frozen, registry_dir, run_id, run_attempt, workflow_ref, repository):
+    """Write a local intent only. This function never computes TEST signals or metrics."""
+    verify_frozen(frozen)
+    if frozen.get("selected_n") is None:
+        return None
+    context = _reservation_context(run_id, run_attempt, workflow_ref, repository)
+    if not registry_dir:
+        raise engine.EngineError("reservation preparation requires an output registry")
+    os.makedirs(registry_dir, exist_ok=True)
+    key = test_key(frozen)
+    completed = os.path.join(registry_dir, key + ".json")
+    pending = os.path.join(registry_dir, key + ".pending")
+    if os.path.lexists(completed) or os.path.lexists(pending):
+        raise engine.EngineError("completed or pending holdout record already exists; refusing reservation")
+    record = {"status": "reserved", "key": key, "frozen_hash": frozen["frozen_hash"], **context}
+    fd = None
+    try:
+        fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            fd = None
+            json.dump(record, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        raise engine.EngineError("holdout reservation already exists")
+    finally:
+        if fd is not None:
+            os.close(fd)
+    return record
+
+
+def verify_committed_test_reservation(frozen, registry_dir, run_id, run_attempt,
+                                      workflow_ref, repository):
+    """Require the exact persistent reservation copied from the research-data branch."""
+    context = _reservation_context(run_id, run_attempt, workflow_ref, repository)
+    key = test_key(frozen)
+    path = os.path.join(registry_dir, key + ".pending")
+    if not os.path.lexists(path) or os.path.islink(path) or not os.path.isfile(path):
+        raise engine.EngineError("committed holdout reservation is missing or not a regular file")
+    try:
+        with open(path, encoding="utf-8") as stream:
+            record = json.load(stream)
+    except (OSError, ValueError) as exc:
+        raise engine.EngineError(f"committed holdout reservation is unreadable: {type(exc).__name__}")
+    expected = {"status": "reserved", "key": key, "frozen_hash": frozen["frozen_hash"], **context}
+    if record != expected:
+        raise engine.EngineError("committed holdout reservation does not match this frozen choice and workflow attempt")
+    return record
+
+
 def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=None,
-                  allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules()):
+                  allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules(),
+                  committed_reservation=None):
     """Evaluate a frozen holdout once, using an exclusive persistent reservation.
 
     A hard process termination leaves the reservation in place and blocks retries until
@@ -266,6 +335,38 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         raise engine.EngineError("a persistent registry directory is required for holdout evaluation")
     os.makedirs(store_dir, exist_ok=True)
     os.makedirs(reservation_dir, exist_ok=True)
+
+    if committed_reservation is not None:
+        if not registry_dir:
+            raise engine.EngineError("committed reservation verification requires the persistent registry")
+        verify_committed_test_reservation(
+            frozen, registry_dir,
+            committed_reservation.get("run_id"),
+            committed_reservation.get("run_attempt"),
+            committed_reservation.get("workflow_ref"),
+            committed_reservation.get("repository"))
+        prior = find_prior_test(registry_dir, frozen, out_registry_dir)
+        if prior and not allow_reeval:
+            raise engine.EngineError("completed holdout record exists alongside a pending reservation; manual recovery required")
+        # The durable marker is owned by the research-data branch publisher. The evaluator
+        # must neither create nor delete it; it only writes the completed result to out/.
+        key = test_key(frozen)
+        sig = strategy.ma_trend(frozen["selected_n"])(candles)
+        a, b = splits["test"]
+        results = {}
+        for costs in cost_grid:
+            results[costs.name] = {
+                "strategy": engine.metrics(engine.simulate(candles, sig, a, b, costs, rules)),
+                "buy_and_hold": engine.metrics(engine.buy_and_hold(candles, a, b, costs, rules)),
+                "cash": engine.metrics(engine.cash_only(candles, a, b, costs, rules))}
+        record = {"status": "evaluated", "key": key, "run_id": committed_reservation["run_id"],
+                  "run_attempt": committed_reservation["run_attempt"],
+                  "workflow_ref": committed_reservation["workflow_ref"],
+                  "repository": committed_reservation["repository"],
+                  "evaluation_number": 1, "re_evaluation": False,
+                  "frozen_hash": frozen["frozen_hash"], "results": results}
+        _publish_record(store_dir, os.path.join(store_dir, key + ".json"), record)
+        return record
 
     # Fast path permits recovery of a completed publication if the process stopped
     # after publishing the record but before removing its reservation.
