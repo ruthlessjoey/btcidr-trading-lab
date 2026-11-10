@@ -116,8 +116,8 @@ class PipelineTests(unittest.TestCase):
 class SafetyScanTests(unittest.TestCase):
     FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws",
                  "user-data-stream", "listenkey", "x-mbx-apikey", "signature",
-                 "hmac", "api_key", "apikey", "secret", "withdraw"]
-
+                 "hmac", "api_key", "apikey", "secret", "withdraw", "password"]
+    
     def test_no_trading_or_credential_code(self):
         for name in sorted(os.listdir(ROOT)):
             if name.endswith(".py"):
