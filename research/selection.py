@@ -282,6 +282,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         )
 
     published = False
+    calculation_started = False
     try:
         with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
             json.dump({"key": key, "frozen_hash": frozen["frozen_hash"],
@@ -299,6 +300,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         if prior and allow_reeval and run_id is None:
             raise engine.EngineError("run_id is required for an explicitly labelled re-evaluation")
 
+        calculation_started = True
         sig = strategy.ma_trend(frozen["selected_n"])(candles)
         a, b = splits["test"]
         results = {}
@@ -326,7 +328,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     finally:
         # Ordinary exceptions release the reservation. A hard kill leaves it behind,
         # forcing deliberate manual recovery rather than silently repeating the test.
-        try:
-            os.unlink(reservation)
-        except FileNotFoundError:
-            pass
+        if published or not calculation_started:
+            try:
+                os.unlink(reservation)
+            except FileNotFoundError:
+                pass
