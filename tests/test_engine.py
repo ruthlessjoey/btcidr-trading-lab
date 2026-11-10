@@ -538,6 +538,23 @@ class SelectionTests(unittest.TestCase):
             )
             self.assertEqual(second["status"], "already_evaluated")
 
+    def test_completed_result_is_visible_to_another_output_directory(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "shared-registry")
+            output_one = os.path.join(root, "run-one")
+            output_two = os.path.join(root, "run-two")
+            os.mkdir(registry)
+            first = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_one
+            )
+            self.assertEqual(first["status"], "evaluated")
+            second = selection.evaluate_test(
+                self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output_two
+            )
+            self.assertEqual(second["status"], "already_evaluated")
+            self.assertTrue(os.path.exists(os.path.join(registry, selection.test_key(frozen) + ".json")))
+
     def test_holdout_requires_a_persistent_registry(self):
         frozen = self.freeze()
         with self.assertRaises(EngineError):
