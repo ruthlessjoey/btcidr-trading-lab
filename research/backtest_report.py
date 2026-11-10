@@ -54,6 +54,19 @@ def build_markdown(r):
          "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
          "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
          "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+    if r["status"] == "RESERVATION_PREPARED":
+        reservation = r.get("reservation") or {}
+        L += ["## Reservation prepared", "",
+              "TRAIN + VALIDATION selection and the frozen dataset identity were prepared. "
+              "The TEST window was **not evaluated** in this phase.", ""]
+        if reservation.get("status") == "reserved":
+            L.append(f"- Reservation key: `{reservation.get('key')}`")
+            L.append(f"- Frozen hash: `{reservation.get('frozen_hash')}`")
+            L.append(f"- GitHub run: `{reservation.get('run_id')}`, attempt `{reservation.get('run_attempt')}`")
+            L.append("- The workflow must commit this exact reservation to `research-data` before TEST can run.")
+        else:
+            L.append(f"- No TEST reservation was required: {reservation.get('reason', 'no eligible candidate was selected')}.")
+        return "\n".join(L) + "\n"
     if r["status"] != "OK":
         L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
               "Nothing was simulated and no results are shown."]
