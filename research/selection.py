@@ -321,7 +321,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     """Evaluate a frozen holdout once, using an exclusive persistent reservation.
 
     A hard process termination leaves the reservation in place and blocks retries until
-    an operator verifies whether a result was published. This deliberately fails closed.
+    an operator verifies whether a result was published. Production callers must provide
+    committed_reservation. allow_local_reservation is reserved for isolated offline unit tests.
     """
     verify_frozen(frozen)
     _verify_frozen_inputs(candles, frozen, splits)
