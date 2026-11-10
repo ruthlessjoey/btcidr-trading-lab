@@ -287,7 +287,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         )
 
     output_lock_fd = None
-    if output_reservation != reservation:
+    same_reservation_dir = os.path.samefile(store_dir, reservation_dir)
+    if not same_reservation_dir:
         try:
             output_lock_fd = os.open(output_reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
