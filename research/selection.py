@@ -337,6 +337,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     os.makedirs(reservation_dir, exist_ok=True)
 
     if committed_reservation is not None:
+        if allow_reeval:
+            raise engine.EngineError("committed-reservation re-evaluation requires a separate reservation identity and is not enabled")
         if not registry_dir:
             raise engine.EngineError("committed reservation verification requires the persistent registry")
         verify_committed_test_reservation(
