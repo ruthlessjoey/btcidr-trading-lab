@@ -482,6 +482,29 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             selection.evaluate_test(self.c, frozen, self.sp)
 
+    def test_registry_key_rejects_malformed_dataset_sha256(self):
+        frozen = self.freeze()
+        for bad in ("../escape", "g" * 64, "a" * 63, "A" * 64, None, 123):
+            candidate = dict(frozen)
+            candidate["dataset"] = dict(frozen["dataset"])
+            candidate["dataset"]["sha256"] = bad
+            body = {key: value for key, value in candidate.items() if key != "frozen_hash"}
+            candidate["frozen_hash"] = selection.hashlib.sha256(
+                selection._canon(body).encode()
+            ).hexdigest()
+            with self.subTest(bad=bad), self.assertRaises(EngineError):
+                selection.verify_frozen(candidate)
+            with self.subTest(key_bad=bad), self.assertRaises(EngineError):
+                selection.test_key(candidate)
+
+    def test_freeze_rejects_invalid_dataset_sha256(self):
+        result = selection.select(self.c, self.sp)
+        if result["selected_n"] is None:
+            result["selected_n"] = 100
+        for bad in ("../escape", "z" * 64, "a" * 63, None):
+            with self.subTest(bad=bad), self.assertRaises(EngineError):
+                selection.freeze(result, self.sp, {"sha256": bad}, self.c)
+
     def test_test_window_is_evaluated_once_and_a_second_look_is_refused(self):
         f = self.freeze()
         with tempfile.TemporaryDirectory() as reg, tempfile.TemporaryDirectory() as out:

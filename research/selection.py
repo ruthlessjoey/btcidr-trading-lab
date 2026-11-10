@@ -136,6 +136,7 @@ def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_C
     selected = selection.get("selected_n")
     if selected is not None and (type(selected) is not int or selected not in periods):
         raise engine.EngineError("selected period is not one of the evaluated candidates")
+    _validated_dataset_sha256(dataset)
     body = {"selected_n": selected, "candidates": list(periods),
             "rule_text": _selection_rule_text(periods, splits["train"][0]), "selection_costs": costs.name,
             "splits": {k: {"start_index": a, "end_index": b,
@@ -150,9 +151,21 @@ def freeze(selection, splits, dataset, candles, rules=Rules(), costs=SELECTION_C
     return body
 
 
+def _validated_dataset_sha256(dataset):
+    """Return a safe, canonical dataset SHA-256 for registry keys."""
+    if not isinstance(dataset, dict):
+        raise engine.EngineError("frozen dataset metadata must be an object")
+    digest = dataset.get("sha256")
+    if (not isinstance(digest, str) or len(digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in digest)):
+        raise engine.EngineError("frozen dataset sha256 must be 64 lowercase hexadecimal characters")
+    return digest
+
+
 def verify_frozen(frozen):
     if not isinstance(frozen, dict):
         raise engine.EngineError("frozen record must be an object")
+    _validated_dataset_sha256(frozen.get("dataset"))
     expected_hash = frozen.get("frozen_hash")
     if not isinstance(expected_hash, str) or len(expected_hash) != 64:
         raise engine.EngineError("frozen record has no valid integrity hash")
@@ -166,7 +179,12 @@ def verify_frozen(frozen):
 
 
 def test_key(frozen):
-    return f"{frozen['dataset']['sha256'][:12]}_{frozen['frozen_hash'][:12]}"
+    digest = _validated_dataset_sha256(frozen.get("dataset") if isinstance(frozen, dict) else None)
+    frozen_hash = frozen.get("frozen_hash")
+    if (not isinstance(frozen_hash, str) or len(frozen_hash) != 64
+            or any(ch not in "0123456789abcdef" for ch in frozen_hash)):
+        raise engine.EngineError("frozen hash must be 64 lowercase hexadecimal characters")
+    return f"{digest[:12]}_{frozen_hash[:12]}"
 
 
 def find_prior_test(registry_dir, frozen):
