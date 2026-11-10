@@ -142,9 +142,15 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
             result["error"] = ("holdout evaluation requires prev_results_root so the persistent "
                                "test registry and exclusive reservation are shared across runs")
             return finish(result, out_dir)
-        test = selection.evaluate_test(candles, frozen, splits, registry_dir=registry,
-                                       out_registry_dir=os.path.join(out_dir, "test_evaluations"),
-                                       allow_reeval=allow_reeval, run_id=run_id)
+        try:
+            test = selection.evaluate_test(candles, frozen, splits, registry_dir=registry,
+                                           out_registry_dir=os.path.join(out_dir, "test_evaluations"),
+                                           allow_reeval=allow_reeval, run_id=run_id)
+        except Exception as e:
+            # Preserve the failure report and non-zero exit while evaluate_test keeps any
+            # post-start reservation in place for manual recovery.
+            result["error"] = f"{type(e).__name__}: {e}"
+            return finish(result, out_dir)
     else:
         test = {"status": "skipped", "reason": "dry run: the config says evaluate_test is false, so the "
                                                "test window was not computed or looked at"}
