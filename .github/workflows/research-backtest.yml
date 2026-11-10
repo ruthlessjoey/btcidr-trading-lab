@@ -25,6 +25,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require the approved research branch
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/milestone-3-data" ]; then
+            echo "Research backtests are restricted to milestone-3-data."
+            exit 1
+          fi
+
       - name: Offline unit tests (must pass before anything runs on real data)
         run: python3 -m unittest discover -s tests -v
 
