@@ -50,7 +50,8 @@ def load_pinned(cfg, datasets_root):
 def evaluate_frozen(candles, n, splits, rules, include_test=False):
     """The frozen choice on the train and validation segments under every cost scenario, with
     benchmarks. The TEST numbers come only from selection.evaluate_test, never from here."""
-    sig = strategy.ma_trend(n)(candles[:splits["validation"][1]])
+    selection_candles = candles[:splits["validation"][1]]
+    sig = strategy.ma_trend(n)(selection_candles)
     out = {}
     for seg, (a, b) in splits.items():
         if seg == "test":
@@ -58,7 +59,7 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
         out[seg] = {}
         for costs in selection.COST_GRID:
             out[seg][costs.name] = {
-                "strategy": engine.metrics(engine.simulate(candles, sig, a, b, costs, rules)),
+                "strategy": engine.metrics(engine.simulate(selection_candles, sig, a, b, costs, rules)),
                 "buy_and_hold": engine.metrics(engine.buy_and_hold(candles, a, b, costs, rules)),
                 "cash": engine.metrics(engine.cash_only(candles, a, b, costs, rules))}
     return out
@@ -67,7 +68,8 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
 def write_logs(candles, n, splits, out_dir, rules, include_test):
     """BASE-cost trade/order/equity logs for TRAIN + VALIDATION only; never resimulate TEST."""
     costs = selection.SELECTION_COSTS
-    sig = strategy.ma_trend(n)(candles[:splits["validation"][1]])
+    selection_candles = candles[:splits["validation"][1]]
+    sig = strategy.ma_trend(n)(selection_candles)
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as ft, \
             open(os.path.join(out_dir, "orders.csv"), "w", newline="", encoding="utf-8") as fo, \
             open(os.path.join(out_dir, "equity.csv"), "w", newline="", encoding="utf-8") as fe:
@@ -80,7 +82,7 @@ def write_logs(candles, n, splits, out_dir, rules, include_test):
             # here just to produce CSV logs would be a second holdout evaluation.
             if seg == "test":
                 continue
-            run = engine.simulate(candles, sig, a, b, costs, rules)
+            run = engine.simulate(selection_candles, sig, a, b, costs, rules)
             bh = engine.buy_and_hold(candles, a, b, costs, rules)
             for t in run["trades"]:
                 wt.writerow([seg, utc_day(t["entry_time"]), t["entry_price"], utc_day(t["exit_time"]),
