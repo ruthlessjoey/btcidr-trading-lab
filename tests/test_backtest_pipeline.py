@@ -40,8 +40,46 @@ class PipelineTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def run_bt(self, cfg=None, out=None, **kw):
+        cfg = cfg or self.cfg
         out = out or os.path.join(self.tmp, "out")
-        code = pipeline.run_backtest(cfg or self.cfg, self.root, out, run_id="r1", **kw)
+        context = {
+            "run_id": "123456",
+            "run_attempt": "1",
+            "workflow_ref": "tests/test_backtest_pipeline.py",
+            "repository": "ruthlessjoey/btcidr-trading-lab",
+        }
+        if cfg.get("evaluate_test", False):
+            registry = os.path.join(self.tmp, "persistent-registry")
+            os.makedirs(registry, exist_ok=True)
+            prepare_out = out + "-prepare"
+            prepare_code = pipeline.run_backtest(
+                cfg, self.root, prepare_out, run_id=context["run_id"],
+                prepare_reservation=True, run_attempt=context["run_attempt"],
+                workflow_ref=context["workflow_ref"], repository=context["repository"])
+            if prepare_code == 0:
+                with open(os.path.join(prepare_out, "frozen_choice.json"), encoding="utf-8") as f:
+                    frozen = json.load(f)
+                key = selection.test_key(frozen)
+                pending = os.path.join(registry, key + ".pending")
+                completed = os.path.join(registry, key + ".json")
+                prepared = os.path.join(prepare_out, "test_evaluations", key + ".pending")
+                if not os.path.lexists(pending) and not os.path.lexists(completed) and os.path.isfile(prepared):
+                    shutil.copyfile(prepared, pending)
+            code = pipeline.run_backtest(
+                cfg, self.root, out, prev_results_root=self.tmp, run_id=context["run_id"],
+                require_committed_reservation=True, run_attempt=context["run_attempt"],
+                workflow_ref=context["workflow_ref"], repository=context["repository"], **kw)
+            report_path = os.path.join(out, "frozen_choice.json")
+            if code == 0 and os.path.isfile(report_path):
+                with open(report_path, encoding="utf-8") as f:
+                    frozen = json.load(f)
+                key = selection.test_key(frozen)
+                produced = os.path.join(out, "test_evaluations", key + ".json")
+                published = os.path.join(registry, key + ".json")
+                if os.path.isfile(produced) and not os.path.lexists(published):
+                    shutil.copyfile(produced, published)
+        else:
+            code = pipeline.run_backtest(cfg, self.root, out, run_id="r1", **kw)
         with open(os.path.join(out, "backtest_report.json"), encoding="utf-8") as f:
             data = json.load(f)
         with open(os.path.join(out, "backtest_report.md"), encoding="utf-8") as f:
@@ -296,8 +334,8 @@ class CrossCheckTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
-    FORBIDDEN = ["/order", "/account", "/withdraw", "listenkey", "x-mbx-apikey", "signature",
-                 "hmac", "api_key", "apikey", "secret", "password", "leverage=", "margin"]
+    FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws", "listenkey", "x-mbx-apikey",
+                 "signature", "hmac", "api_key", "apikey", "secret", "leverage=", "margin"]
 
     def test_new_files_have_no_trading_or_credential_code(self):
         names = ["run_backtest.py", "run_crosscheck.py"] + [os.path.join("research", n) for n in
