@@ -173,22 +173,30 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     else:
         test = {"status": "skipped", "reason": "dry run: the config says evaluate_test is false, so the "
                                                "test window was not computed or looked at"}
-    n = sel["selected_n"]
-    shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
-    if n is not None:
-        write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
-    cross = None
-    if crosscheck_path and os.path.exists(crosscheck_path):
-        with open(crosscheck_path, encoding="utf-8") as f:
-            cross = json.load(f)
-    sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
-    result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
-                                                     "end": utc_day(candles[b - 1].time),
-                                                     "bars": b - a, "start_index": a, "end_index": b}
-                                                 for k, (a, b) in splits.items()},
-                  selection=sel, frozen=frozen, test=test, shown=shown, crosscheck=cross,
-                  sensitivity=sens, rules=rules.__dict__, expected_selected_n=expected,
-                  cost_grid=[{"name": c.name, "fee": c.fee, "slip": c.slip} for c in selection.COST_GRID])
+    try:
+        n = sel["selected_n"]
+        shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
+        if n is not None:
+            write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
+        cross = None
+        if crosscheck_path and os.path.exists(crosscheck_path):
+            with open(crosscheck_path, encoding="utf-8") as f:
+                cross = json.load(f)
+        sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
+        result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
+                                                         "end": utc_day(candles[b - 1].time),
+                                                         "bars": b - a, "start_index": a, "end_index": b}
+                                                     for k, (a, b) in splits.items()},
+                      selection=sel, frozen=frozen, test=test, shown=shown, crosscheck=cross,
+                      sensitivity=sens, rules=rules.__dict__, expected_selected_n=expected,
+                      cost_grid=[{"name": c.name, "fee": c.fee, "slip": c.slip} for c in selection.COST_GRID])
+    except Exception as e:
+        # TEST may already be durably evaluated. Never leave the earlier preparation
+        # report in place claiming TEST was not evaluated after a post-evaluation error.
+        result.update(status="POST_EVALUATION_FAILED",
+                      error=f"{type(e).__name__}: {e}", dataset=ds,
+                      selection=sel, frozen=frozen, test=test)
+        return finish(result, out_dir)
     return finish(result, out_dir)
 
 
