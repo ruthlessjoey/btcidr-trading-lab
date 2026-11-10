@@ -65,7 +65,7 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
 
 
 def write_logs(candles, n, splits, out_dir, rules, include_test):
-    """Trade, order and equity logs for the frozen choice under the BASE cost scenario."""
+    """BASE-cost trade/order/equity logs for TRAIN + VALIDATION only; never resimulate TEST."""
     costs = selection.SELECTION_COSTS
     sig = strategy.ma_trend(n)(candles[:splits["validation"][1]])
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as ft, \
