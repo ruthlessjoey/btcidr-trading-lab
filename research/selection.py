@@ -214,7 +214,8 @@ def find_prior_test(registry_dir, frozen, out_registry_dir=None):
                 paths.append(path)
     records = []
     for path in paths:
-        if os.path.exists(path):
+        # lexists also detects dangling symlinks; exists() follows them and returns False.
+        if os.path.lexists(path):
             records.append(_load_test_record(path, frozen))
     if not records:
         return None
