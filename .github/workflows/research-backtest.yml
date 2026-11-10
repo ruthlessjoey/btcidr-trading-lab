@@ -161,7 +161,7 @@ jobs:
           if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then
             cp -n "$GITHUB_WORKSPACE"/out/test_evaluations/*.json test_evaluations/ 2>/dev/null || true
           fi
-          PYTHONPATH="$GITHUB_WORKSPACE" python3 -m research.holdout_publish --registry test_evaluations --output "$GITHUB_WORKSPACE/out/test_evaluations"
+          PYTHONPATH="$GITHUB_WORKSPACE" python3 -m research.holdout_publish --registry test_evaluations --output "$GITHUB_WORKSPACE/out/test_evaluations" --report "$GITHUB_WORKSPACE/out/backtest_report.json"
           cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
           cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
           git config user.name "github-actions[bot]"
