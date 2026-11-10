@@ -258,9 +258,11 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         return {"status": "not_evaluated", "reason": "no candidate passed the training screen"}
 
     store_dir = out_registry_dir or registry_dir
-    if not store_dir:
+    reservation_dir = registry_dir or store_dir
+    if not store_dir or not reservation_dir:
         raise engine.EngineError("a persistent registry directory is required for holdout evaluation")
     os.makedirs(store_dir, exist_ok=True)
+    os.makedirs(reservation_dir, exist_ok=True)
 
     # Fast path permits recovery of a completed publication if the process stopped
     # after publishing the record but before removing its reservation.
@@ -273,7 +275,7 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         raise engine.EngineError("run_id is required for an explicitly labelled re-evaluation")
 
     key = test_key(frozen)
-    reservation = os.path.join(store_dir, key + ".pending")
+    reservation = os.path.join(reservation_dir, key + ".pending")
     try:
         lock_fd = os.open(reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
