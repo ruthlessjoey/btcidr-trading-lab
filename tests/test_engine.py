@@ -681,6 +681,99 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual([k.slip for k in selection.COST_GRID], [0.0005, 0.002, 0.0005, 0.002])
 
 
+
+class DurableReservationTests(unittest.TestCase):
+    def setUp(self):
+        self.c = toy.toy_candles(1000)
+        self.sp = splits_mod.make_splits(1000, warmup=200)
+        selected = selection.select(self.c, self.sp)
+        if selected["selected_n"] is None:
+            selected["selected_n"] = 50
+        self.frozen = selection.freeze(selected, self.sp, {"sha256": "a" * 64}, self.c)
+        self.context = {
+            "run_id": "123456",
+            "run_attempt": "2",
+            "workflow_ref": "owner/repo/.github/workflows/research-backtest.yml@refs/heads/main",
+            "repository": "owner/repo",
+        }
+
+    def test_prepare_creates_intent_without_generating_test_signals(self):
+        with tempfile.TemporaryDirectory() as root:
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                record = selection.prepare_test_reservation(
+                    self.frozen, root, **self.context
+                )
+                make_signal.assert_not_called()
+            self.assertEqual(record["status"], "reserved")
+            self.assertEqual(record["run_attempt"], "2")
+            selection.verify_committed_test_reservation(
+                self.frozen, root, **self.context
+            )
+
+    def test_prepare_refuses_existing_pending_or_completed_path(self):
+        with tempfile.TemporaryDirectory() as root:
+            pending = os.path.join(root, selection.test_key(self.frozen) + ".pending")
+            os.symlink(os.path.join(root, "missing"), pending)
+            with self.assertRaises(EngineError):
+                selection.prepare_test_reservation(self.frozen, root, **self.context)
+
+    def test_committed_reservation_must_match_attempt_before_signal_generation(self):
+        with tempfile.TemporaryDirectory() as root:
+            selection.prepare_test_reservation(self.frozen, root, **self.context)
+            wrong = dict(self.context, run_attempt="3")
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                with self.assertRaisesRegex(EngineError, "does not match"):
+                    selection.evaluate_test(
+                        self.c, self.frozen, self.sp, registry_dir=root,
+                        out_registry_dir=os.path.join(root, "out"),
+                        committed_reservation=wrong
+                    )
+                make_signal.assert_not_called()
+
+    def test_committed_reservation_must_match_workflow_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            selection.prepare_test_reservation(self.frozen, root, **self.context)
+            wrong = dict(self.context, workflow_ref="attacker/workflow")
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                with self.assertRaisesRegex(EngineError, "does not match"):
+                    selection.evaluate_test(
+                        self.c, self.frozen, self.sp, registry_dir=root,
+                        committed_reservation=wrong
+                    )
+                make_signal.assert_not_called()
+
+    def test_evaluation_uses_but_does_not_delete_committed_reservation(self):
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "persistent")
+            output = os.path.join(root, "output")
+            os.mkdir(registry)
+            selection.prepare_test_reservation(self.frozen, registry, **self.context)
+            result = selection.evaluate_test(
+                self.c, self.frozen, self.sp, registry_dir=registry,
+                out_registry_dir=output, committed_reservation=self.context
+            )
+            pending = os.path.join(registry, selection.test_key(self.frozen) + ".pending")
+            completed = os.path.join(output, selection.test_key(self.frozen) + ".json")
+            self.assertEqual(result["status"], "evaluated")
+            self.assertTrue(os.path.isfile(pending))
+            self.assertTrue(os.path.isfile(completed))
+            with open(pending, encoding="utf-8") as stream:
+                reservation = json.load(stream)
+            self.assertEqual(reservation["status"], "reserved")
+
+    def test_dangling_committed_reservation_fails_before_signal_generation(self):
+        with tempfile.TemporaryDirectory() as root:
+            pending = os.path.join(root, selection.test_key(self.frozen) + ".pending")
+            os.symlink(os.path.join(root, "missing"), pending)
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                with self.assertRaisesRegex(EngineError, "missing or not a regular file"):
+                    selection.evaluate_test(
+                        self.c, self.frozen, self.sp, registry_dir=root,
+                        committed_reservation=self.context
+                    )
+                make_signal.assert_not_called()
+
+
 class ToyTests(unittest.TestCase):
     def test_toy_series_is_deterministic_and_labelled(self):
         self.assertEqual(toy.toy_candles(50), toy.toy_candles(50))
