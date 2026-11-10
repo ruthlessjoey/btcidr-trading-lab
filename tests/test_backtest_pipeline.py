@@ -49,7 +49,7 @@ class PipelineTests(unittest.TestCase):
             "repository": "ruthlessjoey/btcidr-trading-lab",
         }
         if cfg.get("evaluate_test", False):
-            registry = os.path.join(self.tmp, "persistent-registry")
+            registry = os.path.join(self.tmp, "test_evaluations")
             os.makedirs(registry, exist_ok=True)
             prepare_out = out + "-prepare"
             prepare_code = pipeline.run_backtest(
