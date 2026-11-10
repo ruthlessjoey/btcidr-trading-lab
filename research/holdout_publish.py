@@ -31,7 +31,7 @@ def _read_object(path, description):
     return value
 
 
-def publish_completed_reservations(registry_dir, output_dir):
+def publish_completed_reservations(registry_dir, output_dir, report_path):
     """Validate every result first, then remove only its exact matching reservation."""
     root = Path(registry_dir)
     output = Path(output_dir)
@@ -41,6 +41,13 @@ def publish_completed_reservations(registry_dir, output_dir):
         return 0
     if output.is_symlink() or not output.is_dir():
         raise RuntimeError("run output test registry must be a real directory")
+
+    report = _read_object(Path(report_path), "backtest report")
+    report_test = report.get("test")
+    if (report.get("status") not in ("OK", "POST_EVALUATION_FAILED")
+            or not isinstance(report_test, dict)
+            or report_test.get("status") != "evaluated"):
+        raise RuntimeError("backtest report does not confirm a completed TEST evaluation")
 
     pending_to_remove = []
     for completed in sorted(output.glob("*.json")):
@@ -71,6 +78,9 @@ def publish_completed_reservations(registry_dir, output_dir):
         if any(reservation_record.get(field) != completed_record.get(field)
                for field in IDENTITY_FIELDS):
             raise RuntimeError("completed record does not match its durable reservation")
+        if any(report_test.get(field) != completed_record.get(field)
+               for field in IDENTITY_FIELDS):
+            raise RuntimeError("backtest report does not match the completed TEST record")
         pending_to_remove.append(pending)
 
     # Do not mutate even the temporary publisher checkout until every result validates.
@@ -83,8 +93,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--registry", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--report", required=True)
     args = parser.parse_args(argv)
-    publish_completed_reservations(args.registry, args.output)
+    publish_completed_reservations(args.registry, args.output, args.report)
 
 
 if __name__ == "__main__":
