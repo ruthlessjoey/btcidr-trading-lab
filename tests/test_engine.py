@@ -538,6 +538,19 @@ class SelectionTests(unittest.TestCase):
             )
             self.assertEqual(second["status"], "already_evaluated")
 
+    def test_dangling_symlink_completed_record_fails_closed_before_calculation(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as out:
+            record = os.path.join(out, selection.test_key(frozen) + ".json")
+            os.symlink(os.path.join(out, "missing-record.json"), record)
+            with mock.patch.object(selection.strategy, "ma_trend") as make_signal:
+                with self.assertRaisesRegex(EngineError, "regular, non-symlink"):
+                    selection.evaluate_test(
+                        self.c, frozen, self.sp, out_registry_dir=out, run_id="must-not-run"
+                    )
+                make_signal.assert_not_called()
+            self.assertFalse(os.path.exists(os.path.join(out, selection.test_key(frozen) + ".pending")))
+
     def test_completed_result_is_visible_to_another_output_directory(self):
         frozen = self.freeze()
         with tempfile.TemporaryDirectory() as root:
