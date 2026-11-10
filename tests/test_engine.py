@@ -816,6 +816,15 @@ class DurableReservationTests(unittest.TestCase):
         self.assertEqual(seen_lengths, [self.sp["validation"][1]] * len(selection.CANDIDATES))
 
 
+    def test_postprocessing_failure_report_preserves_non_evaluated_test_status(self):
+        report = pipeline.build_markdown({
+            "status": "POST_PROCESSING_FAILED",
+            "error": "OSError: synthetic log failure",
+            "test": {"status": "skipped"}
+        })
+        self.assertIn("TEST status: **skipped**", report)
+        self.assertIn("No new TEST evaluation is claimed", report)
+
     def test_post_evaluation_failure_report_does_not_claim_test_was_skipped(self):
         report = pipeline.build_markdown({
             "status": "POST_EVALUATION_FAILED",
