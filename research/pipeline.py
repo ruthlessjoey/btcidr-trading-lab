@@ -193,7 +193,8 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     except Exception as e:
         # TEST may already be durably evaluated. Never leave the earlier preparation
         # report in place claiming TEST was not evaluated after a post-evaluation error.
-        result.update(status="POST_EVALUATION_FAILED",
+        post_status = "POST_EVALUATION_FAILED" if test.get("status") == "evaluated" else "POST_PROCESSING_FAILED"
+        result.update(status=post_status,
                       error=f"{type(e).__name__}: {e}", dataset=ds,
                       selection=sel, frozen=frozen, test=test)
         return finish(result, out_dir)
