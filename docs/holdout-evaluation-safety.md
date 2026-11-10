@@ -7,8 +7,9 @@ The research backtest must not silently calculate the same frozen TEST window mo
 A holdout evaluation requires a persistent prior-results registry. The pipeline refuses
 `evaluate_test: true` when `prev_results_root` is missing. The registry is loaded from the
 preserved `test_evaluations` directory; each run writes its completed record and a reservation
-marker to its output `test_evaluations` directory. The publication workflow copies that output
-directory back into the preserved registry.
+marker to its output `test_evaluations` directory, and mirrors the completed record into the
+shared working registry. The publication workflow copies the output directory back into the
+preserved registry.
 
 The repository's research-backtest workflow also serializes runs with its
 `research-data` concurrency group. Do not remove that serialization while relying on this
@@ -25,7 +26,8 @@ For a frozen dataset/choice key, evaluation:
 4. Calculates the TEST window only after the reservation is secured.
 5. Writes the completed JSON to a temporary file, flushes it, and publishes it with an
    exclusive hard link. Existing records are never overwritten.
-6. Removes reservation markers only after successful publication.
+6. Mirrors the completed record into the shared working registry, then removes reservation
+   markers only after both publications succeed.
 
 An ordinary validation failure before TEST calculation releases the reservation. If TEST
 calculation begins and then raises, or the process is forcibly terminated, the reservation is
