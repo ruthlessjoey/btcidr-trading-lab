@@ -76,7 +76,9 @@ def write_logs(candles, n, splits, out_dir, rules, include_test):
         wo.writerow(["segment", "date", "side", "status", "ref_open", "fill", "qty", "fee", "reason"])
         we.writerow(["segment", "date", "strategy_equity", "buy_and_hold_equity"])
         for seg, (a, b) in splits.items():
-            if seg == "test" and not include_test:
+            # TEST is evaluated exactly once by selection.evaluate_test. Re-simulating it
+            # here just to produce CSV logs would be a second holdout evaluation.
+            if seg == "test":
                 continue
             run = engine.simulate(candles, sig, a, b, costs, rules)
             bh = engine.buy_and_hold(candles, a, b, costs, rules)
