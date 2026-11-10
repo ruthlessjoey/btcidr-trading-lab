@@ -240,7 +240,9 @@ class PipelineTests(unittest.TestCase):
         _, data, md, _ = self.run_bt(dict(self.cfg, flagged_dates=[flagged]))
         sv = data["sensitivity"]
         self.assertEqual(sv["removed"], [flagged])
-        self.assertTrue(sv["test_signals_identical_for_original_choice"] in (True, None))
+        self.assertEqual(set(sv), {"removed", "selection", "selected_n_changed"})
+        self.assertIsInstance(sv["selection"], dict)
+        self.assertIsInstance(sv["selected_n_changed"], bool)
         self.assertIn("removed", md)
         self.assertIn("NOT verified", md)         # no cross-check file was given
         self.assertEqual(data["dataset"]["rows"], 1000)    # original data untouched
@@ -258,12 +260,17 @@ class PipelineTests(unittest.TestCase):
         falling = [Candle(toy.START + i * DAY, 1000.0 - i / 2, 1001.0 - i / 2, 998.0 - i / 2, 999.0 - i / 2, 1.0) for i in range(1000)]
         root = tempfile.mkdtemp(dir=self.tmp)
         version, _ = write_toy(root, falling)
-        code = pipeline.run_backtest(dict(CFG, dataset_version=version), root, os.path.join(root, "o"))
-        with open(os.path.join(root, "o", "backtest_report.md"), encoding="utf-8") as f:
+        out = os.path.join(root, "o")
+        code = pipeline.run_backtest(
+            dict(CFG, dataset_version=version), root, out, prev_results_root=self.tmp,
+            run_id="no-candidate", require_committed_reservation=True, run_attempt="1",
+            workflow_ref="tests/test_backtest_pipeline.py", repository="ruthlessjoey/btcidr-trading-lab")
+        with open(os.path.join(out, "backtest_report.md"), encoding="utf-8") as f:
             md = f.read()
         self.assertEqual(code, 0)
         self.assertIn("No candidate passed the training screen", md)
         self.assertNotIn("TEST (final, evaluated once):", md)
+        self.assertFalse(os.path.exists(os.path.join(out, "test_evaluations")))
 
 
 def coinbase_candles(binance, scale=1.0, drop=()):
