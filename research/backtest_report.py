@@ -67,6 +67,17 @@ def build_markdown(r):
         else:
             L.append(f"- No TEST reservation was required: {reservation.get('reason', 'no eligible candidate was selected')}.")
         return "\n".join(L) + "\n"
+    if r["status"] == "POST_EVALUATION_FAILED":
+        test = r.get("test") or {}
+        L += ["## TEST evaluation completed; post-evaluation processing failed", "",
+              f"The TEST result was written with status **{test.get('status', 'unknown')}**. "
+              "The report or supporting logs could not be fully generated.", "",
+              f"- Reservation key: `{test.get('key', 'unavailable')}`",
+              f"- Frozen hash: `{test.get('frozen_hash', 'unavailable')}`",
+              f"- Error: `{r.get('error', 'unknown error')}`", "",
+              "**Do not rerun this TEST evaluation.** Preserve the durable registry and inspect "
+              "the existing result before any recovery action."]
+        return "\n".join(L) + "\n"
     if r["status"] != "OK":
         L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
               "Nothing was simulated and no results are shown."]
