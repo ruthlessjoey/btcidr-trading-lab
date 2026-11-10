@@ -234,7 +234,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("separate reservation", c["error"])
 
-    def test_sensitivity_removes_the_flagged_candle_but_keeps_the_original(self):
+    def test_sensitivity_removes_flagged_candle_without_inspecting_test(self):
         c = toy.toy_candles(1000)
         flagged = pipeline.utc_day(c[300].time)
         _, data, md, _ = self.run_bt(dict(self.cfg, flagged_dates=[flagged]))
@@ -260,6 +260,16 @@ class PipelineTests(unittest.TestCase):
         falling = [Candle(toy.START + i * DAY, 1000.0 - i / 2, 1001.0 - i / 2, 998.0 - i / 2, 999.0 - i / 2, 1.0) for i in range(1000)]
         root = tempfile.mkdtemp(dir=self.tmp)
         version, _ = write_toy(root, falling)
+        prepare_out = os.path.join(root, "prepare")
+        prepare_code = pipeline.run_backtest(
+            dict(CFG, dataset_version=version), root, prepare_out, run_id="no-candidate",
+            prepare_reservation=True, run_attempt="1", workflow_ref="tests/test_backtest_pipeline.py",
+            repository="ruthlessjoey/btcidr-trading-lab")
+        with open(os.path.join(prepare_out, "backtest_report.json"), encoding="utf-8") as f:
+            prepared = json.load(f)
+        self.assertEqual(prepare_code, 0)
+        self.assertEqual(prepared["reservation"]["status"], "not_required")
+        self.assertFalse(os.path.exists(os.path.join(prepare_out, "test_evaluations")))
         out = os.path.join(root, "o")
         code = pipeline.run_backtest(
             dict(CFG, dataset_version=version), root, out, prev_results_root=self.tmp,
