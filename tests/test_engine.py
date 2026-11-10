@@ -21,7 +21,7 @@ from research.engine import Costs, EngineError, Rules  # noqa: E402
 def local_evaluate_test(*args, **kwargs):
     """Explicit offline-test adapter for the legacy local reservation implementation."""
     kwargs["allow_local_reservation"] = True
-    return local_evaluate_test(*args, **kwargs)
+    return selection.evaluate_test(*args, **kwargs)
 
 
 DAY = 86400
