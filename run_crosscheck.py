@@ -1,4 +1,4 @@
-"""run_crosscheck.py - compare flagged Binance candles with Coinbase/Bitstamp (READ-ONLY).
+"""run_crosscheck.py - compare flagged Binance candles with Coinbase (READ-ONLY).
 
 Usage: python3 run_crosscheck.py --datasets-root DIR [--out out]
 Always exits 0 when it could write a report; a disagreement is a finding, not a crash.
