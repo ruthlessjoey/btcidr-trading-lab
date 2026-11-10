@@ -156,6 +156,7 @@ jobs:
                       raise SystemExit("reservation/completion filename does not match its key")
                   if any(reservation_record.get(k) != completed_record.get(k) for k in fields):
                       raise SystemExit("completed record does not match its durable reservation")
+                  pending.unlink()
           PY
           cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
           cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
