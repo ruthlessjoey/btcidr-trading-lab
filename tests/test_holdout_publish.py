@@ -117,6 +117,17 @@ class HoldoutPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
             self.publish()
 
+    def test_report_result_mismatch_refuses_cleanup(self):
+        self.install_pair()
+        mismatched_report = dict(
+            self.completed,
+            results={"BASE": {"strategy": {"total_return": -0.75}}},
+        )
+        self.write_json(self.report, {"status": "OK", "test": mismatched_report})
+        with self.assertRaisesRegex(RuntimeError, "report does not match completed TEST record"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+    
     def test_valid_first_record_is_not_removed_if_later_record_is_invalid(self):
         self.install_pair()
         other_key = "c" * 25
