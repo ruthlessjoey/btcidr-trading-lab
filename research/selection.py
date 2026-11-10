@@ -245,21 +245,25 @@ def _publish_record(directory, final_path, record):
 
 def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=None,
                   allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules()):
-    """Evaluates the frozen choice on the test window ONCE. A second look at the same frozen
-    choice on the same dataset is refused unless allow_reeval is set (and then it is labelled)."""
+    """Evaluate a frozen holdout once, using an exclusive persistent reservation.
+
+    A hard process termination leaves the reservation in place and blocks retries until
+    an operator verifies whether a result was published. This deliberately fails closed.
+    """
     verify_frozen(frozen)
     _verify_frozen_inputs(candles, frozen, splits)
     if run_id is not None and (not isinstance(run_id, str) or not run_id or len(run_id) > 128):
         raise engine.EngineError("run_id must be a non-empty string of at most 128 characters")
     if frozen["selected_n"] is None:
         return {"status": "not_evaluated", "reason": "no candidate passed the training screen"}
+
     store_dir = out_registry_dir or registry_dir
     if not store_dir:
         raise engine.EngineError("a persistent registry directory is required for holdout evaluation")
     os.makedirs(store_dir, exist_ok=True)
 
-    # Fast path also recovers a completed publication if the process crashed before
-    # removing its reservation file. The second lookup below closes the race after locking.
+    # Fast path permits recovery of a completed publication if the process stopped
+    # after publishing the record but before removing its reservation.
     prior = find_prior_test(registry_dir, frozen, out_registry_dir)
     if prior and not allow_reeval:
         return {"status": "already_evaluated", "prior": prior,
@@ -273,7 +277,10 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
     try:
         lock_fd = os.open(reservation, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
-        raise engine.EngineError("a holdout evaluation is already in progress or has an interrupted reservation")
+        raise engine.EngineError(
+            "a holdout evaluation is already in progress or has an interrupted reservation"
+        )
+
     published = False
     try:
         with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
@@ -282,8 +289,8 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
             lock_file.flush()
             os.fsync(lock_file.fileno())
 
-        # Recheck while holding the exclusive reservation. This prevents two callers
-        # that both passed the fast-path lookup from both evaluating the holdout.
+        # Recheck while holding the exclusive reservation. This closes the race
+        # where two callers both observed no prior record before either acquired it.
         prior = find_prior_test(registry_dir, frozen, out_registry_dir)
         if prior and not allow_reeval:
             return {"status": "already_evaluated", "prior": prior,
@@ -293,38 +300,33 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
             raise engine.EngineError("run_id is required for an explicitly labelled re-evaluation")
 
         sig = strategy.ma_trend(frozen["selected_n"])(candles)
-    a, b = splits["test"]
-    results = {}
-    for costs in cost_grid:
-        results[costs.name] = {
-            "strategy": engine.metrics(engine.simulate(candles, sig, a, b, costs, rules)),
-            "buy_and_hold": engine.metrics(engine.buy_and_hold(candles, a, b, costs, rules)),
-            "cash": engine.metrics(engine.cash_only(candles, a, b, costs, rules))}
-    record = {"status": "evaluated", "key": test_key(frozen), "run_id": run_id,
-              "evaluation_number": 2 if prior else 1, "re_evaluation": bool(prior),
-              "frozen_hash": frozen["frozen_hash"], "results": results}
-        # The canonical first result and every re-evaluation are immutable records.
-        # Re-evaluations use a deterministic, path-safe suffix and exclusive publication.
+        a, b = splits["test"]
+        results = {}
+        for costs in cost_grid:
+            results[costs.name] = {
+                "strategy": engine.metrics(engine.simulate(candles, sig, a, b, costs, rules)),
+                "buy_and_hold": engine.metrics(engine.buy_and_hold(candles, a, b, costs, rules)),
+                "cash": engine.metrics(engine.cash_only(candles, a, b, costs, rules))}
+        record = {"status": "evaluated", "key": key, "run_id": run_id,
+                  "evaluation_number": 2 if prior else 1, "re_evaluation": bool(prior),
+                  "frozen_hash": frozen["frozen_hash"], "results": results}
+
         if prior:
+            # Never interpolate caller-controlled run_id into a path.
             suffix = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:12]
             final_path = os.path.join(store_dir, key + f"_reeval_{suffix}.json")
             record["evaluation_number"] = 2
             record["re_evaluation"] = True
         else:
             final_path = os.path.join(store_dir, key + ".json")
+
         _publish_record(store_dir, final_path, record)
         published = True
         return record
     finally:
-        # Ordinary exceptions release the reservation. A hard process termination
-        # leaves it behind and fails closed; recovery requires deliberate manual review.
-        if not published:
-            try:
-                os.unlink(reservation)
-            except FileNotFoundError:
-                pass
-        else:
-            try:
-                os.unlink(reservation)
-            except FileNotFoundError:
-                pass
+        # Ordinary exceptions release the reservation. A hard kill leaves it behind,
+        # forcing deliberate manual recovery rather than silently repeating the test.
+        try:
+            os.unlink(reservation)
+        except FileNotFoundError:
+            pass
