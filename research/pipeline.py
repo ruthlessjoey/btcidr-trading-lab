@@ -112,7 +112,8 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
 
 
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
-                 allow_reeval=False, run_id="local", code_rev=None):
+                 allow_reeval=False, run_id="local", code_rev=None, prepare_reservation=False,
+                 require_committed_reservation=False, run_attempt=None, workflow_ref=None, repository=None):
     rules = Rules()
     os.makedirs(out_dir, exist_ok=True)
     result = {"status": "FAILED", "error": None, "run_id": run_id}
@@ -137,15 +138,33 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     with open(os.path.join(out_dir, "frozen_choice.json"), "w", encoding="utf-8") as f:
         json.dump(frozen, f, indent=2)                      # written BEFORE the test is evaluated
     registry = os.path.join(prev_results_root, "test_evaluations") if prev_results_root else None
+    if prepare_reservation:
+        if not cfg.get("evaluate_test", False):
+            result.update(status="OK", reservation={"status": "not_required", "reason": "evaluate_test is false"})
+            return finish(result, out_dir)
+        try:
+            reservation = selection.prepare_test_reservation(
+                frozen, os.path.join(out_dir, "test_evaluations"), run_id,
+                run_attempt, workflow_ref, repository)
+        except Exception as e:
+            result["error"] = f"{type(e).__name__}: {e}"
+            return finish(result, out_dir)
+        result.update(status="OK", reservation=reservation or {"status": "not_required"})
+        return finish(result, out_dir)
     if cfg.get("evaluate_test", False):
         if not registry:
             result["error"] = ("holdout evaluation requires prev_results_root so the persistent "
                                "test registry and exclusive reservation are shared across runs")
             return finish(result, out_dir)
         try:
+            reservation_context = None
+            if require_committed_reservation:
+                reservation_context = {"run_id": run_id, "run_attempt": run_attempt,
+                                       "workflow_ref": workflow_ref, "repository": repository}
             test = selection.evaluate_test(candles, frozen, splits, registry_dir=registry,
                                            out_registry_dir=os.path.join(out_dir, "test_evaluations"),
-                                           allow_reeval=allow_reeval, run_id=run_id)
+                                           allow_reeval=allow_reeval, run_id=run_id,
+                                           committed_reservation=reservation_context)
         except Exception as e:
             # Preserve the failure report and non-zero exit while evaluate_test keeps any
             # post-start reservation in place for manual recovery.
