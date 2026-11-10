@@ -119,8 +119,6 @@ jobs:
           from pathlib import Path
 
           root = Path("test_evaluations")
-          output = Path("GITHUB_WORKSPACE_PLACEHOLDER")
-          # The runner output is supplied through an environment variable below.
           import os
           output = Path(os.environ["GITHUB_WORKSPACE"]) / "out" / "test_evaluations"
           if output.is_dir():
