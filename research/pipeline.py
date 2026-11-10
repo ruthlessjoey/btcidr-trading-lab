@@ -93,8 +93,7 @@ def write_logs(candles, n, splits, out_dir, rules, include_test):
 
 
 def sensitivity(candles, splits, flagged_dates, rules, original_selection):
-    """Rerun train + validation selection with the flagged candle(s) REMOVED. The test window is
-    not evaluated here. Reports whether the chosen period changes and whether test signals differ."""
+    """Rerun TRAIN + VALIDATION selection with flagged candles removed; never inspect TEST signals."""
     drop = {c.time for c in candles if utc_day(c.time) in flagged_dates}
     if not drop:
         return None
@@ -102,9 +101,6 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
     engine.check_series(reduced, skipped_times=drop)
     sp2 = remap_splits(splits, candles, reduced)
     sel2 = selection.select(reduced, sp2)
-    n = original_selection["selected_n"]
-    same_test_signals = None
-    if n is not None:
     return {"removed": sorted(utc_day(t) for t in drop), "selection": sel2,
             "selected_n_changed": sel2["selected_n"] != original_selection["selected_n"]}
 
