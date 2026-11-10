@@ -790,6 +790,22 @@ class DurableReservationTests(unittest.TestCase):
             self.assertNotIn(self.sp["test"], ranges)
 
 
+    def test_selection_generates_signals_only_through_validation(self):
+        seen_lengths = []
+        original = strategy.ma_trend
+
+        def capture(period):
+            make = original(period)
+            def run(candles):
+                seen_lengths.append(len(candles))
+                return make(candles)
+            return run
+
+        with mock.patch.object(selection.strategy, "ma_trend", side_effect=capture):
+            selection.select(self.c, self.sp)
+        self.assertEqual(seen_lengths, [self.sp["validation"][1]] * len(selection.CANDIDATES))
+
+
 class ToyTests(unittest.TestCase):
     def test_toy_series_is_deterministic_and_labelled(self):
         self.assertEqual(toy.toy_candles(50), toy.toy_candles(50))
