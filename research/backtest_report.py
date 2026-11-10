@@ -67,6 +67,13 @@ def build_markdown(r):
         else:
             L.append(f"- No TEST reservation was required: {reservation.get('reason', 'no eligible candidate was selected')}.")
         return "\n".join(L) + "\n"
+    if r["status"] == "POST_PROCESSING_FAILED":
+        test = r.get("test") or {}
+        L += ["## Post-selection processing failed", "",
+              f"TEST status: **{test.get('status', 'unknown')}**. No new TEST evaluation is claimed by this report.", "",
+              f"- Error: `{r.get('error', 'unknown error')}`",
+              "- Inspect the frozen selection and run output before retrying the workflow."]
+        return "\n".join(L) + "\n"
     if r["status"] == "POST_EVALUATION_FAILED":
         test = r.get("test") or {}
         L += ["## TEST evaluation completed; post-evaluation processing failed", "",
