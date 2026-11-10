@@ -49,6 +49,7 @@ class PipelineTests(unittest.TestCase):
             "repository": "ruthlessjoey/btcidr-trading-lab",
         }
         if cfg.get("evaluate_test", False):
+            kw.pop("prev_results_root", None)
             registry = os.path.join(self.tmp, "test_evaluations")
             os.makedirs(registry, exist_ok=True)
             prepare_out = out + "-prepare"
@@ -223,9 +224,9 @@ class PipelineTests(unittest.TestCase):
         _, b, md2, _ = self.run_bt(out=os.path.join(self.tmp, "r2"), prev_results_root=out1)
         self.assertEqual(b["test"]["status"], "already_evaluated")
         self.assertIn("Refused", md2)
-        _, c, md3, _ = self.run_bt(out=os.path.join(self.tmp, "r3"), prev_results_root=out1, allow_reeval=True)
-        self.assertTrue(c["test"]["re_evaluation"])
-        self.assertIn("re-evaluation", md3)
+        code, c, md3, _ = self.run_bt(out=os.path.join(self.tmp, "r3"), prev_results_root=out1, allow_reeval=True)
+        self.assertEqual(code, 1)
+        self.assertIn("separate reservation", c["error"])
 
     def test_sensitivity_removes_the_flagged_candle_but_keeps_the_original(self):
         c = toy.toy_candles(1000)
