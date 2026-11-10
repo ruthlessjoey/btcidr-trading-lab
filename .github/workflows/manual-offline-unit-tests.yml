@@ -44,6 +44,7 @@ jobs:
           socket.getaddrinfo = deny_network
           socket.socket.connect = deny_network
           socket.socket.connect_ex = deny_network
+          socket.socket.sendto = deny_network
 
           suite = unittest.defaultTestLoader.discover("tests")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
