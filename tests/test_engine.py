@@ -552,6 +552,21 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
                 selection.evaluate_test(self.c, frozen, self.sp, out_registry_dir=out)
 
+    def test_shared_registry_reservation_blocks_new_output_directory(self):
+        frozen = self.freeze()
+        with tempfile.TemporaryDirectory() as root:
+            registry = os.path.join(root, "shared-registry")
+            output = os.path.join(root, "new-run-output")
+            os.mkdir(registry)
+            os.mkdir(output)
+            pending = os.path.join(registry, selection.test_key(frozen) + ".pending")
+            with open(pending, "x", encoding="utf-8") as f:
+                f.write('{"status":"in_progress"}')
+            with self.assertRaisesRegex(EngineError, "already in progress|interrupted reservation"):
+                selection.evaluate_test(
+                    self.c, frozen, self.sp, registry_dir=registry, out_registry_dir=output
+                )
+
     def test_concurrent_holdout_call_cannot_pass_existing_reservation(self):
         frozen = self.freeze()
         original_ma = selection.strategy.ma_trend
