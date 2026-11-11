@@ -3,6 +3,7 @@ import os
 import sys
 import unittest
 import urllib.error
+import http.client
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
@@ -146,6 +147,29 @@ class HttpTests(unittest.TestCase):
         self.assertIn("failed after 3 attempts", str(ctx.exception))
         self.assertNotIn("boom", str(ctx.exception))
         self.assertEqual(len(op.calls), 3)
+
+    def test_runtime_error_from_opener_propagates_without_retry(self):
+        op = scripted(RuntimeError("unexpected bug"))
+        with self.assertRaises(RuntimeError):
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_type_error_from_opener_propagates_without_retry(self):
+        op = scripted(TypeError("unexpected bug"))
+        with self.assertRaises(TypeError):
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_http_protocol_error_retries_then_succeeds(self):
+        op = scripted(
+            http.client.RemoteDisconnected("connection closed"),
+            (200, b'{"ok": 1}')
+        )
+        self.assertEqual(
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP),
+            {"ok": 1}
+        )
+        self.assertEqual(len(op.calls), 2)
 
     def test_timeout_is_handled(self):
         op = scripted(TimeoutError("slow"))
