@@ -84,7 +84,7 @@ jobs:
                   if item.get("encoding") != "base64" or not item.get("content"):
                       raise SystemExit(f"Unexpected API encoding or empty content: {name}")
                   raw = base64.b64decode(item["content"], validate=False)
-                  blob = b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw
+                  blob = b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
                   actual_sha = hashlib.sha1(blob).hexdigest()
                   if actual_sha != item.get("sha"):
                       raise SystemExit(f"Git blob SHA mismatch: {name}")
