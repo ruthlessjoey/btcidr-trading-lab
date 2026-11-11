@@ -1,4 +1,5 @@
-name: Batch 1 isolated offline tests
+
+name: Batch 1 synthetic-fixture tests
 
 on:
   workflow_dispatch:
@@ -18,7 +19,7 @@ jobs:
       contents: read
     steps:
       - name: Sparse checkout of the approved test surface only
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ github.ref }}
           persist-credentials: false
@@ -39,11 +40,11 @@ jobs:
             /tests/test_research_sanitization.py
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
 
-      - name: Run Batch 1 offline regression tests
+      - name: Run Batch 1 synthetic-fixture regression tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
           PYTHONPATH: .
