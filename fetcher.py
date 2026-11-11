@@ -97,6 +97,10 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as exc:
             http_error = True
             status = _safe_http_status(exc.code)
+            try:
+                exc.close()
+            except OSError:
+                pass
         except (OSError, http.client.HTTPException) as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
@@ -207,4 +211,3 @@ def fetch_candles(src, pair, tf, start_s, end_s, timeout, retries, opener, sleep
         requests_made += 1
         chunk_start = chunk_end + 1
     return candles, requests_made
-
