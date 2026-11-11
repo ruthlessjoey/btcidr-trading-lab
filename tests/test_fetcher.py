@@ -1,4 +1,5 @@
 """Tests for fetcher.py. All data here is SYNTHETIC test data, not market prices."""
+import io
 import os
 import sys
 import unittest
@@ -124,10 +125,17 @@ class HttpTests(unittest.TestCase):
         self.assertNotIn(marker, str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
-    def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
+    def test_http_error_exception_is_handled_and_response_is_closed(self):
+        response_body = io.BytesIO(b"synthetic error response")
+        error = urllib.error.HTTPError(
+            "u", 404, "Not Found", {}, response_body
+        )
+        op = scripted(error)
+
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+
+        self.assertTrue(response_body.closed)
         self.assertEqual(len(op.calls), 1)
 
     def test_http_error_with_success_status_is_rejected_without_body_access(self):
