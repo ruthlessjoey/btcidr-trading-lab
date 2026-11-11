@@ -88,7 +88,8 @@ jobs:
                   else:
                       if item.get("encoding") != "base64" or not isinstance(item.get("content"), str) or not item["content"]:
                           raise SystemExit(f"Unexpected API encoding or missing content: {name}")
-                      raw = base64.b64decode(item["content"], validate=True)
+                      encoded = "".join(item["content"].split())
+                      raw = base64.b64decode(encoded, validate=True)
                   blob = b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
                   actual_sha = hashlib.sha1(blob).hexdigest()
                   if actual_sha != item.get("sha"):
