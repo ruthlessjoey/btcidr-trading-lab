@@ -70,19 +70,19 @@ def build_markdown(r):
     if c:
         for e in c["flagged"]:
             L.append(f"- **{e['date']}: {e['verdict']}** (rule: {c['rule']}).")
-            for name in ("coinbase", "bitstamp"):
-                j = e[name]
-                if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs Binance "
-                             f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
-                             f"low diff {j['low_diff_pct']:+.2f}%")
+            j = e.get("coinbase")
+            if j:
+                L.append(f"  - Coinbase: day return {j['other_return_pct']:+.2f}% vs Binance "
+                         f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
+                         f"low diff {j['low_diff_pct']:+.2f}%")
+            else:
+                L.append("  - Coinbase comparison: not available.")
         if c.get("summary"):
             s = c["summary"]
             L.append(f"- Whole history vs Coinbase: median close difference {s['median_abs_close_diff_pct']:.2f}%, "
                      f"99th percentile {s['p99_abs_close_diff_pct']:.2f}%, max {s['max_abs_close_diff_pct']:.2f}%.")
-        for k in ("coinbase_error", "bitstamp_error"):
-            if c.get(k):
-                L.append(f"- {k.split('_')[0]} could not be fetched: {c[k]}")
+        if c.get("coinbase_error"):
+            L.append(f"- Coinbase could not be fetched: {c['coinbase_error']}")
     else:
         L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     sv = r.get("sensitivity")
@@ -177,7 +177,8 @@ def build_markdown(r):
           "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
-          "- One cross-check of the flagged day uses USD venues, not USDT."]
+          "- The Coinbase cross-check uses USD, while the research dataset uses Binance USDT."
     L += ["", "Logs for the frozen choice under base costs: `trades.csv`, `orders.csv`, `equity.csv`; "
           "the frozen record is `frozen_choice.json`."]
     return "\n".join(L) + "\n"
+

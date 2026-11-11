@@ -1,0 +1,54 @@
+
+name: Batch 1 synthetic-fixture tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: batch1-isolated-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout of the approved test surface only
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /live_check.py
+            /report.py
+            /validator.py
+            /research/__init__.py
+            /research/crosscheck.py
+            /research/history.py
+            /research/dataset.py
+            /research/data_report.py
+            /tests/test_fetcher.py
+            /tests/test_live_check.py
+            /tests/test_research_sanitization.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+
+      - name: Run Batch 1 synthetic-fixture regression tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPATH: .
+        run: |
+          python -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python -m unittest discover -s tests -p 'test_live_check.py' -v
+          python -m unittest discover -s tests -p 'test_research_sanitization.py' -v

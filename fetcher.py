@@ -8,6 +8,7 @@ Two "styles" of public endpoint are supported, because Tokocrypto publishes both
   open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
 """
 import json
+import http.client
 import time
 import urllib.error
 import urllib.parse
@@ -22,6 +23,11 @@ TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
 
 # Our own chunk size (kept well under the usual 1000-candle cap).
 CANDLES_PER_REQUEST = 500
+
+# Bound provider-controlled timestamps before datetime/report code consumes them.
+# 2000-01-01 through 2100-01-01 covers the supported crypto-market history horizon.
+MIN_UNIX_SECONDS = 946684800
+MAX_UNIX_SECONDS = 4102444800
 
 
 class ApiError(Exception):
@@ -74,46 +80,60 @@ def default_opener(url, timeout):
         return resp.status, resp.read()
 
 
-def snippet(body, size=200):
-    text = body.decode("utf-8", "replace") if body else ""
-    return " ".join(text.split())[:size]
+def _safe_http_status(status):
+    """Return only a genuine HTTP status integer in the standard 100-599 range."""
+    return status if type(status) is int and 100 <= status <= 599 else None
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET a URL and decode JSON. Retries network errors, 429 and 5xx."""
-    last = "no attempt was made"
+    """GET JSON without exposing provider bodies, URLs, or exception messages."""
+    last = "request failed"
     for attempt in range(1, retries + 1):
         status = None
-        body = b""
+        network_error = False
+        http_error = False
         try:
             status, body = opener(url, timeout)
-        except urllib.error.HTTPError as e:      # must come before URLError
-            status = e.code
+        except urllib.error.HTTPError as exc:
+            http_error = True
+            status = _safe_http_status(exc.code)
             try:
-                body = e.read()
-            except Exception:
-                body = b""
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            last = f"network error: {e}"
-        if status is not None:
-            if status == 200:
-                try:
-                    return json.loads(body.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError) as e:
-                    raise ApiError(f"HTTP 200 but the body is not valid JSON ({e}): "
-                                   f"{snippet(body)}")
-            last = f"HTTP {status}" + (f": {snippet(body)}" if body else "")
-            if status != 429 and status < 500:
-                raise ApiError(f"{url} -> {last} (not retried)")
+                exc.close()
+            except OSError:
+                pass
+        except (OSError, http.client.HTTPException) as exc:
+            network_error = True
+            last = f"network error ({type(exc).__name__})"
+        else:
+            status = _safe_http_status(status)
+
+        if status is None:
+            if network_error:
+                if attempt < retries:
+                    sleep(2 ** attempt)
+                    continue
+                raise ApiError(f"HTTP request failed after {retries} attempts: {last}")
+            raise ApiError("HTTP response had an invalid status")
+        if status == 200 and not http_error:
+            try:
+                return json.loads(body.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError, RecursionError, TypeError, AttributeError):
+                raise ApiError("HTTP 200 returned invalid JSON")
+        last = f"HTTP {status}"
+        if status != 429 and status < 500:
+            raise ApiError(f"HTTP request failed: {last}")
         if attempt < retries:
             sleep(2 ** attempt)
-    raise ApiError(f"{url} failed after {retries} attempts: {last}")
+    raise ApiError(f"HTTP request failed after {retries} attempts: {last}")
 
 
 def to_seconds(t):
     """Exchange timestamps are milliseconds; accept seconds too. Returns seconds."""
     t = int(t)
-    return t // 1000 if t > 100_000_000_000 else t
+    seconds = t // 1000 if t > 100_000_000_000 else t
+    if not MIN_UNIX_SECONDS <= seconds <= MAX_UNIX_SECONDS:
+        raise ValueError("timestamp is outside the supported range")
+    return seconds
 
 
 def unwrap(obj):
@@ -123,8 +143,12 @@ def unwrap(obj):
         if not isinstance(obj, dict):
             break
         code = obj.get("code")
-        if code not in (None, 0, "0", 200, "200"):
-            raise ApiError(f"exchange error code {code}: {str(obj.get('msg', obj))[:200]}")
+        success_code = (
+            (type(code) is int and code in (0, 200))
+            or (type(code) is str and code in ("0", "200"))
+        )
+        if code is not None and not success_code:
+            raise ApiError("exchange returned an error response")
         for key in ("data", "list", "klines", "result"):
             if key in obj:
                 obj = obj[key]
@@ -143,15 +167,15 @@ def extract_server_time(obj):
                 break
     try:
         return to_seconds(obj)
-    except (TypeError, ValueError):
-        raise ApiError(f"unexpected server-time answer: {str(obj)[:200]}")
+    except (TypeError, ValueError, OverflowError):
+        raise ApiError("unexpected server-time answer")
 
 
 def parse_klines(raw):
     """Rows must look like [openTime, open, high, low, close, volume, ...]."""
     rows = unwrap(raw)
     if not isinstance(rows, list):
-        raise ApiError(f"candle answer is not a list: {str(rows)[:200]}")
+        raise ApiError("candle response has an invalid structure")
     out = []
     for i, row in enumerate(rows):
         try:
@@ -159,8 +183,8 @@ def parse_klines(raw):
                 raise ValueError("expected a list of at least 6 values")
             out.append(Candle(to_seconds(row[0]), float(row[1]), float(row[2]),
                               float(row[3]), float(row[4]), float(row[5])))
-        except (TypeError, ValueError) as e:
-            raise ApiError(f"candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
+        except (TypeError, ValueError, OverflowError):
+            raise ApiError(f"candle #{i} has invalid numeric fields")
     return out
 
 

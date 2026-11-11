@@ -32,8 +32,8 @@ def fetch_exchange_info(http, cfg):
     q = urllib.parse.urlencode({"symbol": cfg["symbol"]})
     obj = http.get(f"{cfg['host']}/api/v3/exchangeInfo?{q}")
     entries = obj.get("symbols") if isinstance(obj, dict) else None
-    if not isinstance(entries, list) or len(entries) != 1:
-        raise ApiError(f"exchangeInfo did not return exactly one symbol: {str(obj)[:200]}")
+    if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
+        raise ApiError("exchangeInfo response has an invalid symbol structure")
     return entries[0]
 
 
@@ -111,17 +111,34 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     try:
         # 1. market identity, from the exchange itself
         entry = fetch_exchange_info(http, cfg)
-        result["exchange_info"] = {k: entry.get(k) for k in
-                                   ("symbol", "status", "baseAsset", "quoteAsset", "isSpotTradingAllowed")}
-        ok = (entry.get("symbol") == cfg["symbol"] and entry.get("baseAsset") == cfg["base_asset"]
-              and entry.get("quoteAsset") == cfg["quote_asset"] and entry.get("status") == "TRADING"
-              and entry.get("isSpotTradingAllowed") is True)
-        add("market_identity", PASS if ok else FAIL,
-            f"exchange says symbol={entry.get('symbol')} base={entry.get('baseAsset')} "
-            f"quote={entry.get('quoteAsset')} status={entry.get('status')} "
-            f"spot={entry.get('isSpotTradingAllowed')}; expected {cfg['symbol']} "
-            f"{cfg['base_asset']}/{cfg['quote_asset']} TRADING spot")
-        if not ok:
+        expected_identity = {
+            "symbol": cfg["symbol"],
+            "baseAsset": cfg["base_asset"],
+            "quoteAsset": cfg["quote_asset"],
+            "status": "TRADING",
+        }
+        mismatch_fields = [
+            field for field, expected in expected_identity.items()
+            if type(entry.get(field)) is not str or entry.get(field) != expected
+        ]
+        spot_allowed = entry.get("isSpotTradingAllowed")
+        if type(spot_allowed) is not bool or spot_allowed is not True:
+            mismatch_fields.append("isSpotTradingAllowed")
+        identity_ok = not mismatch_fields
+
+        # Preserve report keys, but publish only configuration-known values.
+        # Never echo provider-controlled identity values into reports.
+        result["exchange_info"] = {
+            field: expected if field not in mismatch_fields else None
+            for field, expected in expected_identity.items()
+        }
+        result["exchange_info"]["isSpotTradingAllowed"] = True if identity_ok else None
+        result["exchange_info"]["validated"] = identity_ok
+        result["exchange_info"]["mismatch_fields"] = mismatch_fields
+        add("market_identity", PASS if identity_ok else FAIL,
+            "exchange market identity validated" if identity_ok else
+            "exchange market identity mismatch: " + ", ".join(mismatch_fields))
+        if not identity_ok:
             raise ApiError("market identity does not match the configuration")
 
         # 2. exchange clock and paged history

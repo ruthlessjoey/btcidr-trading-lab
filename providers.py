@@ -31,13 +31,15 @@ class Http:
     def _opener_with_log(self, url, timeout):
         try:
             status, body = self._opener(url, timeout)
-        except urllib.error.HTTPError as e:
-            self._record(url, f"HTTP {e.code}")
+        except urllib.error.HTTPError as exc:
+            safe_status = fetcher._safe_http_status(exc.code)
+            self._record(url, f"HTTP {safe_status}" if safe_status is not None else "HTTP status unavailable")
             raise
-        except Exception as e:
-            self._record(url, f"network error: {type(e).__name__}")
+        except Exception as exc:
+            self._record(url, f"network error ({type(exc).__name__})")
             raise
-        self._record(url, f"HTTP {status}")
+        safe_status = fetcher._safe_http_status(status)
+        self._record(url, f"HTTP {safe_status}" if safe_status is not None else "HTTP status unavailable")
         return status, body
 
     def get(self, url):
@@ -65,17 +67,20 @@ class Kraken:
     @staticmethod
     def _result(obj):
         if not isinstance(obj, dict) or "result" not in obj:
-            raise ApiError(f"unexpected Kraken answer: {str(obj)[:200]}")
+            raise ApiError("Kraken response has an invalid structure")
         if obj.get("error"):
-            raise ApiError(f"Kraken error: {obj['error']}")
-        return obj["result"]
+            raise ApiError("Kraken returned an error response")
+        result = obj["result"]
+        if not isinstance(result, dict):
+            raise ApiError("Kraken response has an invalid result structure")
+        return result
 
     def server_time(self, http):
         res = self._result(http.get(self.base + "/0/public/Time"))
         try:
-            return int(res["unixtime"])
-        except (KeyError, TypeError, ValueError):
-            raise ApiError(f"no unixtime in Kraken answer: {str(res)[:200]}")
+            return fetcher.to_seconds(res["unixtime"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise ApiError("Kraken response has no valid server timestamp")
 
     def candles(self, tf, start_s, end_s, http):
         if tf not in self.INTERVALS:
@@ -87,15 +92,15 @@ class Kraken:
         res = self._result(http.get(f"{self.base}/0/public/OHLC?{q}"))
         keys = [k for k in res if k != "last"]
         if len(keys) != 1 or not isinstance(res[keys[0]], list):
-            raise ApiError(f"expected exactly one candle list, got keys {list(res)[:5]}")
+            raise ApiError("Kraken response has an invalid candle structure")
         out = []
         for i, row in enumerate(res[keys[0]]):
             # [time, open, high, low, close, vwap, volume, count]
             try:
-                out.append(Candle(int(row[0]), float(row[1]), float(row[2]), float(row[3]),
+                out.append(Candle(fetcher.to_seconds(row[0]), float(row[1]), float(row[2]), float(row[3]),
                                   float(row[4]), float(row[6])))
-            except (TypeError, ValueError, IndexError) as e:
-                raise ApiError(f"Kraken candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
+            except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+                raise ApiError(f"Kraken candle #{i} has invalid numeric fields")
         return _dedupe_sorted(out)
 
 
@@ -109,9 +114,9 @@ class Coinbase:
     def server_time(self, http):
         obj = http.get(self.base + "/time")
         try:
-            return int(float(obj["epoch"]))
-        except (KeyError, TypeError, ValueError):
-            raise ApiError(f"no epoch in Coinbase answer: {str(obj)[:200]}")
+            return fetcher.to_seconds(float(obj["epoch"]))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise ApiError("Coinbase response has no valid server timestamp")
 
     def candles(self, tf, start_s, end_s, http):
         if tf not in self.GRANULARITY:
@@ -124,15 +129,14 @@ class Coinbase:
             q = urllib.parse.urlencode({"granularity": g, "start": _iso(cur), "end": _iso(chunk_end)})
             rows = http.get(f"{self.base}/products/{self.product}/candles?{q}")
             if not isinstance(rows, list):
-                raise ApiError(f"expected a list of candles, got: {str(rows)[:200]}")
+                raise ApiError("Coinbase response has an invalid candle structure")
             for i, row in enumerate(rows):
                 # [time, low, high, open, close, volume]
                 try:
-                    out.append(Candle(int(row[0]), float(row[3]), float(row[2]), float(row[1]),
+                    out.append(Candle(fetcher.to_seconds(row[0]), float(row[3]), float(row[2]), float(row[1]),
                                       float(row[4]), float(row[5])))
-                except (TypeError, ValueError, IndexError) as e:
-                    raise ApiError(f"Coinbase candle #{i} has an unexpected format ({e}): "
-                                   f"{str(row)[:200]}")
+                except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+                    raise ApiError(f"Coinbase candle #{i} has invalid numeric fields")
             cur = chunk_end
         return _dedupe_sorted(out)
 
