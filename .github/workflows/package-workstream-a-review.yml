@@ -81,9 +81,14 @@ jobs:
                       item = json.load(response)
                   if item.get("type") != "file" or item.get("path") != name:
                       raise SystemExit(f"Expected regular file at exact allowlist path: {name}")
-                  if item.get("encoding") != "base64" or not item.get("content"):
-                      raise SystemExit(f"Unexpected API encoding or empty content: {name}")
-                  raw = base64.b64decode(item["content"], validate=False)
+                  if item.get("size") == 0:
+                      if item.get("sha") != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391":
+                          raise SystemExit(f"Unexpected zero-byte Git blob: {name}")
+                      raw = b""
+                  else:
+                      if item.get("encoding") != "base64" or not isinstance(item.get("content"), str) or not item["content"]:
+                          raise SystemExit(f"Unexpected API encoding or missing content: {name}")
+                      raw = base64.b64decode(item["content"], validate=True)
                   blob = b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
                   actual_sha = hashlib.sha1(blob).hexdigest()
                   if actual_sha != item.get("sha"):
