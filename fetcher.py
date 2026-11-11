@@ -8,6 +8,7 @@ Two "styles" of public endpoint are supported, because Tokocrypto publishes both
   open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
 """
 import json
+import http.client
 import time
 import urllib.error
 import urllib.parse
@@ -96,7 +97,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as exc:
             http_error = True
             status = _safe_http_status(exc.code)
-        except Exception as exc:
+        except (OSError, http.client.HTTPException) as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
         else:
@@ -206,3 +207,4 @@ def fetch_candles(src, pair, tf, start_s, end_s, timeout, retries, opener, sleep
         requests_made += 1
         chunk_start = chunk_end + 1
     return candles, requests_made
+
