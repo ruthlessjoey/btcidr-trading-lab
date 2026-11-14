@@ -9,7 +9,7 @@ permissions:
 jobs:
   workflow-audit:
     name: Static workflow security audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out repository without persisting credentials
@@ -21,13 +21,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          "$HOME/go/bin/actionlint" -color
+          url="https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          curl -fsSLo actionlint.tar.gz "$url"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint -color
 
-      - name: Install and run zizmor
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m venv "$RUNNER_TEMP/zizmor-venv"
-          "$RUNNER_TEMP/zizmor-venv/bin/python" -m pip install --disable-pip-version-check "zizmor==1.32.0"
-          "$RUNNER_TEMP/zizmor-venv/bin/zizmor" --format=github .
+      - name: Run zizmor with hash-verified dependencies
+        uses: zizmorcore/zizmor-action@8aaeb6d158204e73d77eb4b50bcb325641de1bd4
+        with:
+          version: "1.32.0"
+          online-audits: false
+          token: ""
+          advanced-security: false
+          annotations: true
