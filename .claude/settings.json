@@ -3,8 +3,8 @@
     "deny": [
       "Read(P1/**)",
       "Edit(P1/**)",
-      "Read(signal/data/**)",
-      "Edit(signal/data/**)"
+      "Read(signal/**)",
+      "Edit(signal/**)"
     ]
   }
 }
