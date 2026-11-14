@@ -1,0 +1,42 @@
+name: Automation Pilot CI
+
+on:
+  push:
+    branches:
+      - automation/pilot
+    paths:
+      - docs/automation-pilot.md
+      - .github/workflows/automation-pilot-ci.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docs/automation-pilot.md
+      - .github/workflows/automation-pilot-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  documentation-smoke-test:
+    name: Documentation-only smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout of the pilot document only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /docs/automation-pilot.md
+
+      - name: Verify the pilot marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s docs/automation-pilot.md
+          grep -Fq "AUTOMATION PILOT: documentation-only" docs/automation-pilot.md
