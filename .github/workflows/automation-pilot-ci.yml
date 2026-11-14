@@ -7,6 +7,12 @@ on:
     paths:
       - docs/automation-pilot.md
       - .github/workflows/automation-pilot-ci.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docs/automation-pilot.md
+      - .github/workflows/automation-pilot-ci.yml
 
 permissions:
   contents: read
