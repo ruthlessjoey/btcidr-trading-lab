@@ -1,0 +1,3 @@
+[submodule "tools/jev-ultrafast"]
+	path = tools/jev-ultrafast
+	url = https://github.com/browser-use/jev-ultrafast.git
