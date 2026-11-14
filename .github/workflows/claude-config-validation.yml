@@ -1,0 +1,101 @@
+name: Claude project configuration validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - CLAUDE.md
+      - .mcp.json
+      - .claude/settings.json
+      - .claude/skills/**
+
+permissions:
+  contents: read
+
+jobs:
+  validate-config:
+    name: Validate Claude configuration (no repository code execution)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout of Claude configuration only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /CLAUDE.md
+            /.mcp.json
+            /.claude/settings.json
+            /.claude/skills/**
+
+      - name: Validate JSON, protected-path denials, MCP policy, and skill frontmatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          settings = json.loads(Path(".claude/settings.json").read_text())
+          denied = set(settings["permissions"]["deny"])
+          required_denials = {
+              "Read(P1/**)", "Edit(P1/**)",
+              "Read(signal/**)", "Edit(signal/**)",
+          }
+          missing = required_denials - denied
+          if missing:
+              raise SystemExit(f"Missing protected-path denials: {sorted(missing)}")
+
+          mcp = json.loads(Path(".mcp.json").read_text())
+          servers = mcp["mcpServers"]
+          context7 = servers["context7"]
+          github = servers["github"]
+          if context7["type"] != "http" or context7["url"] != "https://mcp.context7.com/mcp":
+              raise SystemExit("Unexpected Context7 MCP endpoint")
+          if context7.get("headers", {}).get("Authorization") != "Bearer ${CONTEXT7_API_KEY}":
+              raise SystemExit("Context7 must use the CONTEXT7_API_KEY environment variable")
+          if github["type"] != "http" or github["url"] != "https://api.githubcopilot.com/mcp/":
+              raise SystemExit("Unexpected GitHub MCP endpoint")
+          headers = github.get("headers", {})
+          if headers.get("X-MCP-Readonly") != "true":
+              raise SystemExit("GitHub MCP must remain read-only")
+          if headers.get("X-MCP-Toolsets") != "repos,pull_requests,actions":
+              raise SystemExit("Unexpected GitHub MCP toolset scope")
+
+          root = Path(".claude/skills")
+          skill_files = sorted(root.glob("*/SKILL.md"))
+          if not skill_files:
+              raise SystemExit("No repository skills found")
+          for path in skill_files:
+              raw = path.read_text()
+              if not raw.startswith("---\n"):
+                  raise SystemExit(f"Missing YAML frontmatter: {path}")
+              parts = raw.split("---", 2)
+              if len(parts) < 3:
+                  raise SystemExit(f"Malformed YAML frontmatter: {path}")
+              front = parts[1]
+              name = re.search(r"^name:\s*(.+)$", front, re.MULTILINE)
+              description = re.search(r"^description:\s*(.+)$", front, re.MULTILINE)
+              if not name or not description:
+                  raise SystemExit(f"Missing name/description: {path}")
+              skill_name = name.group(1).strip().strip('"').strip("'")
+              if skill_name != path.parent.name:
+                  raise SystemExit(f"Skill name/path mismatch: {path}")
+              if not description.group(1).strip():
+                  raise SystemExit(f"Empty description: {path}")
+
+          claude_md = Path("CLAUDE.md").read_text()
+          for marker in ("P1/", "signal/", "Workstream B", "LIVE"):
+              if marker not in claude_md:
+                  raise SystemExit(f"Missing repository safety marker: {marker}")
+
+          print(f"Validated {len(skill_files)} skill frontmatter files.")
+          print("Claude settings, MCP endpoints, read-only GitHub policy, and protected-path denials are valid.")
+          PY
