@@ -171,8 +171,7 @@ jobs:
                       old_seen = new_seen = 0
                       current_new = int(match.group(3))
                       in_hunk = True
-                      if new_expected == 0:
-                          lines.add(max(1, current_new))
+                      # Deletion-only hunks have no new-side line that can safely anchor a finding.
                       continue
                   if not in_hunk:
                       if not row or row.startswith("---") or row.startswith("+++"):
