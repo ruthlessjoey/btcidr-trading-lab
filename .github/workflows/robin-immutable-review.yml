@@ -305,6 +305,12 @@ jobs:
           if (
               pr_metadata.get("baseRefOid") != base_sha
               or pr_metadata.get("headRefOid") != head_sha
+              or base_target.get("oid") != base_sha
+              or head_target.get("oid") != head_sha
+              or type(comparison.get("aheadBy")) is not int
+              or comparison.get("aheadBy", 0) < 1
+              or type(comparison.get("behindBy")) is not int
+              or comparison.get("behindBy") != 0
               or page_info.get("hasNextPage") is not False
               or not isinstance(file_nodes, list)
               or not file_nodes
