@@ -401,9 +401,11 @@ jobs:
               if total_blob_bytes > 1000000:
                   stop("The approved-path blob set exceeds the fixed 1 MB limit.")
               def newline_style(value):
-                  if "\r" in value.replace("\r\n", ""):
+                  crlf_count = value.count("\r\n")
+                  lf_count = value.count("\n")
+                  if "\r" in value.replace("\r\n", "") or (crlf_count and lf_count != crlf_count):
                       return "mixed"
-                  return "crlf" if "\r\n" in value else "lf"
+                  return "crlf" if crlf_count else "lf"
               old_newline_style = newline_style(base_text)
               new_newline_style = newline_style(head_text)
               if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
