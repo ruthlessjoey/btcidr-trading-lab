@@ -247,6 +247,19 @@ jobs:
                   or "\x00" in path
               ):
                   stop("A changed path is outside the exact allowlist or lacks a complete text patch.")
+              additions = item.get("additions")
+              deletions = item.get("deletions")
+              changes = item.get("changes")
+              if (
+                  not isinstance(additions, int) or isinstance(additions, bool) or additions < 0
+                  or not isinstance(deletions, int) or isinstance(deletions, bool) or deletions < 0
+                  or changes != additions + deletions
+              ):
+                  stop("The immutable comparison returned invalid change counts.")
+              patch_additions = sum(1 for row in patch.splitlines() if row.startswith("+") and not row.startswith("+++"))
+              patch_deletions = sum(1 for row in patch.splitlines() if row.startswith("-") and not row.startswith("---"))
+              if patch_additions != additions or patch_deletions != deletions:
+                  stop("The patch is incomplete or its line counts do not match GitHub metadata.")
               if path in patches:
                   stop("The immutable comparison returned a duplicate path.")
               total_chars += len(patch)
