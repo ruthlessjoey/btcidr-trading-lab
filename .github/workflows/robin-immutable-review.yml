@@ -271,6 +271,7 @@ jobs:
                 baseRefOid
                 headRefOid
                 files(first: 100) {
+                  totalCount
                   nodes { path changeType }
                   pageInfo { hasNextPage }
                 }
@@ -314,6 +315,8 @@ jobs:
               or page_info.get("hasNextPage") is not False
               or not isinstance(file_nodes, list)
               or not file_nodes
+              or type(file_connection.get("totalCount")) is not int
+              or file_connection.get("totalCount") != len(file_nodes)
               or len(file_nodes) > len(allowed)
           ):
               stop("Path-only PR metadata is incomplete or does not match the immutable event SHAs.")
