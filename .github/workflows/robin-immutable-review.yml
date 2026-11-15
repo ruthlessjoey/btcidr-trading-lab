@@ -35,20 +35,45 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64
           import html
           import json
           import os
           import re
           import sys
           import urllib.error
-          import urllib.parse
           import urllib.request
 
-          ALLOWLIST_PATH = ".github/robin-allowlist.txt"
-          EXPECTED_ALLOWLIST_COUNT = 25
-          EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
-          EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
+          ALLOWED_PATHS = frozenset({
+              ".github/workflows/research-backtest.yml",
+              ".github/workflows/manual-offline-unit-tests.yml",
+              "backtest_config.json",
+              "run_backtest.py",
+              "run_crosscheck.py",
+              "research/__init__.py",
+              "research/backtest_report.py",
+              "research/crosscheck.py",
+              "research/data_report.py",
+              "research/dataset.py",
+              "research/engine.py",
+              "research/history.py",
+              "research/holdout_publish.py",
+              "research/pipeline.py",
+              "research/selection.py",
+              "research/splits.py",
+              "research/strategy.py",
+              "research/toy.py",
+              "tests/test_backtest_pipeline.py",
+              "tests/test_engine.py",
+              "tests/test_history.py",
+              "tests/test_holdout_publish.py",
+              "tests/test_holdout_reporting.py",
+              "tests/test_research_sanitization.py",
+              "tests/test_selection_warmup.py",
+          })
+          MAX_DIFF_CHARS = 100000
+          MAX_FINDINGS = 10
+          SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+          HUNK_RE = re.compile(r"^@@ -[0-9]+(?:,[0-9]+)? \+([0-9]+)(?:,([0-9]+))? @@")
           MAX_DIFF_CHARS = 100000
           MAX_FINDINGS = 10
           SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -80,30 +105,6 @@ jobs:
                   stop("GitHub API request failed (HTTP " + str(exc.code) + ").")
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                   stop("GitHub API request failed or returned invalid JSON.")
-
-          def parse_allowlist(raw):
-              allowed = set()
-              for entry in raw.splitlines():
-                  path = entry.strip()
-                  if not path or path.startswith("#"):
-                      continue
-                  parts = path.split("/")
-                  if (
-                      path.startswith("/")
-                      or "\\" in path
-                      or "\x00" in path
-                      or any(part in ("", ".", "..") for part in parts)
-                      or path == "P1"
-                      or path.startswith("P1/")
-                      or path == "signal"
-                      or path.startswith("signal/")
-                      or path in allowed
-                  ):
-                      stop("The trusted base-commit allowlist contains an unsafe or duplicate path.")
-                  allowed.add(path)
-              if len(allowed) != EXPECTED_ALLOWLIST_COUNT:
-                  stop("The trusted allowlist does not contain the expected exact initial 25 paths.")
-              return allowed
 
           def changed_hunk_lines(patch):
               lines = set()
@@ -189,27 +190,11 @@ jobs:
           if not api_key or base_url != EXPECTED_BASE_URL or model != EXPECTED_MODEL:
               stop("Required OpenRouter secrets are missing or do not match the approved endpoint/model.")
 
-          # Read exactly one trusted file at the event's immutable base SHA.
-          encoded_path = urllib.parse.quote(ALLOWLIST_PATH, safe="/")
-          allowlist_item = github_request(
-              "GET",
-              "/contents/" + encoded_path + "?ref=" + base_sha,
-          )
-          if (
-              not isinstance(allowlist_item, dict)
-              or allowlist_item.get("type") != "file"
-              or allowlist_item.get("path") != ALLOWLIST_PATH
-              or allowlist_item.get("encoding") != "base64"
-              or not isinstance(allowlist_item.get("content"), str)
-          ):
-              stop("The trusted base-commit allowlist could not be read exactly.")
-          try:
-              allowlist_raw = base64.b64decode(
-                  "".join(allowlist_item["content"].split()), validate=True
-              ).decode("utf-8")
-          except (ValueError, UnicodeDecodeError):
-              stop("The trusted base-commit allowlist encoding is invalid.")
-          allowed = parse_allowlist(allowlist_raw)
+          # The exact 25-path allowlist is embedded in this trusted base-branch workflow.
+          # It deliberately excludes P1/, every signal/ path, and all other unapproved paths.
+          allowed = ALLOWED_PATHS
+          if len(allowed) != 25 or any(path == "P1" or path.startswith("P1/") or path == "signal" or path.startswith("signal/") for path in allowed):
+              stop("The embedded Workstream A allowlist failed its fixed-scope assertion.")
 
           # The comparison uses immutable base...head SHAs, never the mutable PR-number diff endpoint.
           compare = github_request(
