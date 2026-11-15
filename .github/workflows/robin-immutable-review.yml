@@ -70,6 +70,8 @@ jobs:
               "tests/test_research_sanitization.py",
               "tests/test_selection_warmup.py",
           })
+          EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
+          EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
           MAX_DIFF_CHARS = 100000
           MAX_FINDINGS = 10
           SHA_RE = re.compile(r"^[0-9a-f]{40}$")
