@@ -1,8 +1,10 @@
 name: Robin Workstream A review
 
 on:
-  pull_request:
-    types: [opened, reopened, ready_for_review]
+  # This workflow must be loaded from the trusted base branch. Do not change
+  # this to pull_request: that event uses the PR merge-commit workflow file.
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
 
 permissions:
   actions: read
@@ -11,10 +13,12 @@ permissions:
 
 jobs:
   review:
-    # Do not send fork PRs or draft PRs to the model.
+    # pull_request_target exposes the base repository token/secrets. Keep this
+    # job restricted to same-repository, non-draft PRs.
     if: >-
       github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -22,6 +26,8 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      # Never checkout, download, or execute PR code. This step reads only
+      # the base-commit allowlist and changed-path metadata (names + status).
       - name: Preflight exact Workstream A path allowlist (names only)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -167,6 +173,8 @@ jobs:
           )
           PY
 
+      # Robin is pinned and explicitly runs without repository tools/snapshot.
+      # It reads its instructions/config from the PR base branch.
       - name: Robin (pinned, diff-only, advisory)
         if: success()
         uses: antongulin/robin@808e18045c93f80f917a41be8fa3f80fa03d70a0
@@ -178,6 +186,6 @@ jobs:
           agent-mode: "off"
           request-changes: "false"
           fail-on-high: "false"
-          review-on-synchronize: "false"
+          review-on-synchronize: "true"
           max-diff-size: "100000"
           review-instructions-file: ".github/code-reviewer.md"
