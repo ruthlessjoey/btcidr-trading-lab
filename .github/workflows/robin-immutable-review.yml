@@ -444,7 +444,7 @@ jobs:
           line_map = {}
           total_chars = 0
           def newline_style(value):
-              lf_count = value.count("\n")
+              crlf_count = value.count("\r\n")
               lf_count = value.count("\n")
               if "\r" in value.replace("\r\n", "") or (crlf_count and lf_count != crlf_count):
                   return "mixed"
@@ -483,7 +483,7 @@ jobs:
 
           diff_parts = []
           for path in sorted(patches):
-              diff_parts.append("FILE: " + path + "\\n" + patches[path])
+              diff_parts.append("FILE: " + path + "\n" + patches[path])
           diff_text = "\n\n".join(diff_parts)
           if not diff_text or len(diff_text) > MAX_DIFF_CHARS:
               stop("The allowlisted diff is empty or exceeds the review limit.")
