@@ -194,7 +194,9 @@ jobs:
               if not isinstance(value, str) or not value.strip():
                   stop("The model returned a missing or invalid text field.")
               value = "".join(ch for ch in value if ch.isprintable())
-              value = re.sub(r"https?://\S+|www\.\S+", "[external link omitted]", value, flags=re.I)
+              if re.search(r"(?i)(?:^|\\s)(?:P1|signal)/", value):
+                  stop("The model response referenced a protected path; no review was posted.")
+              value = re.sub(r"https?://\\S+|www\\.\\S+", "[external link omitted]", value, flags=re.I)
               value = " ".join(value.split())
               value = html.escape(value, quote=False)
               for char in "`*_~[]()!#>|":
