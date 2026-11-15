@@ -436,7 +436,7 @@ jobs:
               ):
                   stop("A verified approved-path blob has no complete UTF-8 text.")
               text_value = blob["text"]
-              if len(text_value.encode("utf-8")) != metadata["byteSize"] or "\\x00" in text_value:
+              if len(text_value.encode("utf-8")) != metadata["byteSize"] or "\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               return text_value
 
@@ -444,9 +444,9 @@ jobs:
           line_map = {}
           total_chars = 0
           def newline_style(value):
-              crlf_count = value.count("\\r\\n")
-              lf_count = value.count("\\n")
-              if "\\r" in value.replace("\\r\\n", "") or (crlf_count and lf_count != crlf_count):
+              lf_count = value.count("\n")
+              lf_count = value.count("\n")
+              if "\r" in value.replace("\r\n", "") or (crlf_count and lf_count != crlf_count):
                   return "mixed"
               return "crlf" if crlf_count else "lf"
 
@@ -457,7 +457,7 @@ jobs:
               new_newline_style = newline_style(head_text)
               if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
                   stop("A changed file has mixed or changed newline style; automatic diffing is blocked.")
-              if base_text.endswith("\\n") != head_text.endswith("\\n"):
+              if base_text.endswith("\n") != head_text.endswith("\n"):
                   stop("A changed file also changes final-newline state; automatic diffing is blocked.")
               patch_lines = list(difflib.unified_diff(
                   base_text.splitlines(),
@@ -467,7 +467,7 @@ jobs:
                   n=3,
                   lineterm="",
               ))
-              patch = "\\n".join(patch_lines)
+              patch = "\n".join(patch_lines)
               if not patch:
                   stop("A path was marked modified but no textual diff could be verified.")
               if any(pattern.search(patch) for pattern in SECRET_PATTERNS):
@@ -484,7 +484,7 @@ jobs:
           diff_parts = []
           for path in sorted(patches):
               diff_parts.append("FILE: " + path + "\\n" + patches[path])
-          diff_text = "\\n\\n".join(diff_parts)
+          diff_text = "\n\n".join(diff_parts)
           if not diff_text or len(diff_text) > MAX_DIFF_CHARS:
               stop("The allowlisted diff is empty or exceeds the review limit.")
 
