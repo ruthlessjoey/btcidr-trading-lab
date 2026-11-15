@@ -127,7 +127,7 @@ jobs:
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                   stop("GitHub API request failed or returned invalid JSON.")
 
-          def github_graphql(query, variables):
+          def github_graphql(query, variables, allowed_missing_file_paths=None):
               token = os.environ.get("GH_TOKEN", "")
               if not token:
                   stop("GitHub token is unavailable.")
@@ -151,19 +151,36 @@ jobs:
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                   stop("GitHub GraphQL request failed or returned invalid JSON.")
               errors = result.get("errors")
-              if errors or not isinstance(result.get("data"), dict):
-                  # Log only bounded GraphQL message text; never dump variables, headers, tokens, or response data.
-                  if isinstance(errors, list):
+              data = result.get("data")
+              if not isinstance(data, dict):
+                  stop("GitHub GraphQL returned missing or incomplete data.")
+              if errors:
+                  allowed_messages = {
+                      "Could not resolve file for path '" + path + "'."
+                      for path in (allowed_missing_file_paths or set())
+                  }
+                  if (
+                      allowed_missing_file_paths is None
+                      or not isinstance(errors, list)
+                      or not errors
+                      or any(
+                          not isinstance(error, dict)
+                          or error.get("message") not in allowed_messages
+                          for error in errors
+                      )
+                  ):
                       messages = []
-                      for error in errors[:3]:
-                          if isinstance(error, dict) and isinstance(error.get("message"), str):
-                              message = " ".join(error["message"].split())
-                              if message:
-                                  messages.append(message[:240])
+                      if isinstance(errors, list):
+                          for error in errors[:3]:
+                              if isinstance(error, dict) and isinstance(error.get("message"), str):
+                                  message = " ".join(error["message"].split())
+                                  if message:
+                                      messages.append(message[:240])
                       if messages:
                           print("::error::GitHub GraphQL diagnostics: " + " | ".join(messages))
-                  stop("GitHub GraphQL returned errors or incomplete data.")
-              return result["data"]
+                      stop("GitHub GraphQL returned an unexpected error; review was blocked.")
+                  print("Accepted only exact missing-file errors for paths in the fixed allowlist.")
+              return data
 
           def changed_hunk_lines(patch):
               lines = set()
@@ -354,7 +371,7 @@ jobs:
               + "repository(owner: $owner, name: $name) { "
               + " ".join(tree_fields) + " } }"
           )
-          tree_result = github_graphql(tree_query, tree_variables)
+          tree_result = github_graphql(tree_query, tree_variables, allowed_missing_file_paths=allowed)
           tree_repository = tree_result.get("repository") or {}
           if not isinstance(tree_repository, dict):
               stop("Path-specific Git tree metadata is malformed.")
