@@ -23,6 +23,10 @@ TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
 # Our own chunk size (kept well under the usual 1000-candle cap).
 CANDLES_PER_REQUEST = 500
 
+# datetime.fromtimestamp(..., tz=UTC) supports Unix seconds in this range.
+MIN_UNIX_SECONDS = 0
+MAX_UNIX_SECONDS = 253_402_300_799  # 9999-12-31T23:59:59Z
+
 
 class ApiError(Exception):
     """Raised when the exchange gives no usable answer."""
@@ -85,10 +89,17 @@ def http_get_json(url, timeout, retries, opener, sleep):
     for attempt in range(1, retries + 1):
         status = None
         network_error = False
+        http_error = False
         try:
             status, body = opener(url, timeout)
         except urllib.error.HTTPError as exc:
+            http_error = True
             status = _safe_http_status(exc.code)
+            # HTTPError is also a file-like response; release it on every path.
+            try:
+                exc.close()
+            except Exception:
+                pass
         except Exception as exc:
             network_error = True
             last = f"network error ({type(exc).__name__})"
@@ -102,7 +113,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
                     continue
                 raise ApiError(f"HTTP request failed after {retries} attempts: {last}")
             raise ApiError("HTTP response had an invalid status")
-        if status == 200:
+        if status == 200 and not http_error:
             try:
                 return json.loads(body.decode("utf-8"))
             except (ValueError, UnicodeDecodeError, RecursionError, TypeError, AttributeError):
@@ -116,9 +127,12 @@ def http_get_json(url, timeout, retries, opener, sleep):
 
 
 def to_seconds(t):
-    """Exchange timestamps are milliseconds; accept seconds too. Returns seconds."""
+    """Convert exchange milliseconds/seconds to supported Unix seconds."""
     t = int(t)
-    return t // 1000 if t > 100_000_000_000 else t
+    seconds = t // 1000 if t > 100_000_000_000 else t
+    if not MIN_UNIX_SECONDS <= seconds <= MAX_UNIX_SECONDS:
+        raise ValueError("timestamp outside supported UTC datetime range")
+    return seconds
 
 
 def unwrap(obj):
