@@ -344,6 +344,9 @@ jobs:
               if len(text_value.encode("utf-8")) != blob["byteSize"] or "\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               candidate = " ".join(text_value.split())
+              segments = candidate.replace("\\\\", "/").split("/")
+              if any(segment in {"P1", "signal"} for segment in segments):
+                  stop("A blob references a protected path; no protected target content was fetched.")
               pathlike = (
                   bool(candidate)
                   and len(candidate) <= 4096
