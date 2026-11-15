@@ -244,7 +244,7 @@ jobs:
                   or item.get("previous_filename") is not None
                   or not isinstance(patch, str)
                   or not patch
-                  or "\\x00" in path
+                  or "\x00" in path
               ):
                   stop("A changed path is outside the exact allowlist or lacks a complete text patch.")
               if path in patches:
@@ -285,9 +285,9 @@ jobs:
           )
           user_prompt = (
               "Review this immutable snapshot. Base SHA: " + base_sha
-              + "\\nHead SHA: " + head_sha
-              + "\\nChanged files: " + str(len(patches))
-              + "\\n\\nDIFF START\\n" + diff_text + "\\nDIFF END"
+              + "\nHead SHA: " + head_sha
+              + "\nChanged files: " + str(len(patches))
+              + "\n\nDIFF START\n" + diff_text + "\nDIFF END"
           )
           llm_payload = {
               "model": model,
