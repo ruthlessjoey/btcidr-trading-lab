@@ -363,8 +363,8 @@ jobs:
                   tree_declarations.append("$" + sha_variable + ": String!")
                   tree_variables[sha_variable] = sha
                   tree_fields.append(
-                      side + str(index) + ": object(expression: $" + sha_variable + ") { __typename "
-                      + "... on Commit { file(path: $" + path_variable + ") { mode size type oid } } }"
+                      side + str(index) + ": object(expression: $" + sha_variable + ") { __typename oid "
+                      + "... on Commit { file(path: $" + path_variable + ") { mode size type oid path } } }"
                   )
           tree_query = (
               "query(" + ", ".join(tree_declarations) + ") { "
@@ -383,7 +383,11 @@ jobs:
               for side in ("base", "head"):
                   alias = side + str(index)
                   commit_object = tree_repository.get(alias)
-                  if not isinstance(commit_object, dict) or commit_object.get("__typename") != "Commit":
+                  if (
+                      not isinstance(commit_object, dict)
+                      or commit_object.get("__typename") != "Commit"
+                      or commit_object.get("oid") != (base_sha if side == "base" else head_sha)
+                  ):
                       stop("An immutable commit object could not be resolved.")
                   entry = commit_object.get("file")
                   if not isinstance(entry, dict):
@@ -395,6 +399,7 @@ jobs:
                       type(mode) is not int
                       or mode not in regular_file_modes
                       or entry.get("type") != "blob"
+                      or entry.get("path") != path
                       or type(size) is not int
                       or size < 0
                       or not isinstance(oid, str)
@@ -429,7 +434,7 @@ jobs:
                   content_variables[variable] = metadata["oid"]
                   content_fields.append(
                       alias + ": object(oid: $" + variable + ") { "
-                      + "__typename ... on Blob { byteSize isBinary isTruncated text } }"
+                      + "__typename ... on Blob { oid byteSize isBinary isTruncated text } }"
                   )
           if total_blob_bytes > 1000000:
               stop("The approved changed blobs exceed the fixed 1 MB total limit.")
@@ -449,6 +454,7 @@ jobs:
               if (
                   not isinstance(blob, dict)
                   or blob.get("__typename") != "Blob"
+                  or blob.get("oid") != metadata["oid"]
                   or type(blob.get("byteSize")) is not int
                   or blob.get("byteSize") != metadata["size"]
                   or blob.get("isBinary") is not False
