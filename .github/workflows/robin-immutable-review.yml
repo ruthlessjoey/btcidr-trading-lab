@@ -338,82 +338,126 @@ jobs:
               seen_paths.add(path)
               changed_paths.append(path)
 
-          # Only after every changed path passes the allowlist do we request blobs for those paths.
-          # Git GraphQL returns the blob object at the path; it does not follow symlink targets.
+          # Fetch path-specific TreeEntry metadata only for approved paths at immutable commits.
+          # Reject symlinks and non-regular entries before requesting any blob text.
           declarations = ["$owner: String!", "$name: String!"]
-          blob_variables = {"owner": owner, "name": repo}
-          blob_fields = []
+          metadata_variables = {"owner": owner, "name": repo}
+          metadata_fields = []
           for index, path in enumerate(sorted(changed_paths)):
+              path_variable = "path" + str(index)
+              declarations.append("$" + path_variable + ": String!")
+              metadata_variables[path_variable] = path
               for side, sha in (("base", base_sha), ("head", head_sha)):
-                  variable = side + str(index)
-                  declarations.append("$" + variable + ": String!")
-                  blob_variables[variable] = sha + ":" + path
-                  blob_fields.append(
-                      side + str(index) + ': object(expression: $' + variable + ') { '
-                      + '__typename ... on Blob { oid byteSize isBinary isTruncated text } }'
+                  sha_variable = side + "Sha" + str(index)
+                  declarations.append("$" + sha_variable + ": String!")
+                  metadata_variables[sha_variable] = sha
+                  metadata_fields.append(
+                      side + str(index) + ": object(expression: $" + sha_variable + ") { "
+                      + "... on Commit { file(path: $" + path_variable + ") { mode "
+                      + "object { __typename ... on Blob { oid byteSize isBinary isTruncated } } } } }"
                   )
-          blob_query = (
+          metadata_blob_query = (
               "query(" + ", ".join(declarations) + ") { "
               + "repository(owner: $owner, name: $name) { "
-              + " ".join(blob_fields) + " } }"
+              + " ".join(metadata_fields) + " } }"
           )
-          blob_result = github_graphql(blob_query, blob_variables)
-          blob_repository = blob_result.get("repository") or {}
-          if not isinstance(blob_repository, dict):
-              stop("The immutable blob response is malformed.")
+          blob_metadata_result = github_graphql(metadata_blob_query, metadata_variables)
+          blob_metadata_repository = blob_metadata_result.get("repository") or {}
+          if not isinstance(blob_metadata_repository, dict):
+              stop("Path-specific Git tree metadata is malformed.")
 
-          def checked_blob(alias):
-              blob = blob_repository.get(alias)
+          regular_file_modes = {int("100644", 8), int("100755", 8)}
+          blob_metadata = {}
+          total_blob_bytes = 0
+          for index, path in enumerate(sorted(changed_paths)):
+              for side in ("base", "head"):
+                  alias = side + str(index)
+                  commit_object = blob_metadata_repository.get(alias)
+                  if not isinstance(commit_object, dict) or commit_object.get("__typename") != "Commit":
+                      stop("An immutable commit object could not be resolved.")
+                  entry = commit_object.get("file")
+                  if not isinstance(entry, dict):
+                      stop("An approved path is missing from an immutable commit tree.")
+                  mode = entry.get("mode")
+                  blob = entry.get("object")
+                  if (
+                      type(mode) is not int
+                      or mode not in regular_file_modes
+                      or not isinstance(blob, dict)
+                      or blob.get("__typename") != "Blob"
+                      or not isinstance(blob.get("oid"), str)
+                      or not SHA_RE.fullmatch(blob.get("oid", ""))
+                      or type(blob.get("byteSize")) is not int
+                      or blob.get("byteSize") < 0
+                      or blob.get("byteSize") > 250000
+                      or blob.get("isBinary") is not False
+                      or blob.get("isTruncated") is not False
+                  ):
+                      stop("An approved path is a symlink, submodule, binary, truncated, oversized, or non-regular entry.")
+                  total_blob_bytes += blob["byteSize"]
+                  if total_blob_bytes > 1000000:
+                      stop("The approved-path blob set exceeds the fixed 1 MB limit.")
+                  blob_metadata[alias] = {
+                      "oid": blob["oid"],
+                      "byteSize": blob["byteSize"],
+                      "mode": mode,
+                  }
+              if blob_metadata["base" + str(index)]["mode"] != blob_metadata["head" + str(index)]["mode"]:
+                  stop("A file mode change is not eligible for automatic review.")
+
+          # Fetch text by verified blob OID only after every approved path has passed mode and size checks.
+          content_declarations = ["$owner: String!", "$name: String!"]
+          content_variables = {"owner": owner, "name": repo}
+          content_fields = []
+          for alias, metadata in sorted(blob_metadata.items()):
+              variable = alias + "Oid"
+              content_declarations.append("$" + variable + ": GitObjectID!")
+              content_variables[variable] = metadata["oid"]
+              content_fields.append(
+                  alias + ": object(oid: $" + variable + ") { __typename ... on Blob { text } }"
+              )
+          content_query = (
+              "query(" + ", ".join(content_declarations) + ") { "
+              + "repository(owner: $owner, name: $name) { "
+              + " ".join(content_fields) + " } }"
+          )
+          content_result = github_graphql(content_query, content_variables)
+          content_repository = content_result.get("repository") or {}
+          if not isinstance(content_repository, dict):
+              stop("The verified blob-content response is malformed.")
+
+          def checked_blob_text(alias):
+              blob = content_repository.get(alias)
+              metadata = blob_metadata[alias]
               if (
                   not isinstance(blob, dict)
                   or blob.get("__typename") != "Blob"
-                  or not isinstance(blob.get("oid"), str)
-                  or type(blob.get("byteSize")) is not int
-                  or blob.get("byteSize") < 0
-                  or blob.get("byteSize") > 250000
-                  or blob.get("isBinary") is not False
-                  or blob.get("isTruncated") is not False
                   or not isinstance(blob.get("text"), str)
               ):
-                  stop("An approved-path blob is missing, binary, truncated, or oversized.")
+                  stop("A verified approved-path blob has no complete UTF-8 text.")
               text_value = blob["text"]
-              if len(text_value.encode("utf-8")) != blob["byteSize"] or "\x00" in text_value:
+              if len(text_value.encode("utf-8")) != metadata["byteSize"] or "\\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
-              candidate = " ".join(text_value.split())
-              segments = candidate.replace("\\", "/").split("/")
-              if any(segment in {"P1", "signal"} for segment in segments):
-                  stop("A blob references a protected path; no protected target content was fetched.")
-              pathlike = (
-                  bool(candidate)
-                  and len(candidate) <= 4096
-                  and all(ch.isalnum() or ch in "._~ /\\:-" for ch in candidate)
-                  and ("/" in candidate or "\\" in candidate or candidate.startswith(".") or candidate in {"P1", "signal"})
-              )
-              if pathlike:
-                  stop("A path-like blob may be a symlink; automatic review is blocked.")
               return text_value
 
           patches = {}
           line_map = {}
           total_chars = 0
-          total_blob_bytes = 0
+          def newline_style(value):
+              crlf_count = value.count("\\r\\n")
+              lf_count = value.count("\\n")
+              if "\\r" in value.replace("\\r\\n", "") or (crlf_count and lf_count != crlf_count):
+                  return "mixed"
+              return "crlf" if crlf_count else "lf"
+
           for index, path in enumerate(sorted(changed_paths)):
-              base_text = checked_blob("base" + str(index))
-              head_text = checked_blob("head" + str(index))
-              total_blob_bytes += len(base_text.encode("utf-8")) + len(head_text.encode("utf-8"))
-              if total_blob_bytes > 1000000:
-                  stop("The approved-path blob set exceeds the fixed 1 MB limit.")
-              def newline_style(value):
-                  crlf_count = value.count("\r\n")
-                  lf_count = value.count("\n")
-                  if "\r" in value.replace("\r\n", "") or (crlf_count and lf_count != crlf_count):
-                      return "mixed"
-                  return "crlf" if crlf_count else "lf"
+              base_text = checked_blob_text("base" + str(index))
+              head_text = checked_blob_text("head" + str(index))
               old_newline_style = newline_style(base_text)
               new_newline_style = newline_style(head_text)
               if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
                   stop("A changed file has mixed or changed newline style; automatic diffing is blocked.")
-              if base_text.endswith("\n") != head_text.endswith("\n"):
+              if base_text.endswith("\\n") != head_text.endswith("\\n"):
                   stop("A changed file also changes final-newline state; automatic diffing is blocked.")
               patch_lines = list(difflib.unified_diff(
                   base_text.splitlines(),
@@ -423,7 +467,7 @@ jobs:
                   n=3,
                   lineterm="",
               ))
-              patch = "\n".join(patch_lines)
+              patch = "\\n".join(patch_lines)
               if not patch:
                   stop("A path was marked modified but no textual diff could be verified.")
               if any(pattern.search(patch) for pattern in SECRET_PATTERNS):
@@ -439,8 +483,8 @@ jobs:
 
           diff_parts = []
           for path in sorted(patches):
-              diff_parts.append("FILE: " + path + "\n" + patches[path])
-          diff_text = "\n\n".join(diff_parts)
+              diff_parts.append("FILE: " + path + "\\n" + patches[path])
+          diff_text = "\\n\\n".join(diff_parts)
           if not diff_text or len(diff_text) > MAX_DIFF_CHARS:
               stop("The allowlisted diff is empty or exceeds the review limit.")
 
