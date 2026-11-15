@@ -94,7 +94,7 @@ jobs:
                   headers["Content-Type"] = "application/json"
               request = urllib.request.Request(url, data=data, headers=headers, method=method)
               try:
-                  with urllib.request.urlopen(request, timeout=25) as response:
+                  with SAFE_OPENER.open(request, timeout=25) as response:
                       return json.load(response)
               except urllib.error.HTTPError as exc:
                   stop("GitHub API request failed (HTTP " + str(exc.code) + ").")
@@ -150,6 +150,7 @@ jobs:
               if not isinstance(value, str) or not value.strip():
                   stop("The model returned a missing or invalid text field.")
               value = "".join(ch for ch in value if ch.isprintable())
+              value = re.sub(r"https?://\\S+|www\\.\\S+", "[external link omitted]", value, flags=re.I)
               value = " ".join(value.split())
               value = html.escape(value, quote=False)
               for char in "`*_~[]()!#>|":
@@ -224,7 +225,7 @@ jobs:
               or not isinstance(commits, list)
               or not commits
               or (commits[-1] or {}).get("sha") != head_sha
-              or not isinstance(compare.get("ahead_by"), int)
+              or type(compare.get("ahead_by")) is not int
               or compare.get("ahead_by", 0) < 1
               or not isinstance(files, list)
               or not files
@@ -259,6 +260,8 @@ jobs:
                   or changes != additions + deletions
               ):
                   stop("The immutable comparison returned invalid change counts.")
+              if any(pattern.search(patch) for pattern in SECRET_PATTERNS):
+                  stop("Credential-like material detected in " + path + "; the diff was not sent to the model.")
               valid_lines, patch_additions, patch_deletions = changed_hunk_lines(patch)
               if patch_additions != additions or patch_deletions != deletions:
                   stop("The patch is incomplete or its line counts do not match GitHub metadata.")
@@ -326,7 +329,7 @@ jobs:
               method="POST",
           )
           try:
-              with urllib.request.urlopen(llm_request, timeout=90) as response:
+              with SAFE_OPENER.open(llm_request, timeout=90) as response:
                   llm_result = json.load(response)
           except urllib.error.HTTPError as exc:
               stop("The configured model endpoint rejected the review request (HTTP " + str(exc.code) + ").")
