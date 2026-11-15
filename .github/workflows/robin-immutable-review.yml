@@ -4,7 +4,7 @@ on:
   # pull_request_target loads this workflow from the trusted base branch.
   # No PR code is checked out, downloaded, or executed.
   pull_request_target:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, edited, reopened, ready_for_review, synchronize]
 
 permissions:
   contents: read
@@ -215,7 +215,7 @@ jobs:
 
           pr = event.get("pull_request")
           if not isinstance(pr, dict) or event.get("action") not in {
-              "opened", "reopened", "ready_for_review", "synchronize"
+              "opened", "edited", "reopened", "ready_for_review", "synchronize"
           }:
               stop("This event is not an eligible pull-request event.")
 
@@ -354,7 +354,7 @@ jobs:
                   tree_declarations.append("$" + sha_variable + ": String!")
                   tree_variables[sha_variable] = sha
                   tree_fields.append(
-                      side + str(index) + ": object(expression: $" + sha_variable + ") { "
+                      side + str(index) + ": object(expression: $" + sha_variable + ") { __typename "
                       + "... on Commit { file(path: $" + path_variable + ") { mode size type oid } } }"
                   )
           tree_query = (
