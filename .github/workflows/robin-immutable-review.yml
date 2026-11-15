@@ -354,7 +354,6 @@ jobs:
                   and ("/" in candidate or "\\" in candidate or candidate.startswith(".") or candidate in {"P1", "signal"})
               )
               if pathlike:
-                      stop("A path-like blob references a protected path; no target content was fetched.")
                   stop("A path-like blob may be a symlink; automatic review is blocked.")
               return text_value
 
