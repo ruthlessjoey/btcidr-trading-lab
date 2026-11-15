@@ -143,6 +143,33 @@ jobs:
                   stop("GitHub GraphQL returned errors or incomplete data.")
               return result["data"]
 
+          def changed_hunk_lines(patch):
+              lines = set()
+              in_hunk = False
+              old_expected = new_expected = 0
+              old_seen = new_seen = 0
+              current_new = None
+              additions = deletions = 0
+              for row in patch.splitlines():
+                  match = HUNK_RE.match(row)
+                  if match:
+                      if in_hunk and (old_seen != old_expected or new_seen != new_expected):
+                          stop("A unified-diff hunk is incomplete.")
+                      old_expected = int(match.group(2) or "1")
+                      new_expected = int(match.group(4) or "1")
+                      old_seen = new_seen = 0
+                      current_new = int(match.group(3))
+                      in_hunk = True
+                      if new_expected == 0:
+                          lines.add(max(1, current_new))
+                      continue
+                  if not in_hunk:
+                      if not row or row.startswith("---") or row.startswith("+++"):
+                          continue
+                      stop("The unified diff contains an invalid preamble.")
+                  if row.startswith("\\"):
+                      continue
+                  if row.startswith("+"):
                       lines.add(current_new)
                       current_new += 1
                       new_seen += 1
@@ -269,7 +296,7 @@ jobs:
                   or path not in allowed
                   or item.get("changeType") != "MODIFIED"
                   or path in seen_paths
-                  or "\\x00" in path
+                  or "\x00" in path
               ):
                   stop("A changed path is outside the exact allowlist or is not a simple modification.")
               seen_paths.add(path)
@@ -314,7 +341,7 @@ jobs:
               ):
                   stop("An approved-path blob is missing, binary, truncated, or oversized.")
               text_value = blob["text"]
-              if len(text_value.encode("utf-8")) != blob["byteSize"] or "\\x00" in text_value:
+              if len(text_value.encode("utf-8")) != blob["byteSize"] or "\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               candidate = " ".join(text_value.split())
               if (
@@ -339,12 +366,12 @@ jobs:
               if total_blob_bytes > 1000000:
                   stop("The approved-path blob set exceeds the fixed 1 MB limit.")
               def newline_style(value):
-                  if "\\r" in value.replace("\\r\\n", ""):
+                  if "\r" in value.replace("\r\n", ""):
                       return "mixed"
-                  return "crlf" if "\\r\\n" in value else "lf"
+                  return "crlf" if "\r\n" in value else "lf"
               if newline_style(base_text) != newline_style(head_text):
                   stop("A changed file also changes newline style; automatic diffing is blocked.")
-              if base_text.endswith("\\n") != head_text.endswith("\\n"):
+              if base_text.endswith("\n") != head_text.endswith("\n"):
                   stop("A changed file also changes final-newline state; automatic diffing is blocked.")
               patch_lines = list(difflib.unified_diff(
                   base_text.splitlines(),
@@ -354,7 +381,7 @@ jobs:
                   n=3,
                   lineterm="",
               ))
-              patch = "\\n".join(patch_lines)
+              patch = "\n".join(patch_lines)
               if not patch:
                   stop("A path was marked modified but no textual diff could be verified.")
               if any(pattern.search(patch) for pattern in SECRET_PATTERNS):
@@ -370,8 +397,8 @@ jobs:
 
           diff_parts = []
           for path in sorted(patches):
-              diff_parts.append("FILE: " + path + "\\n" + patches[path])
-          diff_text = "\\n\\n".join(diff_parts)
+              diff_parts.append("FILE: " + path + "\n" + patches[path])
+          diff_text = "\n\n".join(diff_parts)
           if not diff_text or len(diff_text) > MAX_DIFF_CHARS:
               stop("The allowlisted diff is empty or exceeds the review limit.")
 
