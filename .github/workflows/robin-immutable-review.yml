@@ -494,6 +494,8 @@ jobs:
           except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
               stop("The configured model endpoint failed or returned invalid JSON.")
 
+          if llm_result.get("model") != model:
+              stop("The model endpoint did not confirm the exact approved model ID.")
           choices = llm_result.get("choices")
           if not isinstance(choices, list) or not choices:
               stop("The model returned no review choice.")
