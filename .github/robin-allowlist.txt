@@ -1,0 +1,28 @@
+# Exact initial Workstream A review scope.
+# Derived from the repository's existing package-workstream-a-review.yml FILES tuple.
+# Exact paths only; additions, deletions, renames, and unknown paths are rejected.
+.github/workflows/research-backtest.yml
+.github/workflows/manual-offline-unit-tests.yml
+backtest_config.json
+run_backtest.py
+run_crosscheck.py
+research/__init__.py
+research/backtest_report.py
+research/crosscheck.py
+research/data_report.py
+research/dataset.py
+research/engine.py
+research/history.py
+research/holdout_publish.py
+research/pipeline.py
+research/selection.py
+research/splits.py
+research/strategy.py
+research/toy.py
+tests/test_backtest_pipeline.py
+tests/test_engine.py
+tests/test_history.py
+tests/test_holdout_publish.py
+tests/test_holdout_reporting.py
+tests/test_research_sanitization.py
+tests/test_selection_warmup.py
