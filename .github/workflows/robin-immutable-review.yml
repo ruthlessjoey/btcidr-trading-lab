@@ -280,11 +280,7 @@ jobs:
               pullRequest(number: $number) {
                 baseRefOid
                 headRefOid
-                files(first: 100) {
-                  totalCount
-                  nodes { path changeType }
-                  pageInfo { hasNextPage }
-                }
+                changedFiles
               }
               ref(qualifiedName: $baseQualifiedName) {
                 compare(headRef: $headQualifiedName) {
@@ -310,9 +306,6 @@ jobs:
           comparison = ref_data.get("compare") or {}
           base_target = comparison.get("baseTarget") or {}
           head_target = comparison.get("headTarget") or {}
-          file_connection = pr_metadata.get("files") or {}
-          file_nodes = file_connection.get("nodes")
-          page_info = file_connection.get("pageInfo") or {}
           if (
               pr_metadata.get("baseRefOid") != base_sha
               or pr_metadata.get("headRefOid") != head_sha
@@ -322,32 +315,12 @@ jobs:
               or comparison.get("aheadBy", 0) < 1
               or type(comparison.get("behindBy")) is not int
               or comparison.get("behindBy") != 0
-              or page_info.get("hasNextPage") is not False
-              or not isinstance(file_nodes, list)
-              or not file_nodes
-              or type(file_connection.get("totalCount")) is not int
-              or file_connection.get("totalCount") != len(file_nodes)
-              or len(file_nodes) > len(allowed)
+              or type(pr_metadata.get("changedFiles")) is not int
+              or pr_metadata.get("changedFiles", 0) < 1
           ):
-              stop("Path-only PR metadata is incomplete or does not match the immutable event SHAs.")
+              stop("Aggregate PR metadata is incomplete or does not match the immutable event SHAs.")
 
-          changed_paths = []
-          seen_paths = set()
-          for item in file_nodes:
-              if not isinstance(item, dict):
-                  stop("The path-only PR metadata is malformed.")
-              path = item.get("path")
-              if (
-                  not isinstance(path, str)
-                  or path not in allowed
-                  or item.get("changeType") != "MODIFIED"
-                  or path in seen_paths
-                  or "\x00" in path
-              ):
-                  stop("A changed path is outside the exact allowlist or is not a simple modification.")
-              seen_paths.add(path)
-              changed_paths.append(path)
-
+          # Only exact allowlisted paths are queried below. Do not enumerate PR changed-path names.
           # Query only the 25 exact allowlisted TreeEntry paths; do not enumerate any directory.
           # Read mode/size/type/OID metadata first and reject symlinks before requesting blob text.
           tree_declarations = ["$owner: String!", "$name: String!"]
@@ -413,15 +386,21 @@ jobs:
               if base_entry["oid"] != head_entry["oid"]:
                   tree_changed_paths.add(path)
 
-          if tree_changed_paths != set(changed_paths) or not tree_changed_paths:
-              stop("The PR path metadata does not exactly match the immutable allowlisted tree changes.")
+          # The aggregate changed-file count is compared with only the changed allowlisted paths.
+          # This proves no out-of-scope path changed without requesting or enumerating its filename.
+          if (
+              not tree_changed_paths
+              or pr_metadata.get("changedFiles") != len(tree_changed_paths)
+          ):
+              stop("The aggregate PR changed-file count does not exactly match the allowlisted immutable tree changes.")
+          changed_paths = sorted(tree_changed_paths)
 
           # Fetch text only for changed approved regular-file blobs, addressed by verified immutable OID.
           content_declarations = ["$owner: String!", "$name: String!"]
           content_variables = {"owner": owner, "name": repo}
           content_fields = []
           total_blob_bytes = 0
-          for index, path in enumerate(sorted(changed_paths)):
+          for index, path in enumerate(changed_paths):
               for side in ("base", "head"):
                   alias = side + str(index)
                   metadata = tree_metadata[alias]
