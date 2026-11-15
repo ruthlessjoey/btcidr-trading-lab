@@ -150,7 +150,18 @@ jobs:
                   stop("GitHub GraphQL request failed (HTTP " + str(exc.code) + ").")
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                   stop("GitHub GraphQL request failed or returned invalid JSON.")
-              if result.get("errors") or not isinstance(result.get("data"), dict):
+              errors = result.get("errors")
+              if errors or not isinstance(result.get("data"), dict):
+                  # Log only bounded GraphQL message text; never dump variables, headers, tokens, or response data.
+                  if isinstance(errors, list):
+                      messages = []
+                      for error in errors[:3]:
+                          if isinstance(error, dict) and isinstance(error.get("message"), str):
+                              message = " ".join(error["message"].split())
+                              if message:
+                                  messages.append(message[:240])
+                      if messages:
+                          print("::error::GitHub GraphQL diagnostics: " + " | ".join(messages))
                   stop("GitHub GraphQL returned errors or incomplete data.")
               return result["data"]
 
