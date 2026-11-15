@@ -268,7 +268,6 @@ jobs:
               total_chars += len(patch)
               if total_chars > MAX_DIFF_CHARS:
                   stop("The immutable diff exceeds the fixed 100,000-character review limit.")
-              valid_lines = changed_hunk_lines(patch)
               if not valid_lines:
                   stop("A changed file has no verifiable unified-diff hunk.")
               patches[path] = patch
