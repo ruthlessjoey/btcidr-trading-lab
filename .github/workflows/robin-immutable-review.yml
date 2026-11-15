@@ -446,7 +446,7 @@ jobs:
               ):
                   stop("A verified approved-path blob is missing, binary, truncated, or size-inconsistent.")
               text_value = blob["text"]
-              if len(text_value.encode("utf-8")) != metadata["size"] or "\\x00" in text_value:
+              if len(text_value.encode("utf-8")) != metadata["size"] or "\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               return text_value
 
