@@ -1,4 +1,5 @@
 """Tests for fetcher.py. All data here is SYNTHETIC test data, not market prices."""
+import io
 import os
 import sys
 import unittest
@@ -123,10 +124,22 @@ class HttpTests(unittest.TestCase):
         self.assertNotIn(marker, str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
-    def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
-        with self.assertRaises(fetcher.ApiError):
+    def test_http_error_exception_is_handled_and_closed(self):
+        response = io.BytesIO(b"not-json")
+        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, response))
+        with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        self.assertIn("404", str(ctx.exception))
+        self.assertTrue(response.closed)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_http_error_with_200_status_is_not_treated_as_success(self):
+        response = io.BytesIO(b'{"should": "not be parsed"}')
+        op = scripted(urllib.error.HTTPError("u", 200, "Unexpected HTTPError", {}, response))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
+        self.assertIn("HTTP 200", str(ctx.exception))
+        self.assertTrue(response.closed)
         self.assertEqual(len(op.calls), 1)
 
     def test_network_errors_exhaust_retries(self):
@@ -166,9 +179,16 @@ class HttpTests(unittest.TestCase):
                 self.assertNotIn(str(status), str(ctx.exception))
 
     def test_timestamp_overflow_is_sanitized(self):
+        for timestamp in (float("inf"), 10 ** 1000, -(10 ** 1000)):
+            with self.subTest(timestamp_type=type(timestamp).__name__):
+                with self.assertRaises(fetcher.ApiError) as ctx:
+                    fetcher.parse_klines([[timestamp, "1", "2", "0", "1", "1"]])
+                self.assertIn("invalid numeric fields", str(ctx.exception))
+
+    def test_server_time_outside_datetime_range_is_sanitized(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.parse_klines([[float("inf"), "1", "2", "0", "1", "1"]])
-        self.assertIn("invalid numeric fields", str(ctx.exception))
+            fetcher.extract_server_time({"serverTime": 10 ** 1000})
+        self.assertEqual(str(ctx.exception), "unexpected server-time answer")
 
 
 if __name__ == "__main__":
