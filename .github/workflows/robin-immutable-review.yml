@@ -362,8 +362,12 @@ jobs:
                   ):
                       stop("An immutable commit object could not be resolved.")
                   entry = commit_object.get("file")
+                  if entry is None:
+                      # A path absent at both immutable commits is dormant in this repository revision.
+                      tree_metadata[alias] = None
+                      continue
                   if not isinstance(entry, dict):
-                      stop("An allowlisted path is missing from an immutable commit tree.")
+                      stop("An allowlisted path returned malformed immutable tree metadata.")
                   mode = entry.get("mode")
                   size = entry.get("size")
                   oid = entry.get("oid")
@@ -381,9 +385,13 @@ jobs:
                   tree_metadata[alias] = {"oid": oid, "size": size, "mode": mode}
               base_entry = tree_metadata["base" + str(index)]
               head_entry = tree_metadata["head" + str(index)]
-              if base_entry["mode"] != head_entry["mode"]:
+              if base_entry is None and head_entry is None:
+                  continue
+              if base_entry is not None and head_entry is None:
+                  stop("Deletion of an allowlisted file is not eligible for automatic review.")
+              if base_entry is not None and head_entry is not None and base_entry["mode"] != head_entry["mode"]:
                   stop("A file mode change is not eligible for automatic review.")
-              if base_entry["oid"] != head_entry["oid"]:
+              if base_entry is None or head_entry is None or base_entry["oid"] != head_entry["oid"]:
                   tree_changed_paths.add(path)
 
           # The aggregate changed-file count is compared with only the changed allowlisted paths.
@@ -408,6 +416,9 @@ jobs:
                   content_alias = side + str(index)
                   metadata = tree_metadata[tree_alias]
                   content_metadata[content_alias] = metadata
+                  if metadata is None:
+                      # An allowlisted file addition has an empty base; no blob fetch is needed.
+                      continue
                   if metadata["size"] > 250000:
                       stop("An approved changed blob exceeds the fixed 250 KB per-blob limit.")
                   total_blob_bytes += metadata["size"]
@@ -431,8 +442,10 @@ jobs:
               stop("The verified blob-content response is malformed.")
 
           def checked_blob_text(alias):
-              blob = content_repository.get(alias)
               metadata = content_metadata[alias]
+              if metadata is None:
+                  return ""
+              blob = content_repository.get(alias)
               if (
                   not isinstance(blob, dict)
                   or blob.get("__typename") != "Blob"
@@ -462,12 +475,17 @@ jobs:
           for index, path in enumerate(sorted(changed_paths)):
               base_text = checked_blob_text("base" + str(index))
               head_text = checked_blob_text("head" + str(index))
-              old_newline_style = newline_style(base_text)
+              base_metadata = content_metadata["base" + str(index)]
               new_newline_style = newline_style(head_text)
-              if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
-                  stop("A changed file has mixed or changed newline style; automatic diffing is blocked.")
-              if base_text.endswith("\n") != head_text.endswith("\n"):
-                  stop("A changed file also changes final-newline state; automatic diffing is blocked.")
+              if base_metadata is None:
+                  if new_newline_style == "mixed":
+                      stop("An added file has mixed newline style; automatic diffing is blocked.")
+              else:
+                  old_newline_style = newline_style(base_text)
+                  if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
+                      stop("A changed file has mixed or changed newline style; automatic diffing is blocked.")
+                  if base_text.endswith("\n") != head_text.endswith("\n"):
+                      stop("A changed file also changes final-newline state; automatic diffing is blocked.")
               patch_lines = list(difflib.unified_diff(
                   base_text.splitlines(),
                   head_text.splitlines(),
