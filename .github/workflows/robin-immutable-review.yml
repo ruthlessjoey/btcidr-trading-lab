@@ -72,7 +72,7 @@ jobs:
           MAX_DIFF_CHARS = 100000
           MAX_FINDINGS = 10
           SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-          HUNK_RE = re.compile(r"^@@ -[0-9]+(?:,[0-9]+)? \+([0-9]+)(?:,([0-9]+))? @@")
+          HUNK_RE = re.compile(r"^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@")
 
           def stop(message):
               print("::error::" + message)
@@ -103,28 +103,48 @@ jobs:
 
           def changed_hunk_lines(patch):
               lines = set()
+              in_hunk = False
+              old_expected = new_expected = 0
+              old_seen = new_seen = 0
               current_new = None
+              additions = deletions = 0
               for row in patch.splitlines():
                   match = HUNK_RE.match(row)
                   if match:
-                      current_new = int(match.group(1))
-                      count = int(match.group(2) or "1")
-                      if count == 0:
+                      if in_hunk and (old_seen != old_expected or new_seen != new_expected):
+                          stop("A unified-diff hunk is incomplete.")
+                      old_expected = int(match.group(2) or "1")
+                      new_expected = int(match.group(4) or "1")
+                      old_seen = new_seen = 0
+                      current_new = int(match.group(3))
+                      in_hunk = True
+                      if new_expected == 0:
                           lines.add(max(1, current_new))
                       continue
-                  if current_new is None or row.startswith("\\"):
-                      continue
-                  if row.startswith("+++") or row.startswith("---"):
+                  if not in_hunk:
+                      if not row or row.startswith("---") or row.startswith("+++"):
+                          continue
+                      stop("The unified diff contains an invalid preamble.")
+                  if row.startswith("\\"):
                       continue
                   if row.startswith("+"):
                       lines.add(current_new)
                       current_new += 1
+                      new_seen += 1
+                      additions += 1
                   elif row.startswith("-"):
-                      continue
+                      old_seen += 1
+                      deletions += 1
                   elif row.startswith(" "):
                       lines.add(current_new)
                       current_new += 1
-              return lines
+                      old_seen += 1
+                      new_seen += 1
+                  else:
+                      stop("The unified diff contains a malformed hunk line.")
+              if not in_hunk or old_seen != old_expected or new_seen != new_expected:
+                  stop("The unified diff is missing or has an incomplete hunk.")
+              return lines, additions, deletions
 
           def safe_text(value, limit):
               if not isinstance(value, str) or not value.strip():
@@ -239,10 +259,10 @@ jobs:
                   or changes != additions + deletions
               ):
                   stop("The immutable comparison returned invalid change counts.")
-              patch_additions = sum(1 for row in patch.splitlines() if row.startswith("+") and not row.startswith("+++"))
-              patch_deletions = sum(1 for row in patch.splitlines() if row.startswith("-") and not row.startswith("---"))
+              valid_lines, patch_additions, patch_deletions = changed_hunk_lines(patch)
               if patch_additions != additions or patch_deletions != deletions:
                   stop("The patch is incomplete or its line counts do not match GitHub metadata.")
+
               if path in patches:
                   stop("The immutable comparison returned a duplicate path.")
               total_chars += len(patch)
