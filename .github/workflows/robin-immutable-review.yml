@@ -371,8 +371,10 @@ jobs:
                   if "\r" in value.replace("\r\n", ""):
                       return "mixed"
                   return "crlf" if "\r\n" in value else "lf"
-              if newline_style(base_text) != newline_style(head_text):
-                  stop("A changed file also changes newline style; automatic diffing is blocked.")
+              old_newline_style = newline_style(base_text)
+              new_newline_style = newline_style(head_text)
+              if "mixed" in {old_newline_style, new_newline_style} or old_newline_style != new_newline_style:
+                  stop("A changed file has mixed or changed newline style; automatic diffing is blocked.")
               if base_text.endswith("\n") != head_text.endswith("\n"):
                   stop("A changed file also changes final-newline state; automatic diffing is blocked.")
               patch_lines = list(difflib.unified_diff(
