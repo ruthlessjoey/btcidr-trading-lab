@@ -273,7 +273,7 @@ jobs:
           if len(allowed) != 25 or any(path == "P1" or path.startswith("P1/") or path == "signal" or path.startswith("signal/") for path in allowed):
               stop("The embedded Workstream A allowlist failed its fixed-scope assertion.")
 
-          # First request changed-path metadata only. No diff patches or file contents are requested here.
+          # First request aggregate PR metadata only. No changed-path names or file contents are requested here.
           metadata_query = """
           query($owner: String!, $name: String!, $number: Int!, $baseQualifiedName: String!, $headQualifiedName: String!) {
             repository(owner: $owner, name: $name) {
