@@ -485,6 +485,8 @@ jobs:
               if any(pattern.search(patch) for pattern in SECRET_PATTERNS):
                   stop("Credential-like material detected in " + path + "; the diff was not sent to the model.")
               valid_lines, _, _ = changed_hunk_lines(patch)
+              new_line_count = len(head_text.splitlines())
+              valid_lines = {line for line in valid_lines if 1 <= line <= new_line_count}
               if not valid_lines:
                   stop("A changed file has no verifiable unified-diff hunk.")
               total_chars += len(patch)
