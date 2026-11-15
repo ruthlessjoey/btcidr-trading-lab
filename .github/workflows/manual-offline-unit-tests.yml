@@ -1,3 +1,5 @@
+# Reviewer smoke-test marker: comment-only; no workflow behavior change.
+
 name: Manual Offline Unit Tests
 
 on:
