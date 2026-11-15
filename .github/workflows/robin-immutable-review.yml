@@ -416,10 +416,10 @@ jobs:
                       stop("An approved changed blob exceeds the fixed 250 KB per-blob limit.")
                   total_blob_bytes += metadata["size"]
                   variable = alias + "Oid"
-                  content_declarations.append("$" + variable + ": GitObjectID!")
+                  content_declarations.append("$" + variable + ": String!")
                   content_variables[variable] = metadata["oid"]
                   content_fields.append(
-                      alias + ": object(oid: $" + variable + ") { "
+                      alias + ": object(expression: $" + variable + ") { "
                       + "__typename ... on Blob { byteSize isBinary isTruncated text } }"
                   )
           if total_blob_bytes > 1000000:
