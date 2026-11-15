@@ -95,6 +95,15 @@ jobs:
               print("::error::" + message)
               raise SystemExit(1)
 
+          def read_json_response(response, max_bytes, source):
+              raw = response.read(max_bytes + 1)
+              if len(raw) > max_bytes:
+                  stop(source + " response exceeded the fixed size limit.")
+              try:
+                  return json.loads(raw.decode("utf-8"))
+              except (UnicodeDecodeError, json.JSONDecodeError):
+                  stop(source + " response was not valid UTF-8 JSON.")
+
           def github_request(method, path, payload=None):
               token = os.environ.get("GH_TOKEN", "")
               if not token:
@@ -112,7 +121,7 @@ jobs:
               request = urllib.request.Request(url, data=data, headers=headers, method=method)
               try:
                   with SAFE_OPENER.open(request, timeout=25) as response:
-                      return json.load(response)
+                      return read_json_response(response, 262144, "GitHub REST")
               except urllib.error.HTTPError as exc:
                   stop("GitHub API request failed (HTTP " + str(exc.code) + ").")
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
@@ -136,7 +145,7 @@ jobs:
               )
               try:
                   with SAFE_OPENER.open(request, timeout=30) as response:
-                      result = json.load(response)
+                      result = read_json_response(response, 2097152, "GitHub GraphQL")
               except urllib.error.HTTPError as exc:
                   stop("GitHub GraphQL request failed (HTTP " + str(exc.code) + ").")
               except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
@@ -546,7 +555,7 @@ jobs:
           )
           try:
               with SAFE_OPENER.open(llm_request, timeout=90) as response:
-                  llm_result = json.load(response)
+                  llm_result = read_json_response(response, 262144, "Model")
           except urllib.error.HTTPError as exc:
               stop("The configured model endpoint rejected the review request (HTTP " + str(exc.code) + ").")
           except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
