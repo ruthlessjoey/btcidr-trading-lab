@@ -222,6 +222,7 @@ jobs:
           head = pr.get("head") or {}
           base_sha = base.get("sha")
           head_sha = head.get("sha")
+          head_ref = head.get("ref")
           repository = os.environ.get("GITHUB_REPOSITORY", "")
           if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
               stop("Repository identity is invalid.")
@@ -235,6 +236,12 @@ jobs:
               or not SHA_RE.fullmatch(base_sha)
               or not isinstance(head_sha, str)
               or not SHA_RE.fullmatch(head_sha)
+              or not isinstance(head_ref, str)
+              or not re.fullmatch(r"[A-Za-z0-9._/-]+", head_ref)
+              or ".." in head_ref
+              or "//" in head_ref
+              or head_ref.startswith("/")
+              or head_ref.endswith("/")
               or pr.get("draft") is not False
               or base.get("ref") != "main"
               or (base.get("repo") or {}).get("full_name") != repository
@@ -258,7 +265,7 @@ jobs:
 
           # First request changed-path metadata only. No diff patches or file contents are requested here.
           metadata_query = """
-          query($owner: String!, $name: String!, $number: Int!) {
+          query($owner: String!, $name: String!, $number: Int!, $baseQualifiedName: String!, $headQualifiedName: String!) {
             repository(owner: $owner, name: $name) {
               pullRequest(number: $number) {
                 baseRefOid
@@ -268,12 +275,30 @@ jobs:
                   pageInfo { hasNextPage }
                 }
               }
+              ref(qualifiedName: $baseQualifiedName) {
+                compare(headRef: $headQualifiedName) {
+                  baseTarget { oid }
+                  headTarget { oid }
+                  aheadBy
+                  behindBy
+                }
+              }
             }
           }
           """
-          metadata = github_graphql(metadata_query, {"owner": owner, "name": repo, "number": number})
+          metadata = github_graphql(metadata_query, {
+              "owner": owner,
+              "name": repo,
+              "number": number,
+              "baseQualifiedName": "refs/heads/main",
+              "headQualifiedName": "refs/heads/" + head_ref,
+          })
           repository_data = metadata.get("repository") or {}
           pr_metadata = repository_data.get("pullRequest") or {}
+          ref_data = repository_data.get("ref") or {}
+          comparison = ref_data.get("compare") or {}
+          base_target = comparison.get("baseTarget") or {}
+          head_target = comparison.get("headTarget") or {}
           file_connection = pr_metadata.get("files") or {}
           file_nodes = file_connection.get("nodes")
           page_info = file_connection.get("pageInfo") or {}
