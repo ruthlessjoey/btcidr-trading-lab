@@ -344,7 +344,7 @@ jobs:
               if len(text_value.encode("utf-8")) != blob["byteSize"] or "\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               candidate = " ".join(text_value.split())
-              segments = candidate.replace("\\\\", "/").split("/")
+              segments = candidate.replace("\\", "/").split("/")
               if any(segment in {"P1", "signal"} for segment in segments):
                   stop("A blob references a protected path; no protected target content was fetched.")
               pathlike = (
@@ -354,8 +354,6 @@ jobs:
                   and ("/" in candidate or "\\" in candidate or candidate.startswith(".") or candidate in {"P1", "signal"})
               )
               if pathlike:
-                  segments = candidate.replace("\\", "/").split("/")
-                  if any(segment in {"P1", "signal"} for segment in segments):
                       stop("A path-like blob references a protected path; no target content was fetched.")
                   stop("A path-like blob may be a symlink; automatic review is blocked.")
               return text_value
