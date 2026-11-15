@@ -399,19 +399,23 @@ jobs:
           content_declarations = ["$owner: String!", "$name: String!"]
           content_variables = {"owner": owner, "name": repo}
           content_fields = []
+          content_metadata = {}
+          allowed_path_indexes = {path: index for index, path in enumerate(sorted(allowed))}
           total_blob_bytes = 0
           for index, path in enumerate(changed_paths):
               for side in ("base", "head"):
-                  alias = side + str(index)
-                  metadata = tree_metadata[alias]
+                  tree_alias = side + str(allowed_path_indexes[path])
+                  content_alias = side + str(index)
+                  metadata = tree_metadata[tree_alias]
+                  content_metadata[content_alias] = metadata
                   if metadata["size"] > 250000:
                       stop("An approved changed blob exceeds the fixed 250 KB per-blob limit.")
                   total_blob_bytes += metadata["size"]
-                  variable = alias + "Oid"
+                  variable = content_alias + "Oid"
                   content_declarations.append("$" + variable + ": GitObjectID!")
                   content_variables[variable] = metadata["oid"]
                   content_fields.append(
-                      alias + ": object(oid: $" + variable + ") { "
+                      content_alias + ": object(oid: $" + variable + ") { "
                       + "__typename ... on Blob { oid byteSize isBinary isTruncated text } }"
                   )
           if total_blob_bytes > 1000000:
@@ -428,7 +432,7 @@ jobs:
 
           def checked_blob_text(alias):
               blob = content_repository.get(alias)
-              metadata = tree_metadata[alias]
+              metadata = content_metadata[alias]
               if (
                   not isinstance(blob, dict)
                   or blob.get("__typename") != "Blob"
