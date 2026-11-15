@@ -1,0 +1,183 @@
+name: Robin Workstream A review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Do not send fork PRs or draft PRs to the model.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: robin-workstream-a-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Preflight exact Workstream A path allowlist (names only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          def stop(message):
+              raise SystemExit(message)
+
+          with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as handle:
+              event = json.load(handle)
+
+          pr = event.get("pull_request")
+          if not isinstance(pr, dict):
+              stop("Blocked: pull-request metadata is missing.")
+
+          number = pr.get("number")
+          base_sha = (pr.get("base") or {}).get("sha")
+          if not isinstance(number, int) or not isinstance(base_sha, str) or len(base_sha) != 40:
+              stop("Blocked: pull-request number or base commit is invalid.")
+
+          try:
+              owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+          except ValueError:
+              stop("Blocked: repository identity is invalid.")
+
+          token = os.environ.get("GH_TOKEN", "")
+          if not token:
+              stop("Blocked: GitHub token is unavailable.")
+
+          query = """
+          query($owner: String!, $name: String!, $number: Int!, $expression: String!) {
+            repository(owner: $owner, name: $name) {
+              object(expression: $expression) {
+                ... on Blob { text }
+              }
+              pullRequest(number: $number) {
+                files(first: 100) {
+                  nodes { path changeType }
+                  pageInfo { hasNextPage }
+                }
+              }
+            }
+          }
+          """
+          variables = {
+              "owner": owner,
+              "name": repo,
+              "number": number,
+              "expression": base_sha + ":.github/robin-allowlist.txt",
+          }
+          body = json.dumps({"query": query, "variables": variables}).encode("utf-8")
+          request = urllib.request.Request(
+              "https://api.github.com/graphql",
+              data=body,
+              headers={
+                  "Authorization": "Bearer " + token,
+                  "Content-Type": "application/json",
+                  "User-Agent": "btc-idr-robin-path-preflight",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  payload = json.load(response)
+          except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+              stop("Blocked: GitHub path metadata could not be verified.")
+
+          if payload.get("errors"):
+              stop("Blocked: GitHub rejected the path-only preflight query.")
+
+          repository = payload.get("data", {}).get("repository")
+          if not isinstance(repository, dict):
+              stop("Blocked: repository metadata is unavailable.")
+
+          blob = repository.get("object")
+          allowlist_text = blob.get("text") if isinstance(blob, dict) else None
+          if not isinstance(allowlist_text, str):
+              stop("Blocked: base-branch allowlist is missing or unreadable.")
+
+          allowed = set()
+          for raw in allowlist_text.splitlines():
+              path = raw.strip()
+              if not path or path.startswith("#"):
+                  continue
+              parts = path.split("/")
+              if (
+                  path.startswith("/")
+                  or "\\" in path
+                  or "\x00" in path
+                  or any(part in ("", ".", "..") for part in parts)
+                  or path == "P1"
+                  or path.startswith("P1/")
+                  or path == "signal"
+                  or path.startswith("signal/")
+                  or path in allowed
+              ):
+                  stop("Blocked: base-branch allowlist contains an unsafe or duplicate entry.")
+              allowed.add(path)
+
+          if not allowed:
+              stop("Blocked: base-branch allowlist is empty.")
+
+          pull_request = repository.get("pullRequest")
+          files = pull_request.get("files") if isinstance(pull_request, dict) else None
+          if not isinstance(files, dict):
+              stop("Blocked: changed path metadata is unavailable.")
+          if files.get("pageInfo", {}).get("hasNextPage") is True:
+              stop("Blocked: PR has more than 100 changed paths; pagination is fail-closed.")
+
+          nodes = files.get("nodes")
+          if not isinstance(nodes, list) or not nodes:
+              stop("Blocked: PR has no verifiable changed paths.")
+
+          for item in nodes:
+              if not isinstance(item, dict):
+                  stop("Blocked: malformed changed-path metadata.")
+              path = item.get("path")
+              change_type = item.get("changeType")
+              if (
+                  not isinstance(path, str)
+                  or path not in allowed
+                  or change_type != "MODIFIED"
+                  or "\\" in path
+                  or "\x00" in path
+                  or path.startswith("/")
+                  or any(part in ("", ".", "..") for part in path.split("/"))
+              ):
+                  stop("Blocked: at least one changed path is unknown, unapproved, added, deleted, or renamed.")
+
+          print(
+              "Preflight passed: all "
+              + str(len(nodes))
+              + " changed path names are exact allowlist matches. "
+              + "No diff, patch, file content, or repository snapshot was requested."
+          )
+          PY
+
+      - name: Robin (pinned, diff-only, advisory)
+        if: success()
+        uses: antongulin/robin@808e18045c93f80f917a41be8fa3f80fa03d70a0
+        with:
+          github-token: ${{ github.token }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          model: ${{ secrets.LLM_MODEL }}
+          agent-mode: "off"
+          request-changes: "false"
+          fail-on-high: "false"
+          review-on-synchronize: "false"
+          max-diff-size: "100000"
+          review-instructions-file: ".github/code-reviewer.md"
