@@ -19,7 +19,8 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.repo.full_name == github.repository
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -174,6 +175,7 @@ jobs:
               or not isinstance(head_sha, str)
               or not SHA_RE.fullmatch(head_sha)
               or pr.get("draft") is not False
+              or base.get("ref") != "main"
               or (base.get("repo") or {}).get("full_name") != repository
               or (head.get("repo") or {}).get("full_name") != repository
               or (base.get("repo") or {}).get("id") != (head.get("repo") or {}).get("id")
@@ -403,7 +405,7 @@ jobs:
           rendered.extend([
               "",
               "---",
-              "Advisory only. No tests, scripts, or workflows were executed by this reviewer. "
+              "Advisory only. No PR code, tests, scripts, or workflows were executed. "
               "The review is anchored to the exact head SHA above; a later commit requires a new review.",
           ])
           review_body = "\n".join(rendered)
@@ -416,6 +418,7 @@ jobs:
               current.get("state") != "open"
               or current.get("draft") is not False
               or (current.get("base") or {}).get("sha") != base_sha
+              or (current.get("base") or {}).get("ref") != "main"
               or (current.get("head") or {}).get("sha") != head_sha
               or (current.get("base", {}).get("repo") or {}).get("full_name") != repository
               or (current.get("head", {}).get("repo") or {}).get("full_name") != repository
