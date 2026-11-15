@@ -51,7 +51,7 @@ jobs:
           MAX_DIFF_CHARS = 100000
           MAX_FINDINGS = 10
           SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-          HUNK_RE = re.compile(r"^@@ -[0-9]+(?:,[0-9]+)? \\+([0-9]+)(?:,([0-9]+))? @@")
+          HUNK_RE = re.compile(r"^@@ -[0-9]+(?:,[0-9]+)? \+([0-9]+)(?:,([0-9]+))? @@")
 
           def stop(message):
               print("::error::" + message)
@@ -132,11 +132,12 @@ jobs:
           def safe_text(value, limit):
               if not isinstance(value, str) or not value.strip():
                   stop("The model returned a missing or invalid text field.")
-              value = "".join(ch for ch in value if ch.isprintable() or ch in "\\t")
+              value = "".join(ch for ch in value if ch.isprintable())
               value = " ".join(value.split())
               value = html.escape(value, quote=False)
-              value = re.sub(r"[\x60*_~\\[\\]()!#>|]", "", value)
-              value = value.replace("@", "@\\u200b")
+              for char in "`*_~[]()!#>|":
+                  value = value.replace(char, "")
+              value = value.replace("@", "＠")
               if not value:
                   stop("The model returned an empty text field after sanitization.")
               return value[:limit]
@@ -262,8 +263,8 @@ jobs:
 
           diff_parts = []
           for path in sorted(patches):
-              diff_parts.append("FILE: " + path + "\\nSTATUS: modified\\n" + patches[path])
-          diff_text = "\\n\\n".join(diff_parts)
+              diff_parts.append("FILE: " + path + "\nSTATUS: modified\n" + patches[path])
+          diff_text = "\n\n".join(diff_parts)
           if not diff_text or len(diff_text) > MAX_DIFF_CHARS:
               stop("The immutable diff is empty or exceeds the review limit.")
 
@@ -392,7 +393,7 @@ jobs:
               "Advisory only. No tests, scripts, or workflows were executed by this reviewer. "
               "The review is anchored to the exact head SHA above; a later commit requires a new review.",
           ])
-          review_body = "\\n".join(rendered)
+          review_body = "\n".join(rendered)
           if len(review_body) > 20000:
               stop("The sanitized review body exceeds the fixed size limit.")
 
