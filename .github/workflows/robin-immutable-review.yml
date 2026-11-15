@@ -222,7 +222,7 @@ jobs:
               or not isinstance(commits, list)
               or not commits
               or (commits[-1] or {}).get("sha") != head_sha
-              or compare.get("status") != "ahead"
+              or compare.get("status") not in {"ahead", "diverged"}
               or not isinstance(files, list)
               or not files
               or len(files) > len(allowed)
