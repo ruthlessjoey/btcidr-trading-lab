@@ -338,84 +338,90 @@ jobs:
               seen_paths.add(path)
               changed_paths.append(path)
 
-          # Fetch path-specific TreeEntry metadata only for approved paths at immutable commits.
-          # Reject symlinks and non-regular entries before requesting any blob text.
-          declarations = ["$owner: String!", "$name: String!"]
-          metadata_variables = {"owner": owner, "name": repo}
-          metadata_fields = []
-          for index, path in enumerate(sorted(changed_paths)):
+          # Query only the 25 exact allowlisted TreeEntry paths; do not enumerate any directory.
+          # Read mode/size/type/OID metadata first and reject symlinks before requesting blob text.
+          tree_declarations = ["$owner: String!", "$name: String!"]
+          tree_variables = {"owner": owner, "name": repo}
+          tree_fields = []
+          for index, path in enumerate(sorted(allowed)):
               path_variable = "path" + str(index)
-              declarations.append("$" + path_variable + ": String!")
-              metadata_variables[path_variable] = path
+              tree_declarations.append("$" + path_variable + ": String!")
+              tree_variables[path_variable] = path
               for side, sha in (("base", base_sha), ("head", head_sha)):
                   sha_variable = side + "Sha" + str(index)
-                  declarations.append("$" + sha_variable + ": String!")
-                  metadata_variables[sha_variable] = sha
-                  metadata_fields.append(
+                  tree_declarations.append("$" + sha_variable + ": String!")
+                  tree_variables[sha_variable] = sha
+                  tree_fields.append(
                       side + str(index) + ": object(expression: $" + sha_variable + ") { "
-                      + "... on Commit { file(path: $" + path_variable + ") { mode "
-                      + "object { __typename ... on Blob { oid byteSize isBinary isTruncated } } } } }"
+                      + "... on Commit { file(path: $" + path_variable + ") { mode size type oid } } }"
                   )
-          metadata_blob_query = (
-              "query(" + ", ".join(declarations) + ") { "
+          tree_query = (
+              "query(" + ", ".join(tree_declarations) + ") { "
               + "repository(owner: $owner, name: $name) { "
-              + " ".join(metadata_fields) + " } }"
+              + " ".join(tree_fields) + " } }"
           )
-          blob_metadata_result = github_graphql(metadata_blob_query, metadata_variables)
-          blob_metadata_repository = blob_metadata_result.get("repository") or {}
-          if not isinstance(blob_metadata_repository, dict):
+          tree_result = github_graphql(tree_query, tree_variables)
+          tree_repository = tree_result.get("repository") or {}
+          if not isinstance(tree_repository, dict):
               stop("Path-specific Git tree metadata is malformed.")
 
           regular_file_modes = {int("100644", 8), int("100755", 8)}
-          blob_metadata = {}
-          total_blob_bytes = 0
-          for index, path in enumerate(sorted(changed_paths)):
+          tree_metadata = {}
+          tree_changed_paths = set()
+          for index, path in enumerate(sorted(allowed)):
               for side in ("base", "head"):
                   alias = side + str(index)
-                  commit_object = blob_metadata_repository.get(alias)
+                  commit_object = tree_repository.get(alias)
                   if not isinstance(commit_object, dict) or commit_object.get("__typename") != "Commit":
                       stop("An immutable commit object could not be resolved.")
                   entry = commit_object.get("file")
                   if not isinstance(entry, dict):
-                      stop("An approved path is missing from an immutable commit tree.")
+                      stop("An allowlisted path is missing from an immutable commit tree.")
                   mode = entry.get("mode")
-                  blob = entry.get("object")
+                  size = entry.get("size")
+                  oid = entry.get("oid")
                   if (
                       type(mode) is not int
                       or mode not in regular_file_modes
-                      or not isinstance(blob, dict)
-                      or blob.get("__typename") != "Blob"
-                      or not isinstance(blob.get("oid"), str)
-                      or not SHA_RE.fullmatch(blob.get("oid", ""))
-                      or type(blob.get("byteSize")) is not int
-                      or blob.get("byteSize") < 0
-                      or blob.get("byteSize") > 250000
-                      or blob.get("isBinary") is not False
-                      or blob.get("isTruncated") is not False
+                      or entry.get("type") != "blob"
+                      or type(size) is not int
+                      or size < 0
+                      or not isinstance(oid, str)
+                      or not SHA_RE.fullmatch(oid)
                   ):
-                      stop("An approved path is a symlink, submodule, binary, truncated, oversized, or non-regular entry.")
-                  total_blob_bytes += blob["byteSize"]
-                  if total_blob_bytes > 1000000:
-                      stop("The approved-path blob set exceeds the fixed 1 MB limit.")
-                  blob_metadata[alias] = {
-                      "oid": blob["oid"],
-                      "byteSize": blob["byteSize"],
-                      "mode": mode,
-                  }
-              if blob_metadata["base" + str(index)]["mode"] != blob_metadata["head" + str(index)]["mode"]:
+                      stop("An allowlisted path is a symlink, submodule, binary tree entry, or non-regular file.")
+                  tree_metadata[alias] = {"oid": oid, "size": size, "mode": mode}
+              base_entry = tree_metadata["base" + str(index)]
+              head_entry = tree_metadata["head" + str(index)]
+              if base_entry["mode"] != head_entry["mode"]:
                   stop("A file mode change is not eligible for automatic review.")
+              if base_entry["oid"] != head_entry["oid"]:
+                  tree_changed_paths.add(path)
 
-          # Fetch text by verified blob OID only after every approved path has passed mode and size checks.
+          if tree_changed_paths != set(changed_paths) or not tree_changed_paths:
+              stop("The PR path metadata does not exactly match the immutable allowlisted tree changes.")
+
+          # Fetch text only for changed approved regular-file blobs, addressed by verified immutable OID.
           content_declarations = ["$owner: String!", "$name: String!"]
           content_variables = {"owner": owner, "name": repo}
           content_fields = []
-          for alias, metadata in sorted(blob_metadata.items()):
-              variable = alias + "Oid"
-              content_declarations.append("$" + variable + ": GitObjectID!")
-              content_variables[variable] = metadata["oid"]
-              content_fields.append(
-                  alias + ": object(oid: $" + variable + ") { __typename ... on Blob { text } }"
-              )
+          total_blob_bytes = 0
+          for index, path in enumerate(sorted(changed_paths)):
+              for side in ("base", "head"):
+                  alias = side + str(index)
+                  metadata = tree_metadata[alias]
+                  if metadata["size"] > 250000:
+                      stop("An approved changed blob exceeds the fixed 250 KB per-blob limit.")
+                  total_blob_bytes += metadata["size"]
+                  variable = alias + "Oid"
+                  content_declarations.append("$" + variable + ": GitObjectID!")
+                  content_variables[variable] = metadata["oid"]
+                  content_fields.append(
+                      alias + ": object(oid: $" + variable + ") { "
+                      + "__typename ... on Blob { byteSize isBinary isTruncated text } }"
+                  )
+          if total_blob_bytes > 1000000:
+              stop("The approved changed blobs exceed the fixed 1 MB total limit.")
           content_query = (
               "query(" + ", ".join(content_declarations) + ") { "
               + "repository(owner: $owner, name: $name) { "
@@ -428,15 +434,19 @@ jobs:
 
           def checked_blob_text(alias):
               blob = content_repository.get(alias)
-              metadata = blob_metadata[alias]
+              metadata = tree_metadata[alias]
               if (
                   not isinstance(blob, dict)
                   or blob.get("__typename") != "Blob"
+                  or type(blob.get("byteSize")) is not int
+                  or blob.get("byteSize") != metadata["size"]
+                  or blob.get("isBinary") is not False
+                  or blob.get("isTruncated") is not False
                   or not isinstance(blob.get("text"), str)
               ):
-                  stop("A verified approved-path blob has no complete UTF-8 text.")
+                  stop("A verified approved-path blob is missing, binary, truncated, or size-inconsistent.")
               text_value = blob["text"]
-              if len(text_value.encode("utf-8")) != metadata["byteSize"] or "\x00" in text_value:
+              if len(text_value.encode("utf-8")) != metadata["size"] or "\\x00" in text_value:
                   stop("An approved-path blob failed its byte-size or text-integrity check.")
               return text_value
 
