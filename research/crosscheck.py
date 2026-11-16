@@ -44,7 +44,7 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
         for r in rows:
             try:      # [time, low, high, open, close, volume]
                 out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
-            except (TypeError, ValueError, IndexError):
+            except (TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError("Coinbase daily-candle row has an unexpected format")
         cur = end
     return out
@@ -58,7 +58,7 @@ def fetch_bitstamp_window(http, first_ts, days):
         return {int(r["timestamp"]): Candle(int(r["timestamp"]), float(r["open"]), float(r["high"]),
                                             float(r["low"]), float(r["close"]), float(r["volume"]))
                 for r in rows}
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, IndexError, OverflowError):
         raise ApiError("Bitstamp candle response has an unexpected format")
 
 
