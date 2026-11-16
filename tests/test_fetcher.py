@@ -63,6 +63,15 @@ class ParseTests(unittest.TestCase):
             fetcher.parse_klines({"code": -1121, "msg": "Invalid symbol."})
         self.assertNotIn("Invalid symbol", str(ctx.exception))
 
+    def test_provider_marker_is_not_in_exchange_or_row_errors(self):
+        marker = "UNTRUSTED_PROVIDER_MARKER"
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.unwrap({"code": -1, "msg": marker})
+        self.assertNotIn(marker, str(ctx.exception))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.parse_klines([[MS, marker, "2", "1", "1", "1"]])
+        self.assertNotIn(marker, str(ctx.exception))
+
     def test_not_a_list_is_an_error(self):
         with self.assertRaises(fetcher.ApiError):
             fetcher.parse_klines({"something": "else"})
@@ -146,6 +155,17 @@ class HttpTests(unittest.TestCase):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertIn("failed after 3 attempts", str(ctx.exception))
         self.assertEqual(len(op.calls), 3)
+
+    def test_provider_text_in_transport_exceptions_is_not_exposed(self):
+        marker = "UNTRUSTED_PROVIDER_MARKER"
+        op = scripted(urllib.error.URLError(marker))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/" + marker, 5, 1, op, NO_SLEEP)
+        self.assertNotIn(marker, str(ctx.exception))
+        op = scripted(RuntimeError(marker))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+        self.assertNotIn(marker, str(ctx.exception))
 
     def test_timeout_is_handled(self):
         op = scripted(TimeoutError("slow"))
