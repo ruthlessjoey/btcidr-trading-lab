@@ -15,6 +15,13 @@ import fetcher
 from fetcher import ApiError, Candle, TF_SECONDS
 
 
+def _safe_status_label(status):
+    """Keep only exact integer HTTP statuses in the reportable provider log."""
+    if isinstance(status, bool) or not isinstance(status, int) or not 100 <= status <= 599:
+        return "invalid HTTP status"
+    return f"HTTP {status}"
+
+
 class Http:
     """One GET helper per provider run. Counts requests and records the real HTTP status
     (or network error) of each one, so reports can show evidence."""
@@ -32,12 +39,12 @@ class Http:
         try:
             status, body = self._opener(url, timeout)
         except urllib.error.HTTPError as e:
-            self._record(url, f"HTTP {e.code}")
+            self._record(url, _safe_status_label(e.code))
             raise
         except Exception as e:
             self._record(url, f"network error: {type(e).__name__}")
             raise
-        self._record(url, f"HTTP {status}")
+        self._record(url, _safe_status_label(status))
         return status, body
 
     def get(self, url):
