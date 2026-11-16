@@ -46,8 +46,8 @@ jobs:
       - name: Run the immutable PR #56 specialist review
         if: inputs.mode == 'review'
         env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          LLM_API_KEY: \${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: \${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: \${{ secrets.LLM_MODEL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: python runner/tools/specialist_army_review.py --mode review
