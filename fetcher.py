@@ -75,8 +75,6 @@ def default_opener(url, timeout):
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET JSON without allowing provider-controlled text into errors or logs."""
-def http_get_json(url, timeout, retries, opener, sleep):
     """GET JSON. Error messages contain status/categories, never raw URLs or bodies."""
     last = "no attempt was made"
     for attempt in range(1, retries + 1):
