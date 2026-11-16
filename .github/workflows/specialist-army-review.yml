@@ -32,7 +32,7 @@ jobs:
       - name: Check out the immutable trusted runner
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: f4d4f3d75023db4f50593e006a7dc0d5a7fa0fe6
+          ref: 3db9749c801106e1d9e05b137452bd9b5df5510d
           path: runner
           persist-credentials: false
 
