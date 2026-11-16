@@ -115,7 +115,7 @@ class HttpTests(unittest.TestCase):
         op = scripted((429, b""), (200, b'[1]'))
         self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
 
-    def test_403_is_not_retried_and_shows_the_body(self):
+    def test_403_is_not_retried_and_body_is_not_exposed(self):
         op = scripted((403, b"<html>Access denied by firewall</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
