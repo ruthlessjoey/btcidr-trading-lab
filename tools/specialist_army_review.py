@@ -7,6 +7,8 @@ import json
 import os
 import re
 import sys
+import time
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -172,22 +174,20 @@ def load_role(name: str) -> tuple[str, str]:
         raise RuntimeError("Trusted role instructions exceeded size limit")
     return agent_text, skill_text
 
+EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
+EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
+
 def model_config():
     key = os.environ.get("LLM_API_KEY", "")
-    base = os.environ.get("LLM_BASE_URL", "")
+    base = os.environ.get("LLM_BASE_URL", "").rstrip("/")
     model = os.environ.get("LLM_MODEL", "")
-    u = urllib.parse.urlsplit(base)
     if len(key) < 20:
         raise RuntimeError("Model credential unavailable")
-    if (u.scheme != "https" or u.hostname != "openrouter.ai"
-        or u.port not in (None, 443) or u.username or u.password
-        or u.query or u.fragment or u.path.rstrip("/") != "/api/v1"):
-        raise RuntimeError("Only the approved OpenRouter HTTPS API base is permitted")
-    if not re.fullmatch(r"[A-Za-z0-9._/-]+:free", model):
-        raise RuntimeError("Configured model is not explicitly marked free")
-    return key, "https://openrouter.ai/api/v1/chat/completions", model
+    if base != EXPECTED_BASE_URL or model != EXPECTED_MODEL:
+        raise RuntimeError("Configured model settings do not match Robin's approved OpenRouter endpoint/model")
+    return key, EXPECTED_BASE_URL + "/chat/completions", EXPECTED_MODEL
 
-def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str) -> str:
+def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, label: str) -> str:
     body = json.dumps({
         "model":model, "temperature":0.1, "max_tokens":1800,
         "messages":[{"role":"system","content":system},
@@ -195,27 +195,73 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str) -
     }).encode("utf-8")
     req = urllib.request.Request(endpoint, data=body, headers={
         "Authorization":"Bearer " + key, "Content-Type":"application/json",
-        "Accept":"application/json", "User-Agent":"ai-trading-lab-specialist-review"},
+        "Accept":"application/json", "User-Agent":"ai-trading-lab-specialist-review",
+        "HTTP-Referer":"https://github.com/" + REPO,
+        "X-Title":"BTC IDR AI Trading Lab specialist review"},
         method="POST")
+    started = time.monotonic()
+    print("MODEL_REQUEST_START role=" + label, flush=True)
     try:
         with make_opener().open(req, timeout=90) as response:
             raw = response.read(MAX_RESPONSE + 1)
-            if response.status != 200 or len(raw) > MAX_RESPONSE:
-                raise RuntimeError("Model response rejected by status/size limit")
+            if response.status != 200:
+                raise RuntimeError("Model response rejected with HTTP " + str(response.status))
+            if len(raw) > MAX_RESPONSE:
+                raise RuntimeError("Model response exceeded the configured size limit")
     except urllib.error.HTTPError as exc:
-        raise RuntimeError("Model request failed with HTTP " + str(exc.code)) from None
+        code = exc.code
+        if code == 429:
+            reason = "OpenRouter rate limit (HTTP 429); no retry attempted"
+        elif code in (401, 403):
+            reason = "OpenRouter authentication/authorization rejection (HTTP " + str(code) + ")"
+        elif code == 402:
+            reason = "OpenRouter account or model-credit restriction (HTTP 402)"
+        elif code == 404:
+            reason = "OpenRouter endpoint/model not found (HTTP 404)"
+        elif code >= 500:
+            reason = "OpenRouter upstream/server failure (HTTP " + str(code) + ")"
+        else:
+            reason = "OpenRouter rejected the request (HTTP " + str(code) + ")"
+        print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
+              str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
+        raise RuntimeError(reason) from None
+    except (TimeoutError, socket.timeout):
+        reason = "OpenRouter request timed out after 90 seconds; no retry attempted"
+        print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
+              str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
+        raise RuntimeError(reason) from None
+    except urllib.error.URLError as exc:
+        timed_out = isinstance(exc.reason, (TimeoutError, socket.timeout))
+        reason = ("OpenRouter request timed out after 90 seconds; no retry attempted"
+                  if timed_out else "OpenRouter network/TLS connection failed; no retry attempted")
+        print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
+              str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
+        raise RuntimeError(reason) from None
+    except RuntimeError as exc:
+        reason = redact(str(exc), 240)
+        print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
+              str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
+        raise
+    except Exception as exc:
+        reason = "Unexpected model transport failure (" + type(exc).__name__ + "); no retry attempted"
+        print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
+              str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
+        raise RuntimeError(reason) from None
+    try:
+        result = json.loads(raw.decode("utf-8"))
+        if result.get("model") != model:
+            raise RuntimeError("OpenRouter did not confirm the exact approved model ID")
+        text = result["choices"][0]["message"]["content"]
     except RuntimeError:
         raise
     except Exception:
-        raise RuntimeError("Model request failed; no automatic retry attempted") from None
-    try:
-        text = json.loads(raw.decode("utf-8"))["choices"][0]["message"]["content"]
-    except Exception:
-        raise RuntimeError("Model response was malformed") from None
+        raise RuntimeError("OpenRouter response was malformed or missing model content") from None
     if not isinstance(text, str) or not text.strip() or len(text) > MAX_OUTPUT:
         raise RuntimeError("Model output empty or outside size limit")
-    if not re.search(r"\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\b", text):
+    if not re.search(r"\\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\b", text):
         raise RuntimeError("Model output omitted a recognized verdict")
+    print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
+          str(round(time.monotonic()-started, 1)), flush=True)
     return redact(text, MAX_OUTPUT)
 
 def write_summary(text: str):
@@ -249,10 +295,13 @@ def review():
     gh = os.environ.get("GITHUB_TOKEN", "")
     if len(gh) < 20:
         raise RuntimeError("Read-only GitHub token unavailable")
+    print("STAGE comparison_and_snapshot_start", flush=True)
     added_paths = validate_comparison(gh)
     base_snapshot = fetch_snapshot(gh, BASE_SHA, added_paths)
     head_snapshot = fetch_snapshot(gh, HEAD_SHA, set())
+    print("STAGE comparison_and_snapshot_complete", flush=True)
     key, endpoint, model = model_config()
+    print("STAGE approved_model_configuration_verified", flush=True)
     common = {"repository":REPO, "base_sha":BASE_SHA, "head_sha":HEAD_SHA,
               "scope":list(REVIEW_PATHS), "base_files":base_snapshot,
               "head_files":head_snapshot,
@@ -267,7 +316,7 @@ def review():
         reports[name] = ask_model(
             RULES + "\nUse the following role definition and skill as domain guidance.\n",
             {"agent":name,"agent_definition":agent,"preloaded_skill":skill,**common},
-            key,endpoint,model)
+            key,endpoint,model,name)
 
     agent, skill = load_role(COMMANDER)
     commander = ask_model(
@@ -275,7 +324,7 @@ def review():
         {"agent":COMMANDER,"agent_definition":agent,"preloaded_skill":skill,
          "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
          "scope":list(REVIEW_PATHS),"specialist_reports":reports},
-        key,endpoint,model)
+        key,endpoint,model,COMMANDER)
 
     agent, skill = load_role(ACCEPTANCE)
     acceptance = ask_model(
@@ -284,7 +333,7 @@ def review():
          "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
          "scope":list(REVIEW_PATHS),"specialist_reports":reports,
          "commander_report":commander},
-        key,endpoint,model)
+        key,endpoint,model,ACCEPTANCE)
 
     agent, skill = load_role(VERIFICATION)
     verification = ask_model(
@@ -293,7 +342,7 @@ def review():
          "base_sha":BASE_SHA,"head_sha":HEAD_SHA,"scope":list(REVIEW_PATHS),
          "specialist_reports":reports,"commander_report":commander,
          "independent_acceptance_report":acceptance},
-        key,endpoint,model)
+        key,endpoint,model,VERIFICATION)
 
     parts = [
         "# AI Trading Lab — Specialist Army Review",
@@ -326,9 +375,12 @@ def main():
     try:
         synthetic() if mode == "synthetic" else review()
     except Exception as exc:
-        write_summary("# Specialist Army Runner — BLOCKED\n\n**BLOCKED:** " +
-                      redact(str(exc), 300) +
-                      "\n\nNo retry was attempted. Fix the blocker before another manual run.")
+        reason = redact(str(exc), 300)
+        print("SPECIALIST_ARMY_BLOCKED exception_type=" + type(exc).__name__ +
+              " reason=" + reason, flush=True)
+        write_summary("# Specialist Army Runner — BLOCKED\\n\\n**BLOCKED:** " +
+                      reason +
+                      "\\n\\nNo retry was attempted. Fix the blocker before another manual run.")
         return 1
     return 0
 
