@@ -135,6 +135,12 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaises(ApiError):
             providers.Coinbase().candles("1h", NOW - 7200, NOW, self.http(op))
 
+    def test_coinbase_rejects_numeric_overflow_in_candle(self):
+        huge = 10 ** 400
+        op = lambda url, t: (200, json.dumps([[NOW - 3600, "1", "2", huge, "1", "1"]]).encode())  # noqa: E731
+        with self.assertRaises(ApiError):
+            providers.Coinbase().candles("1h", NOW - 7200, NOW, self.http(op))
+
     def test_http_log_records_real_status(self):
         h = self.http(fake(NOW, blocked={"api.kraken.com"}))
         with self.assertRaises(ApiError):
