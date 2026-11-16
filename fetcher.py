@@ -86,15 +86,17 @@ def http_get_json(url, timeout, retries, opener, sleep):
             status = e.code
             try:
                 e.close()
-            except OSError:
+            except Exception:
                 pass
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             last = f"network error ({type(e).__name__})"
+        except Exception as e:
+            raise ApiError(f"unexpected transport failure ({type(e).__name__})") from None
         if status is not None:
             if status == 200:
                 try:
                     return json.loads(body.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError):
+                except (ValueError, UnicodeDecodeError, RecursionError):
                     raise ApiError("HTTP 200 response was not valid JSON")
             last = f"HTTP {status}"
             if status != 429 and status < 500:
@@ -137,7 +139,7 @@ def extract_server_time(obj):
                 break
     try:
         return to_seconds(obj)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ApiError("unexpected server-time response format")
 
 
@@ -153,7 +155,7 @@ def parse_klines(raw):
                 raise ValueError("expected a list of at least 6 values")
             out.append(Candle(to_seconds(row[0]), float(row[1]), float(row[2]),
                               float(row[3]), float(row[4]), float(row[5])))
-        except (TypeError, ValueError) as e:
+        except (TypeError, ValueError, OverflowError):
             raise ApiError(f"candle row {i} has an unexpected format")
     return out
 
