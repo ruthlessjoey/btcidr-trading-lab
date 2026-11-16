@@ -14,10 +14,10 @@ Open the repository with a Claude Code-compatible client that supports repositor
 | Security | `security-review` | Threat model, trust boundaries, sanitization |
 | Architecture | `architecture-guardrails` | Component boundaries and ownership |
 | Market data | `provider-integration` | Provider contracts, timestamps, candle integrity |
-| Quant research | `quant-research-review` | Bias, backtests, statistical validity |
-| Risk | `risk-invariants` | Fail-closed risk and accounting invariants |
+| Quant research | `quant-research-review`, `strategy-validation` | Bias, strategy evidence, backtests, statistical validity |
+| Risk | `risk-invariants`, `portfolio-accounting-review` | Fail-closed risk, ledger and partial-closure invariants |
 | QA | `offline-testing`, `systematic-debugging` | Deterministic regression design and root cause |
-| CI/release | `release-ci-security` | Workflow triggers, permissions, publishing |
+| Execution safety | `execution-boundary-review` | PAPER/LIVE boundary, emergency stop, bypass analysis |\n| CI/release | `release-ci-security`, `dependency-supply-chain` | Workflow triggers, permissions, dependencies, provenance |
 | Documentation | `documentation-consistency` | ADR, progress, sequencing, handoff consistency |
 | Acceptance | `independent-acceptance` | Evidence-based milestone and PR verdicts |
 
@@ -32,7 +32,7 @@ All lanes inherit the repository's `CLAUDE.md` boundaries. No skill grants permi
 5. Offline test design.
 6. CI/release review.
 7. Documentation reconciliation.
-8. Independent acceptance against explicit criteria.
+8. Dependency and supply-chain review.\n9. Independent acceptance against explicit criteria.
 
 ## Evidence ledger
 For every task, record:
