@@ -74,40 +74,36 @@ def default_opener(url, timeout):
         return resp.status, resp.read()
 
 
-def snippet(body, size=200):
-    text = body.decode("utf-8", "replace") if body else ""
-    return " ".join(text.split())[:size]
-
-
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET a URL and decode JSON. Retries network errors, 429 and 5xx."""
+    """GET JSON without allowing provider-controlled text into errors or logs."""
+def http_get_json(url, timeout, retries, opener, sleep):
+    """GET JSON. Error messages contain status/categories, never raw URLs or bodies."""
     last = "no attempt was made"
     for attempt in range(1, retries + 1):
         status = None
         body = b""
         try:
             status, body = opener(url, timeout)
-        except urllib.error.HTTPError as e:      # must come before URLError
+        except urllib.error.HTTPError as e:
             status = e.code
             try:
-                body = e.read()
-            except Exception:
-                body = b""
+                e.close()
+            except OSError:
+                pass
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            last = f"network error: {e}"
+            last = f"network error ({type(e).__name__})"
         if status is not None:
             if status == 200:
                 try:
                     return json.loads(body.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError) as e:
-                    raise ApiError(f"HTTP 200 but the body is not valid JSON ({e}): "
-                                   f"{snippet(body)}")
-            last = f"HTTP {status}" + (f": {snippet(body)}" if body else "")
+                except (ValueError, UnicodeDecodeError):
+                    raise ApiError("HTTP 200 response was not valid JSON")
+            last = f"HTTP {status}"
             if status != 429 and status < 500:
-                raise ApiError(f"{url} -> {last} (not retried)")
+                raise ApiError(f"HTTP {status} (not retried)")
         if attempt < retries:
             sleep(2 ** attempt)
-    raise ApiError(f"{url} failed after {retries} attempts: {last}")
+    raise ApiError(f"request failed after {retries} attempts: {last}")
 
 
 def to_seconds(t):
@@ -124,7 +120,7 @@ def unwrap(obj):
             break
         code = obj.get("code")
         if code not in (None, 0, "0", 200, "200"):
-            raise ApiError(f"exchange error code {code}: {str(obj.get('msg', obj))[:200]}")
+            raise ApiError("exchange returned an error response")
         for key in ("data", "list", "klines", "result"):
             if key in obj:
                 obj = obj[key]
@@ -144,14 +140,14 @@ def extract_server_time(obj):
     try:
         return to_seconds(obj)
     except (TypeError, ValueError):
-        raise ApiError(f"unexpected server-time answer: {str(obj)[:200]}")
+        raise ApiError("unexpected server-time response format")
 
 
 def parse_klines(raw):
     """Rows must look like [openTime, open, high, low, close, volume, ...]."""
     rows = unwrap(raw)
     if not isinstance(rows, list):
-        raise ApiError(f"candle answer is not a list: {str(rows)[:200]}")
+        raise ApiError("candle response is not a list")
     out = []
     for i, row in enumerate(rows):
         try:
@@ -160,7 +156,7 @@ def parse_klines(raw):
             out.append(Candle(to_seconds(row[0]), float(row[1]), float(row[2]),
                               float(row[3]), float(row[4]), float(row[5])))
         except (TypeError, ValueError) as e:
-            raise ApiError(f"candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
+            raise ApiError(f"candle row {i} has an unexpected format")
     return out
 
 
