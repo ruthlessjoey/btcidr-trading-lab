@@ -189,5 +189,45 @@ class SanitizationSinkTests(unittest.TestCase):
             self.assertIn("failed", output.lower())
 
 
+    def test_provider_row_objects_are_wrapped_in_safe_api_errors(self):
+        class FakeHttp:
+            def __init__(self, value):
+                self.value = value
+
+            def get(self, url):
+                return self.value
+
+        malformed_row = {"time": MARKER}
+        cases = (
+            (
+                "Kraken",
+                lambda: providers.Kraken().candles(
+                    "1h", NOW - 7200, NOW,
+                    FakeHttp({"error": [], "result": {"XXBTZUSD": [malformed_row], "last": NOW}}),
+                ),
+                "Kraken candle row 0 has an unexpected format",
+            ),
+            (
+                "Coinbase",
+                lambda: providers.Coinbase().candles(
+                    "1h", NOW - 7200, NOW, FakeHttp([malformed_row])
+                ),
+                "Coinbase candle row 0 has an unexpected format",
+            ),
+            (
+                "Coinbase cross-check",
+                lambda: crosscheck.fetch_coinbase_daily(
+                    FakeHttp([malformed_row]), NOW - 86400, NOW
+                ),
+                "Coinbase daily-candle row has an unexpected format",
+            ),
+        )
+        for label, call, expected in cases:
+            with self.subTest(adapter=label), self.assertRaises(fetcher.ApiError) as ctx:
+                call()
+            self.assertEqual(str(ctx.exception), expected)
+            self.assertNotIn(MARKER, str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
