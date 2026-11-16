@@ -112,7 +112,20 @@ class AdapterTests(unittest.TestCase):
         op = lambda url, t: (200, json.dumps({"error": ["EQuery:Unknown asset pair"]}).encode())  # noqa: E731
         with self.assertRaises(ApiError) as ctx:
             providers.Kraken().candles("1h", NOW - 7200, NOW, self.http(op))
-        self.assertIn("Unknown asset pair", str(ctx.exception))
+        self.assertNotIn("Unknown asset pair", str(ctx.exception))
+
+    def test_kraken_rejects_millisecond_server_time(self):
+        op = lambda url, t: (200, json.dumps({"error": [], "result": {"unixtime": NOW * 1000}}).encode())  # noqa: E731
+        with self.assertRaises(ApiError):
+            providers.Kraken().server_time(self.http(op))
+
+    def test_kraken_rejects_millisecond_candle_time(self):
+        def op(url, timeout):
+            ts = NOW * 1000
+            return 200, json.dumps({"error": [], "result": {"XXBTZUSD": [
+                [ts, "100", "102", "99", "101", "100", "3.5", 10]], "last": ts}}).encode()
+        with self.assertRaises(ApiError):
+            providers.Kraken().candles("1h", NOW - 3600, NOW, self.http(op))
 
     def test_coinbase_non_list_is_an_error(self):
         op = lambda url, t: (200, json.dumps({"message": "NotFound"}).encode())  # noqa: E731
