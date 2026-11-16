@@ -258,7 +258,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError("OpenRouter response was malformed or missing model content") from None
     if not isinstance(text, str) or not text.strip() or len(text) > MAX_OUTPUT:
         raise RuntimeError("Model output empty or outside size limit")
-    if not re.search(r"\\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\b", text):
+    if not re.search(r"\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\b", text):
         raise RuntimeError("Model output omitted a recognized verdict")
     print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
           str(round(time.monotonic()-started, 1)), flush=True)
@@ -378,9 +378,9 @@ def main():
         reason = redact(str(exc), 300)
         print("SPECIALIST_ARMY_BLOCKED exception_type=" + type(exc).__name__ +
               " reason=" + reason, flush=True)
-        write_summary("# Specialist Army Runner — BLOCKED\\n\\n**BLOCKED:** " +
+        write_summary("# Specialist Army Runner — BLOCKED\n\n**BLOCKED:** " +
                       reason +
-                      "\\n\\nNo retry was attempted. Fix the blocker before another manual run.")
+                      "\n\nNo retry was attempted. Fix the blocker before another manual run.")
         return 1
     return 0
 
