@@ -4,12 +4,15 @@ EVERYTHING HERE IS A SYNTHETIC FAKE EXCHANGE used only to test our code paths.
 These prices are not market data, and passing these tests does not show that any
 real exchange works. Only a real run of the workflow can show that.
 """
+import contextlib
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
 import urllib.parse
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -146,6 +149,30 @@ class AdapterTests(unittest.TestCase):
 
 
 class LiveCheckTests(unittest.TestCase):
+    def test_provider_marker_is_absent_from_all_report_sinks(self):
+        marker = "UNTRUSTED_PROVIDER_MARKER_7f3a9c"
+
+        def opener(url, timeout):
+            return 451, marker.encode("utf-8")
+
+        with tempfile.TemporaryDirectory() as out:
+            summary = os.path.join(out, "step-summary.md")
+            stdout = io.StringIO()
+            with mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": summary}):
+                with contextlib.redirect_stdout(stdout):
+                    live_check.run_live_check(dict(CFG, live_providers=["kraken"]),
+                                              out, opener, NO_SLEEP, NOW)
+            with open(os.path.join(out, "providers.json"), encoding="utf-8") as f:
+                json_text = f.read()
+            with open(os.path.join(out, "providers.md"), encoding="utf-8") as f:
+                markdown = f.read()
+            with open(summary, encoding="utf-8") as f:
+                step_summary = f.read()
+
+        self.assertIn("HTTP 451", json_text)
+        for output in (json_text, markdown, stdout.getvalue(), step_summary):
+            self.assertNotIn(marker, output)
+
     def test_all_providers_verified(self):
         code, data, md, files = run(CFG, fake(NOW))
         self.assertEqual(code, 0)
