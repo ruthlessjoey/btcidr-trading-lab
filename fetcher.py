@@ -93,6 +93,8 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except Exception as e:
             raise ApiError(f"unexpected transport failure ({type(e).__name__})") from None
         if status is not None:
+            if isinstance(status, bool) or not isinstance(status, int) or not 100 <= status <= 599:
+                raise ApiError("transport returned an invalid HTTP status")
             if status == 200:
                 try:
                     return json.loads(body.decode("utf-8"))
