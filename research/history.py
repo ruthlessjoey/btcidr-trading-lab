@@ -32,8 +32,9 @@ def fetch_exchange_info(http, cfg):
     q = urllib.parse.urlencode({"symbol": cfg["symbol"]})
     obj = http.get(f"{cfg['host']}/api/v3/exchangeInfo?{q}")
     entries = obj.get("symbols") if isinstance(obj, dict) else None
-    if not isinstance(entries, list) or len(entries) != 1:
-        raise ApiError("exchangeInfo response did not contain exactly one symbol")
+    if (not isinstance(entries, list) or len(entries) != 1
+            or not isinstance(entries[0], dict)):
+        raise ApiError("exchangeInfo response did not contain exactly one symbol object")
     return entries[0]
 
 
@@ -112,15 +113,13 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
         # 1. market identity, from the exchange itself
         entry = fetch_exchange_info(http, cfg)
         result["exchange_info"] = {
-            "symbol": cfg["symbol"] if entry.get("symbol") == cfg["symbol"] else "MISMATCH",
-            "status": "TRADING" if entry.get("status") == "TRADING" else "NOT_VERIFIED",
-            "baseAsset": cfg["base_asset"] if entry.get("baseAsset") == cfg["base_asset"] else "MISMATCH",
-            "quoteAsset": cfg["quote_asset"] if entry.get("quoteAsset") == cfg["quote_asset"] else "MISMATCH",
-            "isSpotTradingAllowed": entry.get("isSpotTradingAllowed") is True
+            "symbol_matches": entry.get("symbol") == cfg["symbol"],
+            "status_is_trading": entry.get("status") == "TRADING",
+            "base_asset_matches": entry.get("baseAsset") == cfg["base_asset"],
+            "quote_asset_matches": entry.get("quoteAsset") == cfg["quote_asset"],
+            "spot_trading_allowed": entry.get("isSpotTradingAllowed") is True
         }
-        ok = (entry.get("symbol") == cfg["symbol"] and entry.get("baseAsset") == cfg["base_asset"]
-              and entry.get("quoteAsset") == cfg["quote_asset"] and entry.get("status") == "TRADING"
-              and entry.get("isSpotTradingAllowed") is True)
+        ok = all(result["exchange_info"].values())
         add("market_identity", PASS if ok else FAIL,
             "exchange market identity matches the configured spot market" if ok else
             "exchange market identity does not match the configured spot market")
