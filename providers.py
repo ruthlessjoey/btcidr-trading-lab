@@ -136,7 +136,7 @@ class Coinbase:
                 try:
                     out.append(Candle(int(row[0]), float(row[3]), float(row[2]), float(row[1]),
                                       float(row[4]), float(row[5])))
-                except (TypeError, ValueError, IndexError) as e:
+                except (TypeError, ValueError, IndexError, OverflowError):
                     raise ApiError(f"Coinbase candle row {i} has an unexpected format")
             cur = chunk_end
         return _dedupe_sorted(out)
