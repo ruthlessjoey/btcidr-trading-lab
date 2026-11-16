@@ -33,7 +33,7 @@ def fetch_exchange_info(http, cfg):
     obj = http.get(f"{cfg['host']}/api/v3/exchangeInfo?{q}")
     entries = obj.get("symbols") if isinstance(obj, dict) else None
     if not isinstance(entries, list) or len(entries) != 1:
-        raise ApiError(f"exchangeInfo did not return exactly one symbol: {str(obj)[:200]}")
+        raise ApiError("exchangeInfo response did not contain exactly one symbol")
     return entries[0]
 
 
@@ -111,16 +111,19 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     try:
         # 1. market identity, from the exchange itself
         entry = fetch_exchange_info(http, cfg)
-        result["exchange_info"] = {k: entry.get(k) for k in
-                                   ("symbol", "status", "baseAsset", "quoteAsset", "isSpotTradingAllowed")}
+        result["exchange_info"] = {
+            "symbol": cfg["symbol"] if entry.get("symbol") == cfg["symbol"] else "MISMATCH",
+            "status": "TRADING" if entry.get("status") == "TRADING" else "NOT_VERIFIED",
+            "baseAsset": cfg["base_asset"] if entry.get("baseAsset") == cfg["base_asset"] else "MISMATCH",
+            "quoteAsset": cfg["quote_asset"] if entry.get("quoteAsset") == cfg["quote_asset"] else "MISMATCH",
+            "isSpotTradingAllowed": entry.get("isSpotTradingAllowed") is True
+        }
         ok = (entry.get("symbol") == cfg["symbol"] and entry.get("baseAsset") == cfg["base_asset"]
               and entry.get("quoteAsset") == cfg["quote_asset"] and entry.get("status") == "TRADING"
               and entry.get("isSpotTradingAllowed") is True)
         add("market_identity", PASS if ok else FAIL,
-            f"exchange says symbol={entry.get('symbol')} base={entry.get('baseAsset')} "
-            f"quote={entry.get('quoteAsset')} status={entry.get('status')} "
-            f"spot={entry.get('isSpotTradingAllowed')}; expected {cfg['symbol']} "
-            f"{cfg['base_asset']}/{cfg['quote_asset']} TRADING spot")
+            "exchange market identity matches the configured spot market" if ok else
+            "exchange market identity does not match the configured spot market")
         if not ok:
             raise ApiError("market identity does not match the configuration")
 
@@ -219,8 +222,8 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
                         f"{cmp_['only_in_old']} only in old, {cmp_['added_in_new']} new" if cmp_
                         else "no new data to compare"))
             except dataset.DatasetError as e:
-                result["previous"] = {"found": True, "error": str(e)}
-                add("previous_version", FAIL, f"earlier version FAILED re-verification: {e}")
+                result["previous"] = {"found": True, "error": "previous dataset failed verification"}
+                add("previous_version", FAIL, "earlier dataset failed re-verification; details withheld")
 
     gate = FAIL if any(c["status"] == FAIL for c in checks) else PASS
     result["gate"] = gate
