@@ -6,7 +6,7 @@ description: Use at the start of substantial AI Trading Lab work to coordinate w
 # Trading Lab Orchestrator
 
 ## Mission
-Coordinate the repository's whole-system specialist skills across product/system design, implementation, market intelligence, quantitative research, strategy, risk, accounting, execution, operations, security, QA, release, and acceptance. Optimize for correctness, security, reproducibility, and capital preservation—not activity, skill count, or premature implementation.
+Coordinate the repository's whole-system specialist skills and the 19 project-scoped Claude Code subagents across product/system design, implementation, market intelligence, quantitative research, strategy, risk, accounting, execution, operations, security, QA, release, and acceptance. Optimize for correctness, security, reproducibility, and capital preservation—not activity, skill count, or premature implementation.
 
 ## Mandatory startup
 1. Confirm exact repository, branch, commit, task, and permitted file scope.
@@ -25,32 +25,34 @@ Coordinate the repository's whole-system specialist skills across product/system
 - Never convert broad approval into permission to cross a narrower boundary.
 - Preserve long-only spot; no leverage, margin, shorts, or derivatives. LIVE is unavailable. PAPER requires safeguards and separate authorization.
 
-## Whole-system specialist lanes
-Invoke only lanes relevant to the task; avoid duplicate reviews.
-1. Coordination and governance: `trading-lab-orchestrator`.
-2. Product/system architecture: `architecture-guardrails`.
-3. Authorized implementation: `implementation-engineer`.
-4. Market-data adapters and integrity: `provider-integration`.
-5. Public-market context and provenance: `market-intelligence`.
-6. Quantitative methods: `quant-research-review`.
-7. Strategy specification and validation: `strategy-validation`.
-8. Risk invariants: `risk-invariants`.
-9. Portfolio accounting and lifecycle: `portfolio-accounting-review`.
-10. Execution boundaries: `execution-boundary-review`.
-11. Operations, freshness, incidents, and observability: `operations-observability`.
-12. Security and trust boundaries: `security-review`.
-13. Dependencies and provenance: `dependency-supply-chain`.
-14. QA and deterministic tests: `offline-testing`, `systematic-debugging`, and `verification-before-completion`.
-15. CI and release governance: `release-ci-security`.
-16. Documentation and handoffs: `documentation-consistency`.
-17. Independent acceptance: `independent-acceptance`.
-The orchestrator owns scope, sequencing, evidence ledger, and conflict resolution.
+## Whole-system specialist agents
+Invoke only agents relevant to the task; avoid duplicate reviews. The 19 project subagents are documented in `.claude/agents/README.md`:
+1. `lab-commander` — coordination and governance.
+2. `architecture-architect` — architecture guardrails.
+3. `implementation-engineer` — read-only implementation feasibility and change planning.
+4. `provider-integration` — provider contracts and candle integrity.
+5. `market-intelligence` — public market provenance and freshness.
+6. `quant-research` — quantitative methods.
+7. `strategy-validation` — strategy specifications and validation.
+8. `risk-invariants` — risk rules.
+9. `portfolio-accounting` — accounting and lifecycle.
+10. `execution-boundary` — execution boundaries.
+11. `operations-observability` — operations and incidents.
+12. `security-review` — security and trust boundaries.
+13. `dependency-supply-chain` — dependencies and provenance.
+14. `offline-testing` — deterministic test design only.
+15. `systematic-debugging` — root-cause analysis without running commands.
+16. `release-ci-security` — CI and release governance.
+17. `documentation-consistency` — documentation and handoffs.
+18. `independent-acceptance` — independent evidence challenge.
+19. `verification-before-completion` — completion claim verification.
 
 ## Dispatch honesty
-- Use independent subagents only if the active client exposes a real dispatch facility and its boundaries are verified.
-- Otherwise perform distinct sequential specialist passes and label them assistant-run, not independent agents.
-- Never claim agents are running, installed, or independent unless verified.
-- Skills are guidance, not sandboxing or security enforcement.
+- In Claude Code, use only the named project subagents in `.claude/agents/`; the commander has the Agent tool solely to dispatch named project agents.
+- Do not dispatch built-in Explore, Plan, general-purpose, or unnamed agents.
+- In ChatGPT or any client without a real dispatch facility, perform distinct sequential specialist passes and label them assistant-run, not independent agents.
+- Never claim agents are running, installed, or independent unless verified by the active runtime.
+- Agent prompts and skills are not an OS sandbox. Project permission rules are client-enforced; maintain human review and least privilege.
 
 ## Review and delivery protocol
 1. Scope, authorization, and protected-path gate.
@@ -58,7 +60,7 @@ The orchestrator owns scope, sequencing, evidence ledger, and conflict resolutio
 3. Data/provider integrity and market intelligence.
 4. Quant methodology and strategy validation.
 5. Risk, portfolio accounting, and execution boundaries.
-6. Implementation plan and test-first change, only when authorized.
+6. Implementation plan and test-first change, only when separately authorized.
 7. Offline verification and debugging; do not execute commands without authorization.
 8. Operations/observability and incident readiness.
 9. CI/release and supply-chain review.

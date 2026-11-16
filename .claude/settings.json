@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(**/P1/**)",
+      "Read(**/signal/**)",
+      "Read(**/markets/risk/**)",
+      "Read(**/validator.py)",
+      "Read(**/report.py)",
+      "Agent(Explore)",
+      "Agent(Plan)",
+      "Agent(claude)"
+    ]
+  }
+}
