@@ -98,9 +98,43 @@ class SanitizationSinkTests(unittest.TestCase):
             with open(summary, encoding="utf-8") as f:
                 step_summary = f.read()
 
-        self.assertIn("MISMATCH", json_text)
+        self.assertIn('"symbol_matches": false', json_text)
         for output in (json_text, markdown, stdout.getvalue(), step_summary):
             self.assertNotIn(MARKER, output)
+
+    def test_non_object_exchange_identity_is_a_safe_error(self):
+        cfg = {
+            "mode": "read_only", "timeframe": "1h", "http_timeout_seconds": 1,
+            "http_retries": 1, "provider": "tokocrypto", "host": "https://example.test",
+            "symbol": "BTCUSDT", "base_asset": "BTC", "quote_asset": "USDT",
+            "fetch_from_utc_date": "2023-11-14",
+            "require_first_candle_on_or_before": "2023-11-14",
+            "min_rows": 1, "page_limit": 10, "max_pages": 2, "max_spike_pct": 10,
+        }
+
+        def opener(url, timeout):
+            if url.endswith("/api/v3/exchangeInfo?symbol=BTCUSDT"):
+                return 200, json.dumps({"symbols": [MARKER]}).encode()
+            return 404, b""
+
+        with tempfile.TemporaryDirectory() as out:
+            summary = os.path.join(out, "step-summary.md")
+            stdout = io.StringIO()
+            with mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": summary}):
+                with contextlib.redirect_stdout(stdout):
+                    history.run_step1(cfg, out_dir=out, opener=opener,
+                                       sleep=lambda _: None, local_now=NOW)
+            with open(os.path.join(out, "dataset_report.json"), encoding="utf-8") as f:
+                json_text = f.read()
+            with open(os.path.join(out, "dataset_report.md"), encoding="utf-8") as f:
+                markdown = f.read()
+            with open(summary, encoding="utf-8") as f:
+                step_summary = f.read()
+
+        self.assertIn("exactly one symbol object", json_text)
+        for output in (json_text, markdown, stdout.getvalue(), step_summary):
+            self.assertNotIn(MARKER, output)
+
 
     def test_previous_dataset_error_marker_is_removed_from_all_history_sinks(self):
         start = int(datetime(2023, 11, 14, tzinfo=timezone.utc).timestamp())
