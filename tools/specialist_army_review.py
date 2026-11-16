@@ -230,6 +230,9 @@ def synthetic():
     assert len(REVIEW_PATHS) == 7 and len(SPECIALISTS) == 16
     assert len(SPECIALISTS) + 3 == 19
     assert set(REVIEW_PATHS).issubset(EXPECTED_CHANGED)
+    for role in SPECIALISTS + (COMMANDER, ACCEPTANCE, VERIFICATION):
+        agent_text, skill_text = load_role(role)
+        assert agent_text and skill_text
     assert not contains_secret("normal code")
     assert contains_secret("sk-or-v1-abcdefghijklmnopqrstuvwxyz123456")
     assert redact("token=sk-or-v1-abcdefghijklmnopqrstuvwxyz123456") == "token=[REDACTED]"
