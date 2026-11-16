@@ -65,17 +65,20 @@ class Kraken:
     @staticmethod
     def _result(obj):
         if not isinstance(obj, dict) or "result" not in obj:
-            raise ApiError(f"unexpected Kraken answer: {str(obj)[:200]}")
+            raise ApiError("unexpected Kraken response format")
         if obj.get("error"):
-            raise ApiError(f"Kraken error: {obj['error']}")
+            raise ApiError("Kraken returned an error response")
         return obj["result"]
 
     def server_time(self, http):
         res = self._result(http.get(self.base + "/0/public/Time"))
         try:
-            return int(res["unixtime"])
+            value = res["unixtime"]
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 100_000_000_000:
+                raise ValueError("Kraken unixtime must be integer Unix seconds")
+            return value
         except (KeyError, TypeError, ValueError):
-            raise ApiError(f"no unixtime in Kraken answer: {str(res)[:200]}")
+            raise ApiError("Kraken server-time response is invalid")
 
     def candles(self, tf, start_s, end_s, http):
         if tf not in self.INTERVALS:
@@ -87,15 +90,18 @@ class Kraken:
         res = self._result(http.get(f"{self.base}/0/public/OHLC?{q}"))
         keys = [k for k in res if k != "last"]
         if len(keys) != 1 or not isinstance(res[keys[0]], list):
-            raise ApiError(f"expected exactly one candle list, got keys {list(res)[:5]}")
+            raise ApiError("Kraken candle response must contain exactly one candle list")
         out = []
         for i, row in enumerate(res[keys[0]]):
             # [time, open, high, low, close, vwap, volume, count]
             try:
-                out.append(Candle(int(row[0]), float(row[1]), float(row[2]), float(row[3]),
+                timestamp = row[0]
+                if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp <= 0 or timestamp > 100_000_000_000:
+                    raise ValueError("Kraken candle time must be integer Unix seconds")
+                out.append(Candle(timestamp, float(row[1]), float(row[2]), float(row[3]),
                                   float(row[4]), float(row[6])))
             except (TypeError, ValueError, IndexError) as e:
-                raise ApiError(f"Kraken candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
+                raise ApiError(f"Kraken candle row {i} has an unexpected format")
         return _dedupe_sorted(out)
 
 
@@ -111,7 +117,7 @@ class Coinbase:
         try:
             return int(float(obj["epoch"]))
         except (KeyError, TypeError, ValueError):
-            raise ApiError(f"no epoch in Coinbase answer: {str(obj)[:200]}")
+            raise ApiError("Coinbase server-time response is invalid")
 
     def candles(self, tf, start_s, end_s, http):
         if tf not in self.GRANULARITY:
@@ -124,15 +130,14 @@ class Coinbase:
             q = urllib.parse.urlencode({"granularity": g, "start": _iso(cur), "end": _iso(chunk_end)})
             rows = http.get(f"{self.base}/products/{self.product}/candles?{q}")
             if not isinstance(rows, list):
-                raise ApiError(f"expected a list of candles, got: {str(rows)[:200]}")
+                raise ApiError("Coinbase candle response is not a list")
             for i, row in enumerate(rows):
                 # [time, low, high, open, close, volume]
                 try:
                     out.append(Candle(int(row[0]), float(row[3]), float(row[2]), float(row[1]),
                                       float(row[4]), float(row[5])))
                 except (TypeError, ValueError, IndexError) as e:
-                    raise ApiError(f"Coinbase candle #{i} has an unexpected format ({e}): "
-                                   f"{str(row)[:200]}")
+                    raise ApiError(f"Coinbase candle row {i} has an unexpected format")
             cur = chunk_end
         return _dedupe_sorted(out)
 
