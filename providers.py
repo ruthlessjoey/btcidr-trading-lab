@@ -74,7 +74,7 @@ class Kraken:
         res = self._result(http.get(self.base + "/0/public/Time"))
         try:
             value = res["unixtime"]
-            if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 100_000_000_000:
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 10_000_000_000:
                 raise ValueError("Kraken unixtime must be integer Unix seconds")
             return value
         except (KeyError, TypeError, ValueError, OverflowError):
@@ -96,7 +96,7 @@ class Kraken:
             # [time, open, high, low, close, vwap, volume, count]
             try:
                 timestamp = row[0]
-                if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp <= 0 or timestamp > 100_000_000_000:
+                if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp <= 0 or timestamp > 10_000_000_000:
                     raise ValueError("Kraken candle time must be integer Unix seconds")
                 out.append(Candle(timestamp, float(row[1]), float(row[2]), float(row[3]),
                                   float(row[4]), float(row[6])))
