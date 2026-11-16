@@ -158,10 +158,15 @@ class AdapterTests(unittest.TestCase):
 class LiveCheckTests(unittest.TestCase):
     def test_invalid_http_status_never_reaches_report_sinks(self):
         marker = "UNTRUSTED_STATUS_MARKER_8b2f"
+        class UntrustedInt(int):
+            def __str__(self):
+                return marker
+
         cases = (
             lambda url, timeout: (marker, b"synthetic"),
             lambda url, timeout: (_ for _ in ()).throw(
                 urllib.error.HTTPError(url, marker, "synthetic", None, None)),
+            lambda url, timeout: (UntrustedInt(451), b"synthetic"),
         )
         for opener in cases:
             with self.subTest(opener=opener), tempfile.TemporaryDirectory() as out:
