@@ -115,6 +115,22 @@ class HttpTests(unittest.TestCase):
         op = scripted((429, b""), (200, b'[1]'))
         self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
 
+    def test_http_500_body_marker_is_not_exposed_after_retries(self):
+        marker = "UNTRUSTED_HTTP_500_BODY_MARKER"
+        op = scripted((500, marker.encode()), (500, marker.encode()))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 2, op, NO_SLEEP)
+        self.assertIn("HTTP 500", str(ctx.exception))
+        self.assertNotIn(marker, str(ctx.exception))
+        self.assertEqual(len(op.calls), 2)
+
+    def test_invalid_http_status_values_are_rejected(self):
+        for status in (True, 99, 600, 200.0):
+            with self.subTest(status=status):
+                op = scripted((status, b"{}"))
+                with self.assertRaises(fetcher.ApiError):
+                    fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+
     def test_403_is_not_retried_and_body_is_not_exposed(self):
         op = scripted((403, b"<html>Access denied by firewall</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
