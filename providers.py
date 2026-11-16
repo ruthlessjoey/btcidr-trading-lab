@@ -17,7 +17,7 @@ from fetcher import ApiError, Candle, TF_SECONDS
 
 def _safe_status_label(status):
     """Keep only exact integer HTTP statuses in the reportable provider log."""
-    if isinstance(status, bool) or not isinstance(status, int) or not 100 <= status <= 599:
+    if type(status) is not int or not 100 <= status <= 599:
         return "invalid HTTP status"
     return f"HTTP {status}"
 
