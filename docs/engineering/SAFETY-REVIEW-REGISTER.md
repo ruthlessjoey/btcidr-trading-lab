@@ -79,6 +79,19 @@ No Tokocrypto login is needed for the public market-data work described here. Ne
 - **Impact:** A future contributor or agent could follow stale milestones or misunderstand the current project state.
 - **Required disposition:** Prepare a reconciled current handoff from authoritative ADR/progress/sequencing records. Do not overwrite the authoritative records or protected material.
 
+
+### SAF-009 — Existing regression tests encode behavior that conflicts with approved hardening decisions
+
+- **Severity:** HIGH
+- **Evidence:** PR #56 head test blobs: `tests/test_fetcher.py` `b2a3865a23f3e05c6b88dda225f65c3b2e0ac014`; `tests/test_live_check.py` `2fcf82389dd465341821b77a38fe7417fceae763`; `tests/test_research_sanitization.py` `23b6acd7d1e31cf4fe10e4368752d497e0e4df17`.
+- **Observed:**
+  - `test_network_errors_exhaust_retries` expects network exceptions to be retried, while approved D6 wording says retry only HTTP 429 and 5xx.
+  - Provider adapter tests expect paginated candles to be deduplicated; current `_dedupe_sorted()` silently keeps one row for each timestamp. D5 requires rejecting duplicates within a response; cross-page duplicate behavior remains a separate owner decision.
+  - Research sanitization tests still exercise Bitstamp, although approved D2 excludes Bitstamp from the correction scope.
+  - The tests do not close the known gap around a response object returning `status=None`.
+- **Impact:** A green test suite could preserve behavior that violates the approved policy. Tests must be reconciled with the decision record before they can serve as acceptance evidence.
+- **Required disposition:** Update the v7 test plan and expected test behavior first. Do not run or modify tests without exact authorization.
+
 ## Mandatory safety gates before any automated operation
 
 1. Exact provider host, method, path, port, redirect, and query allowlist enforced before network access.
