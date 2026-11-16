@@ -61,7 +61,7 @@ class ParseTests(unittest.TestCase):
     def test_exchange_error_code_is_an_error(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.parse_klines({"code": -1121, "msg": "Invalid symbol."})
-        self.assertIn("Invalid symbol", str(ctx.exception))
+        self.assertNotIn("Invalid symbol", str(ctx.exception))
 
     def test_not_a_list_is_an_error(self):
         with self.assertRaises(fetcher.ApiError):
@@ -111,7 +111,7 @@ class HttpTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertIn("403", str(ctx.exception))
-        self.assertIn("Access denied", str(ctx.exception))
+        self.assertNotIn("Access denied", str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
     def test_451_region_block_is_not_retried(self):
@@ -121,11 +121,24 @@ class HttpTests(unittest.TestCase):
         self.assertIn("451", str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
-    def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
+    def test_http_error_exception_is_closed_without_reading_body(self):
+        class TrackedHTTPError(urllib.error.HTTPError):
+            def __init__(self):
+                super().__init__("u", 404, "Not Found", {}, None)
+                self.closed = False
+                self.read_called = False
+            def read(self, *args, **kwargs):
+                self.read_called = True
+                raise AssertionError("HTTP error body must not be read")
+            def close(self):
+                self.closed = True
+        error = TrackedHTTPError()
+        op = scripted(error)
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertEqual(len(op.calls), 1)
+        self.assertTrue(error.closed)
+        self.assertFalse(error.read_called)
 
     def test_network_errors_exhaust_retries(self):
         op = scripted(urllib.error.URLError("boom"))
@@ -143,7 +156,7 @@ class HttpTests(unittest.TestCase):
         op = scripted((200, b"<html>challenge page</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("challenge page", str(ctx.exception))
+        self.assertNotIn("challenge page", str(ctx.exception))
 
 
 if __name__ == "__main__":
