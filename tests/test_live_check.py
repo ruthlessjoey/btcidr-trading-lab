@@ -182,7 +182,7 @@ class LiveCheckTests(unittest.TestCase):
                 self.assertNotIn(marker, markdown)
                 self.assertNotIn(marker, stdout.getvalue())
                 self.assertNotIn(marker, step_summary)
-                self.assertIn("invalid HTTP status", json_text.lower())
+                self.assertIn("invalid http status", json_text.lower())
 
 
     def test_provider_marker_is_absent_from_all_report_sinks(self):
