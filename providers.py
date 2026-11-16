@@ -77,7 +77,7 @@ class Kraken:
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 100_000_000_000:
                 raise ValueError("Kraken unixtime must be integer Unix seconds")
             return value
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             raise ApiError("Kraken server-time response is invalid")
 
     def candles(self, tf, start_s, end_s, http):
@@ -100,7 +100,7 @@ class Kraken:
                     raise ValueError("Kraken candle time must be integer Unix seconds")
                 out.append(Candle(timestamp, float(row[1]), float(row[2]), float(row[3]),
                                   float(row[4]), float(row[6])))
-            except (TypeError, ValueError, IndexError) as e:
+            except (TypeError, ValueError, IndexError, OverflowError):
                 raise ApiError(f"Kraken candle row {i} has an unexpected format")
         return _dedupe_sorted(out)
 
@@ -116,7 +116,7 @@ class Coinbase:
         obj = http.get(self.base + "/time")
         try:
             return int(float(obj["epoch"]))
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             raise ApiError("Coinbase server-time response is invalid")
 
     def candles(self, tf, start_s, end_s, http):
