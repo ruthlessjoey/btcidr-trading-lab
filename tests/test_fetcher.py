@@ -61,7 +61,7 @@ class ParseTests(unittest.TestCase):
     def test_exchange_error_code_is_an_error(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.parse_klines({"code": -1121, "msg": "Invalid symbol."})
-        self.assertNotIn("Invalid symbol", str(ctx.exception))
+        self.assertEqual(str(ctx.exception), "exchange returned an error response")
 
     def test_provider_marker_is_not_in_exchange_or_row_errors(self):
         marker = "UNTRUSTED_PROVIDER_MARKER"
@@ -187,6 +187,13 @@ class HttpTests(unittest.TestCase):
         op = scripted(TimeoutError("slow"))
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 2, op, NO_SLEEP)
+
+    def test_recursion_error_in_json_is_a_safe_error(self):
+        deeply_nested = b"[" * 2000 + b"]" * 2000
+        op = scripted((200, deeply_nested))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+        self.assertEqual(str(ctx.exception), "HTTP 200 response was not valid JSON")
 
     def test_invalid_json_is_an_error(self):
         op = scripted((200, b"<html>challenge page</html>"))
