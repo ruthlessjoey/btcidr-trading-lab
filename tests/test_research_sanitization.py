@@ -21,6 +21,26 @@ NOW = 1_700_003_700
 
 
 class SanitizationSinkTests(unittest.TestCase):
+    def test_coinbase_and_bitstamp_parser_errors_are_sanitized(self):
+        class FakeHttp:
+            def __init__(self, value):
+                self.value = value
+            def get(self, url):
+                return self.value
+
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            crosscheck.fetch_coinbase_daily(FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]),
+                                            NOW - 86400, NOW)
+        self.assertNotIn(MARKER, str(ctx.exception))
+
+        malformed_bitstamp = {"data": {"ohlc": [{
+            "timestamp": MARKER, "open": "1", "high": "2",
+            "low": "1", "close": "1", "volume": "1",
+        }]}}
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            crosscheck.fetch_bitstamp_window(FakeHttp(malformed_bitstamp), NOW - 86400, 1)
+        self.assertNotIn(MARKER, str(ctx.exception))
+
     def test_crosscheck_marker_does_not_reach_json_markdown_or_stdout(self):
         candle = fetcher.Candle(NOW - 86400, 100.0, 101.0, 99.0, 100.0, 1.0)
 
