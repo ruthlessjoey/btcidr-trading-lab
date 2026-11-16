@@ -40,12 +40,12 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
                                     "end": datetime.fromtimestamp(end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
         rows = http.get(f"{COINBASE}/products/BTC-USD/candles?{q}")
         if not isinstance(rows, list):
-            raise ApiError(f"Coinbase did not return a list: {str(rows)[:200]}")
+            raise ApiError("Coinbase daily-candle response is not a list")
         for r in rows:
             try:      # [time, low, high, open, close, volume]
                 out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
             except (TypeError, ValueError, IndexError):
-                raise ApiError(f"unexpected Coinbase candle: {str(r)[:200]}")
+                raise ApiError("Coinbase daily-candle row has an unexpected format")
         cur = end
     return out
 
@@ -59,7 +59,7 @@ def fetch_bitstamp_window(http, first_ts, days):
                                             float(r["low"]), float(r["close"]), float(r["volume"]))
                 for r in rows}
     except (KeyError, TypeError, ValueError):
-        raise ApiError(f"unexpected Bitstamp answer: {str(obj)[:200]}")
+        raise ApiError("Bitstamp candle response has an unexpected format")
 
 
 def pct(a, b):
