@@ -31,3 +31,10 @@ The upstream plugin repository includes executable `index.js`, `hooks/`, and `sc
 - Ask Context7 generic library/documentation questions only. Do not submit repository source or sensitive data.
 - Skills are instructions, not enforcement mechanisms. They do not replace code-level validation, CI, branch protection, or human review.
 - Review and update these files when ADRs, security boundaries, or milestone gates change.
+
+
+## Review army
+
+The repository now includes a coordinated set of 12 skill folders under `.claude/skills/`: the existing architecture, documentation, offline-testing, provider, risk, security, systematic-debugging, and verification skills, plus the trading-lab orchestrator, quantitative research review, release/CI security review, and independent acceptance review.
+
+See [REVIEW-ARMY.md](REVIEW-ARMY.md) for the roster and invocation order. The orchestrator is designed to use genuine subagent dispatch only when the active coding client exposes it; otherwise it requires separate sequential passes and honest disclosure. Skills remain guidance, not technical sandboxing or permission enforcement.
