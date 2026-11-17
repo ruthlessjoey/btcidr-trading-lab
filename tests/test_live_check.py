@@ -1,26 +1,13 @@
-"""Offline tests for the currently authorized provider configuration."""
+"""Offline static and provider-factory checks; do not import protected validator.py."""
+import json
 import os
 import sys
-import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-import live_check  # noqa: E402
 import providers  # noqa: E402
 import fetcher  # noqa: E402
-
-CFG = {
-    "mode": "read_only",
-    "timeframe": "1h",
-    "lookback_days": 2,
-    "max_missing_ratio": 0.02,
-    "max_spike_pct": 10,
-    "http_timeout_seconds": 5,
-    "http_retries": 1,
-    "min_verified": 1,
-    "live_providers": ["tokocrypto"],
-}
 
 
 class ProviderAuthorizationTests(unittest.TestCase):
@@ -32,22 +19,6 @@ class ProviderAuthorizationTests(unittest.TestCase):
             with self.subTest(provider=name), self.assertRaises(ValueError):
                 providers.build(name)
 
-    def test_live_check_rejects_unapproved_provider_lists_before_network(self):
-        def forbidden_network(*args, **kwargs):
-            raise AssertionError("network callback must not be reached")
-        for names in (["kraken"], ["coinbase"], ["binance-vision"], ["tokocrypto", "kraken"], []):
-            cfg = dict(CFG, live_providers=names)
-            with self.subTest(providers=names), self.assertRaises(SystemExit):
-                live_check.run_live_check(cfg, tempfile.gettempdir(), forbidden_network)
-    
-    def test_live_check_rejects_non_read_only_mode_before_network(self):
-        def forbidden_network(*args, **kwargs):
-            raise AssertionError("network callback must not be reached")
-        for mode in ("paper", "live", None):
-            cfg = dict(CFG, mode=mode)
-            with self.subTest(mode=mode), self.assertRaises(SystemExit):
-                live_check.run_live_check(cfg, tempfile.gettempdir(), forbidden_network)
-
     def test_approved_source_urls_pass_central_policy(self):
         p = providers.build("tokocrypto")
         self.assertEqual(fetcher.validate_public_url(p.src.time_url()), p.src.time_url())
@@ -55,9 +26,26 @@ class ProviderAuthorizationTests(unittest.TestCase):
                   "?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003599999&limit=500")
         self.assertEqual(fetcher.validate_public_url(candle), candle)
 
-    def test_no_legacy_provider_is_reported_as_verified(self):
-        self.assertEqual(CFG["live_providers"], ["tokocrypto"])
-        self.assertEqual(CFG["min_verified"], 1)
+    def test_live_check_provider_guard_precedes_filesystem_and_network(self):
+        with open(os.path.join(ROOT, "live_check.py"), encoding="utf-8") as f:
+            source = f.read()
+        provider_guard = 'if cfg.get("live_providers") != ["tokocrypto"]:'
+        self.assertIn(provider_guard, source)
+        self.assertLess(source.index(provider_guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
+        self.assertLess(source.index(provider_guard), source.index('for name in cfg["live_providers"]'))
+
+    def test_live_check_rejects_non_read_only_before_filesystem_and_network(self):
+        with open(os.path.join(ROOT, "live_check.py"), encoding="utf-8") as f:
+            source = f.read()
+        read_only_guard = 'if cfg.get("mode") != "read_only":'
+        self.assertIn(read_only_guard, source)
+        self.assertLess(source.index(read_only_guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
+
+    def test_default_configuration_authorizes_only_tokocrypto(self):
+        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
+            cfg = json.load(f)
+        self.assertEqual(cfg["live_providers"], ["tokocrypto"])
+        self.assertEqual(cfg["min_verified"], 1)
 
 
 if __name__ == "__main__":
