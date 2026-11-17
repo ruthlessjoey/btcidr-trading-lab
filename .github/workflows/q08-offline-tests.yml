@@ -1,0 +1,36 @@
+name: Q0.8 offline security regression tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: q08-offline-security-tests
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6fd4d22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+          cache: false
+
+      - name: Run authorized offline tests only
+        run: |
+          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
+          python3 -m unittest discover -s tests -p 'test_history.py' -v
+          python3 -m unittest discover -s tests -p 'test_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
+          python3 -m unittest discover -s tests -p 'test_engine.py' -v
+          python3 -m unittest discover -s tests -p 'test_backtest_pipeline.py' -v

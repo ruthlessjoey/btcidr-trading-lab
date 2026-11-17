@@ -1,7 +1,7 @@
 {
   "mode": "read_only",
-  "provider": "binance-vision",
-  "host": "https://data-api.binance.vision",
+  "provider": "tokocrypto",
+  "host": "https://www.tokocrypto.site",
   "symbol": "BTCUSDT",
   "base_asset": "BTC",
   "quote_asset": "USDT",

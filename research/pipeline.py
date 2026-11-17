@@ -16,6 +16,9 @@ SEGMENTS = (("train", "TRAIN (in-sample; used to screen candidates)"),
             ("validation", "VALIDATION (used to pick among eligible candidates)"),
             ("test", "TEST (final; evaluated once)"))
 
+# Empty until the owner separately approves at least one independent source.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
 
 def utc_day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -111,6 +114,55 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
             "test_signals_identical_for_original_choice": same_test_signals}
 
 
+def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
+    """Validate dataset-bound evidence against an explicit provider authorization set."""
+    flagged = cfg.get("flagged_dates", [])
+    if not flagged:
+        return None
+    if not authorized_providers:
+        raise EngineError("no independent cross-check provider is currently authorized; flagged-date backtests are blocked")
+    if not crosscheck_path or not os.path.isfile(crosscheck_path):
+        raise EngineError("independent cross-check evidence is required for flagged dates; no artifact was supplied")
+    try:
+        with open(crosscheck_path, encoding="utf-8") as f:
+            evidence = json.load(f)
+    except (OSError, ValueError) as e:
+        raise EngineError(f"independent cross-check artifact is unreadable: {type(e).__name__}")
+    if not isinstance(evidence, dict):
+        raise EngineError("independent cross-check artifact must be a JSON object")
+    if (evidence.get("dataset_version") != manifest.get("version_id") or
+            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+        raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
+    used = evidence.get("providers")
+    if (not isinstance(used, list) or not used or
+            any(not isinstance(p, str) for p in used) or
+            len(used) != len(set(used)) or
+            any(p not in authorized_providers for p in used)):
+        raise EngineError("cross-check artifact does not identify exclusively authorized independent providers")
+    flagged_entries = evidence.get("flagged")
+    if not isinstance(flagged_entries, list):
+        raise EngineError("cross-check artifact flagged entries must be a list")
+    entries = {}
+    for item in flagged_entries:
+        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+            raise EngineError("cross-check artifact contains a malformed flagged entry")
+        if item["date"] in entries:
+            raise EngineError("cross-check artifact contains duplicate flagged dates")
+        entries[item["date"]] = item
+    for date in flagged:
+        item = entries.get(date)
+        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
+            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+            raise EngineError(f"flagged date {date} lacks confirmed independent evidence ({verdict})")
+    return evidence
+
+
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Apply the current owner-approved provider set to the cross-check artifact."""
+    return validate_crosscheck_artifact(cfg, manifest, crosscheck_path,
+                                         AUTHORIZED_CROSSCHECK_PROVIDERS)
+
+
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
                  allow_reeval=False, run_id="local", code_rev=None):
     rules = Rules()
@@ -118,6 +170,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     result = {"status": "FAILED", "error": None, "run_id": run_id}
     try:
         manifest, candles = load_pinned(cfg, datasets_root)
+        cross = load_required_crosscheck(cfg, manifest, crosscheck_path)
         splits = splits_mod.make_splits(len(candles), warmup=cfg.get("warmup", 200))
         for n in selection.CANDIDATES:                      # look-ahead guard on the real series
             strategy.assert_causal(strategy.ma_trend(n), candles)
@@ -148,10 +201,6 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
     if n is not None:
         write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
-    cross = None
-    if crosscheck_path and os.path.exists(crosscheck_path):
-        with open(crosscheck_path, encoding="utf-8") as f:
-            cross = json.load(f)
     sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
     result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
                                                      "end": utc_day(candles[b - 1].time),

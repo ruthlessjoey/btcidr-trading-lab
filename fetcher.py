@@ -3,9 +3,10 @@
 Only public GET addresses are used. There is no login, no key and no code
 that can place, cancel or change an order.
 
-Two "styles" of public endpoint are supported, because Tokocrypto publishes both:
-  binance_style  {base}/api/v3/time and {base}/api/v3/klines     (symbol BTCUSDT)
-  open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
+Only these exact public GET routes are permitted:
+  {base}/api/v3/time
+  {base}/api/v3/klines     (symbol BTCUSDT)
+All other hosts, paths, endpoint styles and redirects are refused.
 """
 import json
 import time
@@ -15,6 +16,9 @@ import urllib.request
 from dataclasses import dataclass
 
 USER_AGENT = "tokocrypto-btcusdt-lab/0.1 (read-only market data)"
+MAX_RESPONSE_BYTES = 1024 * 1024
+APPROVED_HOST = "www.tokocrypto.site"
+APPROVED_PATHS = {"/api/v3/time", "/api/v3/klines"}
 
 # Interval names -> seconds (Binance-style names).
 TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
@@ -26,6 +30,48 @@ CANDLES_PER_REQUEST = 500
 
 class ApiError(Exception):
     """Raised when the exchange gives no usable answer."""
+
+
+class DisallowedRequestError(ApiError):
+    """Raised before network access when a URL is outside the approved public API."""
+
+
+def validate_public_url(url):
+    """Only the approved Tokocrypto HTTPS time and candle GET routes are permitted."""
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
+    except (TypeError, ValueError):
+        raise DisallowedRequestError("request URL is malformed")
+    if (p.scheme != "https" or p.hostname != APPROVED_HOST or
+            p.username is not None or p.password is not None or
+            port not in (None, 443) or p.fragment or p.path not in APPROVED_PATHS):
+        raise DisallowedRequestError("request refused by the public market-data allowlist")
+    try:
+        pairs = urllib.parse.parse_qsl(p.query, keep_blank_values=True, strict_parsing=True) if p.query else []
+    except ValueError:
+        raise DisallowedRequestError("candle request query is malformed")
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise DisallowedRequestError("duplicate query parameters are not allowed")
+    if p.path == "/api/v3/time":
+        if pairs:
+            raise DisallowedRequestError("server-time route does not accept query parameters")
+    else:
+        q = dict(pairs)
+        required = {"symbol", "interval", "startTime", "endTime", "limit"}
+        if set(q) != required:
+            raise DisallowedRequestError("candle request must contain exactly the approved query parameters")
+        if q.get("symbol") != "BTCUSDT" or q.get("interval") not in TF_SECONDS:
+            raise DisallowedRequestError("candle request is outside the approved BTC/USDT market")
+        numeric = ("startTime", "endTime", "limit")
+        if any(not (q[k].isascii() and q[k].isdecimal()) for k in numeric):
+            raise DisallowedRequestError("candle request contains an invalid numeric parameter")
+        start_ms, end_ms, limit = (int(q[k]) for k in numeric)
+        if start_ms > end_ms or not 1 <= limit <= CANDLES_PER_REQUEST:
+            raise DisallowedRequestError("candle request range or limit is outside the approved bounds")
+    return url
+
 
 
 @dataclass(frozen=True)
@@ -45,33 +91,39 @@ class Source:
     base_url: str
 
     def __post_init__(self):
-        if self.style not in ("binance_style", "open_v1"):
-            raise ValueError(f"unknown source style {self.style!r}")
+        if self.style != "binance_style":
+            raise DisallowedRequestError("only the approved Tokocrypto Binance-style API is permitted")
 
     def symbol(self, pair):
-        return pair.replace("_", "") if self.style == "binance_style" else pair
+        return pair.replace("_", "")
 
     def time_url(self):
-        path = "/api/v3/time" if self.style == "binance_style" else "/open/v1/common/time"
-        return self.base_url + path
+        return self.base_url + "/api/v3/time"
 
     def klines_url(self):
-        path = "/api/v3/klines" if self.style == "binance_style" else "/open/v1/market/klines"
-        return self.base_url + path
+        return self.base_url + "/api/v3/klines"
 
     def symbols_url(self, pair):
-        if self.style == "binance_style":
-            return (self.base_url + "/api/v3/exchangeInfo?"
-                    + urllib.parse.urlencode({"symbol": self.symbol(pair)}))
-        return self.base_url + "/open/v1/common/symbols"
+        raise DisallowedRequestError("symbol metadata routes are not approved")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def default_opener(url, timeout):
-    """Do one real HTTPS GET. Returns (status_code, body_bytes)."""
+    """Do one bounded HTTPS GET without following redirects."""
+    validate_public_url(url)
     req = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.status, resp.read()
+    opener = urllib.request.build_opener(_NoRedirect())
+    resp = opener.open(req, timeout=timeout)
+    try:
+        body = resp.read(MAX_RESPONSE_BYTES + 1)
+        return resp.status, body
+    finally:
+        resp.close()
 
 
 def snippet(body, size=200):
@@ -80,7 +132,8 @@ def snippet(body, size=200):
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET a URL and decode JSON. Retries network errors, 429 and 5xx."""
+    """GET only approved URLs; bound every response and refuse redirects."""
+    validate_public_url(url)
     last = "no attempt was made"
     for attempt in range(1, retries + 1):
         status = None
@@ -90,11 +143,15 @@ def http_get_json(url, timeout, retries, opener, sleep):
         except urllib.error.HTTPError as e:      # must come before URLError
             status = e.code
             try:
-                body = e.read()
+                body = e.read(MAX_RESPONSE_BYTES + 1)
             except Exception:
                 body = b""
+            finally:
+                e.close()
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             last = f"network error: {e}"
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise ApiError("response exceeded the 1 MiB public-data limit")
         if status is not None:
             if status == 200:
                 try:
