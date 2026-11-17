@@ -27,16 +27,6 @@ def _day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
-def fetch_exchange_info(http, cfg):
-    """Asks the exchange what this symbol is. Returns the symbol entry."""
-    q = urllib.parse.urlencode({"symbol": cfg["symbol"]})
-    obj = http.get(f"{cfg['host']}/api/v3/exchangeInfo?{q}")
-    entries = obj.get("symbols") if isinstance(obj, dict) else None
-    if not isinstance(entries, list) or len(entries) != 1:
-        raise ApiError(f"exchangeInfo did not return exactly one symbol: {str(obj)[:200]}")
-    return entries[0]
-
-
 def fetch_pages(http, cfg, from_s, now_s):
     """Pages forward through history. Returns (all rows as received, per-page evidence)."""
     tf_sec, limit = TF_SECONDS[cfg["timeframe"]], cfg["page_limit"]
@@ -86,6 +76,10 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
               local_now=None, previous_root=None):
     if cfg.get("mode") != "read_only":
         raise SystemExit("Refusing to run: only mode 'read_only' is supported.")
+    if cfg.get("provider") != "tokocrypto" or cfg.get("host") != "https://www.tokocrypto.site":
+        raise SystemExit("Refusing to run: research host/provider is not the approved Tokocrypto endpoint.")
+    fetcher.validate_public_url(cfg["host"] + "/api/v3/time")
+    fetcher.validate_public_url(cfg["host"] + "/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1")
     if cfg["timeframe"] not in TF_SECONDS:
         raise SystemExit(f"Unknown timeframe {cfg['timeframe']!r}")
     os.makedirs(out_dir, exist_ok=True)
@@ -109,20 +103,10 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     candles = []
 
     try:
-        # 1. market identity, from the exchange itself
-        entry = fetch_exchange_info(http, cfg)
-        result["exchange_info"] = {k: entry.get(k) for k in
-                                   ("symbol", "status", "baseAsset", "quoteAsset", "isSpotTradingAllowed")}
-        ok = (entry.get("symbol") == cfg["symbol"] and entry.get("baseAsset") == cfg["base_asset"]
-              and entry.get("quoteAsset") == cfg["quote_asset"] and entry.get("status") == "TRADING"
-              and entry.get("isSpotTradingAllowed") is True)
-        add("market_identity", PASS if ok else FAIL,
-            f"exchange says symbol={entry.get('symbol')} base={entry.get('baseAsset')} "
-            f"quote={entry.get('quoteAsset')} status={entry.get('status')} "
-            f"spot={entry.get('isSpotTradingAllowed')}; expected {cfg['symbol']} "
-            f"{cfg['base_asset']}/{cfg['quote_asset']} TRADING spot")
-        if not ok:
-            raise ApiError("market identity does not match the configuration")
+        # 1. Market identity is configuration-only: exchangeInfo is not an approved route.
+        result["exchange_info"] = None
+        add("market_identity", WARN,
+            "Configuration declares BTC/USDT on Tokocrypto; exchange symbol metadata was not queried because that route is not approved.")
 
         # 2. exchange clock and paged history
         server_now = fetcher.extract_server_time(http.get(cfg["host"] + "/api/v3/time"))
