@@ -1,7 +1,6 @@
-"""Static offline tests for the Step 1 fail-closed gates.
+"""Static offline tests for the Step 1 fail-closed gate.
 
-These tests deliberately do not import research.history because that module imports the
-protected, not-yet-authorized validator.py dependency.
+These tests deliberately avoid importing protected validator.py or invoking network code.
 """
 import json
 import os
@@ -18,28 +17,28 @@ class HistoryContainmentTests(unittest.TestCase):
         self.assertEqual(cfg["host"], "https://www.tokocrypto.site")
         self.assertEqual(cfg["symbol"], "BTCUSDT")
 
-    def test_market_identity_is_a_hard_fail_before_network_access(self):
+    def test_history_gate_fails_without_symbol_metadata_authorization(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:
             source = f.read()
-        fail_marker = 'add("market_identity", FAIL,'
-        refusal = 'raise ApiError("market identity cannot be independently verified'
-        first_network = 'server_now = fetcher.extract_server_time(http.get('
-        self.assertIn(fail_marker, source)
-        self.assertIn(refusal, source)
-        self.assertLess(source.index(fail_marker), source.index(first_network))
-        self.assertLess(source.index(refusal), source.index(first_network))
+        self.assertIn('"name": "market_identity", "status": "FAIL"', source)
+        self.assertIn('"network_requests": 0', source)
+        self.assertIn('"backtest_allowed": False', source)
+        self.assertIn("Configuration alone is insufficient", source)
 
-    def test_symbol_metadata_route_is_not_requested(self):
+    def test_history_module_has_no_network_or_protected_imports(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:
             source = f.read()
-        self.assertNotIn('"/api/v3/exchangeInfo', source)
+        for forbidden in ("urllib", "providers.Http", "import validator", "import fetcher"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, source)
 
-    def test_unapproved_provider_and_host_are_refused_before_output_or_network(self):
+    def test_only_exact_tokocrypto_scope_is_accepted_as_configuration(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:
             source = f.read()
-        provider_guard = 'if cfg.get("provider") != "tokocrypto"'
-        self.assertIn(provider_guard, source)
-        self.assertLess(source.index(provider_guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
+        for literal in ('provider == "tokocrypto"',
+                        'host == "https://www.tokocrypto.site"',
+                        'symbol == "BTCUSDT"', 'base_asset == "BTC"', 'quote_asset == "USDT"'):
+            self.assertIn(literal, source)
 
 
 if __name__ == "__main__":
