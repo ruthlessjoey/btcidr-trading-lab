@@ -111,6 +111,31 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
             "test_signals_identical_for_original_choice": same_test_signals}
 
 
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Require dataset-bound independent evidence for every predeclared flagged date."""
+    flagged = cfg.get("flagged_dates", [])
+    if not flagged:
+        return None
+    if not crosscheck_path or not os.path.isfile(crosscheck_path):
+        raise EngineError("independent cross-check evidence is required for flagged dates; no artifact was supplied")
+    try:
+        with open(crosscheck_path, encoding="utf-8") as f:
+            evidence = json.load(f)
+    except (OSError, ValueError) as e:
+        raise EngineError(f"independent cross-check artifact is unreadable: {type(e).__name__}")
+    if (evidence.get("dataset_version") != manifest.get("version_id") or
+            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+        raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
+    entries = {item.get("date"): item for item in evidence.get("flagged", [])
+               if isinstance(item, dict)}
+    for date in flagged:
+        item = entries.get(date)
+        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
+            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+            raise EngineError(f"flagged date {date} lacks confirmed independent evidence ({verdict})")
+    return evidence
+
+
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
                  allow_reeval=False, run_id="local", code_rev=None):
     rules = Rules()
@@ -118,6 +143,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     result = {"status": "FAILED", "error": None, "run_id": run_id}
     try:
         manifest, candles = load_pinned(cfg, datasets_root)
+        cross = load_required_crosscheck(cfg, manifest, crosscheck_path)
         splits = splits_mod.make_splits(len(candles), warmup=cfg.get("warmup", 200))
         for n in selection.CANDIDATES:                      # look-ahead guard on the real series
             strategy.assert_causal(strategy.ma_trend(n), candles)
@@ -148,10 +174,6 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
     if n is not None:
         write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
-    cross = None
-    if crosscheck_path and os.path.exists(crosscheck_path):
-        with open(crosscheck_path, encoding="utf-8") as f:
-            cross = json.load(f)
     sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
     result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
                                                      "end": utc_day(candles[b - 1].time),
