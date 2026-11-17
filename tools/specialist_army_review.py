@@ -45,7 +45,7 @@ VERIFICATION = "verification-before-completion"
 MAX_FILE = 48_000
 MAX_TOTAL = 120_000
 MAX_RESPONSE = 512_000
-MAX_OUTPUT = 12_000
+MAX_OUTPUT = 16_000
 
 SECRET_PATTERNS = (
     re.compile(r"\bsk-or-v1-[A-Za-z0-9]{20,}\b"),
