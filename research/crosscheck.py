@@ -20,6 +20,9 @@ COINBASE = "https://api.exchange.coinbase.com"
 BITSTAMP = "https://www.bitstamp.net"
 TOLERANCE_PCT = 3.0
 
+# Empty until each independent source is separately approved by the owner.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
 
 def day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -143,6 +146,9 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
 
 def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.default_opener,
                    sleep=time.sleep, timeout=20, retries=3):
+    required = {"coinbase"} | ({"bitstamp"} if flagged_dates else set())
+    if not required.issubset(AUTHORIZED_CROSSCHECK_PROVIDERS):
+        raise ApiError("required independent cross-check providers are not authorized")
     os.makedirs(out_dir, exist_ok=True)
     http = providers.Http(timeout, retries, opener, sleep)
     result = {"dataset_version": manifest["version_id"], "dataset_sha256": manifest["csv_sha256"],
