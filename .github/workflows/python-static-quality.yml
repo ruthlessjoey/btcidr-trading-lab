@@ -1,0 +1,56 @@
+name: Python static quality (manual, protected-path safe)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+    name: Ruff lint (unprotected root modules only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout only approved unprotected Python modules
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /live_check.py
+            /probe.py
+            /run.py
+
+      - name: Download verified Ruff 0.17.5 release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ruff-x86_64-unknown-linux-gnu.tar.gz"
+          url="https://github.com/astral-sh/ruff/releases/download/0.17.5/ruff-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLo "$archive" "$url"
+          echo "7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90  $archive" | sha256sum -c -
+
+          entry="$(tar -tzf "$archive" | awk '$0 ~ /(^|\/)ruff$/ { print; exit }')"
+          test -n "$entry"
+          case "$entry" in
+            ruff|*/ruff) ;;
+            *) echo "::error::Unexpected Ruff archive path"; exit 1 ;;
+          esac
+
+          mkdir -p "$RUNNER_TEMP/ruff-extract"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/ruff-extract" "$entry"
+          install -m 0755 "$RUNNER_TEMP/ruff-extract/$entry" "$RUNNER_TEMP/ruff"
+          "$RUNNER_TEMP/ruff" --version | grep -Fx "ruff 0.17.5"
+
+      - name: Lint approved modules (no auto-fixes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ruff" check --no-cache --target-version py311 --output-format=github \
+            fetcher.py providers.py live_check.py probe.py run.py
