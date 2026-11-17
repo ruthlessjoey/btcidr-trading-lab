@@ -19,8 +19,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run offline unit tests
-        run: python3 -m unittest discover -s tests -v
+      - name: Run authorized offline tests (no protected validator import)
+        run: |
+          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
+          python3 -m unittest discover -s tests -p 'test_history.py' -v
+          python3 -m unittest discover -s tests -p 'test_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
+          python3 -m unittest discover -s tests -p 'test_backtest_pipeline.py' -v
 
       - name: Load the preserved research-data branch without write credentials
         uses: actions/checkout@v4
