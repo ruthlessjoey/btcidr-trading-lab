@@ -1,4 +1,4 @@
-name: Batch 1 isolated offline tests
+name: Batch 1 isolated tests (blocked by protected import boundary)
 
 on:
   workflow_dispatch:
@@ -6,48 +6,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: batch1-isolated-tests-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  offline-tests:
+  blocked:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
+    timeout-minutes: 2
     steps:
-      - name: Sparse checkout of the approved test surface only
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /fetcher.py
-            /providers.py
-            /live_check.py
-            /report.py
-            /validator.py
-            /research/__init__.py
-            /research/crosscheck.py
-            /research/history.py
-            /research/dataset.py
-            /research/data_report.py
-            /tests/test_fetcher.py
-            /tests/test_live_check.py
-            /tests/test_research_sanitization.py
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Run Batch 1 offline regression tests
-        env:
-          PYTHONDONTWRITEBYTECODE: "1"
-          PYTHONPATH: .
+      - name: Explain why Batch 1 execution is blocked
         run: |
-          python -m unittest discover -s tests -p 'test_fetcher.py' -v
-          python -m unittest discover -s tests -p 'test_live_check.py' -v
-          python -m unittest discover -s tests -p 'test_research_sanitization.py' -v
+          echo "::error::Batch 1 test execution is blocked because its current sparse checkout includes protected validator.py/report.py and its test imports reach those modules."
+          echo "No checkout, protected file access, test execution, network request, or exchange call occurred."
+          echo "Resume only after the owner separately authorizes the exact protected-module scope or the tests are redesigned to avoid those imports."
+          exit 1
