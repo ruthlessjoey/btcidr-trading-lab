@@ -152,18 +152,23 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.def
     os.makedirs(out_dir, exist_ok=True)
     http = providers.Http(timeout, retries, opener, sleep)
     result = {"dataset_version": manifest["version_id"], "dataset_sha256": manifest["csv_sha256"],
+              "providers": [],
               "rule": f"open and close within {TOLERANCE_PCT}%, and the day's return within "
                       f"{TOLERANCE_PCT} percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
               "coinbase_error": None, "bitstamp_error": None, "http_log": []}
     coinbase, bitstamp = {}, {}
     try:
         coinbase = fetch_coinbase_daily(http, candles[0].time, candles[-1].time)
+        if coinbase:
+            result["providers"].append("coinbase")
     except ApiError as e:
         result["coinbase_error"] = str(e)
     if flagged_dates:
         try:
             first = to_ts(min(flagged_dates)) - 3 * DAY
             bitstamp = fetch_bitstamp_window(http, first, 8 + (to_ts(max(flagged_dates)) - to_ts(min(flagged_dates))) // DAY)
+            if bitstamp:
+                result["providers"].append("bitstamp")
         except ApiError as e:
             result["bitstamp_error"] = str(e)
     result.update(compare(candles, coinbase, bitstamp, flagged_dates))
