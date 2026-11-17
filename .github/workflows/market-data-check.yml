@@ -1,4 +1,4 @@
-name: Market data check
+name: Market data check (blocked pending protected validator review)
 
 on:
   workflow_dispatch:
@@ -7,29 +7,13 @@ permissions:
   contents: read
 
 jobs:
-  approved-market-data-check:
+  blocked:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-
-      - name: Run authorized offline tests only (no protected validator import)
+      - name: Explain why live market diagnostics are disabled
         run: |
-          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
-          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
-          python3 -m unittest discover -s tests -p 'test_history.py' -v
-          python3 -m unittest discover -s tests -p 'test_probe.py' -v
-          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
-
-      - name: Check only the explicitly approved Tokocrypto public time and candle routes
-        run: python3 live_check.py
-
-      - name: Keep reports and candle file as a run artifact only
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: market-data-report
-          path: out/
-          if-no-files-found: ignore
+          echo "::error::Live diagnostics are blocked because live_check.py imports protected validator.py/report.py. This workflow must not check out or execute those modules."
+          echo "No checkout, test, protected file access, network request, or exchange call occurred."
+          echo "Resume only after the protected module boundary is separately reviewed and authorized."
+          exit 1
