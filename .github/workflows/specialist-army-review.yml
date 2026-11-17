@@ -29,12 +29,18 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Check out the immutable trusted runner
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Sparse checkout only the immutable trusted runner and its guidance
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: d78750d154886f91f146be2e709f55bf88cba146
           path: runner
           persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/specialist_army_review.py
+            /.claude/agents/
+            /.claude/skills/
 
       - name: Verify runner syntax
         run: python -m py_compile runner/tools/specialist_army_review.py
