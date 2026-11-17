@@ -216,6 +216,34 @@ class CrosscheckSanitizationTests(unittest.TestCase):
 
         self.assertEqual(calls, [])
 
+    def test_crosscheck_artifact_records_exact_sources_that_returned_data(self):
+        candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
+        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
+        original_authorized = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
+        original_fetch = crosscheck.fetch_coinbase_daily
+
+        def synthetic_coinbase(http, first_ts, last_ts):
+            return {candle.time: candle}
+
+        def forbidden_opener(url, timeout):
+            raise AssertionError("synthetic cross-check must not access the network")
+
+        crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase"})
+        crosscheck.fetch_coinbase_daily = synthetic_coinbase
+        try:
+            with tempfile.TemporaryDirectory() as out:
+                result = crosscheck.run_crosscheck(
+                    manifest, [candle], [], out, opener=forbidden_opener,
+                    sleep=NO_SLEEP, timeout=1, retries=1)
+                with open(os.path.join(out, "crosscheck.json"), encoding="utf-8") as f:
+                    artifact = json.load(f)
+        finally:
+            crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = original_authorized
+            crosscheck.fetch_coinbase_daily = original_fetch
+
+        self.assertEqual(result["providers"], ["coinbase"])
+        self.assertEqual(artifact["providers"], ["coinbase"])
+
     def test_zero_reference_prices_do_not_crash_comparison(self):
         zero = fetcher.Candle(1_700_000_000, 0.0, 0.0, 0.0, 0.0, 0.0)
         result = crosscheck.compare([zero], {zero.time: zero}, {}, [])
