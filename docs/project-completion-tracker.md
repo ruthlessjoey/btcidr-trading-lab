@@ -16,8 +16,8 @@ Therefore, assigning a numeric whole-project completion percentage now would req
 
 - `main`: `3d478a37ce2963abbc9d89f6843d6f806d6d28f5` at the time of this tracker.
 - M6 engineering baseline: `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
-- Q0.3–Q0.8 security-correction work remains on its separate `security/q0-3-q0-8-final-2026-11-17` branch; it is not merged.
-- Batch 1 provider-response corrections are in draft PR #56.
+- Q0.3–Q0.8 corrections plus provider sanitization are integrated as a candidate in draft PR #60, based on `feature/m6-risk-engine`; it is not merged.
+- PR #56 is retained as a historical draft and is explicitly superseded by PR #60.
 - Default-branch workflow isolation is in draft PR #57.
 - The repository's `CLAUDE.md` and `docs/development-stack/roadmap.md` define the current access, trading, and tooling constraints.
 
@@ -42,7 +42,7 @@ Trading constraints remain: spot-only and long-only; no shorts, leverage, margin
 |---|---|---|---|---|---|
 | Project architecture and ADRs | One provider-neutral architecture with explicit ownership, risk, portfolio, and execution boundaries | Partially documented across README, repository instructions, milestone history, and prior project decisions | Whole-project master specification not found; no complete acceptance matrix | Core invariants documented; full architecture reconciliation incomplete | Recover or reconstruct the authoritative master scope with owner confirmation; map every requirement and dependency |
 | M1 public market-data transport | Read-only BTC/USDT public candle retrieval, parsing, and reporting | Implemented as a candidate; current approved Tokocrypto scope is only `www.tokocrypto.site` server-time/candles | Q0 offline suite historically passed 35/35 on commit `6678b3d06fc780bbeef21894c9650827a9e52904`; this is not evidence for later heads | Transport allowlist and fail-closed checks exist on the Q0 branch; live-check workflow is blocked where it imports protected modules | Re-run only the sparse, approved offline suite on the exact current Q0 head; independently review transport boundary |
-| Provider-response sanitization | Prevent provider-controlled values and exceptions from reaching reports, logs, summaries, or output sinks | Candidate corrections are in draft PR #56 | Historical 53/53 run was on old head `fc1804b60bec69f46c5bbd17a9a0d0a538e9f311`; it is not current-head verification | Historical test workflow checked out protected `validator.py` and `report.py`; that workflow is now replaced with a no-checkout blocker | Keep PR #56 draft; design an approved test boundary that avoids protected imports; obtain fresh review and exact-head evidence |
+| Provider-response sanitization | Prevent provider-controlled values and exceptions from reaching reports, logs, summaries, or output sinks | Integrated candidate is in draft PR #60 on top of the Q0 allowlist; PR #56 is superseded | A local isolated snapshot passed 50/50 tests across six approved offline modules; it is not a byte-for-byte checkout or exact-head GitHub Actions result. Historical 53/53 run on old PR #56 head remains historical only | Old PR #56 workflow checked out protected `validator.py` and `report.py`; its replacement now blocks before checkout. PR #60 keeps the Tokocrypto-only allowlist and excludes protected imports from the sanitizer test | Obtain exact-head manual workflow run and independent review; keep unapproved providers disabled; retain PR #56 as historical only |
 | Market identity and historical dataset gate | Verify market identity before publishing a historical dataset | Step 1 deliberately fails closed; it writes no dataset and makes zero network requests | Static/offline tests exist on the Q0 branch; no successful dataset publication is evidenced | Fail-closed gate preserves the current public-route restriction | Owner-approved market-identity method or formal descope; only then implement and verify dataset creation |
 | Research cross-check | Compare approved sources without allowing unapproved providers or provider-controlled data to bypass gates | Current cross-check authorization set is empty; cross-checks are blocked | No successful authorized cross-check run is evidenced | Empty provider set is intentionally fail-closed | Keep empty until a separate host/provider authorization and review |
 | Dataset integrity and publication | Immutable dataset identity, manifests, hashes, atomic publication, rollback, path confinement | Candidate work exists across stacked PRs #17–#21, #25, and #27; not integrated into the authoritative baseline | Most PR descriptions report static review or tests not yet run; no single integrated exact-head result established here | Security work is present as separate draft changes; end-to-end assurance remains incomplete | Reconcile stack order and bases; run only approved offline tests; verify atomicity, rollback, symlink/path handling, and hash binding |
@@ -71,12 +71,15 @@ Security, offline tests, documentation, supply-chain review, and CI isolation ar
 
 ## Current integration picture
 
-At the time of this tracker, GitHub reports **47 open pull requests: 42 draft and 5 non-draft**. Many research and hardening changes are stacked on earlier branches rather than integrated into one accepted baseline. This is evidence of substantial candidate work, not evidence that the whole project is complete.
+At the time of this update, GitHub reports **50 open pull requests: 45 draft and 5 non-draft**. Many research and hardening changes are stacked on earlier branches rather than integrated into one accepted baseline. This is evidence of substantial candidate work, not evidence that the whole project is complete.
 
 Important current review items:
 
-- PR #56 — Batch 1 provider-response sanitization; draft, current head `9511e13484206fbef417e24ac05f1dae855edc3c`. Its previous 53-test result is historical only. The old workflow checked out protected files and has been replaced with a no-checkout blocker.
-- PR #57 — default-branch workflow protected-path isolation; draft, head `a15d2257184fd41e1a970e9b19d469a97285a30e`. Seven workflow files changed; no application source changed.
+- PR #56 — Batch 1 provider-response sanitization; draft and superseded by PR #60. The historical workflow checked out protected files; it now fails closed before checkout.
+- PR #57 — default-branch workflow protected-path isolation; draft, head `55fde80570b3b7edefdc78f4b84d4ffbcf57a2a9`. Seven workflow files changed; no application source changed. Actionlint/zizmor execution remains pending.
+- PR #58 — provisional project-wide completion tracker; draft, one documentation file.
+- PR #59 — first repository-specific `security-review` skill; draft, one guidance-only file. Runtime discovery/invocation remains unverified.
+- PR #60 — integrated Q0 transport allowlist and provider sanitization; draft, head `fb1537cad11c5c36a537ffca28969909b1ca025a`, 26 paths, 25 commits ahead of the M6 baseline. Local isolated snapshot: 50/50 tests; exact-head GitHub Actions run and independent review remain pending.
 - PR #2 — Milestone 3 dataset/backtest; open against an older main base. Provider authorization and current integration status require reconciliation before use.
 - PRs #16–#36 — stacked backtest, dataset integrity, and holdout-reservation changes; most remain draft and several descriptions explicitly say tests were not run.
 - PRs #38–#48 — development tooling, skills, and review automation; remain separate draft stages.
