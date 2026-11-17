@@ -361,7 +361,7 @@ def synthetic():
     sample_token = "sk-or-v1-" + ("x" * 32)
     assert contains_secret(sample_token)
     assert redact("token=" + sample_token) == "token=[REDACTED]"
-    verdict_pattern = r"(?im)^\\s*VERDICT:\\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\s*$"
+    verdict_pattern = r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$"
     assert re.search(verdict_pattern, "VERDICT: PASS")
     assert re.search(verdict_pattern, "VERDICT: PASS WITH FINDINGS")
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
