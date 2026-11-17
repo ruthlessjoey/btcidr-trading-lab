@@ -32,4 +32,5 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
           python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
+          python3 -m unittest discover -s tests -p 'test_engine.py' -v
           python3 -m unittest discover -s tests -p 'test_backtest_pipeline.py' -v
