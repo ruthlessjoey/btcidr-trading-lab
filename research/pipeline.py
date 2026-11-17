@@ -114,12 +114,12 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
             "test_signals_identical_for_original_choice": same_test_signals}
 
 
-def load_required_crosscheck(cfg, manifest, crosscheck_path):
-    """Require dataset-bound independent evidence for every predeclared flagged date."""
+def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
+    """Validate dataset-bound evidence against an explicit provider authorization set."""
     flagged = cfg.get("flagged_dates", [])
     if not flagged:
         return None
-    if not AUTHORIZED_CROSSCHECK_PROVIDERS:
+    if not authorized_providers:
         raise EngineError("no independent cross-check provider is currently authorized; flagged-date backtests are blocked")
     if not crosscheck_path or not os.path.isfile(crosscheck_path):
         raise EngineError("independent cross-check evidence is required for flagged dates; no artifact was supplied")
@@ -135,7 +135,7 @@ def load_required_crosscheck(cfg, manifest, crosscheck_path):
         raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
     used = evidence.get("providers")
     if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) or p not in AUTHORIZED_CROSSCHECK_PROVIDERS for p in used)):
+            any(not isinstance(p, str) or p not in authorized_providers for p in used)):
         raise EngineError("cross-check artifact does not identify exclusively authorized independent providers")
     entries = {item.get("date"): item for item in evidence.get("flagged", [])
                if isinstance(item, dict) and isinstance(item.get("date"), str)}
@@ -145,6 +145,12 @@ def load_required_crosscheck(cfg, manifest, crosscheck_path):
             verdict = item.get("verdict", "MISSING") if item else "MISSING"
             raise EngineError(f"flagged date {date} lacks confirmed independent evidence ({verdict})")
     return evidence
+
+
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Apply the current owner-approved provider set to the cross-check artifact."""
+    return validate_crosscheck_artifact(cfg, manifest, crosscheck_path,
+                                         AUTHORIZED_CROSSCHECK_PROVIDERS)
 
 
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
