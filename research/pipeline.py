@@ -16,6 +16,9 @@ SEGMENTS = (("train", "TRAIN (in-sample; used to screen candidates)"),
             ("validation", "VALIDATION (used to pick among eligible candidates)"),
             ("test", "TEST (final; evaluated once)"))
 
+# Empty until the owner separately approves at least one independent source.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
 
 def utc_day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -116,6 +119,8 @@ def load_required_crosscheck(cfg, manifest, crosscheck_path):
     flagged = cfg.get("flagged_dates", [])
     if not flagged:
         return None
+    if not AUTHORIZED_CROSSCHECK_PROVIDERS:
+        raise EngineError("no independent cross-check provider is currently authorized; flagged-date backtests are blocked")
     if not crosscheck_path or not os.path.isfile(crosscheck_path):
         raise EngineError("independent cross-check evidence is required for flagged dates; no artifact was supplied")
     try:
@@ -123,11 +128,17 @@ def load_required_crosscheck(cfg, manifest, crosscheck_path):
             evidence = json.load(f)
     except (OSError, ValueError) as e:
         raise EngineError(f"independent cross-check artifact is unreadable: {type(e).__name__}")
+    if not isinstance(evidence, dict):
+        raise EngineError("independent cross-check artifact must be a JSON object")
     if (evidence.get("dataset_version") != manifest.get("version_id") or
             evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
         raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
+    used = evidence.get("providers")
+    if (not isinstance(used, list) or not used or
+            any(not isinstance(p, str) or p not in AUTHORIZED_CROSSCHECK_PROVIDERS for p in used)):
+        raise EngineError("cross-check artifact does not identify exclusively authorized independent providers")
     entries = {item.get("date"): item for item in evidence.get("flagged", [])
-               if isinstance(item, dict)}
+               if isinstance(item, dict) and isinstance(item.get("date"), str)}
     for date in flagged:
         item = entries.get(date)
         if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
