@@ -61,7 +61,16 @@ class ParseTests(unittest.TestCase):
     def test_exchange_error_code_is_an_error(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.parse_klines({"code": -1121, "msg": "Invalid symbol."})
-        self.assertIn("Invalid symbol", str(ctx.exception))
+        self.assertEqual(str(ctx.exception), "exchange returned an error response")
+
+    def test_provider_marker_is_not_in_exchange_or_row_errors(self):
+        marker = "UNTRUSTED_PROVIDER_MARKER"
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.unwrap({"code": -1, "msg": marker})
+        self.assertNotIn(marker, str(ctx.exception))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.parse_klines([[MS, marker, "2", "1", "1", "1"]])
+        self.assertNotIn(marker, str(ctx.exception))
 
     def test_not_a_list_is_an_error(self):
         with self.assertRaises(fetcher.ApiError):
@@ -106,12 +115,28 @@ class HttpTests(unittest.TestCase):
         op = scripted((429, b""), (200, b'[1]'))
         self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
 
-    def test_403_is_not_retried_and_shows_the_body(self):
+    def test_http_500_body_marker_is_not_exposed_after_retries(self):
+        marker = "UNTRUSTED_HTTP_500_BODY_MARKER"
+        op = scripted((500, marker.encode()), (500, marker.encode()))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 2, op, NO_SLEEP)
+        self.assertIn("HTTP 500", str(ctx.exception))
+        self.assertNotIn(marker, str(ctx.exception))
+        self.assertEqual(len(op.calls), 2)
+
+    def test_invalid_http_status_values_are_rejected(self):
+        for status in (True, 99, 600, 200.0):
+            with self.subTest(status=status):
+                op = scripted((status, b"{}"))
+                with self.assertRaises(fetcher.ApiError):
+                    fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+
+    def test_403_is_not_retried_and_body_is_not_exposed(self):
         op = scripted((403, b"<html>Access denied by firewall</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertIn("403", str(ctx.exception))
-        self.assertIn("Access denied", str(ctx.exception))
+        self.assertNotIn("Access denied", str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
     def test_451_region_block_is_not_retried(self):
@@ -121,11 +146,24 @@ class HttpTests(unittest.TestCase):
         self.assertIn("451", str(ctx.exception))
         self.assertEqual(len(op.calls), 1)
 
-    def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
+    def test_http_error_exception_is_closed_without_reading_body(self):
+        class TrackedHTTPError(urllib.error.HTTPError):
+            def __init__(self):
+                super().__init__("u", 404, "Not Found", {}, None)
+                self.closed = False
+                self.read_called = False
+            def read(self, *args, **kwargs):
+                self.read_called = True
+                raise AssertionError("HTTP error body must not be read")
+            def close(self):
+                self.closed = True
+        error = TrackedHTTPError()
+        op = scripted(error)
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
         self.assertEqual(len(op.calls), 1)
+        self.assertTrue(error.closed)
+        self.assertFalse(error.read_called)
 
     def test_network_errors_exhaust_retries(self):
         op = scripted(urllib.error.URLError("boom"))
@@ -134,16 +172,34 @@ class HttpTests(unittest.TestCase):
         self.assertIn("failed after 3 attempts", str(ctx.exception))
         self.assertEqual(len(op.calls), 3)
 
+    def test_provider_text_in_transport_exceptions_is_not_exposed(self):
+        marker = "UNTRUSTED_PROVIDER_MARKER"
+        op = scripted(urllib.error.URLError(marker))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/" + marker, 5, 1, op, NO_SLEEP)
+        self.assertNotIn(marker, str(ctx.exception))
+        op = scripted(RuntimeError(marker))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+        self.assertNotIn(marker, str(ctx.exception))
+
     def test_timeout_is_handled(self):
         op = scripted(TimeoutError("slow"))
         with self.assertRaises(fetcher.ApiError):
             fetcher.http_get_json("u", 5, 2, op, NO_SLEEP)
 
+    def test_recursion_error_in_json_is_a_safe_error(self):
+        deeply_nested = b"[" * 2000 + b"]" * 2000
+        op = scripted((200, deeply_nested))
+        with self.assertRaises(fetcher.ApiError) as ctx:
+            fetcher.http_get_json("https://example.test/", 5, 1, op, NO_SLEEP)
+        self.assertEqual(str(ctx.exception), "HTTP 200 response was not valid JSON")
+
     def test_invalid_json_is_an_error(self):
         op = scripted((200, b"<html>challenge page</html>"))
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("challenge page", str(ctx.exception))
+        self.assertNotIn("challenge page", str(ctx.exception))
 
 
 if __name__ == "__main__":

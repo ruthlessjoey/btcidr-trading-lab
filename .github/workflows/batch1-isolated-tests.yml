@@ -1,0 +1,33 @@
+name: Batch 1 isolated tests (blocked by protected import boundary)
+
+on:
+  pull_request:
+    branches:
+      - feature/m6-risk-engine
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: batch1-offline-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  blocked:
+    name: Protected-module boundary prevents this test job
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Explain why Batch 1 tests cannot run in this boundary
+        run: |
+          echo "::error::Batch 1 tests are blocked because the previous sparse checkout included protected validator.py/report.py and tests import those modules."
+          echo "This replacement deliberately performs no checkout, test execution, protected file access, network request, or exchange call."
+          echo "Resume only after separate explicit authorization for the exact protected-module scope or a redesigned test suite that avoids those imports."
+          exit 1
