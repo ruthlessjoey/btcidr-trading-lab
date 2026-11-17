@@ -197,7 +197,7 @@ class CrosscheckSanitizationTests(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "Bitstamp candle response has an unexpected format")
         self.assertNotIn(MARKER, str(ctx.exception))
 
-    def test_crosscheck_run_is_blocked_before_unapproved_network_and_reports_safely(self):
+    def test_crosscheck_run_refuses_before_filesystem_or_network_when_unapproved(self):
         calls = []
 
         def forbidden_opener(url, timeout):
@@ -207,21 +207,15 @@ class CrosscheckSanitizationTests(unittest.TestCase):
         candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
         with tempfile.TemporaryDirectory() as out:
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                result = crosscheck.run_crosscheck(
+            with self.assertRaisesRegex(
+                    fetcher.ApiError, "required independent cross-check providers are not authorized"):
+                crosscheck.run_crosscheck(
                     manifest, [candle], [], out, opener=forbidden_opener,
                     sleep=NO_SLEEP, timeout=1, retries=1)
-            with open(os.path.join(out, "crosscheck.json"), encoding="utf-8") as f:
-                json_text = f.read()
-            with open(os.path.join(out, "crosscheck.md"), encoding="utf-8") as f:
-                markdown = f.read()
+            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
+            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
 
         self.assertEqual(calls, [])
-        self.assertEqual(result["http_log"], [])
-        self.assertIn("allowlist", result["coinbase_error"])
-        for output in (json_text, markdown, stdout.getvalue()):
-            self.assertNotIn(MARKER, output)
 
     def test_zero_reference_prices_do_not_crash_comparison(self):
         zero = fetcher.Candle(1_700_000_000, 0.0, 0.0, 0.0, 0.0, 0.0)
