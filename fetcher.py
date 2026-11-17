@@ -3,9 +3,10 @@
 Only public GET addresses are used. There is no login, no key and no code
 that can place, cancel or change an order.
 
-Two "styles" of public endpoint are supported, because Tokocrypto publishes both:
-  binance_style  {base}/api/v3/time and {base}/api/v3/klines     (symbol BTCUSDT)
-  open_v1        {base}/open/v1/common/time and .../market/klines (symbol BTC_USDT)
+Only these exact public GET routes are permitted:
+  {base}/api/v3/time
+  {base}/api/v3/klines     (symbol BTCUSDT)
+All other hosts, paths, endpoint styles and redirects are refused.
 """
 import json
 import time
@@ -86,15 +87,13 @@ class Source:
             raise DisallowedRequestError("only the approved Tokocrypto Binance-style API is permitted")
 
     def symbol(self, pair):
-        return pair.replace("_", "") if self.style == "binance_style" else pair
+        return pair.replace("_", "")
 
     def time_url(self):
-        path = "/api/v3/time" if self.style == "binance_style" else "/open/v1/common/time"
-        return self.base_url + path
+        return self.base_url + "/api/v3/time"
 
     def klines_url(self):
-        path = "/api/v3/klines" if self.style == "binance_style" else "/open/v1/market/klines"
-        return self.base_url + path
+        return self.base_url + "/api/v3/klines"
 
     def symbols_url(self, pair):
         raise DisallowedRequestError("symbol metadata routes are not approved")
