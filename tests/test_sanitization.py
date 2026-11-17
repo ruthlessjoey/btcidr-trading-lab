@@ -106,15 +106,12 @@ class FetcherSanitizationTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.unwrap({"code": -1, "msg": MARKER})
         self.assertNotIn(MARKER, str(ctx.exception))
-
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.parse_klines([[1_700_000_000_000, MARKER, "2", "1", "1", "1"]])
         self.assertNotIn(MARKER, str(ctx.exception))
-
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.parse_klines({"message": MARKER})
         self.assertNotIn(MARKER, str(ctx.exception))
-
         with self.assertRaises(fetcher.ApiError) as ctx:
             fetcher.extract_server_time(MARKER)
         self.assertNotIn(MARKER, str(ctx.exception))
@@ -123,10 +120,8 @@ class FetcherSanitizationTests(unittest.TestCase):
         for value in (True, False, 1.0, "not-a-timestamp", "-1"):
             with self.subTest(value=repr(value)), self.assertRaises((TypeError, ValueError)):
                 fetcher.to_seconds(value)
-
         with self.assertRaises(fetcher.ApiError):
             fetcher.unwrap({"code": False, "data": [1]})
-
         self.assertEqual(fetcher.to_seconds("1700000000000"), 1_700_000_000)
 
     def test_nonfinite_and_boolean_candle_values_are_rejected(self):
@@ -156,7 +151,7 @@ class ProviderSanitizationTests(unittest.TestCase):
 
     def test_legacy_adapter_errors_are_fixed_safe_messages(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
-            providers.Kraken._result({"error": [MARKER]})
+            providers.Kraken._result({"result": {}, "error": [MARKER]})
         self.assertEqual(str(ctx.exception), "Kraken returned an error response")
 
         class FakeHttp:
@@ -210,15 +205,12 @@ class CrosscheckSanitizationTests(unittest.TestCase):
             raise AssertionError("unapproved provider opener must not be called")
 
         candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
-        marker = {
-            "version_id": "synthetic-v1",
-            "csv_sha256": "a" * 64,
-        }
+        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
         with tempfile.TemporaryDirectory() as out:
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 result = crosscheck.run_crosscheck(
-                    marker, [candle], [], out, opener=forbidden_opener,
+                    manifest, [candle], [], out, opener=forbidden_opener,
                     sleep=NO_SLEEP, timeout=1, retries=1)
             with open(os.path.join(out, "crosscheck.json"), encoding="utf-8") as f:
                 json_text = f.read()
