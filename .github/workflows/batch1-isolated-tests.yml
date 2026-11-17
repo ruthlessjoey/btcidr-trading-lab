@@ -1,4 +1,4 @@
-name: Batch 1 isolated offline tests
+name: Batch 1 isolated tests (blocked by protected import boundary)
 
 on:
   pull_request:
@@ -18,44 +18,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  offline-tests:
-    name: Authorized offline test modules
+  blocked:
+    name: Protected-module boundary prevents this test job
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 2
     permissions:
       contents: read
     steps:
-      - name: Checkout only the approved test scope and required runtime modules
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            fetcher.py
-            providers.py
-            live_check.py
-            report.py
-            validator.py
-            research/__init__.py
-            research/crosscheck.py
-            research/history.py
-            research/dataset.py
-            research/data_report.py
-            tests/test_fetcher.py
-            tests/test_live_check.py
-            tests/test_research_sanitization.py
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
-        with:
-          python-version: "3.11"
-
-      - name: Run authorized offline test modules
-        shell: bash
+      - name: Explain why Batch 1 tests cannot run in this boundary
         run: |
-          set -euo pipefail
-          python --version
-          python tests/test_fetcher.py
-          python tests/test_live_check.py
-          python tests/test_research_sanitization.py
+          echo "::error::Batch 1 tests are blocked because the previous sparse checkout included protected validator.py/report.py and tests import those modules."
+          echo "This replacement deliberately performs no checkout, test execution, protected file access, network request, or exchange call."
+          echo "Resume only after separate explicit authorization for the exact protected-module scope or a redesigned test suite that avoids those imports."
+          exit 1
