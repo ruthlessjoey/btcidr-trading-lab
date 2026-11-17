@@ -135,10 +135,20 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
     used = evidence.get("providers")
     if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) or p not in authorized_providers for p in used)):
+            any(not isinstance(p, str) for p in used) or
+            len(used) != len(set(used)) or
+            any(p not in authorized_providers for p in used)):
         raise EngineError("cross-check artifact does not identify exclusively authorized independent providers")
-    entries = {item.get("date"): item for item in evidence.get("flagged", [])
-               if isinstance(item, dict) and isinstance(item.get("date"), str)}
+    flagged_entries = evidence.get("flagged")
+    if not isinstance(flagged_entries, list):
+        raise EngineError("cross-check artifact flagged entries must be a list")
+    entries = {}
+    for item in flagged_entries:
+        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+            raise EngineError("cross-check artifact contains a malformed flagged entry")
+        if item["date"] in entries:
+            raise EngineError("cross-check artifact contains duplicate flagged dates")
+        entries[item["date"]] = item
     for date in flagged:
         item = entries.get(date)
         if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
