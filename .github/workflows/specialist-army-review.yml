@@ -24,7 +24,7 @@ jobs:
   review:
     name: Bounded read-only review
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 90
     permissions:
       contents: read
       pull-requests: read
@@ -32,7 +32,7 @@ jobs:
       - name: Check out the immutable trusted runner
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: 7644298b881a8d9b0546e5ef4552ffa8dcef8246
+          ref: 94ddcb6fe5fb10e94f52e6280fbd4b5a2737bab5
           path: runner
           persist-credentials: false
 
