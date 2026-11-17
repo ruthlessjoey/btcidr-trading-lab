@@ -201,17 +201,37 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         method="POST")
     started = time.monotonic()
     print("MODEL_REQUEST_START role=" + label, flush=True)
+    retry_count = 0
     try:
-        with make_opener().open(req, timeout=90) as response:
-            raw = response.read(MAX_RESPONSE + 1)
-            if response.status != 200:
-                raise RuntimeError("Model response rejected with HTTP " + str(response.status))
-            if len(raw) > MAX_RESPONSE:
-                raise RuntimeError("Model response exceeded the configured size limit")
+        while True:
+            try:
+                with make_opener().open(req, timeout=90) as response:
+                    raw = response.read(MAX_RESPONSE + 1)
+                    if response.status != 200:
+                        raise RuntimeError("Model response rejected with HTTP " + str(response.status))
+                    if len(raw) > MAX_RESPONSE:
+                        raise RuntimeError("Model response exceeded the configured size limit")
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429 or retry_count >= 2:
+                    raise
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    delay = 5.0 * (2 ** retry_count)
+                if not 0 < delay <= 30:
+                    raise
+                retry_count += 1
+                print("MODEL_RATE_LIMIT_RETRY role=" + label +
+                      " retry=" + str(retry_count) +
+                      " wait_seconds=" + str(round(delay, 1)) +
+                      " policy=max_2_retries_retry_after_at_most_30s", flush=True)
+                time.sleep(delay)
     except urllib.error.HTTPError as exc:
         code = exc.code
         if code == 429:
-            reason = "OpenRouter rate limit (HTTP 429); no retry attempted"
+            reason = "OpenRouter rate limit (HTTP 429); bounded retries exhausted or Retry-After exceeded 30 seconds"
         elif code in (401, 403):
             reason = "OpenRouter authentication/authorization rejection (HTTP " + str(code) + ")"
         elif code == 402:
@@ -226,14 +246,14 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
               str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
         raise RuntimeError(reason) from None
     except (TimeoutError, socket.timeout):
-        reason = "OpenRouter request timed out after 90 seconds; no retry attempted"
+        reason = "OpenRouter request timed out after 90 seconds; no automatic retry"
         print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
               str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
         raise RuntimeError(reason) from None
     except urllib.error.URLError as exc:
         timed_out = isinstance(exc.reason, (TimeoutError, socket.timeout))
         reason = ("OpenRouter request timed out after 90 seconds; no retry attempted"
-                  if timed_out else "OpenRouter network/TLS connection failed; no retry attempted")
+                  if timed_out else "OpenRouter network/TLS connection failed; no automatic retry")
         print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
               str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
         raise RuntimeError(reason) from None
@@ -243,7 +263,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
               str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
         raise
     except Exception as exc:
-        reason = "Unexpected model transport failure (" + type(exc).__name__ + "); no retry attempted"
+        reason = "Unexpected model transport failure (" + type(exc).__name__ + "); no automatic retry"
         print("MODEL_REQUEST_FAILED role=" + label + " elapsed_seconds=" +
               str(round(time.monotonic()-started, 1)) + " reason=" + reason, flush=True)
         raise RuntimeError(reason) from None
