@@ -249,16 +249,63 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError(reason) from None
     try:
         result = json.loads(raw.decode("utf-8"))
-        if result.get("model") != model:
-            raise RuntimeError("OpenRouter did not confirm the exact approved model ID")
-        text = result["choices"][0]["message"]["content"]
-    except RuntimeError:
-        raise
     except Exception:
-        raise RuntimeError("OpenRouter response was malformed or missing model content") from None
-    if not isinstance(text, str) or not text.strip() or len(text) > MAX_OUTPUT:
-        raise RuntimeError("Model output empty or outside size limit")
-    if not re.search(r"\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\b", text):
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " body_bytes=" + str(len(raw)) + " json_valid=false", flush=True)
+        raise RuntimeError("OpenRouter returned a non-JSON response body") from None
+    if not isinstance(result, dict):
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " json_root_type=" + type(result).__name__, flush=True)
+        raise RuntimeError("OpenRouter response JSON root was not an object")
+    returned_model = result.get("model")
+    choices = result.get("choices")
+    if returned_model != model:
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " returned_model_matches=false", flush=True)
+        raise RuntimeError("OpenRouter did not confirm the exact approved model ID")
+    if not isinstance(choices, list) or not choices:
+        error_obj = result.get("error")
+        error_code = error_obj.get("code") if isinstance(error_obj, dict) else None
+        error_type = error_obj.get("type") if isinstance(error_obj, dict) else None
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " choices_count=0 error_code=" + redact(str(error_code), 80) +
+              " error_type=" + redact(str(error_type), 80), flush=True)
+        raise RuntimeError("OpenRouter response contained no completion choices")
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " first_choice_type=" + type(choice).__name__, flush=True)
+        raise RuntimeError("OpenRouter completion choice had an unexpected structure")
+    finish_reason = choice.get("finish_reason")
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+              " finish_reason=" + redact(str(finish_reason), 80) +
+              " message_type=" + type(message).__name__, flush=True)
+        raise RuntimeError("OpenRouter completion did not contain a message object")
+    content = message.get("content")
+    content_type = type(content).__name__
+    content_length = len(content) if isinstance(content, str) else -1
+    refusal_present = bool(message.get("refusal"))
+    print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
+          " body_bytes=" + str(len(raw)) +
+          " choices_count=" + str(len(choices)) +
+          " finish_reason=" + redact(str(finish_reason), 80) +
+          " content_type=" + content_type +
+          " content_chars=" + str(content_length) +
+          " refusal_present=" + str(refusal_present).lower(), flush=True)
+    if not isinstance(content, str):
+        raise RuntimeError("Model returned non-text completion content (type=" + content_type +
+                           ", finish_reason=" + redact(str(finish_reason), 80) + ")")
+    text = content
+    if not text.strip():
+        raise RuntimeError("Model returned empty text content (finish_reason=" +
+                           redact(str(finish_reason), 80) + ")")
+    if len(text) > MAX_OUTPUT:
+        raise RuntimeError("Model output exceeded " + str(MAX_OUTPUT) +
+                           " characters (received " + str(len(text)) +
+                           "; finish_reason=" + redact(str(finish_reason), 80) + ")")
+    if not re.search(r"\\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\b", text):
         raise RuntimeError("Model output omitted a recognized verdict")
     print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
           str(round(time.monotonic()-started, 1)), flush=True)
