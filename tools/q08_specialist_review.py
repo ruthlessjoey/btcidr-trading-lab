@@ -45,7 +45,7 @@ REVIEW_PATHS = [".github/workflows/market-data-check.yml",
     "tools/net_lab.py"]
 EXPECTED_STATUS = {
   ".github/workflows/market-data-check.yml": "modified",
-  ".github/workflows/q08-offline-tests.yml": "modified",
+  ".github/workflows/q08-offline-tests.yml": "added",
   ".github/workflows/q08-specialist-review.yml": "added",
   ".github/workflows/research-backtest.yml": "modified",
   ".github/workflows/research-data.yml": "modified",
