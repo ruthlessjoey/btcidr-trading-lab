@@ -1,0 +1,47 @@
+name: Python static quality (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+    name: Ruff lint (approved root modules only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout of approved root modules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/requirements/ruff-ci.txt
+            /fetcher.py
+            /providers.py
+            /live_check.py
+            /probe.py
+            /report.py
+            /run.py
+            /validator.py
+
+      - name: Install hash-pinned Ruff without dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 -m pip --version
+          python3 -m pip install --disable-pip-version-check --no-deps --require-hashes --only-binary=:all: -r .github/requirements/ruff-ci.txt
+          ruff --version
+
+      - name: Lint approved root modules (no auto-fixes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruff check --no-cache --target-version py311 --output-format=github \
+            fetcher.py providers.py live_check.py probe.py report.py run.py validator.py
