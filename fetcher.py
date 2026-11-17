@@ -9,6 +9,7 @@ Only these exact public GET routes are permitted:
 All other hosts, paths, endpoint styles and redirects are refused.
 """
 import json
+import math
 import time
 import urllib.error
 import urllib.parse
@@ -73,7 +74,6 @@ def validate_public_url(url):
     return url
 
 
-
 @dataclass(frozen=True)
 class Candle:
     time: int       # candle open time, unix seconds (UTC)
@@ -87,7 +87,7 @@ class Candle:
 @dataclass(frozen=True)
 class Source:
     name: str
-    style: str       # "binance_style" or "open_v1"
+    style: str
     base_url: str
 
     def __post_init__(self):
@@ -126,13 +126,21 @@ def default_opener(url, timeout):
         resp.close()
 
 
-def snippet(body, size=200):
-    text = body.decode("utf-8", "replace") if body else ""
-    return " ".join(text.split())[:size]
+def _reject_json_constant(value):
+    raise ValueError("non-standard JSON numeric constant")
+
+
+def _finite_float(value):
+    if isinstance(value, bool):
+        raise ValueError("boolean is not a numeric candle value")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("candle value must be finite")
+    return number
 
 
 def http_get_json(url, timeout, retries, opener, sleep):
-    """GET only approved URLs; bound every response and refuse redirects."""
+    """GET only approved URLs; bound responses and never expose provider text."""
     validate_public_url(url)
     last = "no attempt was made"
     for attempt in range(1, retries + 1):
@@ -140,48 +148,61 @@ def http_get_json(url, timeout, retries, opener, sleep):
         body = b""
         try:
             status, body = opener(url, timeout)
-        except urllib.error.HTTPError as e:      # must come before URLError
+        except urllib.error.HTTPError as e:  # must come before URLError
             status = e.code
             try:
-                body = e.read(MAX_RESPONSE_BYTES + 1)
-            except Exception:
-                body = b""
-            finally:
                 e.close()
+            except Exception:
+                pass
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            last = f"network error: {e}"
+            last = f"network error ({type(e).__name__})"
+        except Exception as e:
+            raise ApiError(f"unexpected transport failure ({type(e).__name__})") from None
+
+        if type(body) is not bytes:
+            raise ApiError("transport returned an invalid response body")
         if len(body) > MAX_RESPONSE_BYTES:
             raise ApiError("response exceeded the 1 MiB public-data limit")
         if status is not None:
+            if type(status) is not int or not 100 <= status <= 599:
+                raise ApiError("transport returned an invalid HTTP status")
             if status == 200:
                 try:
-                    return json.loads(body.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError) as e:
-                    raise ApiError(f"HTTP 200 but the body is not valid JSON ({e}): "
-                                   f"{snippet(body)}")
-            last = f"HTTP {status}" + (f": {snippet(body)}" if body else "")
+                    return json.loads(body.decode("utf-8"), parse_constant=_reject_json_constant)
+                except (ValueError, UnicodeDecodeError, RecursionError):
+                    raise ApiError("HTTP 200 response was not valid JSON")
+            last = f"HTTP {status}"
             if status != 429 and status < 500:
-                raise ApiError(f"{url} -> {last} (not retried)")
+                raise ApiError(f"HTTP {status} (not retried)")
         if attempt < retries:
             sleep(2 ** attempt)
-    raise ApiError(f"{url} failed after {retries} attempts: {last}")
+    raise ApiError(f"request failed after {retries} attempts: {last}")
 
 
 def to_seconds(t):
-    """Exchange timestamps are milliseconds; accept seconds too. Returns seconds."""
-    t = int(t)
-    return t // 1000 if t > 100_000_000_000 else t
+    """Accept integer Unix seconds/milliseconds or an ASCII decimal string."""
+    if type(t) is int:
+        value = t
+    elif type(t) is str and t.isascii() and t.isdecimal():
+        value = int(t)
+    else:
+        raise TypeError("timestamp must be an integer or decimal string")
+    if value <= 0 or value > 10_000_000_000_000:
+        raise ValueError("timestamp is outside the supported range")
+    return value // 1000 if value > 100_000_000_000 else value
 
 
 def unwrap(obj):
-    """open/v1 answers may be {"code": 0, "msg": "...", "data": ...}. Peel that off
-    and turn any non-zero error code into an ApiError."""
+    """Peel known response wrappers without exposing provider-controlled values."""
     for _ in range(3):
         if not isinstance(obj, dict):
             break
         code = obj.get("code")
-        if code not in (None, 0, "0", 200, "200"):
-            raise ApiError(f"exchange error code {code}: {str(obj.get('msg', obj))[:200]}")
+        if code is not None:
+            valid_code = ((type(code) is int and code in (0, 200)) or
+                          (type(code) is str and code in ("0", "200")))
+            if not valid_code:
+                raise ApiError("exchange returned an error response")
         for key in ("data", "list", "klines", "result"):
             if key in obj:
                 obj = obj[key]
@@ -200,24 +221,25 @@ def extract_server_time(obj):
                 break
     try:
         return to_seconds(obj)
-    except (TypeError, ValueError):
-        raise ApiError(f"unexpected server-time answer: {str(obj)[:200]}")
+    except (TypeError, ValueError, OverflowError):
+        raise ApiError("unexpected server-time response format")
 
 
 def parse_klines(raw):
     """Rows must look like [openTime, open, high, low, close, volume, ...]."""
     rows = unwrap(raw)
     if not isinstance(rows, list):
-        raise ApiError(f"candle answer is not a list: {str(rows)[:200]}")
+        raise ApiError("candle response is not a list")
     out = []
     for i, row in enumerate(rows):
         try:
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 raise ValueError("expected a list of at least 6 values")
-            out.append(Candle(to_seconds(row[0]), float(row[1]), float(row[2]),
-                              float(row[3]), float(row[4]), float(row[5])))
-        except (TypeError, ValueError) as e:
-            raise ApiError(f"candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
+            out.append(Candle(
+                to_seconds(row[0]), _finite_float(row[1]), _finite_float(row[2]),
+                _finite_float(row[3]), _finite_float(row[4]), _finite_float(row[5])))
+        except (TypeError, ValueError, OverflowError):
+            raise ApiError(f"candle row {i} has an unexpected format")
     return out
 
 
