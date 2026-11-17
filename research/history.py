@@ -79,7 +79,7 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     if cfg.get("provider") != "tokocrypto" or cfg.get("host") != "https://www.tokocrypto.site":
         raise SystemExit("Refusing to run: research host/provider is not the approved Tokocrypto endpoint.")
     fetcher.validate_public_url(cfg["host"] + "/api/v3/time")
-    fetcher.validate_public_url(cfg["host"] + "/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1")
+    fetcher.validate_public_url(cfg["host"] + "/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=1&endTime=2&limit=1")
     if cfg["timeframe"] not in TF_SECONDS:
         raise SystemExit(f"Unknown timeframe {cfg['timeframe']!r}")
     os.makedirs(out_dir, exist_ok=True)
