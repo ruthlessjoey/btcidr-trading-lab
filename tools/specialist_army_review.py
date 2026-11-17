@@ -138,7 +138,7 @@ def fetch_snapshot(token: str, ref: str, added_paths: set[str]) -> dict[str, str
     total = 0
     for path in REVIEW_PATHS:
         if path in added_paths:
-        result[path] = "\n".join(lines)
+            result[path] = ""
             continue
         encoded = urllib.parse.quote(path, safe="/")
         item = github_json(f"/repos/{REPO}/contents/{encoded}?ref={ref}", token)
@@ -168,7 +168,7 @@ def build_review_diff(base_snapshot: dict[str, str], head_snapshot: dict[str, st
             fromfile=path + "@" + BASE_SHA[:12],
             tofile=path + "@" + HEAD_SHA[:12],
             n=8, lineterm="")
-        result[path] = "\\n".join(lines)
+        result[path] = "\n".join(lines)
     return result
 
 
