@@ -265,11 +265,9 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError("OpenRouter did not confirm the exact approved model ID")
     if not isinstance(choices, list) or not choices:
         error_obj = result.get("error")
-        error_code = error_obj.get("code") if isinstance(error_obj, dict) else None
-        error_type = error_obj.get("type") if isinstance(error_obj, dict) else None
         print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
-              " choices_count=0 error_code=" + redact(str(error_code), 80) +
-              " error_type=" + redact(str(error_type), 80), flush=True)
+              " choices_count=0 error_present=" +
+              str(isinstance(error_obj, dict)).lower(), flush=True)
         raise RuntimeError("OpenRouter response contained no completion choices")
     choice = choices[0]
     if not isinstance(choice, dict):
@@ -305,7 +303,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError("Model output exceeded " + str(MAX_OUTPUT) +
                            " characters (received " + str(len(text)) +
                            "; finish_reason=" + redact(str(finish_reason), 80) + ")")
-    if not re.search(r"\\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\b", text):
+    if not re.search(r"\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\b", text):
         raise RuntimeError("Model output omitted a recognized verdict")
     print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
           str(round(time.monotonic()-started, 1)), flush=True)
