@@ -30,7 +30,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_engine.py' -v
           python3 -m unittest discover -s tests -p 'test_backtest_pipeline.py' -v
 
-      - name: Fetch and validate history from the approved public endpoint
+      - name: Emit the fail-closed market-identity report; no network request is made
         run: python3 fetch_history.py
 
       - name: Keep reports and dataset as a run artifact only
