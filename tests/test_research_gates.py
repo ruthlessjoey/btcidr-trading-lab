@@ -53,6 +53,26 @@ class CrosscheckGateTests(unittest.TestCase):
             with self.assertRaisesRegex(EngineError, "authorized independent providers"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    def test_malformed_or_duplicate_flagged_entries_are_rejected(self):
+        malformed = [
+            {"dataset_version": "v-test", "dataset_sha256": "abc123",
+             "providers": ["coinbase"], "flagged": None},
+            {"dataset_version": "v-test", "dataset_sha256": "abc123",
+             "providers": ["coinbase"], "flagged": ["not-an-object"]},
+            {"dataset_version": "v-test", "dataset_sha256": "abc123",
+             "providers": ["coinbase"], "flagged": [
+                 {"date": "2020-03-12", "verdict": "CONFIRMED"},
+                 {"date": "2020-03-12", "verdict": "CONFIRMED"}]},
+            {"dataset_version": "v-test", "dataset_sha256": "abc123",
+             "providers": ["coinbase", "coinbase"],
+             "flagged": [{"date": "2020-03-12", "verdict": "CONFIRMED"}]},
+        ]
+        for payload in malformed:
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, payload)
+                with self.subTest(payload=payload), self.assertRaises(EngineError):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_flagged_day_must_be_confirmed(self):
         for verdict in ("UNAVAILABLE", "NOT CONFIRMED", "MISSING"):
             with tempfile.TemporaryDirectory() as d:
