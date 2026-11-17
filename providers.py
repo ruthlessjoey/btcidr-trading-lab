@@ -1,11 +1,9 @@
-"""providers.py - READ-ONLY adapters, one per exchange, for PUBLIC candle endpoints.
+"""providers.py - public market-data adapters.
 
-Every adapter has its own URL, symbol format, response layout and time rules.
-Nothing here logs in, uses keys, or can place an order.
-
-Doc facts below were read from each exchange's official docs on 2026-10-27
-(Kraken, Coinbase, Binance "market data only" page) and are re-checked by the
-live run itself: a provider counts as verified only if real candles pass validation.
+Only build("tokocrypto") is currently authorized. Legacy adapter classes remain for
+historical comparison code, but fetcher.validate_public_url refuses every host and
+route except Tokocrypto's approved HTTPS time and candle endpoints. No adapter can
+bypass that transport boundary.
 """
 import urllib.error
 import urllib.parse
