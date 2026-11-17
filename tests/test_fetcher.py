@@ -61,6 +61,11 @@ class UrlPolicyTests(unittest.TestCase):
             "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&foo=bar",
             "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&symbol=ETHUSDT&interval=1h",
             "https://www.tokocrypto.site/api/v3/time?x=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=9&endTime=8&limit=500",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=2&limit=501",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=%D9%A1&endTime=2&limit=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=2&limit=1&",
         ]
         for url in bad:
             with self.subTest(url=url), self.assertRaises(fetcher.DisallowedRequestError):
