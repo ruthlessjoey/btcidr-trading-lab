@@ -166,8 +166,6 @@ class BinanceStyle:
 def build(name):
     if name == "kraken":
         return Kraken()
-    if name == "coinbase":
-        return Coinbase()
     if name == "binance-vision":
         return BinanceStyle("binance-vision", "BTC/USDT", "USDT", "BTC_USDT",
                             "https://data-api.binance.vision",
