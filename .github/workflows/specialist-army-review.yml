@@ -39,8 +39,7 @@ jobs:
       - name: Verify runner syntax
         run: python -m py_compile runner/tools/specialist_army_review.py
 
-      - name: Run synthetic smoke test
-        if: inputs.mode == 'synthetic'
+      - name: Run synthetic smoke test before any review
         run: python runner/tools/specialist_army_review.py --mode synthetic
 
       - name: Run the immutable PR #56 specialist review
