@@ -47,7 +47,10 @@ def validate_public_url(url):
             p.username is not None or p.password is not None or
             port not in (None, 443) or p.fragment or p.path not in APPROVED_PATHS):
         raise DisallowedRequestError("request refused by the public market-data allowlist")
-    pairs = urllib.parse.parse_qsl(p.query, keep_blank_values=True, strict_parsing=True) if p.query else []
+    try:
+        pairs = urllib.parse.parse_qsl(p.query, keep_blank_values=True, strict_parsing=True) if p.query else []
+    except ValueError:
+        raise DisallowedRequestError("candle request query is malformed")
     keys = [k for k, _ in pairs]
     if len(keys) != len(set(keys)):
         raise DisallowedRequestError("duplicate query parameters are not allowed")
@@ -56,12 +59,17 @@ def validate_public_url(url):
             raise DisallowedRequestError("server-time route does not accept query parameters")
     else:
         q = dict(pairs)
-        if set(q) - {"symbol", "interval", "startTime", "endTime", "limit"}:
-            raise DisallowedRequestError("candle route contains an unapproved query parameter")
+        required = {"symbol", "interval", "startTime", "endTime", "limit"}
+        if set(q) != required:
+            raise DisallowedRequestError("candle request must contain exactly the approved query parameters")
         if q.get("symbol") != "BTCUSDT" or q.get("interval") not in TF_SECONDS:
             raise DisallowedRequestError("candle request is outside the approved BTC/USDT market")
-        if any(not v.isdigit() for k, v in pairs if k in {"startTime", "endTime", "limit"}):
+        numeric = ("startTime", "endTime", "limit")
+        if any(not (q[k].isascii() and q[k].isdecimal()) for k in numeric):
             raise DisallowedRequestError("candle request contains an invalid numeric parameter")
+        start_ms, end_ms, limit = (int(q[k]) for k in numeric)
+        if start_ms > end_ms or not 1 <= limit <= CANDLES_PER_REQUEST:
+            raise DisallowedRequestError("candle request range or limit is outside the approved bounds")
     return url
 
 
