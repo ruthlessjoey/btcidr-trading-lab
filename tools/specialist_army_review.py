@@ -189,7 +189,7 @@ def model_config():
 
 def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, label: str) -> str:
     body = json.dumps({
-        "model":model, "temperature":0.1, "max_tokens":1800,
+        "model":model, "temperature":0.1, "max_tokens":4096, "reasoning":{"effort":"none"},
         "messages":[{"role":"system","content":system},
                     {"role":"user","content":json.dumps(payload, ensure_ascii=False)}],
     }).encode("utf-8")
@@ -287,11 +287,22 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
     content_type = type(content).__name__
     content_length = len(content) if isinstance(content, str) else -1
     refusal_present = bool(message.get("refusal"))
+    usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
+    completion_tokens = usage.get("completion_tokens")
+    completion_details = usage.get("completion_tokens_details")
+    reasoning_tokens = (completion_details.get("reasoning_tokens")
+                        if isinstance(completion_details, dict) else None)
+    completion_label = (str(completion_tokens) if isinstance(completion_tokens, int)
+                        and 0 <= completion_tokens <= 10_000_000 else "unknown")
+    reasoning_label = (str(reasoning_tokens) if isinstance(reasoning_tokens, int)
+                       and 0 <= reasoning_tokens <= 10_000_000 else "unknown")
     print("MODEL_RESPONSE_DIAGNOSTIC role=" + label +
           " body_bytes=" + str(len(raw)) +
           " choices_count=" + str(len(choices)) +
           " finish_reason=" + finish_label +
           " content_type=" + content_type +
+          " completion_tokens=" + completion_label +
+          " reasoning_tokens=" + reasoning_label +
           " content_chars=" + str(content_length) +
           " refusal_present=" + str(refusal_present).lower(), flush=True)
     if not isinstance(content, str):
@@ -327,8 +338,9 @@ def synthetic():
         agent_text, skill_text = load_role(role)
         assert agent_text and skill_text
     assert not contains_secret("normal code")
-    assert contains_secret("sk-or-v1-abcdefghijklmnopqrstuvwxyz123456")
-    assert redact("token=sk-or-v1-abcdefghijklmnopqrstuvwxyz123456") == "token=[REDACTED]"
+    sample_token = "sk-or-v1-" + ("x" * 32)
+    assert contains_secret(sample_token)
+    assert redact("token=" + sample_token) == "token=[REDACTED]"
     write_summary(
         "# Specialist Army Runner — Synthetic Smoke Test\n\n"
         "**PASS:** local policy checks completed. No repository source was fetched; "
