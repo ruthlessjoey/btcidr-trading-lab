@@ -81,7 +81,11 @@ COMMANDER = "lab-commander"
 ACCEPTANCE = "independent-acceptance"
 VERIFICATION = "verification-before-completion"
 MAX_FILE = 48_000
-MAX_TOTAL = 120_000
+# Each immutable snapshot is bounded independently; the two snapshots are never
+# retained beyond these explicit per-snapshot limits.
+MAX_TOTAL = 256_000
+MAX_DIFF = 160_000
+MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
 MAX_OUTPUT = 16_000
 
@@ -215,6 +219,23 @@ def build_review_diff(base_snapshot: dict[str, str], head_snapshot: dict[str, st
         result[path] = "\n".join(lines)
     return result
 
+def enforce_diff_limit(review_diff: dict[str, str]) -> int:
+    """Bound the exact unified diff before it is placed in any model request."""
+    size = sum(len(value) for value in review_diff.values())
+    if size > MAX_DIFF:
+        raise RuntimeError(
+            "Scoped review diff exceeded limit: chars=" + str(size) +
+            " limit=" + str(MAX_DIFF))
+    return size
+
+
+def enforce_request_limit(body: bytes) -> None:
+    """Bound the fully serialized request, including trusted role instructions."""
+    if len(body) > MAX_REQUEST:
+        raise RuntimeError(
+            "Serialized model request exceeded limit: bytes=" + str(len(body)) +
+            " limit=" + str(MAX_REQUEST))
+
 
 def safe_rate_limit_metadata(headers) -> str:
     """Return only allowlisted numeric rate-limit headers; never log bodies or arbitrary headers."""
@@ -293,6 +314,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         "messages":[{"role":"system","content":system},
                     {"role":"user","content":json.dumps(payload, ensure_ascii=False)}],
     }).encode("utf-8")
+    enforce_request_limit(body)
     req = urllib.request.Request(endpoint, data=body, headers={
         "Authorization":"Bearer " + key, "Content-Type":"application/json",
         "Accept":"application/json", "User-Agent":"ai-trading-lab-specialist-review",
@@ -481,6 +503,20 @@ def synthetic():
     sample_path = REVIEW_PATHS[0]
     sample_diff = build_review_diff({sample_path:"before\nkeep\n"}, {sample_path:"after\nkeep\n"})
     assert "before" in sample_diff[sample_path] and "after" in sample_diff[sample_path]
+    assert enforce_diff_limit(sample_diff) > 0
+    try:
+        enforce_diff_limit({sample_path:"x" * (MAX_DIFF + 1)})
+    except RuntimeError as exc:
+        assert "review diff exceeded limit" in str(exc)
+    else:
+        raise AssertionError("oversized review diff was not rejected")
+    enforce_request_limit(b"x" * MAX_REQUEST)
+    try:
+        enforce_request_limit(b"x" * (MAX_REQUEST + 1))
+    except RuntimeError as exc:
+        assert "model request exceeded limit" in str(exc)
+    else:
+        raise AssertionError("oversized model request was not rejected")
     assert retry_delay_seconds({"Retry-After":"2"}, 0) == 2.0
     assert retry_delay_seconds({}, 0) == 15.0
     write_summary(
