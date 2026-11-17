@@ -164,13 +164,7 @@ class BinanceStyle:
 
 
 def build(name):
-    if name == "kraken":
-        return Kraken()
-    if name == "binance-vision":
-        return BinanceStyle("binance-vision", "BTC/USDT", "USDT", "BTC_USDT",
-                            "https://data-api.binance.vision",
-                            "https://developers.binance.com/docs/binance-spot-api-docs/faqs/market_data_only")
     if name == "tokocrypto":
         return BinanceStyle("tokocrypto", "BTC/USDT", "USDT", "BTC_USDT",
                             "https://www.tokocrypto.site", "https://www.tokocrypto.com/apidocs/")
-    raise ValueError(f"unknown provider {name!r}")
+    raise ValueError(f"provider {name!r} is not currently authorized")
