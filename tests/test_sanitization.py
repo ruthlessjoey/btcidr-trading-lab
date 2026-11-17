@@ -3,7 +3,6 @@
 This module imports only fetcher, providers, and research.crosscheck. It does not
 import live_check, validator, report, dataset, or any protected module.
 """
-import contextlib
 import io
 import json
 import os
