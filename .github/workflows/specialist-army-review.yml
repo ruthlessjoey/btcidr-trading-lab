@@ -1,58 +1,19 @@
-name: Specialist Army Review
+name: Legacy Specialist Army Review (retired; use Q0.8 review)
 
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: "Synthetic policy smoke test first; scoped PR #56 review only after it passes"
-        required: true
-        type: choice
-        options:
-          - synthetic
-          - review
-        default: synthetic
 
 permissions:
   contents: read
-  pull-requests: read
-
-concurrency:
-  group: specialist-army-review
-  cancel-in-progress: false
 
 jobs:
-  review:
-    name: Bounded read-only review
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    permissions:
-      contents: read
-      pull-requests: read
+  retired:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
     steps:
-      - name: Sparse checkout only the immutable trusted runner and its guidance
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: d78750d154886f91f146be2e709f55bf88cba146
-          path: runner
-          persist-credentials: false
-          fetch-depth: 1
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /tools/specialist_army_review.py
-            /.claude/agents/
-            /.claude/skills/
-
-      - name: Verify runner syntax
-        run: python -m py_compile runner/tools/specialist_army_review.py
-
-      - name: Run synthetic smoke test before any review
-        run: python runner/tools/specialist_army_review.py --mode synthetic
-
-      - name: Run the immutable PR #56 specialist review
-        if: inputs.mode == 'review'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: python runner/tools/specialist_army_review.py --mode review
+      - name: Explain the replacement workflow
+        run: |
+          echo "::error::This legacy reviewer targeted superseded PR #56 and is retired."
+          echo "Use q08-specialist-review.yml on the current Q0 provider-sanitization branch instead."
+          echo "No checkout, source access, secret access, model call, or review action was performed."
+          exit 1
