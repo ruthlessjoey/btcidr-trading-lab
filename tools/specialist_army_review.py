@@ -396,9 +396,9 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
     if not re.search(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$", text):
         print("MODEL_VERDICT_MISSING role=" + label +
               " classification=INCONCLUSIVE not_pass=true", flush=True)
-        text = ("VERDICT: INCONCLUSIVE\\n\\n"
+        text = ("VERDICT: INCONCLUSIVE\n\n"
                 "[Runner note: The model response omitted the required explicit verdict. "
-                "This response is retained but classified INCONCLUSIVE, never PASS.]\\n\\n" + text)
+                "This response is retained but classified INCONCLUSIVE, never PASS.]\n\n" + text)
     print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
           str(round(time.monotonic()-started, 1)), flush=True)
     return redact(text, MAX_OUTPUT)
@@ -428,11 +428,11 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
-    missing_verdict = ("VERDICT: INCONCLUSIVE\\n\\n"
+    missing_verdict = ("VERDICT: INCONCLUSIVE\n\n"
         "[Runner note: The model response omitted the required explicit verdict. "
-        "This response is retained but classified INCONCLUSIVE, never PASS.]\\n\\n"
+        "This response is retained but classified INCONCLUSIVE, never PASS.]\n\n"
         "Review body without a verdict")
-    assert missing_verdict.startswith("VERDICT: INCONCLUSIVE\\n")
+    assert missing_verdict.startswith("VERDICT: INCONCLUSIVE\n")
     assert "never PASS" in missing_verdict
     sample_path = REVIEW_PATHS[0]
     sample_diff = build_review_diff({sample_path:"before\nkeep\n"}, {sample_path:"after\nkeep\n"})
