@@ -7,27 +7,53 @@ permissions:
   contents: read
 
 concurrency:
-  group: q08-offline-security-tests
+  group: q08-offline-tests-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   offline-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - name: Sparse checkout only the approved fetcher test surface
+      - name: Sparse checkout only approved unprotected test and source files
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /config.json
+            /research_config.json
             /fetcher.py
+            /providers.py
+            /probe.py
+            /run.py
+            /research/__init__.py
+            /research/crosscheck.py
+            /research/history.py
+            /research/pipeline.py
             /tests/test_fetcher.py
+            /tests/test_live_check.py
+            /tests/test_history.py
+            /tests/test_probe.py
+            /tests/test_pipeline.py
+            /tests/test_sanitization.py
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
-      - name: Run the approved offline fetcher security tests
-        run: python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+      - name: Run approved offline security regression modules
+        run: |
+          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
+          python3 -m unittest discover -s tests -p 'test_history.py' -v
+          python3 -m unittest discover -s tests -p 'test_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_sanitization.py' -v
