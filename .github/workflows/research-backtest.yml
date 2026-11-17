@@ -1,4 +1,4 @@
-name: Research backtest (Step 2)
+name: Research backtest (blocked pending protected engine review)
 
 on:
   workflow_dispatch:
@@ -19,31 +19,36 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run authorized offline tests (no protected validator import)
+      - name: Run authorized offline tests only (no protected validator import)
         run: |
           python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
           python3 -m unittest discover -s tests -p 'test_live_check.py' -v
           python3 -m unittest discover -s tests -p 'test_history.py' -v
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
-          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
-          python3 -m unittest discover -s tests -p 'test_engine.py' -v
-          python3 -m unittest discover -s tests -p 'test_backtest_pipeline.py' -v
 
-      - name: Load the preserved research-data branch without write credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: research-data
-          path: prev
-          persist-credentials: false
+      - name: Record why Step 2 is blocked without importing protected modules
+        run: |
+          mkdir -p out
+          cat > out/backtest-blocked.md <<'EOF'
+          # Research backtest blocked
 
-      - name: Backtest the pinned local dataset (no cross-check providers authorized)
-        run: python3 run_backtest.py --datasets-root prev/datasets --prev-results prev
+          Step 2 remains disabled because its current import chain reaches the protected
+          root-level validator.py through research.pipeline -> research.engine.
 
-      - name: Keep reports and logs as a run artifact only
+          This workflow intentionally does not check out research-data, import the engine,
+          execute run_backtest.py, read protected files, or evaluate any backtest.
+
+          Resume only after the protected-module boundary is separately reviewed and
+          the owner authorizes the required access.
+          EOF
+          cat "$GITHUB_WORKSPACE/out/backtest-blocked.md" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Preserve the blocker report as a run artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: backtest-report
-          path: out/
+          name: backtest-blocked-report
+          path: out/backtest-blocked.md
           if-no-files-found: ignore
