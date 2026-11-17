@@ -16,13 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out immutable trusted reviewer only
+      - name: Check out only the immutable trusted reviewer and its guidance
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
           ref: 93b8b63a66ec38ab4887cb64255f1641f0c3203e
           path: runner
           persist-credentials: false
+          sparse-checkout: |
+            /tools/q08_specialist_review.py
+            /.claude/agents/
+            /.claude/skills/
+          sparse-checkout-cone-mode: false
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
