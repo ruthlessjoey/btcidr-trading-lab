@@ -31,6 +31,9 @@ def assert_read_only(cfg):
 def run_pipeline(cfg, out_dir="out", opener=fetcher.default_opener,
                  sleep=time.sleep, local_now=None):
     assert_read_only(cfg)
+    if cfg.get("sources") != [{"name": "tokocrypto-mbx", "style": "binance_style",
+                               "base_url": "https://www.tokocrypto.site"}]:
+        raise SystemExit("Refusing to run: source configuration is not the exact approved Tokocrypto endpoint.")
     tf = cfg["timeframe"]
     if tf not in fetcher.TF_SECONDS:
         raise SystemExit(f"Unknown timeframe {tf!r}. Allowed: {', '.join(fetcher.TF_SECONDS)}")
