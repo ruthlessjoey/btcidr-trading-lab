@@ -142,6 +142,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
     for attempt in range(1, retries + 1):
         status = None
         body = b""
+        network_error = False
         try:
             status, body = opener(url, timeout)
         except urllib.error.HTTPError as e:
@@ -151,6 +152,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
             except Exception:
                 pass
         except (urllib.error.URLError, TimeoutError, OSError) as e:
+            network_error = True
             last = f"network error ({type(e).__name__})"
         except Exception as e:
             raise ApiError(f"unexpected transport failure ({type(e).__name__})") from None
@@ -159,6 +161,10 @@ def http_get_json(url, timeout, retries, opener, sleep):
             raise ApiError("transport returned an invalid response body")
         if len(body) > MAX_RESPONSE_BYTES:
             raise ApiError("response exceeded the 1 MiB public-data limit")
+        if network_error:
+            if attempt < retries:
+                sleep(2 ** attempt)
+            continue
         if status is None:
             raise ApiError("transport returned no HTTP status")
         if type(status) is not int or not 100 <= status <= 599:
