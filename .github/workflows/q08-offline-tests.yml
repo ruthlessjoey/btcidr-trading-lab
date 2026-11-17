@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@6fd4d22b20465ccc0f7354476588e8df7c9ca0e0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
           cache: false
