@@ -279,9 +279,7 @@ class CrossCheckTests(unittest.TestCase):
         c = out[toy.START]
         self.assertEqual((c.open, c.high, c.low, c.close), (100.0, 110.0, 90.0, 105.0))
 
-    def test_run_crosscheck_reports_a_fetch_failure_instead_of_crashing(self):
-        def blocked(url, timeout):
-            return 403, b"denied"
+    def test_run_crosscheck_reports_refusal_without_network_access(self):
         with tempfile.TemporaryDirectory() as d:
             root = os.path.join(d, "ds")
             _, man = write_toy(root, self.b)
