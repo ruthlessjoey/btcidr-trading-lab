@@ -78,16 +78,14 @@ class CrosscheckGateTests(unittest.TestCase):
 
 
 class HistoryGateStaticTests(unittest.TestCase):
-    def test_unverified_market_identity_fails_before_first_network_request(self):
+    def test_unverified_market_identity_fails_without_any_network_request(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:
             source = f.read()
-        fail_marker = 'add("market_identity", FAIL,'
-        refusal = 'raise ApiError("market identity cannot be independently verified'
-        first_request = 'server_now = fetcher.extract_server_time(http.get('
-        self.assertIn(fail_marker, source)
-        self.assertIn(refusal, source)
-        self.assertLess(source.index(fail_marker), source.index(first_request))
-        self.assertLess(source.index(refusal), source.index(first_request))
+        self.assertIn('"name": "market_identity", "status": "FAIL"', source)
+        self.assertIn('"network_requests": 0', source)
+        self.assertIn('"backtest_allowed": False', source)
+        self.assertNotIn("urllib", source)
+        self.assertNotIn("import validator", source)
 
 
 if __name__ == "__main__":
