@@ -186,8 +186,16 @@ def fetch_snapshot(token: str, ref: str, added_paths: set[str]) -> dict[str, str
         except Exception:
             raise RuntimeError("Scoped source file was not valid UTF-8/base64") from None
         total += len(raw)
-        if len(raw) > MAX_FILE or total > MAX_TOTAL:
-            raise RuntimeError("Scoped source exceeded configured size limits")
+        if len(raw) > MAX_FILE:
+            raise RuntimeError(
+                "Scoped file exceeded per-file limit: " + path +
+                " bytes=" + str(len(raw)) +
+                " limit=" + str(MAX_FILE))
+        if total > MAX_TOTAL:
+            raise RuntimeError(
+                "Scoped snapshot exceeded aggregate limit after: " + path +
+                " total_bytes=" + str(total) +
+                " limit=" + str(MAX_TOTAL))
         if contains_secret(source):
             raise RuntimeError("Secret-screen pattern detected; model transmission halted")
         result[path] = source
