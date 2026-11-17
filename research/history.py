@@ -105,8 +105,10 @@ def run_step1(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time.slee
     try:
         # 1. Market identity is configuration-only: exchangeInfo is not an approved route.
         result["exchange_info"] = None
-        add("market_identity", WARN,
-            "Configuration declares BTC/USDT on Tokocrypto; exchange symbol metadata was not queried because that route is not approved.")
+        add("market_identity", FAIL,
+            "Market identity is unverified: the approved public API scope excludes symbol metadata. "
+            "No dataset may be accepted on configuration alone.")
+        raise ApiError("market identity cannot be independently verified under the current endpoint authorization")
 
         # 2. exchange clock and paged history
         server_now = fetcher.extract_server_time(http.get(cfg["host"] + "/api/v3/time"))
