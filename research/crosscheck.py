@@ -1,9 +1,8 @@
-"""research/crosscheck.py - compare the preserved Binance daily candles with independent sources.
+"""research/crosscheck.py - compare preserved daily candles with independent sources.
 
-READ-ONLY. Coinbase BTC/USD (docs read) is compared over the whole history. Bitstamp BTC/USD
-(docs NOT read this session, so treated as unverified) is compared only around flagged days.
-USD is not USDT, so small differences are normal; this checks that a flagged day really happened.
-The Binance candles are never changed.
+READ-ONLY. This module is currently disabled by the empty provider authorization set.
+All parser and transport errors are fixed safe messages; provider-controlled values are
+never copied into exception text, logs, Markdown, or stdout.
 """
 import json
 import os
@@ -19,8 +18,7 @@ from fetcher import ApiError, Candle
 DAY = 86400
 COINBASE = "https://api.exchange.coinbase.com"
 BITSTAMP = "https://www.bitstamp.net"
-# Pre-stated rule for a flagged day (written before looking at the answer):
-TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
+TOLERANCE_PCT = 3.0
 
 
 def day(ts):
@@ -40,12 +38,16 @@ def fetch_coinbase_daily(http, first_ts, last_ts):
                                     "end": datetime.fromtimestamp(end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
         rows = http.get(f"{COINBASE}/products/BTC-USD/candles?{q}")
         if not isinstance(rows, list):
-            raise ApiError(f"Coinbase did not return a list: {str(rows)[:200]}")
-        for r in rows:
-            try:      # [time, low, high, open, close, volume]
-                out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
-            except (TypeError, ValueError, IndexError):
-                raise ApiError(f"unexpected Coinbase candle: {str(r)[:200]}")
+            raise ApiError("Coinbase daily-candle response is not a list")
+        for row in rows:
+            try:
+                timestamp = fetcher.to_seconds(row[0])
+                candle = Candle(timestamp, fetcher._finite_float(row[3]),
+                                fetcher._finite_float(row[2]), fetcher._finite_float(row[1]),
+                                fetcher._finite_float(row[4]), fetcher._finite_float(row[5]))
+                out[timestamp] = candle
+            except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+                raise ApiError("Coinbase daily-candle row has an unexpected format")
         cur = end
     return out
 
@@ -55,14 +57,22 @@ def fetch_bitstamp_window(http, first_ts, days):
     obj = http.get(f"{BITSTAMP}/api/v2/ohlc/btcusd/?{q}")
     try:
         rows = obj["data"]["ohlc"]
-        return {int(r["timestamp"]): Candle(int(r["timestamp"]), float(r["open"]), float(r["high"]),
-                                            float(r["low"]), float(r["close"]), float(r["volume"]))
-                for r in rows}
-    except (KeyError, TypeError, ValueError):
-        raise ApiError(f"unexpected Bitstamp answer: {str(obj)[:200]}")
+        out = {}
+        for row in rows:
+            timestamp = fetcher.to_seconds(row["timestamp"])
+            out[timestamp] = Candle(timestamp, fetcher._finite_float(row["open"]),
+                                    fetcher._finite_float(row["high"]),
+                                    fetcher._finite_float(row["low"]),
+                                    fetcher._finite_float(row["close"]),
+                                    fetcher._finite_float(row["volume"]))
+        return out
+    except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+        raise ApiError("Bitstamp candle response has an unexpected format")
 
 
 def pct(a, b):
+    if b == 0:
+        raise ValueError("comparison reference price must be non-zero")
     return (a / b - 1) * 100
 
 
@@ -71,22 +81,30 @@ def judge(binance, other, t):
     if t not in other or t - DAY not in other or t - DAY not in binance:
         return None
     b, o = binance[t], other[t]
-    ret_b = pct(b.close, binance[t - DAY].close)
-    ret_o = pct(o.close, other[t - DAY].close)
-    d = {"open_diff_pct": pct(b.open, o.open), "close_diff_pct": pct(b.close, o.close),
-         "high_diff_pct": pct(b.high, o.high), "low_diff_pct": pct(b.low, o.low),
-         "binance_return_pct": ret_b, "other_return_pct": ret_o,
-         "return_gap_pp": ret_b - ret_o}
+    try:
+        ret_b = pct(b.close, binance[t - DAY].close)
+        ret_o = pct(o.close, other[t - DAY].close)
+        d = {"open_diff_pct": pct(b.open, o.open), "close_diff_pct": pct(b.close, o.close),
+             "high_diff_pct": pct(b.high, o.high), "low_diff_pct": pct(b.low, o.low),
+             "binance_return_pct": ret_b, "other_return_pct": ret_o,
+             "return_gap_pp": ret_b - ret_o}
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
     d["agrees"] = (abs(d["open_diff_pct"]) <= TOLERANCE_PCT and abs(d["close_diff_pct"]) <= TOLERANCE_PCT
                    and abs(d["return_gap_pp"]) <= TOLERANCE_PCT)
     return d
 
 
 def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
-    """Pure comparison. `candles` is the preserved Binance list."""
+    """Pure comparison. `candles` is the preserved source list."""
     bn = {c.time: c for c in candles}
     common = sorted(set(bn) & set(coinbase))
-    diffs = [(abs(pct(bn[t].close, coinbase[t].close)), t) for t in common]
+    diffs = []
+    for t in common:
+        try:
+            diffs.append((abs(pct(bn[t].close, coinbase[t].close)), t))
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
     abs_d = [d for d, _ in diffs]
     res = {"common_days": len(common), "binance_days": len(bn),
            "coinbase_days": len(coinbase), "summary": None, "worst_days": [], "flagged": []}
@@ -155,10 +173,10 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.def
 
 def build_markdown(r):
     L = ["# Cross-check of flagged candles", "",
-         f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The Binance candles "
+         f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The source candles "
          "were **not changed**.", "",
-         "Sources: **Coinbase BTC/USD** daily candles (official docs read; USD is not USDT) and "
-         "**Bitstamp BTC/USD** around flagged days (official docs NOT read this session, so unverified).",
+         "Sources: **Coinbase BTC/USD** daily candles (USD is not USDT) and "
+         "**Bitstamp BTC/USD** around flagged days. Cross-check providers remain disabled pending authorization.",
          f"Pre-stated rule: {r['rule']}.", ""]
     if r["coinbase_error"]:
         L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")
@@ -182,7 +200,7 @@ def build_markdown(r):
             if j:
                 L.append(f"- vs {name}: open {j['open_diff_pct']:+.2f}%, close {j['close_diff_pct']:+.2f}%, "
                          f"high {j['high_diff_pct']:+.2f}%, low {j['low_diff_pct']:+.2f}%; day return "
-                         f"{j['binance_return_pct']:+.2f}% (Binance) vs {j['other_return_pct']:+.2f}% ({name}); "
+                         f"{j['binance_return_pct']:+.2f}% (source) vs {j['other_return_pct']:+.2f}% ({name}); "
                          f"gap {j['return_gap_pp']:+.2f} pp; rule met: {j['agrees']}")
             else:
                 L.append(f"- vs {name}: not available")
