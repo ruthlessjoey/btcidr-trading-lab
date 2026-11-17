@@ -138,7 +138,7 @@ def fetch_snapshot(token: str, ref: str, added_paths: set[str]) -> dict[str, str
     total = 0
     for path in REVIEW_PATHS:
         if path in added_paths:
-            result[path] = ""
+        result[path] = "\n".join(lines)
             continue
         encoded = urllib.parse.quote(path, safe="/")
         item = github_json(f"/repos/{REPO}/contents/{encoded}?ref={ref}", token)
@@ -424,8 +424,9 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
-    sample_diff = build_review_diff({"sample.py":"before\\nkeep\\n"}, {"sample.py":"after\\nkeep\\n"})
-    assert "before" in sample_diff["sample.py"] and "after" in sample_diff["sample.py"]
+    sample_path = REVIEW_PATHS[0]
+    sample_diff = build_review_diff({sample_path:"before\nkeep\n"}, {sample_path:"after\nkeep\n"})
+    assert "before" in sample_diff[sample_path] and "after" in sample_diff[sample_path]
     assert retry_delay_seconds({"Retry-After":"2"}, 0) == 2.0
     assert retry_delay_seconds({}, 0) == 15.0
     write_summary(
