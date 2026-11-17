@@ -76,7 +76,7 @@ deployments, edits, commits, pushes, merges, account access, or trades occurred.
 Treat missing evidence as unknown, not a pass. Never invent code, line numbers,
 test results, or decisions. Separate facts, inference, and unknowns. Give
 severity, evidence, impact, minimal recommendation, and acceptance criteria.
-Verdict must be PASS, PASS WITH FINDINGS, BLOCKED, or INCONCLUSIVE.
+The first non-empty output line MUST be exactly `VERDICT: PASS`, `VERDICT: PASS WITH FINDINGS`, `VERDICT: BLOCKED`, or `VERDICT: INCONCLUSIVE`. Then provide the review. Do not omit this line.
 """
 
 def redact(text: str, limit: int = 3200) -> str:
@@ -336,8 +336,8 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError("Model output exceeded " + str(MAX_OUTPUT) +
                            " characters (received " + str(len(text)) +
                            "; finish_reason=" + finish_label + ")")
-    if not re.search(r"\b(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\b", text):
-        raise RuntimeError("Model output omitted a recognized verdict")
+    if not re.search(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$", text):
+        raise RuntimeError("Model output omitted the required explicit VERDICT line")
     print("MODEL_REQUEST_COMPLETE role=" + label + " elapsed_seconds=" +
           str(round(time.monotonic()-started, 1)), flush=True)
     return redact(text, MAX_OUTPUT)
@@ -361,6 +361,12 @@ def synthetic():
     sample_token = "sk-or-v1-" + ("x" * 32)
     assert contains_secret(sample_token)
     assert redact("token=" + sample_token) == "token=[REDACTED]"
+    verdict_pattern = r"(?im)^\\s*VERDICT:\\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\s*$"
+    assert re.search(verdict_pattern, "VERDICT: PASS")
+    assert re.search(verdict_pattern, "VERDICT: PASS WITH FINDINGS")
+    assert re.search(verdict_pattern, "VERDICT: BLOCKED")
+    assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
+    assert not re.search(verdict_pattern, "This review is a PASS")
     write_summary(
         "# Specialist Army Runner — Synthetic Smoke Test\n\n"
         "**PASS:** local policy checks completed. No repository source was fetched; "
