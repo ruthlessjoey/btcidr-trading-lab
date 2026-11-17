@@ -189,16 +189,15 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(c["test"]["re_evaluation"])
         self.assertIn("re-evaluation", md3)
 
-    def test_sensitivity_removes_the_flagged_candle_but_keeps_the_original(self):
+    def test_flagged_date_backtest_is_blocked_without_owner_authorized_crosscheck(self):
         c = toy.toy_candles(1000)
         flagged = pipeline.utc_day(c[300].time)
-        _, data, md, _ = self.run_bt(dict(self.cfg, flagged_dates=[flagged]))
-        sv = data["sensitivity"]
-        self.assertEqual(sv["removed"], [flagged])
-        self.assertTrue(sv["test_signals_identical_for_original_choice"] in (True, None))
-        self.assertIn("removed", md)
-        self.assertIn("NOT verified", md)         # no cross-check file was given
-        self.assertEqual(data["dataset"]["rows"], 1000)    # original data untouched
+        code, data, md, out = self.run_bt(dict(self.cfg, flagged_dates=[flagged]))
+        self.assertEqual(code, 1)
+        self.assertEqual(data["status"], "FAILED")
+        self.assertIn("no independent cross-check provider is currently authorized", data["error"])
+        self.assertIn("STOPPED", md)
+        self.assertFalse(os.path.exists(os.path.join(out, "frozen_choice.json")))
 
     def test_remap_keeps_calendar_boundaries(self):
         c = toy.toy_candles(1000)
@@ -287,9 +286,13 @@ class CrossCheckTests(unittest.TestCase):
             root = os.path.join(d, "ds")
             _, man = write_toy(root, self.b)
             manifest, candles = dataset.load_verified(man)
+            calls = []
+            def blocked(url, timeout):
+                calls.append(url)
+                return 403, b"denied"
             res = crosscheck.run_crosscheck(manifest, candles, [self.fd], os.path.join(d, "o"),
                                             opener=blocked, sleep=lambda s: None, retries=1)
-            self.assertIn("403", res["coinbase_error"])
+            self.assertEqual(calls, [])
             self.assertEqual(res["flagged"][0]["verdict"], "UNAVAILABLE")
             with open(os.path.join(d, "o", "crosscheck.md"), encoding="utf-8") as f:
                 self.assertIn("UNAVAILABLE", f.read())
