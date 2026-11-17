@@ -1,4 +1,4 @@
-name: Research dataset (Step 1 gate)
+name: Research dataset (Step 1 fail-closed gate)
 
 on:
   workflow_dispatch:
@@ -15,11 +15,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Sparse checkout only the approved offline tests and Step 1 gate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /live_check.py
+            /probe.py
+            /run.py
+            /config.json
+            /research_config.json
+            /research/history.py
+            /fetch_history.py
+            /tests/test_fetcher.py
+            /tests/test_live_check.py
+            /tests/test_history.py
+            /tests/test_probe.py
+            /tests/test_pipeline.py
 
-      - name: Run authorized offline tests only (no protected validator import)
+      - name: Run the approved offline tests only
         run: |
           python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
           python3 -m unittest discover -s tests -p 'test_live_check.py' -v
@@ -30,7 +48,7 @@ jobs:
       - name: Emit the fail-closed market-identity report; no network request is made
         run: python3 fetch_history.py
 
-      - name: Keep reports and dataset as a run artifact only
+      - name: Keep the fail-closed report as a run artifact only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
