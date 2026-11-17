@@ -20,12 +20,8 @@ USER_AGENT = "tokocrypto-btcusdt-lab/0.1 (read-only market data)"
 MAX_RESPONSE_BYTES = 1024 * 1024
 APPROVED_HOST = "www.tokocrypto.site"
 APPROVED_PATHS = {"/api/v3/time", "/api/v3/klines"}
-
-# Interval names -> seconds (Binance-style names).
 TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
               "1h": 3600, "4h": 14400, "1d": 86400}
-
-# Our own chunk size (kept well under the usual 1000-candle cap).
 CANDLES_PER_REQUEST = 500
 
 
@@ -76,7 +72,7 @@ def validate_public_url(url):
 
 @dataclass(frozen=True)
 class Candle:
-    time: int       # candle open time, unix seconds (UTC)
+    time: int
     open: float
     high: float
     low: float
@@ -148,7 +144,7 @@ def http_get_json(url, timeout, retries, opener, sleep):
         body = b""
         try:
             status, body = opener(url, timeout)
-        except urllib.error.HTTPError as e:  # must come before URLError
+        except urllib.error.HTTPError as e:
             status = e.code
             try:
                 e.close()
@@ -163,17 +159,18 @@ def http_get_json(url, timeout, retries, opener, sleep):
             raise ApiError("transport returned an invalid response body")
         if len(body) > MAX_RESPONSE_BYTES:
             raise ApiError("response exceeded the 1 MiB public-data limit")
-        if status is not None:
-            if type(status) is not int or not 100 <= status <= 599:
-                raise ApiError("transport returned an invalid HTTP status")
-            if status == 200:
-                try:
-                    return json.loads(body.decode("utf-8"), parse_constant=_reject_json_constant)
-                except (ValueError, UnicodeDecodeError, RecursionError):
-                    raise ApiError("HTTP 200 response was not valid JSON")
-            last = f"HTTP {status}"
-            if status != 429 and status < 500:
-                raise ApiError(f"HTTP {status} (not retried)")
+        if status is None:
+            raise ApiError("transport returned no HTTP status")
+        if type(status) is not int or not 100 <= status <= 599:
+            raise ApiError("transport returned an invalid HTTP status")
+        if status == 200:
+            try:
+                return json.loads(body.decode("utf-8"), parse_constant=_reject_json_constant)
+            except (ValueError, UnicodeDecodeError, RecursionError):
+                raise ApiError("HTTP 200 response was not valid JSON")
+        last = f"HTTP {status}"
+        if status != 429 and status < 500:
+            raise ApiError(f"HTTP {status} (not retried)")
         if attempt < retries:
             sleep(2 ** attempt)
     raise ApiError(f"request failed after {retries} attempts: {last}")
