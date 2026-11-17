@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime, timezone
 
-from research import dataset, engine, selection, splits as splits_mod, strategy
+from research import crosscheck, dataset, engine, selection, splits as splits_mod, strategy
 from research.backtest_report import build_markdown
 from research.engine import EngineError, Rules
 
@@ -16,8 +16,8 @@ SEGMENTS = (("train", "TRAIN (in-sample; used to screen candidates)"),
             ("validation", "VALIDATION (used to pick among eligible candidates)"),
             ("test", "TEST (final; evaluated once)"))
 
-# Empty until the owner separately approves at least one independent source.
-AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+# Share the exact provider authorization gate with the cross-check runner.
+AUTHORIZED_CROSSCHECK_PROVIDERS = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
 
 
 def utc_day(ts):
