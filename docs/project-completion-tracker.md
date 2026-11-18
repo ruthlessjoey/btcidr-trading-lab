@@ -674,3 +674,16 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - This workflow is a fail-closed offline gate, not proof that Tokocrypto market identity or data availability has been verified. It was not dispatched or executed in this review.
 - Static review of `.github/workflows/research-backtest.yml` (blob `9c1fa840bb70d5c285a0ac5d730f4aac65e7046b`) found read-only permissions, pinned actions, credential persistence disabled, and an explicit stop after the approved offline subset to avoid importing protected `validator.py` through the backtest engine. No backtest, dataset checkout, TEST evaluation, or exchange request is performed by this blocked workflow.
 - This is static configuration/import-closure evidence only. It does not replace the pending 19-role specialist review, actionlint/zizmor execution, or manual Actions runs. No protected file was opened, no test or workflow was executed in this audit, and no PR was merged.
+
+
+### Q0 public transport policy source review (2026-11-19)
+
+- Reviewed exact PR #60 source blobs at head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`:
+  - `fetcher.py`: `bab797835ef2fdbff616847d7eb6ba887124fe7e`
+  - `providers.py`: `4d0fd1115d44f6e427954809a99332a087169cc8`
+  - `tests/test_fetcher.py`: `f3b08e3957ad1b49d90b0f36817e74accf2ba602`
+  - `tests/test_sanitization.py`: exact content was statically inspected as part of PR #60.
+- Bounded static review found the transport policy restricts HTTPS to exact host `www.tokocrypto.site`, exact path `/api/v3/klines`, exact BTCUSDT query shape, supported intervals, bounded timestamps/limit, and rejects userinfo, non-default ports, fragments, duplicate/unknown query parameters, unapproved routes, and malformed URLs.
+- Production opener constructs a default GET request with only User-Agent and Accept headers, disables redirects, reads at most 1 MiB + 1 byte, and closes the response. HTTP errors are closed without reading provider-controlled bodies. Retry policy stops immediately on 429 and does not retry non-5xx responses. Parser rejects non-finite values, booleans, malformed rows, and non-standard JSON constants. Provider factory authorizes only Tokocrypto; legacy provider classes cannot bypass the central URL allowlist.
+- No actionable defect was established by this bounded static review. This is **not** an independent specialist acceptance: dynamic behavior, TLS/DNS/runtime properties, complete call graph, Python 3.11 test rerun, and the 19-role review remain unverified/pending. The existing 51/51 offline result remains tied only to its exact recorded SHA.
+- No source was modified, no module was imported/executed, no network/exchange request was made, and no protected path was accessed.
