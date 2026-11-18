@@ -1,4 +1,4 @@
-"""Offline static and provider-factory checks; do not import protected validator.py."""
+"""Offline provider-factory and configuration checks; no protected live-check imports."""
 import json
 import os
 import sys
