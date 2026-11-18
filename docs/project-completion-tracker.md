@@ -279,3 +279,11 @@ No protected paths were accessed, checked out, imported, or executed during this
 - PR #34 head `3295b3d1390d8cd56ebeb65455a369db1dafe633` deletes the unsafe backtest workflow; focused publisher test remains static-only/unverified.
 - PR #36 head `d673f93ce88230886563c9326408d328e632500d` also deletes the unsafe backtest workflow and replaces broad discovery with focused publisher-only testing. It remains non-mergeable and 5 commits behind its base; pipeline/engine tests remain unverified due protected import dependencies.
 - No workflows were dispatched. No protected source was checked out/imported/executed. No market-data requests, account access, reservations, TEST evaluation, or trading occurred.
+
+
+### Latest Q0.8 review hardening (2026-11-18)
+
+- PR #60 advanced to `f69ca4aad36e5d12a80936b34da088ee047d94da`; GitHub compare against M6 baseline reports 45 commits ahead, 0 behind, exactly 26 changed paths. This is still a draft candidate; no exact-head test or specialist review run has been observed.
+- The public URL allowlist now rejects query strings over 256 characters, more than five parsed fields, timestamp/limit strings longer than their bounded decimal lengths, zero timestamps, and timestamps above 10,000,000,000,000 ms. Regression cases cover a zero timestamp, over-range timestamp, 5,000-digit timestamp, and excessive query fields. Commits `f8f7bea397ed799666f7f025333863e1ac6a86e1` and `f69ca4aad36e5d12a80936b34da088ee047d94da`; source/test re-fetch confirms the guards and cases. Runtime test result remains UNVERIFIED.
+- The default-branch `tests/test_live_check.py` was found to import protected `live_check.py`, while PR #57's Q0.8 sparse workflow intentionally excludes that module. Draft PR #66 (`580b1a8ac17c3630ae82e79597753020c639785f`) replaces the broad tests with provider/configuration-only tests; static re-fetch confirms no live_check import or file read. PR #66 is mergeable but not merged, and its tests have not been run.
+- PR #60's workflow/test correction is on its current branch, but the main branch remains dependent on PR #66 for a safe default-branch test module. PR #64 still must correct the specialist reviewer pin before its workflow can run.
