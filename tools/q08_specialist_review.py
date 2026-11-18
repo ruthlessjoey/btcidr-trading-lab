@@ -314,7 +314,7 @@ EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
 EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 
 MAX_CHECKPOINT = 600_000
-VERDICT_RE = re.compile(r"(?im)^\\s*VERDICT:\\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\s*$")
+VERDICT_RE = re.compile(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$")
 
 
 def _unique_json_object(pairs):
