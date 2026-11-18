@@ -628,3 +628,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 - The exact PR #74 workflow source was copied into an isolated local parser input and parsed with installed PyYAML 6.0.3. Parsing succeeded; the expected job and three steps were present, and the bounded HTTPS download/digest-before-extract sequence was asserted.
 - PyYAML uses YAML 1.1 and therefore represents the GitHub Actions `on` key as a boolean in its parsed mapping. This check is syntax-only; it does not validate GitHub Actions expression semantics. Actionlint and zizmor have not run. PR #74 remains manual-only and runtime-unverified.
+
+### Q0.8 synthetic-only preflight workflow improvement (2026-11-19)
+
+- Updated the specialist workflow on both PR #60 and PR #64 to add a required `mode` choice: `synthetic` or `review`, defaulting to `synthetic`.
+- In default synthetic mode, the workflow still compiles the immutable runner and runs the offline synthetic policy suite, but skips model requests, checkpoint restoration, and checkpoint upload. The full 19-role model review and checkpoint steps run only when the owner explicitly selects `mode=review`; that mode repeats the synthetic preflight first.
+- PR #60 latest head is now `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; 26 changed paths, 71 commits ahead/0 behind the M6 base. PR #64 latest head is `41390c5d56513cf5157c6971e8e30994dd7d4e63`; two changed files, 24 commits ahead/0 behind current `main`. Both remain open/draft/unmerged.
+- Exact workflow file re-fetch on both branches confirmed the same blob SHA `a32e4e78b9987c133934ce86a64be367468e839d`, synthetic default, review-step gate, review-only checkpoint restore, and review-only checkpoint upload.
+- This is workflow static evidence only. No workflow was dispatched. Python 3.11 compilation, synthetic runtime, checkpoint round-trip, and all 19 roles remain UNVERIFIED.
+- Owner dispatch sequence: first select `mode=synthetic` with current PR #60 SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; only after success, dispatch again with `mode=review`, same SHA, and blank `resume_from_run_id`. Later resume only from a failed review run that actually uploaded a checkpoint artifact.
