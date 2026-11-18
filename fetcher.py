@@ -33,7 +33,7 @@ class DisallowedRequestError(ApiError):
 
 
 def validate_public_url(url):
-    """Only the approved Tokocrypto HTTPS time and candle GET routes are permitted."""
+    """Only the documented Tokocrypto HTTPS candle GET route is permitted."""
     try:
         p = urllib.parse.urlsplit(url)
         port = p.port
@@ -96,6 +96,7 @@ class Source:
         return pair.replace("_", "")
 
     def time_url(self):
+        """Legacy candidate path only; fetch_server_time refuses it until verified."""
         return self.base_url + "/api/v3/time"
 
     def klines_url(self):
