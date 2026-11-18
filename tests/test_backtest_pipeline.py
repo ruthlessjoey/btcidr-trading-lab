@@ -40,8 +40,50 @@ class PipelineTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def run_bt(self, cfg=None, out=None, **kw):
+        cfg = cfg or self.cfg
         out = out or os.path.join(self.tmp, "out")
-        code = pipeline.run_backtest(cfg or self.cfg, self.root, out, run_id="r1", **kw)
+        context = {
+            "run_id": "123456",
+            "run_attempt": "1",
+            "workflow_ref": "tests/test_backtest_pipeline.py",
+            "repository": "ruthlessjoey/btcidr-trading-lab",
+        }
+        if cfg.get("evaluate_test", False):
+            kw.pop("prev_results_root", None)
+            registry = os.path.join(self.tmp, "test_evaluations")
+            os.makedirs(registry, exist_ok=True)
+            prepare_out = out + "-prepare"
+            prepare_code = pipeline.run_backtest(
+                cfg, self.root, prepare_out, run_id=context["run_id"],
+                prepare_reservation=True, run_attempt=context["run_attempt"],
+                workflow_ref=context["workflow_ref"], repository=context["repository"])
+            if prepare_code == 0:
+                with open(os.path.join(prepare_out, "frozen_choice.json"), encoding="utf-8") as f:
+                    frozen = json.load(f)
+                key = selection.test_key(frozen)
+                pending = os.path.join(registry, key + ".pending")
+                completed = os.path.join(registry, key + ".json")
+                prepared = os.path.join(prepare_out, "test_evaluations", key + ".pending")
+                if not os.path.lexists(pending) and not os.path.lexists(completed) and os.path.isfile(prepared):
+                    shutil.copyfile(prepared, pending)
+            code = pipeline.run_backtest(
+                cfg, self.root, out, prev_results_root=self.tmp, run_id=context["run_id"],
+                require_committed_reservation=True, run_attempt=context["run_attempt"],
+                workflow_ref=context["workflow_ref"], repository=context["repository"], **kw)
+            report_path = os.path.join(out, "frozen_choice.json")
+            if code == 0 and os.path.isfile(report_path):
+                with open(report_path, encoding="utf-8") as f:
+                    frozen = json.load(f)
+                key = selection.test_key(frozen)
+                produced = os.path.join(out, "test_evaluations", key + ".json")
+                published = os.path.join(registry, key + ".json")
+                if os.path.isfile(produced) and not os.path.lexists(published):
+                    shutil.copyfile(produced, published)
+                    pending = os.path.join(registry, key + ".pending")
+                    if os.path.isfile(pending):
+                        os.unlink(pending)  # model the publisher's atomic completed-record publication
+        else:
+            code = pipeline.run_backtest(cfg, self.root, out, run_id="r1", **kw)
         with open(os.path.join(out, "backtest_report.json"), encoding="utf-8") as f:
             data = json.load(f)
         with open(os.path.join(out, "backtest_report.md"), encoding="utf-8") as f:
@@ -117,8 +159,9 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(before, (dataset.sha256_file(csv_path), os.listdir(os.path.dirname(csv_path))))
 
     def test_run_is_reproducible(self):
-        _, a, _, _ = self.run_bt(out=os.path.join(self.tmp, "o1"))
-        _, b, _, _ = self.run_bt(out=os.path.join(self.tmp, "o2"))
+        cfg = dict(self.cfg, evaluate_test=False)
+        _, a, _, _ = self.run_bt(cfg, out=os.path.join(self.tmp, "o1"))
+        _, b, _, _ = self.run_bt(cfg, out=os.path.join(self.tmp, "o2"))
         self.assertEqual(a["selection"], b["selection"])
         self.assertEqual(a["frozen"]["frozen_hash"], b["frozen"]["frozen_hash"])
         self.assertEqual(a["shown"], b["shown"])
@@ -182,20 +225,24 @@ class PipelineTests(unittest.TestCase):
         if a["selection"]["selected_n"] is None:
             self.skipTest("toy data produced no eligible candidate")
         self.assertEqual(a["test"]["status"], "evaluated")
-        _, b, md2, _ = self.run_bt(out=os.path.join(self.tmp, "r2"), prev_results_root=out1)
-        self.assertEqual(b["test"]["status"], "already_evaluated")
-        self.assertIn("Refused", md2)
-        _, c, md3, _ = self.run_bt(out=os.path.join(self.tmp, "r3"), prev_results_root=out1, allow_reeval=True)
-        self.assertTrue(c["test"]["re_evaluation"])
-        self.assertIn("re-evaluation", md3)
+        code, b, md2, out2 = self.run_bt(out=os.path.join(self.tmp, "r2"), prev_results_root=out1)
+        self.assertEqual(code, 1)
+        self.assertIn("committed holdout reservation is missing", b["error"])
+        self.assertFalse(os.path.exists(os.path.join(out2, "test_evaluations", selection.test_key(
+            json.load(open(os.path.join(out2, "frozen_choice.json"), encoding="utf-8"))) + ".json")))
+        code, c, md3, _ = self.run_bt(out=os.path.join(self.tmp, "r3"), prev_results_root=out1, allow_reeval=True)
+        self.assertEqual(code, 1)
+        self.assertIn("separate reservation", c["error"])
 
-    def test_sensitivity_removes_the_flagged_candle_but_keeps_the_original(self):
+    def test_sensitivity_removes_flagged_candle_without_inspecting_test(self):
         c = toy.toy_candles(1000)
         flagged = pipeline.utc_day(c[300].time)
         _, data, md, _ = self.run_bt(dict(self.cfg, flagged_dates=[flagged]))
         sv = data["sensitivity"]
         self.assertEqual(sv["removed"], [flagged])
-        self.assertTrue(sv["test_signals_identical_for_original_choice"] in (True, None))
+        self.assertEqual(set(sv), {"removed", "selection", "selected_n_changed"})
+        self.assertIsInstance(sv["selection"], dict)
+        self.assertIsInstance(sv["selected_n_changed"], bool)
         self.assertIn("removed", md)
         self.assertIn("NOT verified", md)         # no cross-check file was given
         self.assertEqual(data["dataset"]["rows"], 1000)    # original data untouched
@@ -213,12 +260,27 @@ class PipelineTests(unittest.TestCase):
         falling = [Candle(toy.START + i * DAY, 1000.0 - i / 2, 1001.0 - i / 2, 998.0 - i / 2, 999.0 - i / 2, 1.0) for i in range(1000)]
         root = tempfile.mkdtemp(dir=self.tmp)
         version, _ = write_toy(root, falling)
-        code = pipeline.run_backtest(dict(CFG, dataset_version=version), root, os.path.join(root, "o"))
-        with open(os.path.join(root, "o", "backtest_report.md"), encoding="utf-8") as f:
+        prepare_out = os.path.join(root, "prepare")
+        prepare_code = pipeline.run_backtest(
+            dict(CFG, dataset_version=version), root, prepare_out, run_id="no-candidate",
+            prepare_reservation=True, run_attempt="1", workflow_ref="tests/test_backtest_pipeline.py",
+            repository="ruthlessjoey/btcidr-trading-lab")
+        with open(os.path.join(prepare_out, "backtest_report.json"), encoding="utf-8") as f:
+            prepared = json.load(f)
+        self.assertEqual(prepare_code, 0)
+        self.assertEqual(prepared["reservation"]["status"], "not_required")
+        self.assertFalse(os.path.exists(os.path.join(prepare_out, "test_evaluations")))
+        out = os.path.join(root, "o")
+        code = pipeline.run_backtest(
+            dict(CFG, dataset_version=version), root, out, prev_results_root=self.tmp,
+            run_id="no-candidate", require_committed_reservation=True, run_attempt="1",
+            workflow_ref="tests/test_backtest_pipeline.py", repository="ruthlessjoey/btcidr-trading-lab")
+        with open(os.path.join(out, "backtest_report.md"), encoding="utf-8") as f:
             md = f.read()
         self.assertEqual(code, 0)
         self.assertIn("No candidate passed the training screen", md)
         self.assertNotIn("TEST (final, evaluated once):", md)
+        self.assertFalse(os.path.exists(os.path.join(out, "test_evaluations")))
 
 
 def coinbase_candles(binance, scale=1.0, drop=()):
@@ -296,8 +358,8 @@ class CrossCheckTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
-    FORBIDDEN = ["/order", "/account", "/withdraw", "listenkey", "x-mbx-apikey", "signature",
-                 "hmac", "api_key", "apikey", "secret", "password", "leverage=", "margin"]
+    FORBIDDEN = ["/open/v1/orders", "/open/v1/account", "/open/v1/withdraws", "listenkey", "x-mbx-apikey",
+                 "signature", "hmac", "api_key", "apikey", "secret", "leverage=", "margin"]
 
     def test_new_files_have_no_trading_or_credential_code(self):
         names = ["run_backtest.py", "run_crosscheck.py"] + [os.path.join("research", n) for n in

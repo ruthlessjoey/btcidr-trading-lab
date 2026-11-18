@@ -796,7 +796,9 @@ class DurableReservationTests(unittest.TestCase):
             with mock.patch.object(pipeline.engine, "simulate", wraps=engine.simulate) as simulate:
                 pipeline.write_logs(self.c, 50, self.sp, root, Rules(), include_test=True)
             ranges = [(call.args[2], call.args[3]) for call in simulate.call_args_list]
-            self.assertEqual(ranges, [self.sp["train"], self.sp["validation"]])
+            self.assertEqual(set(ranges), {self.sp["train"], self.sp["validation"]})
+            self.assertEqual(ranges.count(self.sp["train"]), 2)  # strategy + buy-and-hold benchmark
+            self.assertEqual(ranges.count(self.sp["validation"]), 2)
             self.assertNotIn(self.sp["test"], ranges)
 
 
