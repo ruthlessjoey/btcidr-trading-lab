@@ -1,6 +1,6 @@
 # Repository instructions for Claude
 
-These instructions apply across this repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
+These instructions apply across the repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
 
 ## Mission and working style
 
@@ -15,10 +15,12 @@ These instructions apply across this repository, including shared tooling used b
 The following restrictions are mandatory:
 
 1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`.
-2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `signal/data/`.
-3. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the user gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
-4. Before any repository-wide search, recursive listing, archive, or test discovery, explicitly exclude all protected paths. If a tool cannot guarantee exclusion, do not run it.
-5. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
+2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path.
+3. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `markets/risk/`.
+4. Never read, write, edit, execute, import, or otherwise process the root-level `validator.py` or `report.py`.
+5. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the owner gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
+6. Before any repository-wide search, recursive listing, archive, test discovery, or broad checkout, explicitly exclude every protected path and file above. If a tool cannot guarantee exclusion, do not run it.
+7. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
 
 If protected content appears in output accidentally, stop. Do not quote, summarize, copy, or continue processing it.
 
@@ -26,8 +28,8 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
 - No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data exception is unauthenticated server-time/candles access scoped to `www.tokocrypto.site`. Do not use `www.tokocrypto.com` or private endpoints.
-- `PAPER` is permitted only after its safeguards are separately approved. `LIVE` remains unavailable and must not be enabled.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data access is unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines`. Do not use `.com`, other `.site` endpoints, or private endpoints without separate explicit approval.
+- PAPER-only. LIVE trading remains disabled and unavailable.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.
 - Do not change custody, execution, risk, or exchange boundaries as part of a tooling task.
