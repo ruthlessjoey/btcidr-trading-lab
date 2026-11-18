@@ -19,12 +19,23 @@ class ProviderAuthorizationTests(unittest.TestCase):
             with self.subTest(provider=name), self.assertRaises(ValueError):
                 providers.build(name)
 
-    def test_approved_source_urls_pass_central_policy(self):
+    def test_only_documented_candle_route_passes_central_policy(self):
         p = providers.build("tokocrypto")
-        self.assertEqual(fetcher.validate_public_url(p.src.time_url()), p.src.time_url())
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            fetcher.validate_public_url(p.src.time_url())
         candle = (p.src.klines_url() +
                   "?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003599999&limit=500")
         self.assertEqual(fetcher.validate_public_url(candle), candle)
+
+    def test_server_time_fetch_fails_before_network_until_route_is_verified(self):
+        p = providers.build("tokocrypto")
+        calls = []
+        def opener(url, timeout):
+            calls.append(url)
+            raise AssertionError("unverified server-time route must not reach transport")
+        with self.assertRaisesRegex(fetcher.DisallowedRequestError, "server-time route is unverified"):
+            fetcher.fetch_server_time(p.src, 5, 1, opener, lambda seconds: None)
+        self.assertEqual(calls, [])
 
     def test_default_configuration_authorizes_only_tokocrypto(self):
         with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
