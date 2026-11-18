@@ -525,3 +525,13 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 ### PR #60 ancestry refresh
 
 - Final live compare at head `c3b593da446835716d54b964e6be5c53981a87a9` reports **66 commits ahead, 0 behind**, with exactly 26 changed paths/statuses. The prior 65-ahead tracker entry was one commit stale; no additional changed paths were introduced.
+
+
+### Live-state refresh after clean-main successor PRs (2026-11-19)
+
+- PR #69 is the clean-main successor to stale draft PR #61 (Ruff static quality). Head `fa2a5b7760757ee92fb690b08f57ae23060eaa08`; exactly two added files; 2 commits ahead/0 behind `main` at `9bf95e28171447faa910ecd5185b59a349555a52`. It preserves the read-only manual workflow, immutable checkout action, five-file unprotected sparse checkout, and verified Ruff binary digest. Ruff has not yet run; manual workflow execution remains pending.
+- PR #70 is the clean-main successor to stale draft PR #62 (deny all signal paths). Head `17c853e9d6d927e8708fcea31120da766e0af860`; exactly two changed instruction/configuration files; 2 commits ahead/0 behind `main`. JSON parsing confirms the four intended deny rules: Read/Edit for `P1/**` and Read/Edit for all `signal/**`. This is defense in depth, not an OS sandbox.
+- PR #61 and PR #62 remain open/draft for traceability but are superseded by #69 and #70. Do not merge the superseded PRs.
+- Both successor branches were created directly from current `main`, avoiding the 3-commit divergence present in the older branches. Exact file content and compare metadata were re-fetched after creation.
+- PR #60 remains at `c3b593da446835716d54b964e6be5c53981a87a9`; PR #64 remains at `dd01298dc0da0fc45bc31d8df4a313207d45a4bd`. Neither exact-head Q0.8 offline tests nor the corrected 19-role review have been dispatched. The old specialist run #44337003905 has no checkpoint artifact.
+- No source execution, protected-path access, workflow dispatch, PR merge, exchange request, account operation, or trading action occurred in this refresh. Whole-project completion remains UNRATED; no numeric progress claim is supported by these tooling/documentation changes.
