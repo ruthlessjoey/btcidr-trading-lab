@@ -11,6 +11,7 @@ import re
 import sys
 import time
 import socket
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -312,6 +313,91 @@ def load_role(name: str) -> tuple[str, str]:
 EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
 EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 
+MAX_CHECKPOINT = 600_000
+VERDICT_RE = re.compile(r"(?im)^\\s*VERDICT:\\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\\s*$")
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise RuntimeError("Checkpoint contains duplicate JSON keys")
+        result[key] = value
+    return result
+
+
+def _validate_checkpoint_report(value: str, label: str) -> None:
+    if not isinstance(value, str) or not value or len(value) > MAX_OUTPUT:
+        raise RuntimeError("Checkpoint report is missing or exceeds the output limit: " + label)
+    if contains_secret(value):
+        raise RuntimeError("Checkpoint secret-screen pattern detected: " + label)
+    if not VERDICT_RE.search(value):
+        raise RuntimeError("Checkpoint report has no explicit verdict: " + label)
+
+
+def save_checkpoint(path: Path, reports: dict, commander=None,
+                    acceptance=None, verification=None) -> None:
+    if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
+        raise RuntimeError("Checkpoint specialist role set is invalid")
+    for name, report in reports.items():
+        _validate_checkpoint_report(report, name)
+    for name, report in ((COMMANDER, commander), (ACCEPTANCE, acceptance),
+                         (VERIFICATION, verification)):
+        if report is not None:
+            _validate_checkpoint_report(report, name)
+    payload = {
+        "schema_version": 1, "repository": REPO, "base_sha": BASE_SHA,
+        "head_sha": HEAD_SHA, "model": EXPECTED_MODEL, "reports": reports,
+        "commander": commander, "acceptance": acceptance,
+        "verification": verification,
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    if len(encoded) > MAX_CHECKPOINT:
+        raise RuntimeError("Checkpoint exceeds the configured size limit")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_bytes(encoded)
+    os.replace(temporary, path)
+
+
+def load_checkpoint(path: Path) -> dict:
+    empty = {"reports": {}, "commander": None, "acceptance": None,
+             "verification": None}
+    if not path.exists():
+        return empty
+    raw = path.read_bytes()
+    if len(raw) > MAX_CHECKPOINT:
+        raise RuntimeError("Checkpoint exceeds the configured size limit")
+    try:
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json_object)
+    except RuntimeError:
+        raise
+    except Exception:
+        raise RuntimeError("Checkpoint is not valid UTF-8 JSON") from None
+    expected_keys = {"schema_version", "repository", "base_sha", "head_sha",
+                     "model", "reports", "commander", "acceptance", "verification"}
+    if not isinstance(payload, dict) or set(payload) != expected_keys:
+        raise RuntimeError("Checkpoint schema is invalid")
+    if (payload["schema_version"] != 1 or payload["repository"] != REPO
+        or payload["base_sha"] != BASE_SHA or payload["head_sha"] != HEAD_SHA
+        or payload["model"] != EXPECTED_MODEL):
+        raise RuntimeError("Checkpoint does not match the exact repository, base, head, and model")
+    reports = payload["reports"]
+    if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
+        raise RuntimeError("Checkpoint specialist role set is invalid")
+    for name, report in reports.items():
+        _validate_checkpoint_report(report, name)
+    for name, report in ((COMMANDER, payload["commander"]),
+                         (ACCEPTANCE, payload["acceptance"]),
+                         (VERIFICATION, payload["verification"])):
+        if report is not None:
+            _validate_checkpoint_report(report, name)
+    return {"reports": reports, "commander": payload["commander"],
+            "acceptance": payload["acceptance"],
+            "verification": payload["verification"]}
+
+
+
 def model_config():
     key = os.environ.get("LLM_API_KEY", "")
     base = os.environ.get("LLM_BASE_URL", "").rstrip("/")
@@ -534,6 +620,24 @@ def synthetic():
         raise AssertionError("oversized model request was not rejected")
     assert retry_delay_seconds({"Retry-After":"2"}, 0) == 2.0
     assert retry_delay_seconds({}, 0) == 15.0
+    future_epoch = time.time() + 30.0
+    assert 28.0 <= retry_delay_seconds(
+        {"x-ratelimit-reset":str(int(future_epoch * 1000))}, 0) <= 30.0
+    assert 28.0 <= retry_delay_seconds(
+        {"ratelimit-reset":str(future_epoch)}, 0) <= 30.0
+    with tempfile.TemporaryDirectory() as checkpoint_dir:
+        checkpoint_path = Path(checkpoint_dir) / "checkpoint.json"
+        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS\\nvalid"})
+        restored = load_checkpoint(checkpoint_path)
+        assert restored["reports"]["architecture-architect"] == "VERDICT: PASS\\nvalid"
+        malformed_path = Path(checkpoint_dir) / "malformed.json"
+        malformed_path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
+        try:
+            load_checkpoint(malformed_path)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("duplicate checkpoint keys were not rejected")
     # Provider reset is Unix epoch milliseconds; seconds remain supported.
     future_epoch = time.time() + 30.0
     millis_delay = retry_delay_seconds(
@@ -574,39 +678,56 @@ def review():
               "protected_exclusions":["P1/","signal/data/","any copy of signal/",
                 "markets/risk/","validator.py","report.py","protected Workstream B artifacts",
                 ".github/workflows/batch1-isolated-tests.yml"]}
-    reports = {}
+    checkpoint_path = Path(os.environ.get("Q08_CHECKPOINT_PATH", "q08-review-checkpoint.json"))
+    checkpoint = load_checkpoint(checkpoint_path)
+    reports = checkpoint["reports"]
+    commander = checkpoint["commander"]
+    acceptance = checkpoint["acceptance"]
+    verification = checkpoint["verification"]
+    save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+
     for name in SPECIALISTS:
+        if name in reports:
+            print("CHECKPOINT_REUSED role=" + name, flush=True)
+            continue
         agent, skill = load_role(name)
         reports[name] = ask_model(
-            RULES + "\nUse the following role definition and skill as domain guidance.\n",
+            RULES + "\\nUse the following role definition and skill as domain guidance.\\n",
             {"agent":name,"agent_definition":agent,"preloaded_skill":skill,**common},
             key,endpoint,model,name)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
 
-    agent, skill = load_role(COMMANDER)
-    commander = ask_model(
-        RULES + "\nYou are the Commander synthesis pass. Reconcile all specialist reports. Do not claim native Agent-tool dispatch.\n",
-        {"agent":COMMANDER,"agent_definition":agent,"preloaded_skill":skill,
-         "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
-         "scope":list(REVIEW_PATHS),"specialist_reports":reports},
-        key,endpoint,model,COMMANDER)
+    if commander is None:
+        agent, skill = load_role(COMMANDER)
+        commander = ask_model(
+            RULES + "\\nYou are the Commander synthesis pass. Reconcile all specialist reports. Do not claim native Agent-tool dispatch.\\n",
+            {"agent":COMMANDER,"agent_definition":agent,"preloaded_skill":skill,
+             "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
+             "scope":list(REVIEW_PATHS),"specialist_reports":reports},
+            key,endpoint,model,COMMANDER)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
 
-    agent, skill = load_role(ACCEPTANCE)
-    acceptance = ask_model(
-        RULES + "\nYou are the separate independent-acceptance challenge. Challenge unsupported claims; do not rubber-stamp.\n",
-        {"agent":ACCEPTANCE,"agent_definition":agent,"preloaded_skill":skill,
-         "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
-         "scope":list(REVIEW_PATHS),"specialist_reports":reports,
-         "commander_report":commander},
-        key,endpoint,model,ACCEPTANCE)
+    if acceptance is None:
+        agent, skill = load_role(ACCEPTANCE)
+        acceptance = ask_model(
+            RULES + "\\nYou are the separate independent-acceptance challenge. Challenge unsupported claims; do not rubber-stamp.\\n",
+            {"agent":ACCEPTANCE,"agent_definition":agent,"preloaded_skill":skill,
+             "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
+             "scope":list(REVIEW_PATHS),"specialist_reports":reports,
+             "commander_report":commander},
+            key,endpoint,model,ACCEPTANCE)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
 
-    agent, skill = load_role(VERIFICATION)
-    verification = ask_model(
-        RULES + "\nYou are the final verification pass. Check claims against supplied metadata/reports only.\n",
-        {"agent":VERIFICATION,"agent_definition":agent,"preloaded_skill":skill,
-         "base_sha":BASE_SHA,"head_sha":HEAD_SHA,"scope":list(REVIEW_PATHS),
-         "specialist_reports":reports,"commander_report":commander,
-         "independent_acceptance_report":acceptance},
-        key,endpoint,model,VERIFICATION)
+    if verification is None:
+        agent, skill = load_role(VERIFICATION)
+        verification = ask_model(
+            RULES + "\\nYou are the final verification pass. Check claims against supplied metadata/reports only.\\n",
+            {"agent":VERIFICATION,"agent_definition":agent,"preloaded_skill":skill,
+             "base_sha":BASE_SHA,"head_sha":HEAD_SHA,"scope":list(REVIEW_PATHS),
+             "specialist_reports":reports,"commander_report":commander,
+             "independent_acceptance_report":acceptance},
+            key,endpoint,model,VERIFICATION)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
 
     parts = [
         "# AI Trading Lab — Specialist Army Review",
