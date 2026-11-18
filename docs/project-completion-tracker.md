@@ -415,3 +415,14 @@ Fresh GitHub metadata fetch, superseding older heads/statuses above:
 - Executed the exact focused suite using `python -m unittest discover -s tests -p test_holdout_publish.py -v`: **18 passed, 0 failed, 0 errors**, 0.182 seconds.
 - Runtime Python was 3.13.5. The repository's GitHub Actions workflow specifies Python 3.11, so Python 3.11 exact-head CI remains pending manual dispatch. Do not mark CI as passed or the entire holdout workstream independently verified yet.
 - This test used only `research/holdout_publish.py`, `research/__init__.py`, and `tests/test_holdout_publish.py` in a temporary isolated directory. No protected files, exchange endpoints, datasets, or research-data branches were accessed or modified.
+
+
+### PR #68 test import-chain correction (2026-11-18)
+
+Static import inspection of all six PR #68 test modules confirms none can be executed under the current protected-path boundary:
+- `tests/test_backtest_pipeline.py` and `tests/test_holdout_reporting.py` import `research.pipeline`, which reaches the protected engine/validator chain.
+- `tests/test_engine.py` imports the research engine/pipeline chain.
+- `tests/test_history.py` imports `research.history`, which imports protected `validator.py`.
+- `tests/test_pipeline.py` imports `run.py`, which imports protected `validator.py` and `report.py`.
+- The sixth changed file is `research/pipeline.py` itself; it can be statically inspected but must not be imported/executed.
+The PR body has been corrected to state this precisely. PR #68's inherited publisher-only workflow does not test these pipeline changes. All six modules remain **UNVERIFIED / NOT RUN** until the owner separately authorizes the protected import boundary or a safe non-importing test design is implemented.
