@@ -190,6 +190,23 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
 
+    def test_completed_record_count_limit_refuses_publication(self):
+        self.install_pair()
+        for index in range(1000):
+            (self.output / f"extra-{index}.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "more than 1000 completed records"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_symlinked_report_parent_refuses_cleanup(self):
+        self.install_pair()
+        alias = self.report.parent / "report-parent-alias"
+        os.symlink(self.report.parent, alias, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "symlinked path component"):
+            publish_completed_reservations(self.root, self.output, alias / self.report.name)
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+
 
 if __name__ == "__main__":
     unittest.main()
