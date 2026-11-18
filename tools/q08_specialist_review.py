@@ -277,7 +277,12 @@ def retry_delay_seconds(headers, retry_count: int) -> float:
             value = headers.get(key)
             if isinstance(value, str) and re.fullmatch(r"[0-9.]{1,24}", value.strip()):
                 try:
-                    reset_delay = float(value.strip()) - time.time()
+                    reset_epoch = float(value.strip())
+                    # OpenRouter's x-ratelimit-reset is an epoch timestamp in
+                    # milliseconds; tolerate seconds-based reset headers too.
+                    if reset_epoch >= 100_000_000_000:
+                        reset_epoch /= 1000.0
+                    reset_delay = reset_epoch - time.time()
                     if reset_delay > 0:
                         return reset_delay
                 except (TypeError, ValueError, OverflowError):
@@ -529,6 +534,14 @@ def synthetic():
         raise AssertionError("oversized model request was not rejected")
     assert retry_delay_seconds({"Retry-After":"2"}, 0) == 2.0
     assert retry_delay_seconds({}, 0) == 15.0
+    # Provider reset is Unix epoch milliseconds; seconds remain supported.
+    future_epoch = time.time() + 30.0
+    millis_delay = retry_delay_seconds(
+        {"x-ratelimit-reset":str(int(future_epoch * 1000))}, 0)
+    seconds_delay = retry_delay_seconds(
+        {"ratelimit-reset":str(future_epoch)}, 0)
+    assert 28.0 <= millis_delay <= 30.0
+    assert 28.0 <= seconds_delay <= 30.0
     write_summary(
         "# Specialist Army Runner — Synthetic Smoke Test\n\n"
         "**PASS:** local policy checks completed. No repository source was fetched; "
