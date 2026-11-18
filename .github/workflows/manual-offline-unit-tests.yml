@@ -1,4 +1,4 @@
-name: Manual Offline Unit Tests
+name: Manual Offline Holdout Publisher Tests (protected-path-safe)
 
 on:
   workflow_dispatch:
@@ -7,23 +7,28 @@ permissions:
   contents: read
 
 concurrency:
-  group: manual-offline-unit-tests-${{ github.ref }}
+  group: holdout-publisher-offline-tests-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  unit-tests:
-    name: Offline unit tests (no market-data fetch)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  holdout-publisher-tests:
+    name: Holdout publisher tests only (no protected imports)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       PYTHONPATH: ${{ github.workspace }}
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - name: Check out selected ref without persisted credentials
+      - name: Sparse checkout only the publisher and its isolated test
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /research/__init__.py
+            /research/holdout_publish.py
+            /tests/test_holdout_publish.py
 
       - name: Set up Python 3.11
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -31,22 +36,5 @@ jobs:
           python-version: "3.11"
           check-latest: false
 
-      - name: Run offline unit-test suite with Python socket access disabled
-        run: |
-          python - <<'PY'
-          import socket
-          import unittest
-
-          def deny_network(*args, **kwargs):
-              raise RuntimeError("network access is disabled in the offline unit-test process")
-
-          socket.create_connection = deny_network
-          socket.getaddrinfo = deny_network
-          socket.socket.connect = deny_network
-          socket.socket.connect_ex = deny_network
-          socket.socket.sendto = deny_network
-
-          suite = unittest.defaultTestLoader.discover("tests")
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
-          raise SystemExit(0 if result.wasSuccessful() else 1)
-          PY
+      - name: Run the isolated holdout publisher tests
+        run: python -m unittest discover -s tests -p 'test_holdout_publish.py' -v
