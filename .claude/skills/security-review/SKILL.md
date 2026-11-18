@@ -7,7 +7,7 @@ description: Use when assessing code, workflows, dependencies, permissions, secr
 
 ## Mandatory exclusions
 
-Never access `P1/`, `signal/data/`, any `signal/` path, or protected Workstream B source/data. Exclude these paths before traversal. If a tool cannot guarantee exclusion, do not run it. Also respect any additional exact protected modules or artifacts designated by the owner.
+Never access `P1/`, any `signal/` path, `markets/risk/`, the protected root modules `validator.py` and `report.py`, or protected Workstream B source/data. Exclude these paths and modules before traversal. If a tool cannot guarantee exclusion, do not run it. Also respect any additional exact protected modules or artifacts designated by the owner.
 
 ## Scope and evidence
 
