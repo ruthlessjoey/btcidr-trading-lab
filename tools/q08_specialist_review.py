@@ -630,7 +630,7 @@ def synthetic():
         checkpoint_path = Path(checkpoint_dir) / "checkpoint.json"
         save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
         restored = load_checkpoint(checkpoint_path)
-        assert restored["reports"]["architecture-architect"] == "VERDICT: PASS\\nvalid"
+        assert restored["reports"]["architecture-architect"] == "VERDICT: PASS"
         malformed_path = Path(checkpoint_dir) / "malformed.json"
         malformed_path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
         try:
