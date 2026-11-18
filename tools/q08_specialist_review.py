@@ -693,7 +693,7 @@ def review():
             continue
         agent, skill = load_role(name)
         reports[name] = ask_model(
-            RULES + "\\nUse the following role definition and skill as domain guidance.\\n",
+            RULES + "\nUse the following role definition and skill as domain guidance.\n",
             {"agent":name,"agent_definition":agent,"preloaded_skill":skill,**common},
             key,endpoint,model,name)
         save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
@@ -701,7 +701,7 @@ def review():
     if commander is None:
         agent, skill = load_role(COMMANDER)
         commander = ask_model(
-            RULES + "\\nYou are the Commander synthesis pass. Reconcile all specialist reports. Do not claim native Agent-tool dispatch.\\n",
+            RULES + "\nYou are the Commander synthesis pass. Reconcile all specialist reports. Do not claim native Agent-tool dispatch.\n",
             {"agent":COMMANDER,"agent_definition":agent,"preloaded_skill":skill,
              "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
              "scope":list(REVIEW_PATHS),"specialist_reports":reports},
@@ -711,7 +711,7 @@ def review():
     if acceptance is None:
         agent, skill = load_role(ACCEPTANCE)
         acceptance = ask_model(
-            RULES + "\\nYou are the separate independent-acceptance challenge. Challenge unsupported claims; do not rubber-stamp.\\n",
+            RULES + "\nYou are the separate independent-acceptance challenge. Challenge unsupported claims; do not rubber-stamp.\n",
             {"agent":ACCEPTANCE,"agent_definition":agent,"preloaded_skill":skill,
              "repository":REPO,"base_sha":BASE_SHA,"head_sha":HEAD_SHA,
              "scope":list(REVIEW_PATHS),"specialist_reports":reports,
@@ -722,7 +722,7 @@ def review():
     if verification is None:
         agent, skill = load_role(VERIFICATION)
         verification = ask_model(
-            RULES + "\\nYou are the final verification pass. Check claims against supplied metadata/reports only.\\n",
+            RULES + "\nYou are the final verification pass. Check claims against supplied metadata/reports only.\n",
             {"agent":VERIFICATION,"agent_definition":agent,"preloaded_skill":skill,
              "base_sha":BASE_SHA,"head_sha":HEAD_SHA,"scope":list(REVIEW_PATHS),
              "specialist_reports":reports,"commander_report":commander,
