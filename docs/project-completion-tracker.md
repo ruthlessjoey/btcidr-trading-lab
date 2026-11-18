@@ -267,3 +267,15 @@ No protected paths were accessed, checked out, imported, or executed during this
 - PR #34 commit `3295b3d1390d8cd56ebeb65455a369db1dafe633` removes the unsafe backtest workflow. Re-fetch of that path on the branch returns 404. Its focused publisher workflow remains sparse/read-only and runs only `tests/test_holdout_publish.py`.
 - PR #36 commit `d673f93ce88230886563c9326408d328e632500d` applies the same focused publisher-only workflow and deletes the unsafe backtest workflow. The previous Python socket monkey-patching plus full test discovery was not accepted as a protected-path boundary.
 - PR #36 is still 5 commits behind its current base PR #34 and diverged; do not merge it until its stack is reconciled. The only safe runtime test claim it can make at present is the focused publisher test, which remains undispatched/unverified.
+
+
+### Q0.8 and holdout boundary follow-up (2026-11-18, latest)
+
+- PR #60 latest head is `121c4044301ce7e2e2bac0d578128e5360638286`; GitHub compare against M6 baseline reports 43 commits ahead, 0 behind, exactly 26 changed paths. Exact-head tests and independent review remain unverified.
+- A second protected-boundary defect was found: PR #60's Q0 workflows sparse-checked out `live_check.py`, while `tests/test_live_check.py` imported it/read its source; that wrapper imports protected `validator.py` and `report.py`. The Q0 branch has now removed those two source-dependent tests and removed `live_check.py` from all three sparse checkout lists (Q0.8, Step 1, blocked Step 2). The remaining provider/config tests import only `providers` and `fetcher`. Live-check guard behavior is explicitly unverified.
+- The same test-file correction has been proposed for `main` in draft PR #66, head `580b1a8ac17c3630ae82e79597753020c639785f`, one changed file, mergeable. This is needed because the default-branch Q0.8 workflow excludes `live_check.py` but its original test module imported it.
+- PR #64 remains a one-file draft correction of the immutable reviewer pin, head `823a45a0e02733a249e24eced71d279bb1f7abb5`, mergeable. It pins the reviewer workflow to `8c6f5dd9f35ae4cbe3513d32aab1539d64ecebd7`. It has not been merged or run.
+- PR #65 is this tracker reconciliation branch, head `6c2e4b6533c5babdf7a8d9ff3719805e0b8696ab`, draft and mergeable.
+- PR #34 head `3295b3d1390d8cd56ebeb65455a369db1dafe633` deletes the unsafe backtest workflow; focused publisher test remains static-only/unverified.
+- PR #36 head `d673f93ce88230886563c9326408d328e632500d` also deletes the unsafe backtest workflow and replaces broad discovery with focused publisher-only testing. It remains non-mergeable and 5 commits behind its base; pipeline/engine tests remain unverified due protected import dependencies.
+- No workflows were dispatched. No protected source was checked out/imported/executed. No market-data requests, account access, reservations, TEST evaluation, or trading occurred.
