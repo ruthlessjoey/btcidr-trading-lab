@@ -135,6 +135,10 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
         json.dump(frozen, f, indent=2)                      # written BEFORE the test is evaluated
     registry = os.path.join(prev_results_root, "test_evaluations") if prev_results_root else None
     if prepare_reservation:
+        if sel["selected_n"] is None:
+            result.update(status="RESERVATION_PREPARED", reservation={"status": "not_required",
+                                                                         "reason": "no candidate passed the training screen"})
+            return finish(result, out_dir)
         if not cfg.get("evaluate_test", False):
             result.update(status="RESERVATION_PREPARED", reservation={"status": "not_required", "reason": "evaluate_test is false"})
             return finish(result, out_dir)
@@ -147,7 +151,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
             return finish(result, out_dir)
         result.update(status="RESERVATION_PREPARED", reservation=reservation or {"status": "not_required"})
         return finish(result, out_dir)
-    if cfg.get("evaluate_test", False):
+    if cfg.get("evaluate_test", False) and sel["selected_n"] is not None:
         if not require_committed_reservation:
             result["error"] = ("TEST evaluation requires --require-committed-reservation; "
                                "prepare and persist the exact reservation first")
@@ -171,8 +175,12 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
             result["error"] = f"{type(e).__name__}: {e}"
             return finish(result, out_dir)
     else:
-        test = {"status": "skipped", "reason": "dry run: the config says evaluate_test is false, so the "
-                                               "test window was not computed or looked at"}
+        if cfg.get("evaluate_test", False):
+            test = {"status": "skipped", "reason": "no candidate passed the training screen, so the "
+                                                   "test window was not computed or looked at"}
+        else:
+            test = {"status": "skipped", "reason": "dry run: the config says evaluate_test is false, so the "
+                                                   "test window was not computed or looked at"}
     try:
         n = sel["selected_n"]
         shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
