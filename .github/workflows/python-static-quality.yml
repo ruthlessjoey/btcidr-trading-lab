@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           archive="$RUNNER_TEMP/ruff-x86_64-unknown-linux-gnu.tar.gz"
           url="https://github.com/astral-sh/ruff/releases/download/0.17.5/ruff-x86_64-unknown-linux-gnu.tar.gz"
-          curl -fsSLo "$archive" "$url"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 --retry 2 --retry-all-errors --output "$archive" "$url"
           echo "7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90  $archive" | sha256sum -c -
 
           entry="$(tar -tzf "$archive" | awk '$0 ~ /(^|\/)ruff$/ { print; exit }')"
