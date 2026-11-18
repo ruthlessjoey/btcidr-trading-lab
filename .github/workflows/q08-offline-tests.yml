@@ -24,7 +24,6 @@ jobs:
           sparse-checkout: |
             /fetcher.py
             /providers.py
-            /live_check.py
             /probe.py
             /run.py
             /config.json
