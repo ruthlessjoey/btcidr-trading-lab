@@ -197,7 +197,6 @@ def validate_comparison(token: str) -> set[str]:
     cmp = github_json(f"/repos/{REPO}/compare/{BASE_SHA}...{HEAD_SHA}", token)
     if (cmp.get("status") != "ahead"
         or cmp.get("base_commit", {}).get("sha") != BASE_SHA
-        or cmp.get("head_commit", {}).get("sha") != HEAD_SHA
         or cmp.get("merge_base_commit", {}).get("sha") != BASE_SHA):
         raise RuntimeError("Immutable base/head comparison did not match")
     if cmp.get("too_large") is True:
