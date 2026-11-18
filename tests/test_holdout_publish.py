@@ -127,7 +127,7 @@ class HoldoutPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "report does not match completed TEST record"):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
-    
+
     def test_valid_first_record_is_not_removed_if_later_record_is_invalid(self):
         self.install_pair()
         other_key = "c" * 25
@@ -141,6 +141,28 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
         self.assertTrue((self.root / (other_key + ".pending")).is_file())
+
+
+    def test_duplicate_json_keys_refuse_cleanup(self):
+        self.install_pair()
+        pending = self.root / (self.key + ".pending")
+        pending.write_text(
+            json.dumps(self.reservation, sort_keys=True).replace(
+                '"status": "reserved"', '"status": "reserved", "status": "evaluated"'),
+            encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "unreadable: ValueError"):
+            self.publish()
+        self.assertTrue(pending.is_file())
+
+    def test_nonstandard_json_constant_refuses_cleanup(self):
+        self.install_pair()
+        completed = self.output / (self.key + ".json")
+        raw = json.dumps(self.completed, sort_keys=True)
+        raw = raw.replace('"results": {"BASE": {}}', '"results": {"BASE": {"metric": NaN}}')
+        completed.write_text(raw, encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "unreadable: ValueError"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
 
 if __name__ == "__main__":
