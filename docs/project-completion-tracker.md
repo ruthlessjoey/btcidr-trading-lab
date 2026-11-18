@@ -541,14 +541,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 - Added a workflow guard before artifact restoration: a non-empty `resume_from_run_id` must match 1–20 decimal digits before it is used in the artifact name or download action.
 - The exact workflow blob is `4e704851011a6b10f66d22804edf91aad41af5eb` on both PR #60 and PR #64 branches; runner pin remains immutable commit `0b1d357ccffa8395f611833da1e4bb50ac52fd26`.
-- PR #60 head is now `03bdff51c23a68a57ea2947904cf6f3c0c1e9dcf` (26 changed paths); PR #64 head is now `e1c4c1d3f308275d644151f375eef0b4f5d9cf23` (two changed files). Both remain open/draft/unmerged.
+- PR #60 head is now `4cc229fb09b1030100101ad873944ea07c4f1982` (26 changed paths); PR #64 head is now `a3c845102746196a6865cd1ae481875d954f24aa` (two changed files). Both remain open/draft/unmerged.
 - GitHub reports mergeable for both branches, but the Q0.8 workflow has not been dispatched on either updated head. Python 3.11 syntax/synthetic tests, checkpoint artifact round-trip, exact-head offline tests, and full 19-role review remain unverified.
 
 ### Complete protected-path guard successor (2026-11-19)
 
 - New PR #71: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/71
-- Branch: `security/complete-protected-path-guard-2026-11-19`; head `dbad9ff47974f93f6ae179ffb208ad298fe67c95`; based directly on current `main` `9bf95e28171447faa910ecd5185b59a349555a52`.
-- Exactly two shared policy files changed: `.claude/settings.json` and `CLAUDE.md`. GitHub compare confirms 2 commits ahead, 0 behind, and exactly those two paths.
+- Branch: `security/complete-protected-path-guard-2026-11-19`; head `ec011a0cf16eeb3a4eaae3df924d96e8a0f99511`; based directly on current `main` `9bf95e28171447faa910ecd5185b59a349555a52`.
+- Exactly three shared policy files changed: `.claude/settings.json`, `CLAUDE.md`, and `docs/development-stack/roadmap.md`. GitHub compare confirms 3 commits ahead, 0 behind, and exactly those three paths.
 - The Claude Code Read/Edit deny configuration now covers `P1/**`, all `signal/**`, `markets/risk/**`, root `validator.py`, and root `report.py`. JSON parsing succeeded and all 10 expected deny rules were present after re-fetching the committed file.
 - The repository instructions now explicitly prohibit processing those paths, require exclusions before broad checkout/search/test discovery, narrow Tokocrypto to unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines`, and state PAPER-only/LIVE-disabled boundaries.
 - PR #71 is open/draft/unmerged. It supersedes PR #70 for the overlapping signal-path policy because it includes the same all-`signal/**` rules plus the additional protected modules and endpoint correction. PR #70 remains open/draft for traceability; do not merge it separately.
@@ -565,7 +565,7 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The prior specialist run #44337003905 targeted an earlier PR #60 head, stopped after 10 of 19 review stages on HTTP 429, and has no checkpoint artifact. It is inconclusive and cannot be resumed.
 - PR #69 is the clean-main successor for the protected-path-safe Ruff workflow; head `fa2a5b7760757ee92fb690b08f57ae23060eaa08`, two added files, open/draft/unmerged, mergeable. Ruff has not yet executed against repository source.
 - PR #70 is the clean-main successor for all-`signal/**` deny rules; head `17c853e9d6d927e8708fcea31120da766e0af860`, two changed files, open/draft/unmerged, mergeable. PR #71 supersedes #70's overlapping policy scope.
-- PR #71 adds complete shared policy boundaries for `P1/**`, all `signal/**`, `markets/risk/**`, root `validator.py`, and root `report.py`; it also narrows Tokocrypto to unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines` and states PAPER-only/LIVE-disabled. Head `dbad9ff47974f93f6ae179ffb208ad298fe67c95`; two changed files; open/draft/unmerged; current-main compare is 2 ahead/0 behind.
+- PR #71 adds complete shared policy boundaries for `P1/**`, all `signal/**`, `markets/risk/**`, root `validator.py`, and root `report.py`; it also narrows Tokocrypto to unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines` and states PAPER-only/LIVE-disabled. Head `ec011a0cf16eeb3a4eaae3df924d96e8a0f99511`; three changed files; open/draft/unmerged; current-main compare is 3 ahead/0 behind.
 - PR #61 and #62 are stale drafts superseded by #69 and #71 respectively. PR #70 is retained as a draft for traceability but should not be merged separately from #71.
 - PR #34 remains open/draft at `301b90dca0fd1622d3ff69ee3bbf47d2b401d448`; local 18/18 tests were reported on Python 3.13.5, while Python 3.11 CI remains pending. PR #68 remains open/draft at `e280af8e9224ff3dd5ce282d7e9da3224c6a4136`; six associated test modules remain blocked by protected import dependencies.
 - PR #65's tracker branch has accumulated 60 commits ahead and 3 behind current `main`; this clean-main successor preserves its 557-line requirement register and evidence history without inheriting that divergence.
@@ -577,3 +577,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The Ruff workflow on PR #69's actual head `ad7213f17df08f3b748bd32d7b93c016fc29025a` was re-fetched by immutable commit SHA. It already uses HTTPS-only redirects, bounded connect/total timeouts, retries, an official SHA-256 check, immutable checkout, sparse checkout of five unprotected modules, and lint-only execution. An apparent mismatch was caused by inspecting a different older branch; no redundant fix was created.
 - PR #69 remains 4 commits ahead/0 behind current `main`, with exactly two files. Ruff has not been executed because its workflow is manual-only and no owner-dispatched run is available.
 - The project-wide completion score remains UNRATED. These policy, roadmap, and tooling changes do not establish functional trading-system completion.
+
+### Q0.8 exact-current-head enforcement (2026-11-19)
+
+- Static review of the immutable reviewer found it validated the M6 merge base and 26-path allowlist but did not independently prove the supplied SHA was still the current PR #60 head. This could permit a stale or unrelated commit with the same path/status pattern to be presented as the intended PR review.
+- Added immutable runner commit `2695d51d3387f789a784561c1b572f4ceddf6d9f`; source blob `98f8ea2b186ab287fe79a8626acedcdf801bfc6f`.
+- The runner now fetches PR #60 metadata and requires PR #60 to remain open/unmerged, exact equality between the supplied SHA and current PR head, the approved same-repository head branch, and the exact M6 base ref/SHA. It rejects stale SHAs, fork heads, closed PRs, wrong PR numbers, and wrong bases. The compare response continues to require the exact base and merge base; no unsupported `head_commit` field is assumed.
+- Added synthetic negative cases for stale head and wrong base. A separate local isolated check of the validator logic passed valid-head, stale-head, wrong-base, closed-PR, fork-head, and wrong-PR cases. This is not a run of the full immutable runner.
+- Both PR #60 and PR #64 specialist workflows now pin the new immutable runner. PR #60 head is `4cc229fb09b1030100101ad873944ea07c4f1982` (26 changed paths; 69 ahead/0 behind M6). PR #64 head is `a3c845102746196a6865cd1ae481875d954f24aa` (two files; 21 ahead/0 behind main).
+- The runner's Tokocrypto reviewer instruction is narrowed to unauthenticated GET candles only at `www.tokocrypto.site/api/v3/klines`.
+- Full Python 3.11 syntax/synthetic execution, exact-head offline tests, checkpoint artifact round-trip, and all 19 review stages remain UNVERIFIED. Manual GitHub Actions dispatch is still required; the previous run #44337003905 cannot be resumed.
+- No protected implementation/data was accessed, no workflow was dispatched, and no PR was merged. Overall completion remains UNRATED.
