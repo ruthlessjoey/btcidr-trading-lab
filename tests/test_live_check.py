@@ -35,6 +35,12 @@ class ProviderAuthorizationTests(unittest.TestCase):
             raise AssertionError("unverified server-time route must not reach transport")
         with self.assertRaisesRegex(fetcher.DisallowedRequestError, "server-time route is unverified"):
             fetcher.fetch_server_time(p.src, 5, 1, opener, lambda seconds: None)
+        class FakeHttp:
+            def get(self, url):
+                calls.append(url)
+                raise AssertionError("unverified server-time route must not reach HTTP adapter")
+        with self.assertRaisesRegex(fetcher.DisallowedRequestError, "server-time route is unverified"):
+            p.server_time(FakeHttp())
         self.assertEqual(calls, [])
 
     def test_default_configuration_authorizes_only_tokocrypto(self):
