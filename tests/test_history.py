@@ -23,6 +23,7 @@ class HistoryContainmentTests(unittest.TestCase):
         self.assertIn('"name": "market_identity", "status": "FAIL"', source)
         self.assertIn('"network_requests": 0', source)
         self.assertIn('"backtest_allowed": False', source)
+        self.assertIn("server-time route is undocumented", source)
         self.assertIn("Configuration alone is insufficient", source)
 
     def test_history_module_has_no_network_or_protected_imports(self):
