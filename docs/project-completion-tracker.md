@@ -582,3 +582,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #69's release download now follows GitHub's HTTPS-only release-asset redirects and uses bounded connection (10s), total (90s), and retry (2) timeouts. The previously authored curl command did not follow redirects; it would not reliably retrieve the actual release asset.
 - Extracted shell step passed local `bash -n` syntax validation. The archive hash check remains mandatory. Ruff itself has not been downloaded or executed, and the manual workflow has not been dispatched.
 - PR #69 still changes exactly two files, 4 commits ahead/0 behind `main`; no application code or protected paths changed.
+
+
+### Authoritative PR head snapshot (2026-11-19)
+
+- PR #60: `03bdff51c23a68a57ea2947904cf6f3c0c1e9dcf`, 26 changed paths; Q0.8 offline tests and specialist review not yet dispatched on this exact head.
+- PR #64: `e1c4c1d3f308275d644151f375eef0b4f5d9cf23`, two changed files; same updated Q0.8 workflow blob as PR #60.
+- PR #65 tracker: this update records the current snapshot.
+- PR #69: `ad7213f17df08f3b748bd32d7b93c016fc29025a`, two added files, 4 ahead/0 behind `main`; bounded HTTPS release download shell syntax checked, Ruff execution pending.
+- PR #70: `d9483900a97f8c809946b0a3a947cac82f4efdeb`, two changed files, 4 ahead/0 behind `main`; ten Read/Edit deny entries parsed and verified.
+- PR #72: `3eaed39a83a66804018ef8069cf0cd0f63821e98`, one added file, 2 ahead/0 behind `main`; skill content re-fetched and protected exclusions verified.
+- All listed PRs remain open/draft/unmerged. No new manual workflow run has supplied Python 3.11, Ruff, checkpoint artifact, or 19-role acceptance evidence. Whole-project completion remains UNRATED; the 80% target is not yet evidenced.
