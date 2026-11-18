@@ -529,8 +529,8 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 ### Live-state refresh after clean-main successor PRs (2026-11-19)
 
-- PR #69 is the clean-main successor to stale draft PR #61 (Ruff static quality). Head `fa2a5b7760757ee92fb690b08f57ae23060eaa08`; exactly two added files; 2 commits ahead/0 behind `main` at `9bf95e28171447faa910ecd5185b59a349555a52`. It preserves the read-only manual workflow, immutable checkout action, five-file unprotected sparse checkout, and verified Ruff binary digest. Ruff has not yet run; manual workflow execution remains pending.
-- PR #70 is the clean-main successor to stale draft PR #62 (deny all signal paths). Head `17c853e9d6d927e8708fcea31120da766e0af860`; exactly two changed instruction/configuration files; 2 commits ahead/0 behind `main`. JSON parsing confirms the four intended deny rules: Read/Edit for `P1/**` and Read/Edit for all `signal/**`. This is defense in depth, not an OS sandbox.
+- PR #69 is the clean-main successor to stale draft PR #61 (Ruff static quality). Latest head `ad7213f17df08f3b748bd32d7b93c016fc29025a`; exactly two added files; 2 commits ahead/0 behind `main` at `9bf95e28171447faa910ecd5185b59a349555a52`. It preserves the read-only manual workflow, immutable checkout action, five-file unprotected sparse checkout, verified Ruff 0.17.5 GitHub release asset digest, HTTPS-only download with redirect following and bounded retries. Ruff has not yet run; manual workflow execution remains pending.
+- PR #70 is the clean-main successor to stale draft PR #62 (deny all signal paths). Head `d9483900a97f8c809946b0a3a947cac82f4efdeb`; exactly two changed instruction/configuration files; 2 commits ahead/0 behind `main`. JSON parsing confirms the four intended deny rules: Read/Edit for `P1/**` and Read/Edit for all `signal/**`. This is defense in depth, not an OS sandbox.
 - PR #61 and PR #62 remain open/draft for traceability but are superseded by #69 and #70. Do not merge the superseded PRs.
 - Both successor branches were created directly from current `main`, avoiding the 3-commit divergence present in the older branches. Exact file content and compare metadata were re-fetched after creation.
 - PR #60 remains at `c3b593da446835716d54b964e6be5c53981a87a9`; PR #64 remains at `dd01298dc0da0fc45bc31d8df4a313207d45a4bd`. Neither exact-head Q0.8 offline tests nor the corrected 19-role review have been dispatched. The old specialist run #44337003905 has no checkpoint artifact.
@@ -563,8 +563,8 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #60 latest head: `03bdff51c23a68a57ea2947904cf6f3c0c1e9dcf`; 26 changed files; open/draft/unmerged; GitHub reports mergeable. Exact-head Q0.8 offline tests and corrected specialist review have not been dispatched.
 - PR #64 latest head: `e1c4c1d3f308275d644151f375eef0b4f5d9cf23`; two changed files; open/draft/unmerged; GitHub reports mergeable. Its corrected reviewer and checkpoint workflow remain runtime-unverified pending exact-head dispatch.
 - The prior specialist run #44337003905 targeted an earlier PR #60 head, stopped after 10 of 19 review stages on HTTP 429, and has no checkpoint artifact. It is inconclusive and cannot be resumed.
-- PR #69 is the clean-main successor for the protected-path-safe Ruff workflow; head `fa2a5b7760757ee92fb690b08f57ae23060eaa08`, two added files, open/draft/unmerged, mergeable. Ruff has not yet executed against repository source.
-- PR #70 is the clean-main successor for all-`signal/**` deny rules; head `17c853e9d6d927e8708fcea31120da766e0af860`, two changed files, open/draft/unmerged, mergeable. PR #71 supersedes #70's overlapping policy scope.
+- PR #69 is the clean-main successor for the protected-path-safe Ruff workflow; head `ad7213f17df08f3b748bd32d7b93c016fc29025a`, two added files, open/draft/unmerged, mergeable. Ruff has not yet executed against repository source.
+- PR #70 is the clean-main successor for all-`signal/**` deny rules; head `d9483900a97f8c809946b0a3a947cac82f4efdeb`, two changed files, open/draft/unmerged, mergeable. PR #71 supersedes #70's overlapping policy scope.
 - PR #71 adds complete shared policy boundaries for `P1/**`, all `signal/**`, `markets/risk/**`, root `validator.py`, and root `report.py`; it also narrows Tokocrypto to unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines` and states PAPER-only/LIVE-disabled. Head `ec011a0cf16eeb3a4eaae3df924d96e8a0f99511`; three changed files; open/draft/unmerged; current-main compare is 3 ahead/0 behind.
 - PR #61 and #62 are stale drafts superseded by #69 and #71 respectively. PR #70 is retained as a draft for traceability but should not be merged separately from #71.
 - PR #34 remains open/draft at `301b90dca0fd1622d3ff69ee3bbf47d2b401d448`; local 18/18 tests were reported on Python 3.13.5, while Python 3.11 CI remains pending. PR #68 remains open/draft at `e280af8e9224ff3dd5ce282d7e9da3224c6a4136`; six associated test modules remain blocked by protected import dependencies.
@@ -588,3 +588,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The runner's Tokocrypto reviewer instruction is narrowed to unauthenticated GET candles only at `www.tokocrypto.site/api/v3/klines`.
 - Full Python 3.11 syntax/synthetic execution, exact-head offline tests, checkpoint artifact round-trip, and all 19 review stages remain UNVERIFIED. Manual GitHub Actions dispatch is still required; the previous run #44337003905 cannot be resumed.
 - No protected implementation/data was accessed, no workflow was dispatched, and no PR was merged. Overall completion remains UNRATED.
+
+### Ruff workflow supply-chain recheck (2026-11-19)
+
+- Re-fetched PR #69's latest workflow at head `ad7213f17df08f3b748bd32d7b93c016fc29025a`. The download command now uses HTTPS-only protocols, follows GitHub's release-asset redirect, and applies bounded connect/total timeouts and retries before SHA-256 verification.
+- GitHub's official Ruff 0.17.5 release API confirms the Linux x86-64 archive digest is `7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90`; tag commit is `c91de8a012cb87efe279b762020a0d28dd75ddb5`.
+- PR #70 latest head is `d9483900a97f8c809946b0a3a947cac82f4efdeb`; it remains superseded by PR #71. PR #71 head remains `ec011a0cf16eeb3a4eaae3df924d96e8a0f99511`.
+- PR #73 tracker head before this addendum: `ada4bac634f694ce6c3e3472e257e47ce869de3f`; clean-main compare was 3 commits ahead/0 behind with exactly one tracker file.
+- No Ruff execution, workflow dispatch, PR merge, protected-path access, or trading action occurred.
