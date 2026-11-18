@@ -742,3 +742,17 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Re-fetched both blobs from PR #76 after commit and confirmed exact SHA matches. The focused suite imports only the empty `research/__init__.py`, the publisher, and standard-library modules; no protected path/module is part of its execution closure.
 - PR #76 is open/draft/unmerged and GitHub reports the branch mergeable relative to its stacked PR #34 base. No Action workflow run or commit status was reported for its head at the verification check. No PR #34/#68 branch was changed, no TEST evaluation or backtest workflow was run, and no exchange/network operation occurred.
 - This is local Python 3.13.5 evidence only. Python 3.11 CI and integration into `main` remain pending; PR #76 depends on the PR #34 parent chain and earns no whole-project completion percentage by itself.
+
+
+### Q0.8 checkpoint and dispatch-form revalidation (2026-11-19)
+
+- PR #60 remains open/draft/unmerged at exact review head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`, based on M6 baseline `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
+- Run `44374650548` remains the latest specialist attempt on that SHA; job is completed with failure due the previously established free-provider HTTP 429. It did not complete a specialist role.
+- Checkpoint artifact remains available: `q08-review-checkpoint-44374650548`, artifact ID `14460422014`, `expired=false`, expiry `2026-11-25T18:54:17Z`. The artifact's earlier SHA-256 and successful restore evidence remain in the preceding Q0.8 addendum.
+- Live workflow YAML comparison found:
+  - Default-branch `.github/workflows/q08-specialist-review.yml` blob `f017b5aa44bbfaa5f8fcefb24cbca9cc8fe49267` exposes `review_head_sha` and `mode`, but not `resume_from_run_id`.
+  - PR #60 branch workflow blob `a32e4e78b9987c133934ce86a64be367468e839d` exposes all three inputs and pins the immutable self-contained runner commit `c0ed377c82d4f0586dceb20eeaffd3725b568101`.
+  - PR #64 branch workflow blob `5ad241f6fd7777dbc449818874b8981786cc6054` also exposes all three inputs and adds the extra guard that checkpoint restoration is only attempted in `review` mode. The PR #60 branch version's restore condition still checks only for a non-empty resume ID; with required `mode=review`, that is the intended restore path.
+- Therefore the safe dispatch target remains branch `security/q0-provider-sanitization-2026-11-18`, review SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`, resume run ID `44374650548`, mode `review`. The checkpoint is not expired. Provider capacity after reset is still not confirmed.
+- GitHub documents that the workflow must exist on the default branch for manual dispatch, and the Actions UI allows selecting a branch and filling its inputs. A current GitHub Community thread (2026-10-17) reports that the UI may fail to refresh input fields after changing the selected branch; when using iPhone, refresh/reopen the Run workflow form after selecting the PR #60 branch and do not submit unless the `resume_from_run_id` field is visible. Sources: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow and https://github.com/orgs/community/discussions/210506.
+- No dispatch was performed; no workflow or reviewer code was executed during this state check.
