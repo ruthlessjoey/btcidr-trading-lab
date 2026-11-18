@@ -18,11 +18,19 @@ def main(argv=None):
     ap.add_argument("--crosscheck", default=None)
     ap.add_argument("--out", default="out")
     ap.add_argument("--allow-reeval", action="store_true", help="repeat the test window (labelled)")
+    modes = ap.add_mutually_exclusive_group()
+    modes.add_argument("--prepare-reservation", action="store_true", help="prepare a holdout reservation without evaluating TEST")
+    modes.add_argument("--require-committed-reservation", action="store_true", help="evaluate TEST only with the exact persistent reservation")
     a = ap.parse_args(argv)
     with open(a.config, encoding="utf-8") as f:
         cfg = json.load(f)
     return run_backtest(cfg, a.datasets_root, a.out, a.prev_results, a.crosscheck, a.allow_reeval,
-                        os.environ.get("GITHUB_RUN_ID", "local"), os.environ.get("GITHUB_SHA"))
+                        os.environ.get("GITHUB_RUN_ID", "local"), os.environ.get("GITHUB_SHA"),
+                        prepare_reservation=a.prepare_reservation,
+                        require_committed_reservation=a.require_committed_reservation,
+                        run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", "1"),
+                        workflow_ref=os.environ.get("GITHUB_WORKFLOW_REF", "local"),
+                        repository=os.environ.get("GITHUB_REPOSITORY", "local/repository"))
 
 
 if __name__ == "__main__":
