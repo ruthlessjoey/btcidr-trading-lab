@@ -569,3 +569,9 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Expanded successor PR #70 to align Claude Code permission denies with the complete current protected-path list: Read/Edit denied for `P1/**`, all `signal/**`, `markets/risk/**`, and root `validator.py` / `report.py`.
 - Re-fetched and parsed `.claude/settings.json`; all ten exact Read/Edit entries are present. The mandatory `CLAUDE.md` instructions now explicitly identify all five protected locations/modules and retain the Workstream B boundary.
 - PR #70 head: `d9483900a97f8c809946b0a3a947cac82f4efdeb`; exactly two files changed, 4 commits ahead/0 behind `main`. GitHub reports mergeable. These permission rules remain defense in depth, not an OS sandbox.
+
+
+### Security-review skill protected-scope alignment (2026-11-19)
+
+- PR #72 now explicitly lists `P1/`, all `signal/`, `markets/risk/`, `validator.py`, and `report.py` as protected exclusions, matching the expanded policy candidate in PR #70.
+- PR #72 head: `3eaed39a83a66804018ef8069cf0cd0f63821e98`; one file changed, 2 commits ahead/0 behind `main`. Runtime skill discovery remains unverified.
