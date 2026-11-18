@@ -17,7 +17,7 @@ This roadmap is an implementation sequence, not permission to access protected s
 ### Stage 1 — Shared Claude project foundation
 
 - Add root `CLAUDE.md` instructions for repository purpose, workstream separation, protected paths, trading invariants, free-only policy, least privilege, and review requirements.
-- Add project-level Claude permission denials for direct Read/Edit access to `P1/` and `signal/data/`.
+- Add project-level Claude permission denials for direct Read/Edit access to `P1/`, every `signal/` path, `markets/risk/`, and root-level `validator.py` and `report.py`.
 - Treat permission settings as defense-in-depth, not a complete sandbox: shell commands and external tools may have different access paths.
 - Keep Workstream B implementation and data unopened. Shared root instructions may still guide Claude when working within separately approved Workstream B scope.
 
@@ -76,6 +76,6 @@ For every stage:
 
 - No live trading, exchange account integration, wallet or order access.
 - No paid API, hosted agent, subscription, or cloud runtime.
-- No access to `P1/`, `signal/data/`, or protected Workstream B implementation.
-- No autonomous code changes, workflow dispatch, secrets, or merge authority.
+- No access to `P1/`, any `signal/` path, `markets/risk/`, root `validator.py` or `report.py`, or protected Workstream B implementation.
+- Autonomous code changes are permitted only within the owner's explicit project authorization and the exact protected-path boundaries. Workflow dispatch, secrets, repository settings, and PR merges still require their own explicit authorization.
 - No claim that development tooling makes a strategy profitable.
