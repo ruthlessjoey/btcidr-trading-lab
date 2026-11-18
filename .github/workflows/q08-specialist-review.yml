@@ -2,6 +2,11 @@ name: Q0.8 immutable 19-role specialist review
 
 on:
   workflow_dispatch:
+    inputs:
+      review_head_sha:
+        description: "Exact immutable PR #60 commit SHA to review"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -46,7 +51,7 @@ jobs:
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_HEAD_SHA: ${{ github.sha }}
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
