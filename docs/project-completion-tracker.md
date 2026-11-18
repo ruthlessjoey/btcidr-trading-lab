@@ -575,3 +575,10 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 - PR #72 now explicitly lists `P1/`, all `signal/`, `markets/risk/`, `validator.py`, and `report.py` as protected exclusions, matching the expanded policy candidate in PR #70.
 - PR #72 head: `3eaed39a83a66804018ef8069cf0cd0f63821e98`; one file changed, 2 commits ahead/0 behind `main`. Runtime skill discovery remains unverified.
+
+
+### Ruff release download hardening (2026-11-19)
+
+- PR #69's release download now follows GitHub's HTTPS-only release-asset redirects and uses bounded connection (10s), total (90s), and retry (2) timeouts. The previously authored curl command did not follow redirects; it would not reliably retrieve the actual release asset.
+- Extracted shell step passed local `bash -n` syntax validation. The archive hash check remains mandatory. Ruff itself has not been downloaded or executed, and the manual workflow has not been dispatched.
+- PR #69 still changes exactly two files, 4 commits ahead/0 behind `main`; no application code or protected paths changed.
