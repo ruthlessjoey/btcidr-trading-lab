@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
 
 NO_SLEEP = lambda seconds: None  # noqa: E731
-UNVERIFIED_UNVERIFIED_TIME_URL = "https://www.tokocrypto.site/api/v3/time"
+UNVERIFIED_TIME_URL = "https://www.tokocrypto.site/api/v3/time"
 CANDLE_URL = ("https://www.tokocrypto.site/api/v3/klines?"
               "symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003599999&limit=500")
 
