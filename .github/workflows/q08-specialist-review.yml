@@ -29,6 +29,17 @@ jobs:
       pull-requests: read
       actions: read
     steps:
+      - name: Validate checkpoint run ID before artifact restore
+        if: ${{ inputs.resume_from_run_id != '' }}
+        env:
+          RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RESUME_FROM_RUN_ID" =~ ^[0-9]{1,20}$ ]]; then
+            echo "::error::resume_from_run_id must be a numeric GitHub Actions run ID."
+            exit 1
+          fi
+
       - name: Sparse checkout only the immutable reviewer and its guidance
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
