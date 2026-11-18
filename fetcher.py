@@ -4,7 +4,6 @@ Only public GET addresses are used. There is no login, no key and no code
 that can place, cancel or change an order.
 
 Only these exact public GET routes are permitted:
-  {base}/api/v3/time
   {base}/api/v3/klines     (symbol BTCUSDT)
 All other hosts, paths, endpoint styles and redirects are refused.
 """
@@ -19,7 +18,7 @@ from dataclasses import dataclass
 USER_AGENT = "tokocrypto-btcusdt-lab/0.1 (read-only market data)"
 MAX_RESPONSE_BYTES = 1024 * 1024
 APPROVED_HOST = "www.tokocrypto.site"
-APPROVED_PATHS = {"/api/v3/time", "/api/v3/klines"}
+APPROVED_PATHS = {"/api/v3/klines"}
 TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800,
               "1h": 3600, "4h": 14400, "1d": 86400}
 CANDLES_PER_REQUEST = 500
@@ -55,25 +54,21 @@ def validate_public_url(url):
     keys = [k for k, _ in pairs]
     if len(keys) != len(set(keys)):
         raise DisallowedRequestError("duplicate query parameters are not allowed")
-    if p.path == "/api/v3/time":
-        if pairs:
-            raise DisallowedRequestError("server-time route does not accept query parameters")
-    else:
-        q = dict(pairs)
-        required = {"symbol", "interval", "startTime", "endTime", "limit"}
-        if set(q) != required:
-            raise DisallowedRequestError("candle request must contain exactly the approved query parameters")
-        if q.get("symbol") != "BTCUSDT" or q.get("interval") not in TF_SECONDS:
-            raise DisallowedRequestError("candle request is outside the approved BTC/USDT market")
-        numeric = ("startTime", "endTime", "limit")
-        if any(not (q[k].isascii() and q[k].isdecimal()) for k in numeric):
-            raise DisallowedRequestError("candle request contains an invalid numeric parameter")
-        if len(q["startTime"]) > 14 or len(q["endTime"]) > 14 or len(q["limit"]) > 3:
-            raise DisallowedRequestError("candle request numeric parameter exceeds the approved length")
-        start_ms, end_ms, limit = (int(q[k]) for k in numeric)
-        if (not 1 <= start_ms <= end_ms <= 10_000_000_000_000
-                or not 1 <= limit <= CANDLES_PER_REQUEST):
-            raise DisallowedRequestError("candle request range or limit is outside the approved bounds")
+    q = dict(pairs)
+    required = {"symbol", "interval", "startTime", "endTime", "limit"}
+    if set(q) != required:
+        raise DisallowedRequestError("candle request must contain exactly the approved query parameters")
+    if q.get("symbol") != "BTCUSDT" or q.get("interval") not in TF_SECONDS:
+        raise DisallowedRequestError("candle request is outside the approved BTC/USDT market")
+    numeric = ("startTime", "endTime", "limit")
+    if any(not (q[k].isascii() and q[k].isdecimal()) for k in numeric):
+        raise DisallowedRequestError("candle request contains an invalid numeric parameter")
+    if len(q["startTime"]) > 14 or len(q["endTime"]) > 14 or len(q["limit"]) > 3:
+        raise DisallowedRequestError("candle request numeric parameter exceeds the approved length")
+    start_ms, end_ms, limit = (int(q[k]) for k in numeric)
+    if (not 1 <= start_ms <= end_ms <= 10_000_000_000_000
+            or not 1 <= limit <= CANDLES_PER_REQUEST):
+        raise DisallowedRequestError("candle request range or limit is outside the approved bounds")
     return url
 
 
@@ -259,8 +254,9 @@ def parse_klines(raw):
 
 
 def fetch_server_time(src, timeout, retries, opener, sleep):
-    return extract_server_time(
-        http_get_json(src.time_url(), timeout, retries, opener, sleep))
+    """Fail closed until Tokocrypto documents and the owner approves a server-time route."""
+    raise DisallowedRequestError(
+        "Tokocrypto server-time route is unverified; no network request was made")
 
 
 def fetch_candles(src, pair, tf, start_s, end_s, timeout, retries, opener, sleep):
