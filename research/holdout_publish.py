@@ -84,7 +84,7 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
                for field in IDENTITY_FIELDS):
             raise RuntimeError("completed record does not match its durable reservation")
         if report_test != completed_record:
-            raise RuntimeError("backtest report does not match the completed TEST record")
+            raise RuntimeError("report does not match completed TEST record")
         pending_to_remove.append(pending)
 
     # Do not mutate even the temporary publisher checkout until every result validates.
