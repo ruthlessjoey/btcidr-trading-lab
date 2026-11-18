@@ -562,3 +562,10 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #72 is the clean-main successor to stale draft PR #59. It adds only `.claude/skills/security-review/SKILL.md`, head `e7883eccdba34fe1754d0bb4fd76401412c78b7b`, 1 commit ahead/0 behind `main`.
 - The skill makes exact-scope recording, untrusted-input handling, sparse-checkout review, least privilege, supply-chain checks, and protected-path/trading boundaries explicit. It is guidance only; runtime discovery is unverified and it is not an OS-level sandbox.
 - PR #59 remains open/draft for traceability and is superseded; do not merge it separately.
+
+
+### Protected-path Read/Edit deny alignment (2026-11-19)
+
+- Expanded successor PR #70 to align Claude Code permission denies with the complete current protected-path list: Read/Edit denied for `P1/**`, all `signal/**`, `markets/risk/**`, and root `validator.py` / `report.py`.
+- Re-fetched and parsed `.claude/settings.json`; all ten exact Read/Edit entries are present. The mandatory `CLAUDE.md` instructions now explicitly identify all five protected locations/modules and retain the Workstream B boundary.
+- PR #70 head: `d9483900a97f8c809946b0a3a947cac82f4efdeb`; exactly two files changed, 4 commits ahead/0 behind `main`. GitHub reports mergeable. These permission rules remain defense in depth, not an OS sandbox.
