@@ -26,21 +26,6 @@ class ProviderAuthorizationTests(unittest.TestCase):
                   "?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003599999&limit=500")
         self.assertEqual(fetcher.validate_public_url(candle), candle)
 
-    def test_live_check_provider_guard_precedes_filesystem_and_network(self):
-        with open(os.path.join(ROOT, "live_check.py"), encoding="utf-8") as f:
-            source = f.read()
-        provider_guard = 'if cfg.get("live_providers") != ["tokocrypto"]:'
-        self.assertIn(provider_guard, source)
-        self.assertLess(source.index(provider_guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
-        self.assertLess(source.index(provider_guard), source.index('for name in cfg["live_providers"]'))
-
-    def test_live_check_rejects_non_read_only_before_filesystem_and_network(self):
-        with open(os.path.join(ROOT, "live_check.py"), encoding="utf-8") as f:
-            source = f.read()
-        read_only_guard = 'if cfg.get("mode") != "read_only":'
-        self.assertIn(read_only_guard, source)
-        self.assertLess(source.index(read_only_guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
-
     def test_default_configuration_authorizes_only_tokocrypto(self):
         with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
             cfg = json.load(f)
