@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: cc6c9a13808ad4f9a87ed34baba5cd4f48d85f04
+          ref: 92bda8aef7e3243062e038f157d44374801ab41e
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
