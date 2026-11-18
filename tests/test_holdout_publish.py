@@ -143,5 +143,27 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue((self.root / (other_key + ".pending")).is_file())
 
 
+    def test_duplicate_json_keys_refuse_cleanup(self):
+        self.install_pair()
+        pending = self.root / (self.key + ".pending")
+        pending.write_text(
+            json.dumps(self.reservation, sort_keys=True).replace(
+                '"status": "reserved"', '"status": "reserved", "status": "evaluated"'),
+            encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "unreadable: ValueError"):
+            self.publish()
+        self.assertTrue(pending.is_file())
+
+    def test_nonstandard_json_constant_refuses_cleanup(self):
+        self.install_pair()
+        completed = self.output / (self.key + ".json")
+        raw = json.dumps(self.completed, sort_keys=True)
+        raw = raw.replace('"results": {"BASE": {}}', '"results": {"BASE": {"metric": NaN}}')
+        completed.write_text(raw, encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "unreadable: ValueError"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
