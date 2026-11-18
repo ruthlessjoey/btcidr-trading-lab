@@ -11,6 +11,14 @@ on:
         description: "Optional prior run ID containing a checkpoint for this exact review head"
         required: false
         type: string
+      mode:
+        description: "Run synthetic preflight only, or continue to the full 19-role review"
+        required: true
+        type: choice
+        options:
+          - synthetic
+          - review
+        default: synthetic
 
 permissions:
   contents: read
@@ -30,7 +38,7 @@ jobs:
       actions: read
     steps:
       - name: Validate checkpoint run ID before artifact restore
-        if: ${{ inputs.resume_from_run_id != '' }}
+        if: ${{ inputs.mode == 'review' && inputs.resume_from_run_id != '' }}
         env:
           RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
         run: |
@@ -73,6 +81,7 @@ jobs:
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
+        if: ${{ inputs.mode == 'review' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
@@ -83,7 +92,7 @@ jobs:
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
       - name: Persist resumable review checkpoint
-        if: always()
+        if: ${{ always() && inputs.mode == 'review' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: q08-review-checkpoint-${{ github.run_id }}
