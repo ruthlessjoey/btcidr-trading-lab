@@ -716,3 +716,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The latest exact-head offline test remains run `44373013889`, conclusion `success`, on the same SHA. No newer offline run appears.
 - Therefore Q0.8 remains: offline tests passed; specialist review quota-blocked/incomplete; all 19 roles, Commander synthesis, independent acceptance, and final verification remain pending. No assumption is made that provider capacity automatically returned after reset.
 - Workflow dispatch remains unavailable through the connected GitHub read-only API. The owner must manually dispatch the specialist workflow when ready; use the same branch and review SHA, and resume from run `44374650548` if its checkpoint artifact is still retained and downloadable. Recheck PR #60 head and artifact identity immediately before dispatch. No merge or code execution was performed by this recheck.
+
+
+### Q0.8 reviewer workflow checkpoint-restore guard (2026-11-19)
+
+- Rechecked PR #64 before editing. Its prior head was `41390c5d56513cf5157c6971e8e30994dd7d4e63`; only the intended workflow and immutable runner files are in its change set. The pinned runner remains `c0ed377c82d4f0586dceb20eeaffd3725b568101` / blob `5466bf6039e9653ef79cbbbb65b15753ce5cd723`.
+- Identified a minor workflow hygiene issue: the checkpoint-download step ran whenever `resume_from_run_id` was non-empty, even in `synthetic` mode, although the ID validation step was correctly conditional on `mode == review`.
+- Updated only `.github/workflows/q08-specialist-review.yml` on PR #64 branch `security/q08-reviewer-pin-correction-2026-11-18`. New commit: `7638be6c0eeb6a63f819e47d016c983cd2487854`; new blob: `5ad241f6fd7777dbc449818874b8981786cc6054`.
+- The artifact restore now requires both `inputs.mode == 'review'` and a non-empty `resume_from_run_id`, matching the validation step. Re-fetched the committed workflow and verified both conditions, the immutable reviewer pin, default synthetic mode, read-only permissions, and pinned artifact action.
+- This is a narrow static workflow edit; Actionlint/GitHub runtime verification is **PENDING**. PR #64 remains open/draft/unmerged. No checkpoint was restored, no workflow dispatched, no reviewer code executed, and no PR merged.
