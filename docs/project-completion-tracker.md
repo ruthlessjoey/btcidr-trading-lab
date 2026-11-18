@@ -767,3 +767,13 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The repository code search on the default branch returned only the master handoff / repository instructions for `meme` and `token discovery`, and no results for `universe` or `ranking`. The PR #60 candidate tree contains no paths named for meme intelligence, token discovery, universe scanning, or opportunity ranking. These searches are bounded evidence, not proof that no concept exists under a different name or in external/uncommitted work.
 - Result: MEME_INTEL remains **NOT DEMONSTRATED / UNVERIFIED** in the repository. The existing provider-neutral contracts and exact registries are a possible foundation, not an implemented scanner.
 - No new market-data provider, token-listing feed, DEX source, external API, package, or network permission was added or used. Before implementation, the owner must approve the research universe and source categories; engineering must then define deterministic eligibility/anti-scam rules, provenance, stale/partial handling, ranking evaluation, and synthetic acceptance tests. This is a requirements/data-source approval dependency, not a reason to bypass the current provider allowlist.
+
+
+### Q0.8 checkpoint artifact byte-level revalidation (2026-11-19)
+
+- Downloaded artifact ID `14460422014` from failed run `44374650548` and independently inspected the ZIP bytes.
+- ZIP SHA-256 exactly matches the previously recorded artifact digest: `45f96c901b9ceac0dee624dcfa3f3b06fb4ae3dc99884f15dd2e3fb9b0854f32`.
+- ZIP contains only `q08-review-checkpoint.json` (302 bytes; SHA-256 `2e05c50a545083c1180d816fc07d26eb04f9acb5ffaa3cafe43e4edbfda1614c`).
+- Parsed checkpoint identity: schema 1; repository `ruthlessjoey/btcidr-trading-lab`; base `cd451972e3a641ad6fa78e64abf3968655a4b82a`; head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; model `inclusionai/ling-3.2-flash:free`.
+- Checkpoint contains **0 completed specialist reports**, no Commander synthesis, no independent acceptance, and no final verification. It is valid as a resume starting point but contains no specialist work to preserve.
+- This confirms the quota-blocked review did not complete any role. The next review run must use exact head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` and may reference run ID `44374650548` as the resume source; expected restored report count is zero.
