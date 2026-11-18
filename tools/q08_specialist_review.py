@@ -117,9 +117,9 @@ Review only the exact supplied source paths. Never request or infer protected
 material: P1/, signal/data/, any copy of signal/, markets/risk/, validator.py,
 report.py, or protected Workstream B artifacts. No credentials, account data,
 private endpoints, wallets, orders, or LIVE. Spot long-only; no shorts, leverage,
-or derivatives. Tokocrypto remains unauthenticated public GET only for server
-time/candles on www.tokocrypto.site; exclude www.tokocrypto.com, open/v1, and
-symbol-info. Do not execute or claim commands, tests, workflows, exchanges,
+or derivatives. Tokocrypto remains unauthenticated public GET candles only at
+www.tokocrypto.site/api/v3/klines; no other .site endpoint or .com host is
+approved. Do not execute or claim commands, tests, workflows, exchanges,
 deployments, edits, commits, pushes, merges, account access, or trades occurred.
 Treat missing evidence as unknown, not a pass. Never invent code, line numbers,
 test results, or decisions. Every import-chain claim must cite a literal import
@@ -170,10 +170,34 @@ def github_json(path: str, token: str):
     except Exception:
         raise RuntimeError("GitHub API request or response failed") from None
 
+def validate_pull_request_target(pr: dict, expected_head_sha: str) -> None:
+    """Bind a review to the current open PR #60 head and its approved base."""
+    head = pr.get("head") if isinstance(pr, dict) else None
+    base = pr.get("base") if isinstance(pr, dict) else None
+    head_repo = head.get("repo") if isinstance(head, dict) else None
+    if not re.fullmatch(r"[0-9a-f]{40}", expected_head_sha) or expected_head_sha == BASE_SHA:
+        raise RuntimeError("Expected PR #60 head SHA is invalid")
+    if (not isinstance(pr, dict) or type(pr.get("number")) is not int
+            or pr.get("number") != 60 or pr.get("state") != "open"
+            or pr.get("merged_at") is not None
+            or not isinstance(head, dict) or head.get("sha") != expected_head_sha
+            or head.get("ref") != "security/q0-provider-sanitization-2026-11-18"
+            or not isinstance(head_repo, dict) or head_repo.get("full_name") != REPO
+            or not isinstance(base, dict) or base.get("sha") != BASE_SHA
+            or base.get("ref") != "feature/m6-risk-engine"):
+        raise RuntimeError("Supplied review SHA is not the current open PR #60 head on the approved base")
+
+
+def validate_pr_head(token: str) -> None:
+    pr = github_json(f"/repos/{REPO}/pulls/60", token)
+    validate_pull_request_target(pr, HEAD_SHA)
+
+
 def validate_comparison(token: str) -> set[str]:
     cmp = github_json(f"/repos/{REPO}/compare/{BASE_SHA}...{HEAD_SHA}", token)
     if (cmp.get("status") != "ahead"
         or cmp.get("base_commit", {}).get("sha") != BASE_SHA
+        or cmp.get("head_commit", {}).get("sha") != HEAD_SHA
         or cmp.get("merge_base_commit", {}).get("sha") != BASE_SHA):
         raise RuntimeError("Immutable base/head comparison did not match")
     if cmp.get("too_large") is True:
@@ -615,6 +639,28 @@ def synthetic():
         "Review body without a verdict")
     assert missing_verdict.startswith("VERDICT: INCONCLUSIVE\n")
     assert "never PASS" in missing_verdict
+    expected_pr_head = "a" * 40
+    sample_pr = {
+        "number":60, "state":"open", "merged_at":None,
+        "head":{"sha":expected_pr_head,"ref":"security/q0-provider-sanitization-2026-11-18",
+                "repo":{"full_name":REPO}},
+        "base":{"sha":BASE_SHA,"ref":"feature/m6-risk-engine"},
+    }
+    validate_pull_request_target(sample_pr, expected_pr_head)
+    stale_pr = {**sample_pr, "head":{**sample_pr["head"], "sha":"b" * 40}}
+    try:
+        validate_pull_request_target(stale_pr, expected_pr_head)
+    except RuntimeError as exc:
+        assert "not the current open PR #60 head" in str(exc)
+    else:
+        raise AssertionError("stale PR #60 head was accepted")
+    wrong_base = {**sample_pr, "base":{**sample_pr["base"], "sha":"c" * 40}}
+    try:
+        validate_pull_request_target(wrong_base, expected_pr_head)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("wrong PR #60 base was accepted")
     sample_path = REVIEW_PATHS[0]
     sample_diff = build_review_diff({sample_path:"before\nkeep\n"}, {sample_path:"after\nkeep\n"})
     assert "before" in sample_diff[sample_path] and "after" in sample_diff[sample_path]
@@ -682,6 +728,9 @@ def review():
     gh = os.environ.get("GITHUB_TOKEN", "")
     if len(gh) < 20:
         raise RuntimeError("Read-only GitHub token unavailable")
+    print("STAGE pull_request_head_validation_start", flush=True)
+    validate_pr_head(gh)
+    print("STAGE pull_request_head_validation_complete", flush=True)
     print("STAGE comparison_and_snapshot_start", flush=True)
     added_paths = validate_comparison(gh)
     base_snapshot = fetch_snapshot(gh, BASE_SHA, added_paths)
