@@ -175,7 +175,12 @@ def http_get_json(url, timeout, retries, opener, sleep):
             except (ValueError, UnicodeDecodeError, RecursionError):
                 raise ApiError("HTTP 200 response was not valid JSON")
         last = f"HTTP {status}"
-        if status != 429 and status < 500:
+        if status == 429:
+            # Tokocrypto documents Retry-After for rate limits. This transport
+            # interface does not preserve response headers, so fail closed rather
+            # than retrying before the server's requested wait has elapsed.
+            raise ApiError("HTTP 429 rate limit; automatic retry disabled")
+        if status < 500:
             raise ApiError(f"HTTP {status} (not retried)")
         if attempt < retries:
             sleep(2 ** attempt)
