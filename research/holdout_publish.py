@@ -1,4 +1,3 @@
-
 """Fail-closed publication checks for durable holdout reservations.
 
 This module is called by the research-backtest workflow after it copies completed
@@ -20,11 +19,26 @@ def _regular_file(path, description):
         raise RuntimeError(f"{description} must be a regular non-symlink file")
 
 
+def _reject_json_constant(value):
+    raise ValueError("non-standard JSON constant")
+
+
+def _unique_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
 def _read_object(path, description):
     _regular_file(path, description)
     try:
         with path.open(encoding="utf-8") as stream:
-            value = json.load(stream)
+            value = json.load(
+                stream, parse_constant=_reject_json_constant,
+                object_pairs_hook=_unique_object)
     except (OSError, ValueError) as exc:
         raise RuntimeError(f"{description} is unreadable: {type(exc).__name__}") from exc
     if not isinstance(value, dict):
@@ -85,7 +99,7 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
                for field in IDENTITY_FIELDS):
             raise RuntimeError("completed record does not match its durable reservation")
         if report_test != completed_record:
-            raise RuntimeError("backtest report does not match completed TEST record")
+            raise RuntimeError("report does not match completed TEST record")
         pending_to_remove.append(pending)
 
     # Do not mutate even the temporary publisher checkout until every result validates.
