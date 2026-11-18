@@ -662,3 +662,15 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The only completed local execution for this holdout publisher is the isolated 18/18 Python 3.13.5 run recorded above (also repeated with warnings treated as errors: 18/18 passed). Exact Git blob hashes matched before execution. Python 3.11 Actions evidence remains pending.
 - The manual publisher workflow lives on the unmerged PR #34 branch, not on current `main`; under GitHub's `workflow_dispatch` default-branch requirement it is not yet manually dispatchable through the Actions UI. No merge authority is implied.
 - No protected files were opened, no actual research-data registry or frozen dataset was touched, no TEST evaluation/backtest ran, no exchange request was made, and no PR was merged.
+
+
+### Q0 provider workflow static review (2026-11-19)
+
+- Re-fetched PR #60 at exact head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; it remains open/draft/unmerged against M6 baseline `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
+- Static review of `.github/workflows/research-data.yml` (blob `0fa6cd03da7fa0f7a26fd81fc2229241f8fbaae0`) found:
+  - `contents: read` only; pinned checkout and upload-artifact actions; checkout uses `persist-credentials: false`.
+  - Sparse checkout is limited to fetcher/provider/probe/config/history files and the named offline test files; it does not include protected root `validator.py`, root `report.py`, `P1/`, `signal/`, or `markets/risk/`.
+  - The included tests were statically inspected: `tests/test_pipeline.py` explicitly reads source text rather than importing `run.py`; `tests/test_live_check.py` imports only `providers` and `fetcher`; `tests/test_history.py` reads the unprotected history gate source/config. The workflow then invokes `fetch_history.py`, whose import closure is `research.history` and Python standard library only. That gate explicitly records zero network requests, writes no dataset, and returns FAIL while market identity remains unverified.
+  - This workflow is a fail-closed offline gate, not proof that Tokocrypto market identity or data availability has been verified. It was not dispatched or executed in this review.
+- Static review of `.github/workflows/research-backtest.yml` (blob `9c1fa840bb70d5c285a0ac5d730f4aac65e7046b`) found read-only permissions, pinned actions, credential persistence disabled, and an explicit stop after the approved offline subset to avoid importing protected `validator.py` through the backtest engine. No backtest, dataset checkout, TEST evaluation, or exchange request is performed by this blocked workflow.
+- This is static configuration/import-closure evidence only. It does not replace the pending 19-role specialist review, actionlint/zizmor execution, or manual Actions runs. No protected file was opened, no test or workflow was executed in this audit, and no PR was merged.
