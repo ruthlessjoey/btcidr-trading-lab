@@ -44,8 +44,12 @@ def validate_public_url(url):
             p.username is not None or p.password is not None or
             port not in (None, 443) or p.fragment or p.path not in APPROVED_PATHS):
         raise DisallowedRequestError("request refused by the public market-data allowlist")
+    if len(p.query) > 256:
+        raise DisallowedRequestError("request query exceeds the approved length limit")
     try:
-        pairs = urllib.parse.parse_qsl(p.query, keep_blank_values=True, strict_parsing=True) if p.query else []
+        pairs = (urllib.parse.parse_qsl(
+            p.query, keep_blank_values=True, strict_parsing=True, max_num_fields=5)
+            if p.query else [])
     except ValueError:
         raise DisallowedRequestError("candle request query is malformed")
     keys = [k for k, _ in pairs]
@@ -64,8 +68,11 @@ def validate_public_url(url):
         numeric = ("startTime", "endTime", "limit")
         if any(not (q[k].isascii() and q[k].isdecimal()) for k in numeric):
             raise DisallowedRequestError("candle request contains an invalid numeric parameter")
+        if len(q["startTime"]) > 14 or len(q["endTime"]) > 14 or len(q["limit"]) > 3:
+            raise DisallowedRequestError("candle request numeric parameter exceeds the approved length")
         start_ms, end_ms, limit = (int(q[k]) for k in numeric)
-        if start_ms > end_ms or not 1 <= limit <= CANDLES_PER_REQUEST:
+        if (not 1 <= start_ms <= end_ms <= 10_000_000_000_000
+                or not 1 <= limit <= CANDLES_PER_REQUEST):
             raise DisallowedRequestError("candle request range or limit is outside the approved bounds")
     return url
 
