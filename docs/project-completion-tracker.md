@@ -570,3 +570,10 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #34 remains open/draft at `301b90dca0fd1622d3ff69ee3bbf47d2b401d448`; local 18/18 tests were reported on Python 3.13.5, while Python 3.11 CI remains pending. PR #68 remains open/draft at `e280af8e9224ff3dd5ce282d7e9da3224c6a4136`; six associated test modules remain blocked by protected import dependencies.
 - PR #65's tracker branch has accumulated 60 commits ahead and 3 behind current `main`; this clean-main successor preserves its 557-line requirement register and evidence history without inheriting that divergence.
 - No workflow was dispatched, no protected implementation/data was accessed, and no PR was merged in this reconciliation. The proposed 100-point weights remain owner-unapproved. Overall project completion remains **UNRATED**; policy and tracker changes do not count as implemented trading functionality.
+
+### Follow-up live-state correction (2026-11-19)
+
+- PR #71 advanced after its initial tracker entry. Its latest head is `ec011a0cf16eeb3a4eaae3df924d96e8a0f99511`, with 3 commits ahead/0 behind current `main` and exactly 3 changed files: `.claude/settings.json`, `CLAUDE.md`, and `docs/development-stack/roadmap.md`. The latest commit updates the roadmap to match the protected-path rules. PR #71 remains open/draft/unmerged; its body now records the latest head and verification limits.
+- The Ruff workflow on PR #69's actual head `ad7213f17df08f3b748bd32d7b93c016fc29025a` was re-fetched by immutable commit SHA. It already uses HTTPS-only redirects, bounded connect/total timeouts, retries, an official SHA-256 check, immutable checkout, sparse checkout of five unprotected modules, and lint-only execution. An apparent mismatch was caused by inspecting a different older branch; no redundant fix was created.
+- PR #69 remains 4 commits ahead/0 behind current `main`, with exactly two files. Ruff has not been executed because its workflow is manual-only and no owner-dispatched run is available.
+- The project-wide completion score remains UNRATED. These policy, roadmap, and tooling changes do not establish functional trading-system completion.
