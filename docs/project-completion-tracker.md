@@ -639,3 +639,16 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #69 adds `.github/workflows/python-static-quality.yml` with only `workflow_dispatch`. That workflow file is not on `main` at the current default-branch baseline `9bf95e28171447faa910ecd5185b59a349555a52`; GitHub requires a workflow_dispatch file to exist on the default branch before it can be manually triggered from the Actions UI. Therefore its Ruff check cannot be dispatched against the PR branch until the workflow is first present on the default branch. No merge is authorized by this addendum. Source: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch
 - Verified the official Ruff 0.17.5 GitHub release metadata: tag commit `c91de8a012cb87efe279b762020a0d28dd75ddb5`; Linux x86-64 archive digest `sha256:7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90`. The local lint run was **NOT EXECUTED** because the current container cannot resolve external hosts; no Ruff result is claimed.
 - This was static inspection only. No protected path was opened, no application module was imported/executed, no workflow was dispatched, and no PR was merged. PR #71's config syntax/content checks are passed; effective runtime enforcement remains unverified. PR #69 Ruff execution remains pending an approved route to run the check.
+
+
+### Isolated durable holdout publisher tests (2026-11-19)
+
+- Re-fetched PR #34 source at exact head `301b90dca0fd1622d3ff69ee3bbf47d2b401d448` (open/draft/unmerged).
+- Executed only `tests/test_holdout_publish.py` against `research/holdout_publish.py` in an isolated temporary directory using Python 3.13.5: **18 tests passed, 0 failures, 0 errors**.
+- Exact Git blob identity was verified for both executed files before the final run:
+  - `tests/test_holdout_publish.py`: `e84f4978ac8a72202c017cb88dbee5ee7dafea22`
+  - `research/holdout_publish.py`: `923acda6fb731a0d1ad4f8c3936a3a825ea54e8a`
+  - `research/__init__.py` is empty (blob `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`).
+- Static import review found only Python standard-library imports plus the publisher module; the publisher itself imports only `argparse`, `json`, `os`, `stat`, and `pathlib`. No protected module is imported or executed by this test closure.
+- Test cases exercise synthetic temporary files only. No frozen dataset, real registry, backtest pipeline, holdout evaluation, exchange endpoint, credential, or protected path was accessed.
+- This is a focused local Python 3.13.5 pass for the publisher only. Python 3.11 CI, complete PR #34 integration, and dependent pipeline suites remain **UNVERIFIED**. PR #34 remains open/draft/unmerged; no Actions workflow was dispatched and no merge occurred.
