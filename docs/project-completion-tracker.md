@@ -708,3 +708,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Ran the exact `fetch_history.py` entry point against the exact checked-in `research_config.json`, with output redirected to an isolated temporary directory. Exit code **1 was expected** because market identity is deliberately unverified. The generated JSON reported `gate=FAIL`, `network_requests=0`, `dataset=null`, and `backtest_allowed=false`; only `dataset_report.json` and `dataset_report.md` were created, and no dataset directory was created.
 - The command emitted an unrelated environment startup warning from the local spreadsheet warmup hook; it did not affect the 4/4 test result or the expected fail-closed report.
 - This verifies the local fail-closed Step 1 gate on Python 3.13.5 only. It does not validate Tokocrypto market identity, candle retrieval, Python 3.11 compatibility, or any backtest. No network call or protected-module import occurred.
+
+
+### Q0.8 workflow state recheck (2026-11-19)
+
+- Re-read the repository Actions API after the previously reported provider quota reset window. The latest specialist-review run is still `44374650548` on exact SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; no later specialist-review dispatch appears in the latest 100 workflow runs.
+- The latest exact-head offline test remains run `44373013889`, conclusion `success`, on the same SHA. No newer offline run appears.
+- Therefore Q0.8 remains: offline tests passed; specialist review quota-blocked/incomplete; all 19 roles, Commander synthesis, independent acceptance, and final verification remain pending. No assumption is made that provider capacity automatically returned after reset.
+- Workflow dispatch remains unavailable through the connected GitHub read-only API. The owner must manually dispatch the specialist workflow when ready; use the same branch and review SHA, and resume from run `44374650548` if its checkpoint artifact is still retained and downloadable. Recheck PR #60 head and artifact identity immediately before dispatch. No merge or code execution was performed by this recheck.
