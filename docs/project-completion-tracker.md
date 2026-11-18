@@ -725,3 +725,20 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Updated only `.github/workflows/q08-specialist-review.yml` on PR #64 branch `security/q08-reviewer-pin-correction-2026-11-18`. New commit: `7638be6c0eeb6a63f819e47d016c983cd2487854`; new blob: `5ad241f6fd7777dbc449818874b8981786cc6054`.
 - The artifact restore now requires both `inputs.mode == 'review'` and a non-empty `resume_from_run_id`, matching the validation step. Re-fetched the committed workflow and verified both conditions, the immutable reviewer pin, default synthetic mode, read-only permissions, and pinned artifact action.
 - This is a narrow static workflow edit; Actionlint/GitHub runtime verification is **PENDING**. PR #64 remains open/draft/unmerged. No checkpoint was restored, no workflow dispatched, no reviewer code executed, and no PR merged.
+
+
+### Bounded holdout publisher enumeration successor PR #76 (2026-11-19)
+
+- Static review found the prior implementation sorted/materialized every `*.json` entry before enforcing `MAX_COMPLETED_FILES = 1000`; the nominal cap therefore did not bound enumeration memory or iteration.
+- Created a separate draft successor, PR #76: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/76
+  - Branch: `security/holdout-publisher-bounded-scan-2026-11-19`
+  - Head: `5970d6d7b6bd99b83cb5dfb0eb502013b2f69678`
+  - Base: PR #34 branch at exact parent `301b90dca0fd1622d3ff69ee3bbf47d2b401d448`
+  - Exactly two changed paths: `research/holdout_publish.py` and `tests/test_holdout_publish.py`.
+- Implementation now uses `itertools.islice(..., MAX_COMPLETED_FILES + 1)`, stops after 1,001 matches, rejects overflow, and sorts only the bounded list. Added a deterministic regression test whose iterator offers 10,000 entries and asserts exactly 1,001 were consumed.
+- Re-ran the focused synthetic test suite against the exact content committed in PR #76, Python 3.13.5 with warnings treated as errors: **19/19 passed**. Exact changed blobs:
+  - `research/holdout_publish.py`: `b2c27931b5b4a86b84cd9dc0892d2c8032a6c0b5`
+  - `tests/test_holdout_publish.py`: `4ca2aa5465b8ab0c07d2a84e6f1de9fe59182150`
+- Re-fetched both blobs from PR #76 after commit and confirmed exact SHA matches. The focused suite imports only the empty `research/__init__.py`, the publisher, and standard-library modules; no protected path/module is part of its execution closure.
+- PR #76 is open/draft/unmerged and GitHub reports the branch mergeable relative to its stacked PR #34 base. No Action workflow run or commit status was reported for its head at the verification check. No PR #34/#68 branch was changed, no TEST evaluation or backtest workflow was run, and no exchange/network operation occurred.
+- This is local Python 3.13.5 evidence only. Python 3.11 CI and integration into `main` remain pending; PR #76 depends on the PR #34 parent chain and earns no whole-project completion percentage by itself.
