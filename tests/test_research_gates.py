@@ -1,4 +1,9 @@
-"""Offline tests for fail-closed research evidence gates; no network or protected modules."""
+"""Protected-import research gate tests; excluded from the approved offline test suite.
+
+This module imports research.pipeline and research.engine, whose runtime dependency
+chain reaches protected root-level validator.py. Do not execute under the current
+protected-path boundary without separate owner authorization.
+"""
 import json
 import os
 import sys
