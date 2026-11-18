@@ -555,3 +555,10 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #69 remains the clean-main Ruff workflow successor to #61; Ruff runtime execution is still pending. PR #61/#62 remain stale drafts and are superseded by #69/#71 respectively.
 - Verification is limited to exact-file retrieval, JSON parsing, expected-rule assertions, instruction-content checks, and GitHub compare metadata. Claude Code rule semantics and resistance to shell/tool bypass are not independently verified; this is defense in depth, not an OS sandbox.
 - No protected implementation/data was accessed, no application code or tests were run, no workflow was dispatched, and no PR was merged. This policy improvement earns no feature implementation or project-completion credit. Overall completion remains UNRATED pending owner-approved scope/weights and evidence.
+
+
+### Security-review skill successor (2026-11-19)
+
+- PR #72 is the clean-main successor to stale draft PR #59. It adds only `.claude/skills/security-review/SKILL.md`, head `e7883eccdba34fe1754d0bb4fd76401412c78b7b`, 1 commit ahead/0 behind `main`.
+- The skill makes exact-scope recording, untrusted-input handling, sparse-checkout review, least privilege, supply-chain checks, and protected-path/trading boundaries explicit. It is guidance only; runtime discovery is unverified and it is not an OS-level sandbox.
+- PR #59 remains open/draft for traceability and is superseded; do not merge it separately.
