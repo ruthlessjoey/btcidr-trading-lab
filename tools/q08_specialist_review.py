@@ -91,7 +91,7 @@ MAX_TOTAL = 256_000
 MAX_DIFF = 160_000
 MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
-MAX_OUTPUT = 8_000
+MAX_OUTPUT = 12_000
 
 SECRET_PATTERNS = (
     re.compile(r"\bsk-or-v1-[A-Za-z0-9]{20,}\b"),
@@ -314,7 +314,7 @@ def model_config():
 
 def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, label: str) -> str:
     body = json.dumps({
-        "model":model, "temperature":0.1, "max_tokens":1600, "reasoning":{"effort":"none"},
+        "model":model, "temperature":0.1, "max_tokens":2200, "reasoning":{"effort":"none"},
         "messages":[{"role":"system","content":system},
                     {"role":"user","content":json.dumps(payload, ensure_ascii=False)}],
     }).encode("utf-8")
@@ -452,6 +452,8 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
           " reasoning_tokens=" + reasoning_label +
           " content_chars=" + str(content_length) +
           " refusal_present=" + str(refusal_present).lower(), flush=True)
+    if finish_reason == "length":
+        raise RuntimeError("Model completion was truncated at the token limit; incomplete reviews are rejected")
     if not isinstance(content, str):
         raise RuntimeError("Model returned non-text completion content (type=" + content_type +
                            ", finish_reason=" + finish_label + ")")
