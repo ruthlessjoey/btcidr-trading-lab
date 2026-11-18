@@ -40,18 +40,16 @@ jobs:
             exit 1
           fi
 
-      - name: Sparse checkout only the immutable reviewer and its guidance
+      - name: Sparse checkout only the immutable self-contained reviewer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: 2695d51d3387f789a784561c1b572f4ceddf6d9f
+          ref: c0ed377c82d4f0586dceb20eeaffd3725b568101
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /tools/q08_specialist_review.py
-            /.claude/agents/
-            /.claude/skills/
 
       - name: Restore checkpoint from an earlier run
         if: ${{ inputs.resume_from_run_id != '' }}
