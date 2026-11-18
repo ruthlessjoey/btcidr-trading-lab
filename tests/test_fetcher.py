@@ -93,10 +93,11 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(fetcher.http_get_json(TIME_URL, 5, 1, op, NO_SLEEP), {"ok": 1})
         self.assertEqual(len(op.calls), 1)
 
-    def test_retries_429_then_succeeds(self):
+    def test_429_is_not_retried_without_retry_after_support(self):
         op = scripted((429, b""), (200, b'[1]'))
-        self.assertEqual(fetcher.http_get_json(TIME_URL, 5, 2, op, NO_SLEEP), [1])
-        self.assertEqual(len(op.calls), 2)
+        with self.assertRaisesRegex(fetcher.ApiError, "HTTP 429 rate limit; automatic retry disabled"):
+            fetcher.http_get_json(TIME_URL, 5, 2, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
 
     def test_retries_5xx_then_succeeds(self):
         op = scripted((503, b""), (200, b'[1]'))
