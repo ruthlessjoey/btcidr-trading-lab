@@ -6,12 +6,23 @@ records into its research-data checkout and before it removes pending markers.
 import argparse
 import json
 import os
+import stat
 from pathlib import Path
+
+MAX_JSON_BYTES = 1024 * 1024
+MAX_COMPLETED_FILES = 1000
 
 
 IDENTITY_FIELDS = (
     "key", "frozen_hash", "run_id", "run_attempt", "workflow_ref", "repository"
 )
+
+
+def _reject_symlink_components(path, description):
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    for component in (absolute, *absolute.parents):
+        if component.is_symlink():
+            raise RuntimeError(f"{description} must not traverse a symlinked path component")
 
 
 def _regular_file(path, description):
@@ -34,12 +45,23 @@ def _unique_object(pairs):
 
 def _read_object(path, description):
     _regular_file(path, description)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        with path.open(encoding="utf-8") as stream:
-            value = json.load(
-                stream, parse_constant=_reject_json_constant,
-                object_pairs_hook=_unique_object)
-    except (OSError, ValueError) as exc:
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise RuntimeError(f"{description} must be a regular file")
+            raw = stream.read(MAX_JSON_BYTES + 1)
+        if len(raw) > MAX_JSON_BYTES:
+            raise RuntimeError(f"{description} exceeds the {MAX_JSON_BYTES}-byte JSON limit")
+        value = json.loads(
+            raw.decode("utf-8"), parse_constant=_reject_json_constant,
+            object_pairs_hook=_unique_object)
+    except RuntimeError:
+        raise
+    except (OSError, ValueError, RecursionError) as exc:
         raise RuntimeError(f"{description} is unreadable: {type(exc).__name__}") from exc
     if not isinstance(value, dict):
         raise RuntimeError(f"{description} must contain a JSON object")
@@ -50,6 +72,8 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
     """Validate every result first, then remove only its exact matching reservation."""
     root = Path(registry_dir)
     output = Path(output_dir)
+    _reject_symlink_components(root, "research-data test registry")
+    _reject_symlink_components(output, "run output test registry")
     if root.is_symlink() or not root.is_dir():
         raise RuntimeError("research-data test registry must be a real directory")
     if not output.exists() and not output.is_symlink():
@@ -58,10 +82,14 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         raise RuntimeError("run output test registry must be a real directory")
 
     completed_files = sorted(output.glob("*.json"))
+    if len(completed_files) > MAX_COMPLETED_FILES:
+        raise RuntimeError(f"run output contains more than {MAX_COMPLETED_FILES} completed records")
     if not completed_files:
         return 0
 
-    report = _read_object(Path(report_path), "backtest report")
+    report_path = Path(report_path)
+    _reject_symlink_components(report_path, "backtest report")
+    report = _read_object(report_path, "backtest report")
     report_test = report.get("test")
     if (report.get("status") not in ("OK", "POST_EVALUATION_FAILED")
             or not isinstance(report_test, dict)
