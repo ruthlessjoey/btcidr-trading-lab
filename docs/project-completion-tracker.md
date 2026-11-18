@@ -694,3 +694,17 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The proposed B1/E1/E2 requirements already include meme/newly listed asset coverage, universe eligibility, and opportunity ranking. The named `MEME_INTEL` initiative should be tracked as a research-only work package under those requirements, not counted as a completed standalone subsystem or given an extra weight before scope approval.
 - A path-name search of the default-branch tree at `9bf95e28171447faa910ecd5185b59a349555a52` and Q0 candidate tree at `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` found no paths named for meme intelligence, token discovery, universe scanning, or opportunity ranking. The open-PR title search also returned no MEME_INTEL work item. This is only a path/title search; it does not prove no related logic exists under other names or in an uncommitted external workspace.
 - Therefore MEME_INTEL implementation status remains **UNVERIFIED / NOT DEMONSTRATED IN REPOSITORY**. Required scope, approved public data sources, token eligibility/anti-scam criteria, provenance, ranking model, stale-data behavior, and synthetic evaluation criteria still need to be specified before implementation can receive acceptance credit. No new provider or network source is authorized by this note.
+
+
+### Exact-blob local verification of Step 1 fail-closed market-identity gate (2026-11-19)
+
+- Reconstructed only the following unprotected files in an isolated temporary directory from PR #60 head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`, and verified each Git blob SHA-1 before execution:
+  - `research/history.py`: `a6a56d25fe60a255841e27c1b72b7d910eab19d9`
+  - `tests/test_history.py`: `6a3ea9b26a93b60059bda56347bd4ea211dcb574`
+  - `research_config.json`: `58ff32379a7f4fbc0ca5d75ff10e20e82bbaf3ff`
+  - `fetch_history.py`: `75fcaa6cbe0539f6dde5dcf8a69778c07f28513b`
+  - Empty `research/__init__.py` matched the empty-blob hash `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`.
+- Python 3.13.5: `tests/test_history.py` **4/4 passed**.
+- Ran the exact `fetch_history.py` entry point against the exact checked-in `research_config.json`, with output redirected to an isolated temporary directory. Exit code **1 was expected** because market identity is deliberately unverified. The generated JSON reported `gate=FAIL`, `network_requests=0`, `dataset=null`, and `backtest_allowed=false`; only `dataset_report.json` and `dataset_report.md` were created, and no dataset directory was created.
+- The command emitted an unrelated environment startup warning from the local spreadsheet warmup hook; it did not affect the 4/4 test result or the expected fail-closed report.
+- This verifies the local fail-closed Step 1 gate on Python 3.13.5 only. It does not validate Tokocrypto market identity, candle retrieval, Python 3.11 compatibility, or any backtest. No network call or protected-module import occurred.
