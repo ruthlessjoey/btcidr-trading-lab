@@ -28,6 +28,12 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertLess(source.index(guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
         self.assertLess(source.index(guard), source.index('for source_cfg in cfg["sources"]'))
 
+    def test_undocumented_server_time_route_is_not_in_the_transport_allowlist(self):
+        with open(os.path.join(ROOT, "fetcher.py"), encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn('APPROVED_PATHS = {"/api/v3/klines"}', source)
+        self.assertIn("Tokocrypto server-time route is unverified; no network request was made", source)
+
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
         with open(os.path.join(ROOT, "run.py"), encoding="utf-8") as f:
             source = f.read()
