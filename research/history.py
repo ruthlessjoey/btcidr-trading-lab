@@ -1,9 +1,10 @@
 """research/history.py - fail-closed Step 1 gate.
 
-The only currently approved Tokocrypto public routes are server time and candles.
-Those routes do not independently establish market identity, while symbol metadata is
-not approved. Therefore this module deliberately performs no network requests and
-cannot publish a dataset until the owner approves a verifiable market-identity method.
+The only currently approved Tokocrypto public route is candles. The server-time route
+is not documented and remains unverified; symbol metadata is not approved. A candle
+route alone cannot independently establish market identity. Therefore this module
+deliberately performs no network requests and cannot publish a dataset until the owner
+approves a verifiable market-identity method.
 """
 import json
 import os
@@ -24,8 +25,8 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
                        host == "https://www.tokocrypto.site" and
                        symbol == "BTCUSDT" and base_asset == "BTC" and quote_asset == "USDT")
     reason = (
-        "Market identity is unverified: the currently approved public API scope permits only "
-        "server-time and candle routes, not symbol metadata. Configuration alone is insufficient. "
+        "Market identity is unverified: only the public candle route is approved; the server-time "
+        "route is undocumented and symbol metadata is not approved. Configuration alone is insufficient. "
         "No request was made and no dataset was written."
         if approved_config else
         "Research configuration is outside the exact approved read-only Tokocrypto BTC/USDT scope. "
