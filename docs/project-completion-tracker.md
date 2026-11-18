@@ -543,3 +543,15 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The exact workflow blob is `4e704851011a6b10f66d22804edf91aad41af5eb` on both PR #60 and PR #64 branches; runner pin remains immutable commit `0b1d357ccffa8395f611833da1e4bb50ac52fd26`.
 - PR #60 head is now `03bdff51c23a68a57ea2947904cf6f3c0c1e9dcf` (26 changed paths); PR #64 head is now `e1c4c1d3f308275d644151f375eef0b4f5d9cf23` (two changed files). Both remain open/draft/unmerged.
 - GitHub reports mergeable for both branches, but the Q0.8 workflow has not been dispatched on either updated head. Python 3.11 syntax/synthetic tests, checkpoint artifact round-trip, exact-head offline tests, and full 19-role review remain unverified.
+
+### Complete protected-path guard successor (2026-11-19)
+
+- New PR #71: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/71
+- Branch: `security/complete-protected-path-guard-2026-11-19`; head `dbad9ff47974f93f6ae179ffb208ad298fe67c95`; based directly on current `main` `9bf95e28171447faa910ecd5185b59a349555a52`.
+- Exactly two shared policy files changed: `.claude/settings.json` and `CLAUDE.md`. GitHub compare confirms 2 commits ahead, 0 behind, and exactly those two paths.
+- The Claude Code Read/Edit deny configuration now covers `P1/**`, all `signal/**`, `markets/risk/**`, root `validator.py`, and root `report.py`. JSON parsing succeeded and all 10 expected deny rules were present after re-fetching the committed file.
+- The repository instructions now explicitly prohibit processing those paths, require exclusions before broad checkout/search/test discovery, narrow Tokocrypto to unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines`, and state PAPER-only/LIVE-disabled boundaries.
+- PR #71 is open/draft/unmerged. It supersedes PR #70 for the overlapping signal-path policy because it includes the same all-`signal/**` rules plus the additional protected modules and endpoint correction. PR #70 remains open/draft for traceability; do not merge it separately.
+- PR #69 remains the clean-main Ruff workflow successor to #61; Ruff runtime execution is still pending. PR #61/#62 remain stale drafts and are superseded by #69/#71 respectively.
+- Verification is limited to exact-file retrieval, JSON parsing, expected-rule assertions, instruction-content checks, and GitHub compare metadata. Claude Code rule semantics and resistance to shell/tool bypass are not independently verified; this is defense in depth, not an OS sandbox.
+- No protected implementation/data was accessed, no application code or tests were run, no workflow was dispatched, and no PR was merged. This policy improvement earns no feature implementation or project-completion credit. Overall completion remains UNRATED pending owner-approved scope/weights and evidence.
