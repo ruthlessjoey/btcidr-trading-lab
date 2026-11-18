@@ -165,5 +165,31 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
 
+    def test_symlinked_registry_parent_refuses_cleanup(self):
+        self.install_pair()
+        alias = self.root.parent / "registry-parent-alias"
+        os.symlink(self.root.parent, alias, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "symlinked path component"):
+            publish_completed_reservations(alias / self.root.name, self.output, self.report)
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_symlinked_output_parent_refuses_cleanup(self):
+        self.install_pair()
+        alias = self.output.parent.parent / "output-parent-alias"
+        os.symlink(self.output.parent, alias, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "symlinked path component"):
+            publish_completed_reservations(self.root, alias / self.output.name, self.report)
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_oversized_completed_record_refuses_cleanup(self):
+        self.install_pair()
+        completed = self.output / (self.key + ".json")
+        completed.write_text('{"payload":"' + ("x" * (1024 * 1024)) + '"}', encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "exceeds the 1048576-byte JSON limit"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+
+
 if __name__ == "__main__":
     unittest.main()
