@@ -637,3 +637,8 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Exact workflow file re-fetch on both branches confirmed the same blob SHA `a32e4e78b9987c133934ce86a64be367468e839d`, synthetic default, review-step gate, review-only checkpoint restore, and review-only checkpoint upload.
 - This is workflow static evidence only. No workflow was dispatched. Python 3.11 compilation, synthetic runtime, checkpoint round-trip, and all 19 roles remain UNVERIFIED.
 - Owner dispatch sequence: first select `mode=synthetic` with current PR #60 SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; only after success, dispatch again with `mode=review`, same SHA, and blank `resume_from_run_id`. Later resume only from a failed review run that actually uploaded a checkpoint artifact.
+
+### Q0.8 workflow YAML structure check (2026-11-19)
+
+- Parsed the revised specialist workflow structure with local PyYAML 6.0.3. The eight-step structure is valid; synthetic smoke is unconditional; model review is gated by `inputs.mode == 'review'`; checkpoint restore and upload are gated to review mode.
+- This is a local YAML syntax/structure check only. PyYAML uses YAML 1.1 and does not validate GitHub Actions expression semantics. No Python 3.11 runner execution or GitHub Actions dispatch has occurred.
