@@ -1,8 +1,8 @@
 """providers.py - public market-data adapters.
 
 Only build("tokocrypto") is currently authorized. Legacy adapter classes remain for
-historical comparison code, but fetcher.validate_public_url refuses every host and
-route except Tokocrypto's approved HTTPS time and candle endpoints. No adapter can
+historical comparison code, but fetcher.validate_public_url permits only Tokocrypto's documented HTTPS candle route.
+The server-time route remains unverified and is deliberately disabled. No adapter can
 bypass that transport boundary.
 """
 import math
@@ -176,7 +176,8 @@ class BinanceStyle:
         self.pair, self.src = pair, fetcher.Source(name, style, base_url)
 
     def server_time(self, http):
-        return fetcher.extract_server_time(http.get(self.src.time_url()))
+        raise fetcher.DisallowedRequestError(
+            "Tokocrypto server-time route is unverified; no network request was made")
 
     def candles(self, tf, start_s, end_s, http):
         if tf not in TF_SECONDS:
