@@ -378,7 +378,8 @@ def load_checkpoint(path: Path) -> dict:
                      "model", "reports", "commander", "acceptance", "verification"}
     if not isinstance(payload, dict) or set(payload) != expected_keys:
         raise RuntimeError("Checkpoint schema is invalid")
-    if (type(payload["schema_version"]) is not int or payload["schema_version"] != 1\n        or payload["repository"] != REPO
+    if (type(payload["schema_version"]) is not int or payload["schema_version"] != 1
+        or payload["repository"] != REPO
         or payload["base_sha"] != BASE_SHA or payload["head_sha"] != HEAD_SHA
         or payload["model"] != EXPECTED_MODEL):
         raise RuntimeError("Checkpoint does not match the exact repository, base, head, and model")
