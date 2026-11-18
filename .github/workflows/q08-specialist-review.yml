@@ -2,6 +2,11 @@ name: Q0.8 immutable 19-role specialist review
 
 on:
   workflow_dispatch:
+    inputs:
+      review_head_sha:
+        description: "Exact immutable PR #60 commit SHA to review"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,13 +24,18 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Check out immutable trusted reviewer only
+      - name: Sparse checkout only the immutable reviewer and its guidance
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: d7600990d78576baf1a57be6b1a67f24c1b20ab0
+          ref: 92bda8aef7e3243062e038f157d44374801ab41e
           path: runner
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/q08_specialist_review.py
+            /.claude/agents/
+            /.claude/skills/
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -41,7 +51,7 @@ jobs:
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_HEAD_SHA: ${{ github.sha }}
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
