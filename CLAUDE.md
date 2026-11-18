@@ -15,7 +15,7 @@ These instructions apply across this repository, including shared tooling used b
 The following restrictions are mandatory:
 
 1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`.
-2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `signal/data/`.
+2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path, including `signal/data/`.
 3. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the user gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
 4. Before any repository-wide search, recursive listing, archive, or test discovery, explicitly exclude all protected paths. If a tool cannot guarantee exclusion, do not run it.
 5. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
