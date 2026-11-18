@@ -335,10 +335,21 @@ def _validate_checkpoint_report(value: str, label: str) -> None:
         raise RuntimeError("Checkpoint report has no explicit verdict: " + label)
 
 
+def _validate_checkpoint_progress(reports: dict, commander,
+                                    acceptance, verification) -> None:
+    if commander is not None and set(reports) != set(SPECIALISTS):
+        raise RuntimeError("Checkpoint commander exists before all specialist roles completed")
+    if acceptance is not None and commander is None:
+        raise RuntimeError("Checkpoint acceptance exists without Commander synthesis")
+    if verification is not None and acceptance is None:
+        raise RuntimeError("Checkpoint verification exists without independent acceptance")
+
+
 def save_checkpoint(path: Path, reports: dict, commander=None,
                     acceptance=None, verification=None) -> None:
     if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
         raise RuntimeError("Checkpoint specialist role set is invalid")
+    _validate_checkpoint_progress(reports, commander, acceptance, verification)
     for name, report in reports.items():
         _validate_checkpoint_report(report, name)
     for name, report in ((COMMANDER, commander), (ACCEPTANCE, acceptance),
@@ -386,6 +397,8 @@ def load_checkpoint(path: Path) -> dict:
     reports = payload["reports"]
     if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
         raise RuntimeError("Checkpoint specialist role set is invalid")
+    _validate_checkpoint_progress(reports, payload["commander"],
+                                  payload["acceptance"], payload["verification"])
     for name, report in reports.items():
         _validate_checkpoint_report(report, name)
     for name, report in ((COMMANDER, payload["commander"]),
@@ -631,6 +644,13 @@ def synthetic():
         save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
         restored = load_checkpoint(checkpoint_path)
         assert restored["reports"]["architecture-architect"] == "VERDICT: PASS"
+        try:
+            save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"},
+                            commander="VERDICT: PASS")
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("commander checkpoint with missing specialist reports was accepted")
         malformed_path = Path(checkpoint_dir) / "malformed.json"
         malformed_path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
         try:
