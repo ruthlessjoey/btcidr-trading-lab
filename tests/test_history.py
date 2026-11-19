@@ -29,7 +29,65 @@ def source_imports(path):
     return modules
 
 
+
+def source_import_edges(path):
+    """Return normalized source import edges without importing the target module."""
+    with open(os.path.join(ROOT, path), encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=path)
+    edges = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            edges.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = "." * node.level + (node.module or "")
+            if node.level:
+                edges.add(module)
+            elif node.module == "research":
+                edges.update("research." + alias.name for alias in node.names)
+            else:
+                edges.add(module)
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if (isinstance(func, ast.Name) and func.id == "__import__") or (
+                isinstance(func, ast.Attribute) and func.attr == "import_module"
+            ):
+                raise AssertionError(f"{path} contains a dynamic import")
+    return edges
+
+
 class HistoryContainmentTests(unittest.TestCase):
+    def test_q08_workflow_test_import_closure_stays_outside_protected_modules(self):
+        # These are the exact six modules selected by q08-offline-tests.yml and
+        # research-data.yml. Resolve only source imports; do not import or execute them.
+        expected_local_edges = {
+            "tests/test_fetcher.py": {"fetcher"},
+            "tests/test_live_check.py": {"providers", "fetcher"},
+            "tests/test_history.py": set(),
+            "tests/test_probe.py": {"probe"},
+            "tests/test_pipeline.py": set(),
+            "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
+            "fetch_history.py": {"research.history"},
+            "fetcher.py": set(),
+            "providers.py": {"fetcher"},
+            "probe.py": set(),
+            "research/history.py": set(),
+            "research/crosscheck.py": {"fetcher"},
+        }
+        forbidden = {"validator", "report", "markets", "research.engine", "research.pipeline"}
+        for path, expected in expected_local_edges.items():
+            with self.subTest(path=path):
+                edges = source_import_edges(path)
+                local = {
+                    edge for edge in edges
+                    if edge.split(".", 1)[0] in {"fetcher", "providers", "probe", "research"}
+                }
+                self.assertEqual(local, expected)
+                self.assertFalse(
+                    any(edge in forbidden or edge.startswith("markets.risk")
+                        for edge in edges),
+                    f"{path} imports a protected module",
+                )
+
     def test_research_config_names_only_the_approved_provider_and_host(self):
         with open(os.path.join(ROOT, "research_config.json"), encoding="utf-8") as f:
             cfg = json.load(f)
