@@ -118,6 +118,29 @@ class HoldoutPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
             self.publish()
 
+    def test_symlinked_completed_output_file_refuses_cleanup(self):
+        completed = self.output / (self.key + ".json")
+        completed.unlink()
+        os.symlink(self.report, completed)
+        with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_symlinked_branch_completion_file_refuses_cleanup(self):
+        branch_completed = self.root / (self.key + ".json")
+        branch_completed.unlink()
+        os.symlink(self.report, branch_completed)
+        with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_symlinked_report_file_refuses_cleanup(self):
+        self.report.unlink()
+        os.symlink(self.output / (self.key + ".json"), self.report)
+        with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_report_result_mismatch_refuses_cleanup(self):
         self.install_pair()
         mismatched_report = dict(
