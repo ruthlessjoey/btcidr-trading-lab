@@ -10,7 +10,13 @@
       "Read(validator.py)",
       "Edit(validator.py)",
       "Read(report.py)",
-      "Edit(report.py)"
+      "Edit(report.py)",
+      "Read(**/signal/**)",
+      "Edit(**/signal/**)",
+      "Read(**/validator.py)",
+      "Edit(**/validator.py)",
+      "Read(**/report.py)",
+      "Edit(**/report.py)"
     ]
   }
 }
