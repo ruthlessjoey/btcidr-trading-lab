@@ -7,21 +7,13 @@ never copied into exception text, logs, Markdown, or stdout.
 import json
 import os
 import statistics
-import time
-import urllib.parse
 from datetime import datetime, timezone
 
-import fetcher
-import providers
-from fetcher import ApiError, Candle
+from fetcher import ApiError
 
 DAY = 86400
-COINBASE = "https://api.exchange.coinbase.com"
-BITSTAMP = "https://www.bitstamp.net"
 TOLERANCE_PCT = 3.0
 
-# Empty until each independent source is separately approved by the owner.
-AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
 
 
 def day(ts):
@@ -30,47 +22,6 @@ def day(ts):
 
 def to_ts(text):
     return int(datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
-
-
-def fetch_coinbase_daily(http, first_ts, last_ts):
-    out, cur = {}, first_ts
-    while cur <= last_ts:
-        end = min(cur + 299 * DAY, last_ts + DAY)
-        q = urllib.parse.urlencode({"granularity": DAY,
-                                    "start": datetime.fromtimestamp(cur, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                    "end": datetime.fromtimestamp(end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
-        rows = http.get(f"{COINBASE}/products/BTC-USD/candles?{q}")
-        if not isinstance(rows, list):
-            raise ApiError("Coinbase daily-candle response is not a list")
-        for row in rows:
-            try:
-                timestamp = fetcher.to_seconds(row[0])
-                candle = Candle(timestamp, fetcher._finite_float(row[3]),
-                                fetcher._finite_float(row[2]), fetcher._finite_float(row[1]),
-                                fetcher._finite_float(row[4]), fetcher._finite_float(row[5]))
-                out[timestamp] = candle
-            except (KeyError, TypeError, ValueError, IndexError, OverflowError):
-                raise ApiError("Coinbase daily-candle row has an unexpected format")
-        cur = end
-    return out
-
-
-def fetch_bitstamp_window(http, first_ts, days):
-    q = urllib.parse.urlencode({"step": DAY, "limit": days, "start": first_ts})
-    obj = http.get(f"{BITSTAMP}/api/v2/ohlc/btcusd/?{q}")
-    try:
-        rows = obj["data"]["ohlc"]
-        out = {}
-        for row in rows:
-            timestamp = fetcher.to_seconds(row["timestamp"])
-            out[timestamp] = Candle(timestamp, fetcher._finite_float(row["open"]),
-                                    fetcher._finite_float(row["high"]),
-                                    fetcher._finite_float(row["low"]),
-                                    fetcher._finite_float(row["close"]),
-                                    fetcher._finite_float(row["volume"]))
-        return out
-    except (KeyError, TypeError, ValueError, IndexError, OverflowError):
-        raise ApiError("Bitstamp candle response has an unexpected format")
 
 
 def pct(a, b):
@@ -144,42 +95,14 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
     return res
 
 
-def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.default_opener,
-                   sleep=time.sleep, timeout=20, retries=3):
-    required = {"coinbase"} | ({"bitstamp"} if flagged_dates else set())
-    if not required.issubset(AUTHORIZED_CROSSCHECK_PROVIDERS):
-        raise ApiError("required independent cross-check providers are not authorized")
-    os.makedirs(out_dir, exist_ok=True)
-    http = providers.Http(timeout, retries, opener, sleep)
-    result = {"dataset_version": manifest["version_id"], "dataset_sha256": manifest["csv_sha256"],
-              "providers": [],
-              "rule": f"open and close within {TOLERANCE_PCT}%, and the day's return within "
-                      f"{TOLERANCE_PCT} percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
-              "coinbase_error": None, "bitstamp_error": None, "http_log": []}
-    coinbase, bitstamp = {}, {}
-    try:
-        coinbase = fetch_coinbase_daily(http, candles[0].time, candles[-1].time)
-        if coinbase:
-            result["providers"].append("coinbase")
-    except ApiError as e:
-        result["coinbase_error"] = str(e)
-    if flagged_dates:
-        try:
-            first = to_ts(min(flagged_dates)) - 3 * DAY
-            bitstamp = fetch_bitstamp_window(http, first, 8 + (to_ts(max(flagged_dates)) - to_ts(min(flagged_dates))) // DAY)
-            if bitstamp:
-                result["providers"].append("bitstamp")
-        except ApiError as e:
-            result["bitstamp_error"] = str(e)
-    result.update(compare(candles, coinbase, bitstamp, flagged_dates))
-    result["http_log"] = http.log[:6] + ([("...", f"{len(http.log)} requests in total")] if len(http.log) > 6 else [])
-    with open(os.path.join(out_dir, "crosscheck.json"), "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
-    text = build_markdown(result)
-    with open(os.path.join(out_dir, "crosscheck.md"), "w", encoding="utf-8") as f:
-        f.write(text)
-    print(text)
-    return result
+def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=None,
+                   sleep=None, timeout=20, retries=3):
+    """Fail closed until independent cross-check sources receive separate approval.
+
+    No provider authorization can be enabled by mutating a module global or by
+    injecting a transport. Re-enabling this feature requires a reviewed source change.
+    """
+    raise ApiError("independent cross-check providers are not authorized")
 
 
 def build_markdown(r):
