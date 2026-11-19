@@ -1,7 +1,7 @@
 # AI Trading & Automation Laboratory — project-wide completion tracker
 
 **Status:** Provisional scope register; not yet a valid percentage score  
-**Last checked:** 2026-11-19  
+**Last checked:** 2026-11-20  
 
 > **Snapshot rule:** Sections dated later in this document are authoritative for current PR heads, merge state, workflow pins, and verification status. Earlier PR descriptions and status tables preserve historical snapshots; when they conflict with a later reconciliation addendum, the later addendum supersedes them.
 **Repository:** `ruthlessjoey/btcidr-trading-lab`
@@ -653,3 +653,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The specialist workflow remains blocked from safe dispatch through the current GitHub UI because the default-branch `main` workflow file exposes only the legacy required `review_head_sha` input and old reviewer pin. The PR #60 branch copy contains the newer `review_head_sha`, optional `resume_from_run_id`, and `mode` (synthetic/review) inputs and pins the newer immutable runner, but the browser dispatch form loads the default-branch workflow schema. PR #64 is open/draft and contains the default-branch workflow correction. Merging it into `main` is an externally visible repository operation and remains subject to explicit owner approval; no merge was performed.
 - Q0.8 specialist review is therefore still **INCONCLUSIVE / UNVERIFIED** beyond the six checkpointed reports from run #44603985942. Do not resume until the default-branch workflow correction is approved and merged, then dispatch exact PR #60 SHA `d5d5db6cc5d3f11bf579eed45c873b630ed560a4` with `mode=review` and `resume_from_run_id=44603985942`. Do not resume old run #44337003905.
 - Overall project completion remains **UNRATED**; the 58/58 Q0.8 offline result is not project-wide acceptance evidence. No PR merge, protected-path access, private account access, exchange request, PAPER/LIVE execution, or financial operation occurred.
+
+
+## 2026-11-20 Q0.8 default-branch workflow correction and resumed review
+
+- PR #64 was explicitly approved by the owner, marked ready, and squash-merged into `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`. The merged PR had exactly two changed files: `.github/workflows/q08-specialist-review.yml` and `tools/q08_specialist_review.py`. The immutable reviewer runner is pinned by the workflow to commit `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`; its source blob is `92fc820128bba8cf8fa9e7d3de51838fe2672a1c`.
+- Re-fetched both files from the merge commit. The default-branch workflow now exposes required `review_head_sha`, optional `resume_from_run_id`, and required `mode` choice (`synthetic` / `review`, default `synthetic`). It uses least-privilege read permissions, sparse-checks out only the immutable runner, and gates checkpoint restore, model review, and checkpoint upload to review mode.
+- Inspected the GitHub Actions dispatch form after the merge. The exact target branch `security/q0-provider-sanitization-2026-11-18` was available. The form displayed all three expected inputs and choices; no dispatch was attempted before those inputs were verified.
+- Dispatched the read-only review with branch `security/q0-provider-sanitization-2026-11-18`, exact target SHA `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`, checkpoint source run ID `44603985942`, and `mode=review`. New run [#44638204119](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44638204119), run number 22, workflow_dispatch event, exact head SHA confirmed by GitHub.
+- Run #44638204119 job `135962144613`: checkpoint-run-ID validation, sparse checkout, checkpoint restore, Python 3.11 setup, trusted-runner syntax verification, and synthetic policy smoke test all completed successfully. At this snapshot the read-only 19-role specialist-review step is still **IN PROGRESS**; checkpoint artifact persistence is pending. No specialist-stage completion, independent acceptance, or final verification claim is made yet. Continue monitoring this exact run. Do not resume old run #44337003905.
+- PR #60 remains open/draft at frozen head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`; PR #78 remains open/draft at `8198834324f33d16840a770ccd9557a31e844505`. PR #78's exact-head Python 3.11.18 offline suite remains limited to the six approved modules: 58 passed, 0 failed in run #44636629805. This is scoped offline test evidence, not full-system or end-to-end acceptance.
+- The current `main` baseline is `731fc9fbb892dadccc64bf52da2f91ff069da124`. The proposed 40-requirement inventory and weights remain unapproved; overall project completion remains **UNRATED**. Protected Workstream B and other protected paths remain outside this review and unverified.
