@@ -1,6 +1,6 @@
 # Repository instructions for Claude
 
-These instructions apply across this repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
+These instructions apply across the repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
 
 ## Mission and working style
 
@@ -14,23 +14,24 @@ These instructions apply across this repository, including shared tooling used b
 
 The following restrictions are mandatory:
 
-1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, import, execute, or otherwise process anything under `P1/`.
-2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, import, execute, or otherwise process anything under `signal/data/`.
-3. Do not access, modify, expose, import, execute, or test `markets/risk/`, any file named `validator.py` or `report.py` (including copies), or any copy of `signal/` without separate, explicit authorization identifying the exact scope.
-4. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the user gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may still guide separately approved Workstream B work without opening or changing its protected implementation.
-5. Do not run tests, imports, builds, or scripts whose import/execution closure reaches a protected path or Workstream B artifact. Static inspection of unprotected files is allowed only when it does not enumerate or expose protected content.
-6. Before any repository-wide search, recursive listing, archive, or test discovery, explicitly exclude all protected paths. If a tool cannot guarantee exclusion, do not run it.
+1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`.
+2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path, including copies nested elsewhere in the repository.
+3. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `markets/risk/`.
+4. Never read, write, edit, execute, import, or otherwise process any file named `validator.py` or `report.py`, including copies nested elsewhere in the repository.
+5. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the owner gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
+6. Before any repository-wide search, recursive listing, archive, test discovery, or broad checkout, explicitly exclude every protected path and file above. If a tool cannot guarantee exclusion, do not run it.
 7. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
 
 If protected content appears in output accidentally, stop. Do not quote, summarize, copy, or continue processing it.
 
+Project `Read`/`Edit` permission denials are defense-in-depth, not an OS sandbox. They do not constrain arbitrary subprocesses or every indirect file access. Never treat them as authorization to run scripts or tests whose execution/import closure may reach protected content; use only a verified OS-enforced boundary or keep the work static and read-only.
+
 ## Trading and exchange safety boundaries
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
+- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, funding, payments, withdrawals, or real-money activity.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only approved Tokocrypto market-data access is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines`. Do not call server-time endpoints, use `www.tokocrypto.com`, or access private/authenticated endpoints. This Tokocrypto-specific rule does not itself authorize or revoke other providers; use other market-data hosts only where a separate current ADR or provider allowlist explicitly permits them.
 - PAPER-only. LIVE trading remains disabled and unavailable.
-- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, funding, payments, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only approved Tokocrypto market-data access is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines`. Do not call server-time endpoints, use `www.tokocrypto.com`, or access private/authenticated endpoints.
-- This Tokocrypto-specific rule does not itself authorize or revoke other providers; use other market-data hosts only where a separate current ADR or provider allowlist explicitly permits them.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.
 - Do not change custody, execution, risk, or exchange boundaries as part of a tooling task.
@@ -48,7 +49,7 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 ## Change control
 
 - Keep each installation milestone on its own branch and pull request.
-- Draft PRs are for review; do not merge them. Do not dispatch workflows, change repository settings, alter branch protection, or modify secrets without explicit approval for that exact action.
+- Draft PRs are for review; do not merge them. Do not dispatch workflows, change repository settings, alter branch protection, or modify secrets without explicit authorization for that exact action.
 - Do not force-push or delete branches.
 - Do not combine unrelated package upgrades, source changes, and workflow permission changes in one PR.
 - Report any unverified behavior as unverified and list what remains to be tested.
@@ -62,4 +63,4 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 
 ## Mobile-first collaboration
 
-- The repository owner works from an iPhone. Prefer changes that can be reviewed and managed through GitHub's mobile website. Provide exact, short GitHub UI steps when a manual action is required; do not assume desktop terminal access.
+The repository owner works from an iPhone. Prefer changes that can be reviewed and managed through GitHub's mobile website. Provide exact, short GitHub UI steps when a manual action is required; do not assume desktop terminal access.
