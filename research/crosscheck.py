@@ -1,11 +1,9 @@
 """research/crosscheck.py - compare preserved daily candles with independent sources.
 
-READ-ONLY. This module is currently disabled by the empty provider authorization set.
-All parser and transport errors are fixed safe messages; provider-controlled values are
-never copied into exception text, logs, Markdown, or stdout.
+READ-ONLY. External cross-check acquisition is disabled pending separate owner approval.
+Only pure comparison/report helpers remain available; this module cannot fetch Coinbase
+or Bitstamp data or be enabled through mutable module state.
 """
-import json
-import os
 import statistics
 from datetime import datetime, timezone
 
