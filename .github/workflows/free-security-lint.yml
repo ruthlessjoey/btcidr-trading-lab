@@ -25,11 +25,52 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint_1.7.12_linux_amd64.tar.gz"
+          binary="$RUNNER_TEMP/actionlint"
+          max_archive_bytes=16777216
+          max_binary_bytes=33554432
           url="https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
-          curl -fsSLo actionlint.tar.gz "$url"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum -c -
-          tar -xzf actionlint.tar.gz actionlint
-          ./actionlint -color
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 --max-filesize "$max_archive_bytes" --retry 2 --retry-all-errors --output "$archive" "$url"
+          archive_bytes="$(stat -c '%s' "$archive")"
+          if [[ ! "$archive_bytes" =~ ^[0-9]+$ ]] || (( archive_bytes == 0 || archive_bytes > max_archive_bytes )); then
+            echo "::error::Actionlint archive size is invalid or exceeds the 16 MiB limit."
+            exit 1
+          fi
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c -
+
+          # Extract only one regular-file member to a fixed destination. Never call
+          # tar extract on archive-controlled paths; cap its decompressed size too.
+          python3 - "$archive" "$binary" "$max_binary_bytes" <<'PY'
+          import os
+          import sys
+          import tarfile
+
+          archive_path, binary_path, max_binary_text = sys.argv[1:]
+          max_binary = int(max_binary_text)
+          with tarfile.open(archive_path, "r:gz") as archive:
+              matches = [member for member in archive.getmembers()
+                         if member.name == "actionlint"]
+              if len(matches) != 1:
+                  raise SystemExit("archive must contain exactly one actionlint member")
+              member = matches[0]
+              if not member.isfile() or not 0 < member.size <= max_binary:
+                  raise SystemExit("actionlint member is not a bounded regular file")
+              source = archive.extractfile(member)
+              if source is None:
+                  raise SystemExit("unable to read actionlint member")
+              with source, open(binary_path, "xb") as output:
+                  remaining = member.size
+                  while remaining:
+                      chunk = source.read(min(1024 * 1024, remaining))
+                      if not chunk:
+                          raise SystemExit("truncated actionlint member")
+                      output.write(chunk)
+                      remaining -= len(chunk)
+                  if source.read(1):
+                      raise SystemExit("actionlint member exceeded its declared size")
+          os.chmod(binary_path, 0o755)
+          PY
+          "$binary" -color
 
       - name: Run zizmor with hash-verified dependencies and no online audits
         uses: zizmorcore/zizmor-action@8aaeb6d158204e73d77eb4b50bcb325641de1bd4
