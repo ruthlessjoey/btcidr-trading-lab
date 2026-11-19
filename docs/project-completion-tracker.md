@@ -1004,3 +1004,21 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Run PR #64 synthetic mode against the pinned reviewer and inspect its runtime result.
 - Run a fresh 19-stage review on the exact same current PR #60 head. Do not reuse run `44470636642` because its head differs and its workflow used the older reviewer source.
 - Overall project completion remains UNRATED; no project-wide 100% claim is supported.
+
+
+### Latest Q0.8 runner/workflow reconciliation (2026-11-19)
+
+- Re-fetched both Q0.8 PRs after concurrent updates; the current state supersedes the earlier 1def3 pin note:
+  - PR #60 head: d89f4c007f034d0639c55db1c3e6da1d9a18e5d4, 26 changed paths, open/draft/unmerged.
+  - PR #64 head: 51a89922c1f5e0f2aad62aa24af4ed527b432774, two changed paths, open/draft/unmerged.
+  - Both workflow files are now byte-identical at blob ef58dc8dcf99e90cc336a09c7c9ccd6615e150d1 and pin reviewer source commit c9adf486dea64c70a5c5a534d59545bae4f222fb.
+  - That pinned immutable source has blob bf4979a52034b47fdaa7cd06f181dfdad2dc0284 and includes the 192,000-character production diff bound, 256,000-byte request bound, unchanged fetch_history.py review context, strict finish_reason == "stop", refusal rejection, exactly one first-nonempty-line verdict parser, checkpoint validation, and a nonzero acceptance gate for missing/BLOCKED/INCONCLUSIVE roles.
+  - Both workflows store/restore checkpoint artifacts under runner.temp, not the repository workspace. Checkpoint restoration and upload remain restricted to review mode; synthetic mode runs syntax compilation and policy smoke tests without model requests.
+- PR #60's latest AST import-closure test blob is 615ee8041fab1b7d63537d3827ab2fcc4e9d6684. The branch also removed the dormant Coinbase/Bitstamp acquisition path from research.crosscheck and added a regression that an injected legacy authorization attribute cannot enable network or artifact writes. The offline workflow remains a sparse six-module Python 3.11 suite; it does not import run.py or the protected validator/report modules. The exact current-head suite has not run.
+- PR #64's CodeQL, Python analysis, and Actions analysis checks completed successfully on head 51a89922c1f5e0f2aad62aa24af4ed527b432774. These are static-analysis checks only. PR #60 currently has only the automatic review status skipped; its manual offline tests have not run.
+- Exact manual sequence, with no checkpoint reuse:
+  1. Run the Q0.8 specialist workflow on branch security/q08-reviewer-pin-correction-2026-11-18 with review_head_sha=d89f4c007f034d0639c55db1c3e6da1d9a18e5d4, resume_from_run_id blank, mode=synthetic.
+  2. Run Q0.8 Offline Tests on branch security/q0-provider-sanitization-2026-11-18.
+  3. Only after both pass, run the specialist workflow on branch security/q0-provider-sanitization-2026-11-18 with the same exact SHA, resume_from_run_id blank, mode=review.
+  4. If a fresh review stops on quota after uploading a checkpoint artifact, resume only from that new run ID and exact same SHA.
+- The old review run 44470636642 is not an acceptable checkpoint source for these new heads. No manual workflow dispatch or runtime test has occurred.
