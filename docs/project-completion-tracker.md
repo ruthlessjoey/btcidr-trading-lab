@@ -1022,3 +1022,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   3. Only after both pass, run the specialist workflow on branch security/q0-provider-sanitization-2026-11-18 with the same exact SHA, resume_from_run_id blank, mode=review.
   4. If a fresh review stops on quota after uploading a checkpoint artifact, resume only from that new run ID and exact same SHA.
 - The old review run 44470636642 is not an acceptable checkpoint source for these new heads. No manual workflow dispatch or runtime test has occurred.
+
+
+### Original handoff scope and still-prohibited Workstream B actions (2026-11-19)
+
+- Recovered the current main-branch PROJECT_HANDOFF.MD (blob 5ff795aa384302bece43c7f40e3edcec30e8e6a3; 16,458 bytes). It describes the long-term vision as multi-market research/signals across crypto (including meme/new listings/DEX pairs), stocks/ETFs, forex, indices, commodities, BUY/SELL candidates, risk management, and up to 10 simultaneous positions. It explicitly says the immediate next task is the Milestone 3 safety review, not building the multi-market scanner yet. It also describes research-only as the older operating mode; current owner instructions supersede that with PAPER-only and LIVE-disabled.
+- The handoff explicitly prohibits running the research backtest workflow, manual dispatch of that workflow, evaluating the holdout test window, real registry migration, and modification of the frozen research dataset. Those actions remain unperformed and are not authorized by the general 100% completion mandate; no research-backtest workflow was dispatched.
+- The Milestone 3 registry/holdout safety artifacts remain within protected Workstream B scope under the current owner boundary. No protected source, data, validator/report module, P1, signal/data, or copy of signal was accessed. Therefore the earlier handoff's requested line-by-line M3 registry audit cannot be completed without separate exact-scope owner authorization; no tests whose import closure reaches protected code were run.
+- The proposed 100-point inventory remains a planning decomposition only. The original handoff is not a complete acceptance specification, and the owner has not approved the weights or a current requirement-by-requirement acceptance matrix. Project-wide completion therefore remains UNRATED, not 100%.
