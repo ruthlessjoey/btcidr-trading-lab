@@ -61,6 +61,11 @@ def source_import_edges(path):
 
 
 class HistoryContainmentTests(unittest.TestCase):
+    def test_protected_import_gate_test_is_not_discoverable(self):
+        # Its import closure reaches research.pipeline/research.engine and protected
+        # validator.py. It must remain absent from broad unittest discovery.
+        protected_test = os.path.join(ROOT, "tests", "test_research_gates.py")
+        self.assertFalse(os.path.exists(protected_test))
     def test_q08_workflow_test_import_closure_stays_outside_protected_modules(self):
         # These are the exact six modules selected by q08-offline-tests.yml and
         # research-data.yml. Resolve only source imports; do not import or execute them.
