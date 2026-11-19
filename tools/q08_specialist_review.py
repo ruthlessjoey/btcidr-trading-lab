@@ -90,7 +90,7 @@ MAX_FILE = 48_000
 # Each immutable snapshot is bounded independently; the two snapshots are never
 # retained beyond these explicit per-snapshot limits.
 MAX_TOTAL = 256_000
-MAX_DIFF = 160_000
+MAX_DIFF = 192_000  # Allows the current 176,188-character PR #60 diff; requests remain capped at 256,000 bytes.
 MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
 MAX_OUTPUT = 24_000
@@ -474,6 +474,26 @@ EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 MAX_CHECKPOINT = 2_000_000
 VERDICT_RE = re.compile(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$")
 
+def review_verdict_failures(reports: dict, commander, acceptance, verification) -> list[str]:
+    """Return every missing/non-accepting role so BLOCKED reviews cannot exit green."""
+    failures = []
+    if not isinstance(reports, dict):
+        reports = {}
+    if set(reports) != set(SPECIALISTS):
+        failures.extend("missing-specialist:" + name
+                        for name in sorted(set(SPECIALISTS) - set(reports)))
+        failures.extend("unexpected-specialist:" + name
+                        for name in sorted(set(reports) - set(SPECIALISTS)))
+    required = [(name, reports.get(name)) for name in SPECIALISTS]
+    required.extend(((COMMANDER, commander), (ACCEPTANCE, acceptance),
+                     (VERIFICATION, verification)))
+    for name, report in required:
+        match = VERDICT_RE.search(report) if isinstance(report, str) else None
+        verdict = match.group(1) if match else "MISSING"
+        if verdict not in ("PASS", "PASS WITH FINDINGS"):
+            failures.append(name + "=" + verdict)
+    return failures
+
 
 def _unique_json_object(pairs):
     result = {}
@@ -767,6 +787,19 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
+    accepted_reports = {name:"VERDICT: PASS" for name in SPECIALISTS}
+    assert review_verdict_failures(
+        accepted_reports, "VERDICT: PASS WITH FINDINGS",
+        "VERDICT: PASS", "VERDICT: PASS") == []
+    blocked_reports = dict(accepted_reports)
+    blocked_reports["architecture-architect"] = "VERDICT: INCONCLUSIVE"
+    blocked = review_verdict_failures(
+        blocked_reports, "VERDICT: PASS", "VERDICT: BLOCKED", "VERDICT: PASS")
+    assert "architecture-architect=INCONCLUSIVE" in blocked
+    assert "independent-acceptance=BLOCKED" in blocked
+    del blocked_reports["security-review"]
+    assert "missing-specialist:security-review" in review_verdict_failures(
+        blocked_reports, "VERDICT: PASS", "VERDICT: PASS", "VERDICT: PASS")
     missing_verdict = ("VERDICT: INCONCLUSIVE\n\n"
         "[Runner note: The model response omitted the required explicit verdict. "
         "This response is retained but classified INCONCLUSIVE, never PASS.]\n\n"
@@ -873,7 +906,7 @@ def review():
     key, endpoint, model = model_config()
     print("STAGE approved_model_configuration_verified", flush=True)
     review_diff = build_review_diff(base_snapshot, head_snapshot)
-    diff_chars = sum(len(value) for value in review_diff.values())
+    diff_chars = enforce_diff_limit(review_diff)
     print("STAGE compact_review_diff_built diff_chars=" + str(diff_chars), flush=True)
     common = {"repository":REPO, "base_sha":BASE_SHA, "head_sha":HEAD_SHA,
               "scope":list(REVIEW_PATHS), "unified_diff_files":review_diff,
@@ -956,6 +989,17 @@ def review():
         "- Findings require human review. No PR comment, approval, merge, or source change was made."
     )
     write_summary("\n".join(parts))
+    blocked_roles = review_verdict_failures(
+        reports, commander, acceptance, verification)
+    if blocked_roles:
+        write_summary(
+            "\n## Acceptance gate\n\n**BLOCKED** — required roles did not all return "
+            "PASS or PASS WITH FINDINGS:\n\n" +
+            "\n".join("- " + role for role in blocked_roles))
+        print("SPECIALIST_REVIEW_ACCEPTANCE_BLOCKED roles=" +
+              ",".join(blocked_roles), flush=True)
+        raise RuntimeError(
+            "Review completed, but one or more required roles returned BLOCKED or INCONCLUSIVE")
 
 def main():
     p = argparse.ArgumentParser()
