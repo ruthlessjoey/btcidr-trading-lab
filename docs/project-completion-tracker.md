@@ -1,7 +1,7 @@
 # AI Trading & Automation Laboratory — project-wide completion tracker
 
 **Status:** Provisional scope register; not yet a valid percentage score  
-**Last checked:** 2026-11-19  
+**Last checked:** 2026-11-20  
 
 > **Snapshot rule:** Sections dated later in this document are authoritative for current PR heads, merge state, workflow pins, and verification status. Earlier PR descriptions and status tables preserve historical snapshots; when they conflict with a later reconciliation addendum, the later addendum supersedes them.
 **Repository:** `ruthlessjoey/btcidr-trading-lab`
@@ -1180,3 +1180,13 @@ These relationships are based on the current changed-file lists. They do not aut
 - The PR #71 instructions also prohibit access to `P1/`, every `signal/` path including nested copies, `markets/risk/`, any `validator.py` or `report.py`, and protected Workstream B content. They explicitly warn that Claude Read/Edit denies are not an OS sandbox and that scripts/tests with protected import closures must not run without an enforced boundary.
 - Its permission deny list covers root `P1/`, `signal/`, `markets/risk/`, root `validator.py`/`report.py`, and nested signal/validator/report copies. The project-level deny settings are defense-in-depth only.
 - Static review confirms this candidate aligns with the current user-provided Tokocrypto boundary and protected-path policy. It has not been merged. The `main` branch's current `CLAUDE.md` blob `fff092011f7fb67a2c413909991b32ab9dda560a` still describes server-time as approved; this remains a documentation mismatch on `main` until the corrected candidate is separately accepted. Do not merge PR #71 or #77 without the owner's separate review/merge authorization.
+
+
+### Q0.8 specialist-review quota checkpoint (2026-11-20)
+
+- Manual review run [#44542281860](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44542281860) ran on the approved PR #60 branch `security/q0-provider-sanitization-2026-11-18`, exact head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`, and approved M6 base `cd451972e3a641ad6fa78e64abf3968655a4b82a`. PR #60 remained open/draft at that exact head when checked.
+- Python 3.11 setup, immutable-runner compilation, synthetic policy smoke test, pull-request head validation, immutable comparison/snapshot, approved model configuration, and bounded diff construction all completed. The specialist stage stopped at `quant-research` because OpenRouter returned HTTP 429. The runner waited 15, 30, 60, and 120 seconds; the next advertised retry delay was 240 seconds, above its 120-second per-retry wait cap. This is a provider quota interruption, not a repository test assertion failure.
+- The run uploaded checkpoint artifact `q08-review-checkpoint-44542281860`, artifact ID `14539975752`, ZIP SHA-256 `401c4168701506a46ca60d1280e8274ab5188d0e1c8f45f7a6549c1e621c5fdd`. The checkpoint payload was downloaded and inspected: repository, base SHA, target head SHA, schema version, and approved model match the run; four reports are retained (`architecture-architect`, `implementation-engineer`, `provider-integration`, `market-intelligence`), each `PASS WITH FINDINGS`. No `quant-research` report was committed before the 429. Commander, independent acceptance, and verification are null.
+- The immutable runner's restore path reuses only accepted `PASS` / `PASS WITH FINDINGS` reports and retries missing or non-accepting stages. It independently validates source-run ID, repository, workflow ID/path, dispatch event, completed status, approved branch, and exact review SHA. Therefore this run is eligible as a checkpoint source; previous wrong-branch runs `44496231009` and `44510092322` remain ineligible and must never be resumed.
+- Exact continuation dispatch: branch `security/q0-provider-sanitization-2026-11-18`; mode `review`; `review_head_sha=d5d5db6cc5d3f11bf579eed45c873b630ed560a4`; `resume_from_run_id=44542281860`. This resumes the four accepted specialist reports, retries `quant-research`, then runs the remaining specialists and three final review stages. Do not change PR #60 while this exact-head review is in progress.
+- No source code was changed in this review cycle, no tests were executed by this inspection, no protected path was accessed, and no PR was merged. Full 19-role completion and acceptance remain UNVERIFIED.
