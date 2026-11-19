@@ -1255,3 +1255,13 @@ These relationships are based on the current changed-file lists. They do not aut
 - Re-fetched all updated files from PR #78 head and confirmed exact workflow sparse-checkout coverage for the empty package initializer, history source, disabled network-lab stub, two static workflow fixtures, and all selected modules; protected paths remain excluded. PR #78 description has been updated. Current exact-head Python 3.11 offline Actions execution remains pending; do not claim the suite passed.
 - PR #78 remains open/draft, stacked on PR #60; no merge was performed.
 
+
+
+### PR #78 Step 1 gate derivation correction (2026-11-20)
+
+- Addressed the Q0.8 implementation-review finding that the Step 1 result and Markdown report hard-coded `GATE: FAIL`. Draft PR #78 now defines a pure `_gate_status(checks)` helper that returns FAIL for an empty check list or any non-exact-PASS status, and PASS only when at least one check exists and every check is an exact PASS.
+- `run_step1` now derives the JSON gate and Markdown gate from the checks. It derives `backtest_allowed` from both a PASS gate and a present dataset; the current Step 1 implementation still has no dataset and its market-identity check remains FAIL, so runtime behavior remains fail-closed.
+- Added tests for empty, all-PASS, all-FAIL, and mixed check sets. Existing synthetic runtime tests continue to assert the exact approved config cannot pass market identity without approved evidence, with zero network requests and no dataset.
+- Current PR #78 head `770fd64368d93b81344e6bd4b239714332cb2e34`; compare against frozen PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4` confirms 8 commits ahead, 0 behind, exactly six unprotected files. The six approved offline modules now contain 58 test methods. Static re-fetch confirmed the new helper, derived report fields, and unchanged standard-library-only history import closure.
+- Python 3.11 exact-head Actions execution remains pending. No local or CI test pass is claimed. PR #78 remains open/draft and stacked on PR #60; no merge.
+
