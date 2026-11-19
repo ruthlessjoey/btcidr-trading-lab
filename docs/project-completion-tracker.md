@@ -910,3 +910,15 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Tightened PR #77 wording so the Tokocrypto-specific candle-only rule cannot be misread as revoking separately approved providers such as existing Binance Vision/Kraken adapters. The instruction now says other providers remain governed by their own current ADR/provider allowlists.
 - Also clarified that any copy of validator.py or report.py remains protected, not just the root-named files.
 - Latest PR #77 head: c90c890ad78e97609f8a56842a3b419b64d89011; CLAUDE.md blob 44b524cd34a1da7f5145c2208cdf4a5f14469022; still one changed file, open/draft/unmerged and GitHub reports mergeable. Static-analysis run 44484810228 completed with CodeQL, Python analysis, and Actions analysis all successful; the automatic review status was skipped. No functional tests or repository runtime were executed for this documentation-only PR.
+
+
+### Q0 current-head transport boundary source audit (2026-11-19)
+
+- Static inspection of exact current PR #60 head 6f9ab508710272f99c34508a565c214f6adbc9ee confirmed:
+  - config.json blob b35b6c236921fcfad1b2be18fc558d48bc3c2dc6 permits only the Tokocrypto Binance-style source at https://www.tokocrypto.site and has read_only mode.
+  - fetcher.py blob bab797835ef2fdbff616847d7eb6ba887124fe7e sets APPROVED_HOST=www.tokocrypto.site and APPROVED_PATHS={"/api/v3/klines"}, enforces HTTPS/GET URL validation, exact BTCUSDT candle query fields, no redirects, and a 1 MiB response cap. fetch_server_time() raises DisallowedRequestError before any request; symbol-metadata routes are also refused.
+  - HTTP 429 fails closed without retry because this transport does not retain Retry-After headers; network errors and bounded 5xx retry separately.
+  - research/history.py blob a6a56d25fe60a255841e27c1b72b7d910eab19d9 imports only standard-library modules, makes zero network requests, writes no dataset, and keeps backtesting disabled while market identity remains unverified.
+  - research_config.json blob 58ff32379a7f4fbc0ca5d75ff10e20e82bbaf3ff is read-only and scoped to Tokocrypto BTC/USDT.
+- providers.py contains a Tokocrypto documentation URL on .com, but the inspected runtime transport allowlist rejects .com hosts; the documentation URL is not an API request or authorization.
+- This was static source inspection only. No repository code was imported or executed, no test was run, and no external network/exchange request was made. Exact-head Python 3.11 offline tests remain pending.
