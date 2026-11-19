@@ -34,6 +34,26 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertIn('APPROVED_PATHS = {"/api/v3/klines"}', source)
         self.assertIn("Tokocrypto server-time route is unverified; no network request was made", source)
 
+    def test_market_data_check_remains_blocked_without_protected_validator_access(self):
+        with open(os.path.join(ROOT, ".github", "workflows", "market-data-check.yml"),
+                  encoding="utf-8") as f:
+            workflow = f.read()
+        self.assertIn("blocked pending protected validator review", workflow)
+        self.assertIn("live_check.py imports protected validator.py/report.py", workflow)
+        self.assertNotIn("actions/checkout", workflow)
+        self.assertNotIn("python3 live_check.py", workflow)
+        self.assertIn("No checkout, test, protected file access, network request, or exchange call occurred.", workflow)
+
+    def test_research_data_workflow_executes_only_the_offline_step1_entrypoint(self):
+        with open(os.path.join(ROOT, ".github", "workflows", "research-data.yml"),
+                  encoding="utf-8") as f:
+            workflow = f.read()
+        self.assertIn("python3 fetch_history.py", workflow)
+        self.assertIn("python3 -m unittest discover -s tests -p 'test_pipeline.py' -v", workflow)
+        self.assertNotIn("python3 run.py", workflow)
+        self.assertNotIn("python3 live_check.py", workflow)
+        self.assertIn("no network request is made", workflow)
+
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
         with open(os.path.join(ROOT, "run.py"), encoding="utf-8") as f:
             source = f.read()
