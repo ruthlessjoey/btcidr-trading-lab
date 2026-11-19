@@ -11,6 +11,7 @@ import re
 import sys
 import time
 import socket
+import stat
 import tempfile
 import urllib.error
 import urllib.parse
@@ -617,18 +618,50 @@ def save_checkpoint(path: Path, reports: dict, commander=None,
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     if len(encoded) > MAX_CHECKPOINT:
         raise RuntimeError("Checkpoint exceeds the configured size limit")
+    if path.parent.is_symlink():
+        raise RuntimeError("Checkpoint directory must not be a symlink")
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_bytes(encoded)
-    os.replace(temporary, path)
+    if path.parent.is_symlink() or not path.parent.is_dir():
+        raise RuntimeError("Checkpoint directory must be a real directory")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, path)
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary_name)
+        except OSError:
+            pass
+        raise
 
 
 def load_checkpoint(path: Path) -> dict:
     empty = {"reports": {}, "commander": None, "acceptance": None,
              "verification": None}
-    if not path.exists():
+    if path.is_symlink():
+        raise RuntimeError("Checkpoint must be a regular non-symlink file")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
         return empty
-    raw = path.read_bytes()
+    except OSError:
+        raise RuntimeError("Checkpoint is not a readable regular non-symlink file") from None
+    with os.fdopen(descriptor, "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode):
+            raise RuntimeError("Checkpoint must be a regular non-symlink file")
+        if metadata.st_size > MAX_CHECKPOINT:
+            raise RuntimeError("Checkpoint exceeds the configured size limit")
+        raw = stream.read(MAX_CHECKPOINT + 1)
     if len(raw) > MAX_CHECKPOINT:
         raise RuntimeError("Checkpoint exceeds the configured size limit")
     try:
@@ -1025,6 +1058,29 @@ def synthetic():
             pass
         else:
             raise AssertionError("commander checkpoint with missing specialist reports was accepted")
+        symlink_path = Path(checkpoint_dir) / "symlink.json"
+        symlink_path.symlink_to(checkpoint_path)
+        try:
+            load_checkpoint(symlink_path)
+        except RuntimeError as exc:
+            assert "non-symlink" in str(exc)
+        else:
+            raise AssertionError("symlinked checkpoint was accepted")
+        oversized_path = Path(checkpoint_dir) / "oversized.json"
+        oversized_path.write_bytes(b"x" * (MAX_CHECKPOINT + 1))
+        try:
+            load_checkpoint(oversized_path)
+        except RuntimeError as exc:
+            assert "size limit" in str(exc)
+        else:
+            raise AssertionError("oversized checkpoint was accepted")
+        target_path = Path(checkpoint_dir) / "target.bin"
+        predictable_temp = checkpoint_path.with_name(checkpoint_path.name + ".tmp")
+        target_path.write_bytes(b"must remain unchanged")
+        predictable_temp.symlink_to(target_path)
+        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
+        assert target_path.read_bytes() == b"must remain unchanged"
+        assert predictable_temp.is_symlink()
         malformed_path = Path(checkpoint_dir) / "malformed.json"
         malformed_path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
         try:
