@@ -1127,3 +1127,16 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 - Read-only GitHub Actions lookup returned no PR-triggered workflow runs for the latest heads of PRs #60, #64, #69, #71, #72, #74, #75, or #76. These workflows are manual-only or have no matching PR event; do not infer CI success from their definitions.
 - Current review/quality evidence therefore remains limited to the exact historical runs and local isolated checks recorded above. Fresh Python 3.11 Q0 tests, reviewer synthetic mode, full Q0.8 review, Ruff, Actionlint/zizmor, and the updated 22-case holdout suite still need manual or authorized runtime execution.
+### Open-PR overlap and supersession map (2026-11-19)
+
+These relationships are based on the current changed-file lists. They do not authorize merging or closing any PR; no PR was closed or merged.
+
+- PR #69 supersedes the older PR #61 variant for the same two files (`python-static-quality.yml` and `stage-3-python-quality.md`); #69 contains the bounded Ruff installer hardening.
+- PR #71 supersedes the overlapping protected-path variants #62 and #70: it changes the same `.claude/settings.json` and `CLAUDE.md` files and additionally includes the staged development-stack roadmap.
+- PR #77 changes only `CLAUDE.md`; its current blob `53e9a86cb14cc0af28a957d0180b30ad6be068c5` is byte-identical to PR #71's `CLAUDE.md`. PR #71 additionally contains permission settings and roadmap, so #77 is a duplicate documentation variant.
+- PR #74 supersedes the older PR #39 variant for the same `free-security-lint.yml` workflow file; #74 contains bounded Actionlint download and fixed-destination extraction.
+- PR #75 supersedes the older PR #38 Cloudflare audit-skill copy for the same 23 paths; #75 has the newer clean-main branch and explicit upstream pin/local overlay provenance. The upstream commit is unsigned, so its provenance is reproducible but not cryptographically verified.
+- PR #72 supersedes the older PR #59 security-review skill variant for the same single `SKILL.md`; #72 now includes the current project trading and protected-path rules.
+- PR #65 is the current detailed tracker variant and supersedes the older one-file tracker variants #58 and #73 by changed-path overlap and newer evidence. PR #73's latest stored Q0.8 section still refers to the older `0dd176...` review head; use PR #65's updated head/evidence instead.
+- PR #76 is a successor stacked on PR #34's durable publisher implementation; it changes only `research/holdout_publish.py` and `tests/test_holdout_publish.py`. PR #68 is a separate stacked test-suite alignment PR whose tests remain blocked by protected import dependencies.
+- All listed PRs remain open/draft. Treat superseded branches as historical review candidates, not parallel changes to merge together.
