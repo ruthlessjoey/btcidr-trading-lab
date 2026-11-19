@@ -903,3 +903,10 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - Both remain open/draft/unmerged. The latest PR #64 CodeQL analyses were still in progress at the last status check; its automatic review status was skipped. PR #60 also has only an automatic skipped review status at this new head.
 - **Runtime remains unverified:** no local Python 3.11 runtime was available through the connected GitHub tools and no workflow dispatch action is exposed. The required next checks are PR #64 synthetic mode against the pinned runner, followed by PR #60's six-module offline workflow on exact head 6f9ab508710272f99c34508a565c214f6adbc9ee, then a fresh full review on that same SHA with resume_from_run_id blank. Do not reuse artifacts or test results from previous PR #60 heads.
 - No protected file/path was opened or changed; no repository code was executed; no model API, exchange endpoint, account, credential, or trading operation was used. No PR was merged.
+
+
+### PR #77 provider-scope clarification (2026-11-19)
+
+- Tightened PR #77 wording so the Tokocrypto-specific candle-only rule cannot be misread as revoking separately approved providers such as existing Binance Vision/Kraken adapters. The instruction now says other providers remain governed by their own current ADR/provider allowlists.
+- Also clarified that any copy of validator.py or report.py remains protected, not just the root-named files.
+- Latest PR #77 head: c90c890ad78e97609f8a56842a3b419b64d89011; CLAUDE.md blob 44b524cd34a1da7f5145c2208cdf4a5f14469022; still one changed file, open/draft/unmerged. Its new static-analysis run 44484810228 was in progress/queued at the last check. No tests or repository runtime were executed for this documentation-only PR.
