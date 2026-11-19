@@ -41,7 +41,9 @@ def source_import_edges(path):
         elif isinstance(node, ast.ImportFrom):
             module = "." * node.level + (node.module or "")
             if node.level:
-                edges.add(module)
+                # Do not silently ignore relative edges: none are needed by this
+                # approved import closure, so fail closed if one appears.
+                edges.add("__relative_import__")
             elif node.module == "research":
                 edges.update("research." + alias.name for alias in node.names)
             else:
@@ -73,7 +75,10 @@ class HistoryContainmentTests(unittest.TestCase):
             "research/history.py": set(),
             "research/crosscheck.py": {"fetcher"},
         }
-        forbidden = {"validator", "report", "markets", "research.engine", "research.pipeline"}
+        forbidden_roots = {
+            "P1", "signal", "markets", "validator", "report", "__relative_import__",
+        }
+        forbidden_research = ("research.engine", "research.pipeline")
         for path, expected in expected_local_edges.items():
             with self.subTest(path=path):
                 edges = source_import_edges(path)
@@ -83,9 +88,11 @@ class HistoryContainmentTests(unittest.TestCase):
                 }
                 self.assertEqual(local, expected)
                 self.assertFalse(
-                    any(edge in forbidden or edge.startswith("markets.risk")
+                    any(edge.split(".", 1)[0] in forbidden_roots
+                        or any(edge == prefix or edge.startswith(prefix + ".")
+                               for prefix in forbidden_research)
                         for edge in edges),
-                    f"{path} imports a protected module",
+                    f"{path} imports a protected module or uses a relative import",
                 )
 
     def test_research_config_names_only_the_approved_provider_and_host(self):
