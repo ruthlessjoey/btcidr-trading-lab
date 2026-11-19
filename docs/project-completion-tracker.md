@@ -825,3 +825,21 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - **Runtime verification pending:** no Python 3.11 `py_compile` or synthetic workflow has yet run against commit `33df164...`; no Actions dispatch was available through the connected GitHub tools. The owner must manually run `Q0.8 immutable 19-role specialist review` in `synthetic` mode on PR #64 branch first. This mode does not call the LLM. Then run the approved offline tests against the new PR #60 head and, after synthetic succeeds, run the specialist review against exact head `a72c5287b5df64bfb1fb9385e0e1423f89ea8722` with `resume_from_run_id` blank. The old artifacts from runs `44386019954` and `44470636642` are bound to the previous head and must not be resumed against the new SHA.
 - The earlier 51/51 Q0.8 offline result is tied to old head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; it is not promoted to a pass for the new head until the offline workflow is rerun.
 - No protected file/path was opened or changed; no repository module was imported/executed; no exchange, account, credential, or trading operation occurred. PRs were not merged.
+
+
+### Q0.8 unchanged entrypoint context correction (2026-11-19)
+
+- Re-parsed the actual checkpoint artifact from run `44470636642` (ZIP SHA-256 `e41db1d59a3a59bdab559905af847f5223596b0e67262563b5ec6ecf909325b6`; inner checkpoint SHA-256 `a4db7155855591afc38afb9345291790fefb1ab66774063667c6373540135c30`). The `architecture-architect` response omitted its required verdict and was correctly downgraded to `INCONCLUSIVE`; the remaining results were 12 `PASS WITH FINDINGS`, 3 `BLOCKED`, with Commander, independent acceptance, and final verification all `BLOCKED`.
+- A further review-harness gap was confirmed: `fetch_history.py` was in the exact 27-path snapshot allowlist and was fetched/secret-screened, but it was unchanged at base/head and only its empty unified diff was transmitted. Reviewers therefore could not inspect its actual import chain. The full file was independently re-fetched from the exact PR #60 head and is a short entrypoint importing only `research.history.run_step1`; `research/history.py` itself imports only standard-library modules. No runtime import was executed.
+- Corrected the reviewer on PR #64 branch:
+  - Runner commit `4dae2943a716a42056f075bd79ddaf1930a63944`, blob `644d3f61707ce807a113019cd2bef22c7a078be0`.
+  - Added a fixed `UNCHANGED_CONTEXT_PATHS` allowlist and `build_unchanged_context()`, which requires each context file in both snapshots and fails unless base/head contents are byte-identical.
+  - The full head source for `fetch_history.py` is now passed separately as `unchanged_context_files` alongside the bounded diff; source has already passed the normal snapshot secret-screen and size limits.
+  - Synthetic tests cover inclusion and reject unexpected changes to a file declared as unchanged.
+- Both PR #60 and PR #64 workflow copies now pin runner commit `4dae2943a716a42056f075bd79ddaf1930a63944`, with byte-identical workflow blob `284a1f4f36e36a60764e955fdf32e0f4f9fe31ef`. Their checkpoint restore remains restricted to explicit review mode.
+- Latest PR heads:
+  - PR #60: `bda4627cbfa11d4669b3df8d828d7000ac52377d` (26 changed paths, open/draft/unmerged).
+  - PR #64: `7532e8e5e449c9db7d4a507bee8119674083461f` (two changed paths, open/draft/unmerged).
+  - PR #65: this tracker remains open/draft/unmerged; current previous head was `80d3ffb8046fe81ff099e229cfc1d353c25df1b6` before this addendum.
+- Runtime verification is still pending for the new reviewer commit and both new PR heads. The old Q0.8 review artifact and old 51/51 offline test evidence are bound to SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` and must not be reused as proof for the new PR #60 head.
+- PR #60 remains unaccepted because the protected `research.pipeline.py -> research.engine -> validator.py` dependency boundary is unresolved and unauthorized, regardless of the improved reviewer context. Do not test or access that chain. No PRs were merged and no workflow dispatch performed.
