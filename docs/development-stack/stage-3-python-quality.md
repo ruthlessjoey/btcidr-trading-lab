@@ -9,7 +9,8 @@ Ruff is an open-source MIT-licensed Python linter and formatter. This stage inst
 - Release tag commit: `c91de8a012cb87efe279b762020a0d28dd75ddb5`; GitHub reports its commit signature as valid.
 - Linux x86-64 GNU archive: `ruff-x86_64-unknown-linux-gnu.tar.gz`.
 - SHA-256: `7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90` (GitHub release asset digest).
-- PyPI currently reports no provenance for the 0.17.5 release files; the workflow therefore uses the official GitHub release asset and verifies its published digest rather than installing an unprovenanced wheel. The download follows HTTPS-only redirects and has bounded connection, total, retry, and archive-size limits (16 MiB maximum). The workflow verifies the published SHA-256 before reading the archive.\n- Extraction reads exactly one regular-file member named `ruff`, rejects links, duplicate members, and oversized files, caps the decompressed binary at 64 MiB, and writes bytes to a fixed temporary path without extracting archive-controlled paths.
+- PyPI currently reports no provenance for the 0.17.5 release files; the workflow therefore uses the official GitHub release asset and verifies its published digest rather than installing an unprovenanced wheel. The download follows HTTPS-only redirects and has bounded connection, total, retry, and archive-size limits (16 MiB maximum). The workflow verifies the published SHA-256 before reading the archive.
+- Extraction reads exactly one regular-file member named `ruff`, rejects links, duplicate members, and oversized files, caps the decompressed binary at 64 MiB, and writes bytes to a fixed temporary path without extracting archive-controlled paths.
 - No third-party Python dependencies are installed.
 
 ## Workflow boundary
