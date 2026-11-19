@@ -854,3 +854,15 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - Tests now cover local Tokocrypto adapter construction (no network), unknown-provider rejection, and read-only default configuration while checking inclusion (not exclusivity) of Tokocrypto on the existing `main` baseline.
   - Removed every `time_url()` or endpoint-authorization assertion from this default-branch isolation PR; endpoint security assertions remain within Q0 transport tests.
 - Re-fetched exact PR #66 head and file. The visible test imports only standard-library modules and `providers`; `providers` imports `fetcher`, so the visible closure stays outside protected modules. No test was run. PR #66 remains open/draft/unmerged.
+
+
+### Q0 Step 1 entrypoint import-closure regression (2026-11-19)
+
+- Exact PR #60 `fetch_history.py` blob `75fcaa6cbe0539f6dde5dcf8a69778c07f28513b` was re-read. It imports `argparse`, `json`, `sys`, and `research.history.run_step1`; it does not visibly import a protected module, HTTP client, or other provider.
+- Added a static Python AST import-closure regression to `tests/test_history.py`:
+  - PR #60 commit `cef049ebbf9f1390a4f14c618e6a12a53621761e`
+  - Test blob `5237398fc8b24283e4d0654246d66e8279270886`
+  - The test asserts the exact direct/transitive-source import names for `fetch_history.py` and `research/history.py`, rejects dynamic `__import__` / `importlib.import_module` calls, and parses files as text only. It does not import or execute the entrypoint or protected code.
+  - `tests/test_history.py` is already part of the Q0 offline workflow's six-module approved subset. The expected behavior is now machine-checkable on future workflow runs.
+- PR #60 current head at this update: `cef049ebbf9f1390a4f14c618e6a12a53621761e`, still open/draft/unmerged with exactly 26 changed paths and M6 base `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
+- The new static regression has not yet been run under Python 3.11; the previous 51/51 run belongs to old head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` and is not evidence for this head.
