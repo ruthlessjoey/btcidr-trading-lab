@@ -19,7 +19,7 @@ This file is a local safety overlay for `ruthlessjoey/btcidr-trading-lab`. It su
 ## Protected scope and trading boundaries
 
 - Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`, any `signal/` path, or `markets/risk/`.
-- Never read, write, edit, execute, import, or otherwise process the root-level `validator.py` or `report.py`.
+- Never read, write, edit, execute, import, or otherwise process any file named `validator.py` or `report.py`, including copies.
 - Exclude every protected directory and file before broad checkout, repository-wide search, recursive listing, archive creation, or test discovery. If a tool cannot guarantee exclusion, do not run it.
 - Do not inspect or modify Workstream B.
 - No exchange credentials, private/authenticated endpoints, account login, balance synchronization, wallet access, orders, cancellations, withdrawals, or real-money execution.
