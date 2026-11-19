@@ -119,6 +119,7 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
 
     def test_symlinked_completed_output_file_refuses_cleanup(self):
+        self.install_pair()
         completed = self.output / (self.key + ".json")
         completed.unlink()
         os.symlink(self.report, completed)
@@ -127,6 +128,7 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
     def test_symlinked_branch_completion_file_refuses_cleanup(self):
+        self.install_pair()
         branch_completed = self.root / (self.key + ".json")
         branch_completed.unlink()
         os.symlink(self.report, branch_completed)
@@ -135,6 +137,7 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
     def test_symlinked_report_file_refuses_cleanup(self):
+        self.install_pair()
         self.report.unlink()
         os.symlink(self.output / (self.key + ".json"), self.report)
         with self.assertRaisesRegex(RuntimeError, "symlinked path component"):
