@@ -137,7 +137,7 @@ class HoldoutPublicationTests(unittest.TestCase):
     def test_symlinked_report_file_refuses_cleanup(self):
         self.report.unlink()
         os.symlink(self.output / (self.key + ".json"), self.report)
-        with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+        with self.assertRaisesRegex(RuntimeError, "symlinked path component"):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
