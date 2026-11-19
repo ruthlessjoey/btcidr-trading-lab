@@ -25,18 +25,23 @@ jobs:
             /fetcher.py
             /providers.py
             /probe.py
+            /tools/net_lab.py
             /run.py
             /config.json
             /research_config.json
             /research/history.py
             /research/crosscheck.py
+            /research/__init__.py
             /fetch_history.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
             /tests/test_history.py
+            /tests/test_research_gates.py
             /tests/test_probe.py
             /tests/test_pipeline.py
             /tests/test_sanitization.py
+            /.github/workflows/market-data-check.yml
+            /.github/workflows/research-data.yml
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:

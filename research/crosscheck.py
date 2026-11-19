@@ -12,6 +12,9 @@ from fetcher import ApiError
 DAY = 86400
 TOLERANCE_PCT = 3.0
 
+# No independent cross-check source is authorized; keep the pipeline allowlist empty.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
 
 
 def day(ts):

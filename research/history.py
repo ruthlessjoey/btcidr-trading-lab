@@ -12,6 +12,13 @@ import time
 from datetime import datetime, timezone
 
 
+def _gate_status(checks):
+    """Fail closed when no checks exist or any check is not an exact PASS."""
+    if not checks or any(check.get("status") != "PASS" for check in checks):
+        return "FAIL"
+    return "PASS"
+
+
 def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previous_root=None):
     now = time.time() if local_now is None else local_now
     generated = datetime.fromtimestamp(now, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -32,6 +39,10 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
         "Research configuration is outside the exact approved read-only Tokocrypto BTC/USDT scope. "
         "No request was made and no dataset was written."
     )
+    checks = [{"name": "market_identity", "status": "FAIL", "detail": reason}]
+    gate = _gate_status(checks)
+    dataset = None
+    backtest_allowed = gate == "PASS" and dataset is not None
     result = {
         "generated_utc": generated,
         "market": {
@@ -40,16 +51,16 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
             "pair_label": f"{base_asset}/{quote_asset}" if base_asset and quote_asset else None,
             "timeframe": cfg.get("timeframe"), "market_type": "spot",
         },
-        "checks": [{"name": "market_identity", "status": "FAIL", "detail": reason}],
+        "checks": checks,
         "pages": [],
-        "gate": "FAIL",
-        "dataset": None,
+        "gate": gate,
+        "dataset": dataset,
         "previous": None,
         "coverage": None,
         "exchange_info": None,
         "stop_reason": reason,
         "top_moves": [],
-        "backtest_allowed": False,
+        "backtest_allowed": backtest_allowed,
         "http_log": [],
         "network_requests": 0,
     }
@@ -59,7 +70,7 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
     report = (
         "# Research history gate\n\n"
         f"Generated: {generated}\n\n"
-        "**GATE: FAIL**\n\n"
+        f"**GATE: {gate}**\n\n"
         f"{reason}\n\n"
         "- Network requests: 0\n"
         "- Dataset written: no\n"

@@ -1,12 +1,15 @@
-"""Static offline tests for the Step 1 fail-closed gate.
+"""Offline tests for the Step 1 fail-closed gate.
 
-These tests deliberately avoid importing protected validator.py or invoking network code.
-They parse source text with Python's AST; they never import the Step 1 entrypoint.
+Runtime tests invoke only the standard-library-only gate with synthetic configuration
+and forbidden network callbacks. AST tests avoid protected validator.py entirely.
 """
 import ast
 import json
 import os
+import tempfile
 import unittest
+
+from research.history import _gate_status, run_step1
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -58,13 +61,18 @@ def source_import_edges(path):
 
 
 class HistoryContainmentTests(unittest.TestCase):
+    def test_protected_import_gate_test_is_not_discoverable(self):
+        # Its import closure reaches research.pipeline/research.engine and protected
+        # validator.py. It must remain absent from broad unittest discovery.
+        protected_test = os.path.join(ROOT, "tests", "test_research_gates.py")
+        self.assertFalse(os.path.exists(protected_test))
     def test_q08_workflow_test_import_closure_stays_outside_protected_modules(self):
         # These are the exact six modules selected by q08-offline-tests.yml and
         # research-data.yml. Resolve only source imports; do not import or execute them.
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": set(),
+            "tests/test_history.py": {"research.history"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
@@ -107,7 +115,7 @@ class HistoryContainmentTests(unittest.TestCase):
             source = f.read()
         self.assertIn('"name": "market_identity", "status": "FAIL"', source)
         self.assertIn('"network_requests": 0', source)
-        self.assertIn('"backtest_allowed": False', source)
+        self.assertIn('backtest_allowed = gate == "PASS" and dataset is not None', source)
         self.assertIn("route is undocumented", source)
         self.assertIn("Configuration alone is insufficient", source)
 
@@ -135,6 +143,74 @@ class HistoryContainmentTests(unittest.TestCase):
             'quote_asset == "USDT"',
         ):
             self.assertIn(literal, source)
+
+
+class HistoryRuntimeGateTests(unittest.TestCase):
+    def test_gate_status_requires_nonempty_all_pass_checks(self):
+        self.assertEqual(_gate_status([]), "FAIL")
+        self.assertEqual(_gate_status([{"status": "PASS"}]), "PASS")
+        self.assertEqual(_gate_status([{"status": "FAIL"}]), "FAIL")
+        self.assertEqual(
+            _gate_status([{"status": "PASS"}, {"status": "FAIL"}]),
+            "FAIL",
+        )
+
+    def run_and_assert_fail_closed(self, cfg, expected_reason):
+        calls = []
+
+        def forbidden_opener(*args, **kwargs):
+            calls.append(("opener", args, kwargs))
+            raise AssertionError("the Step 1 gate must not make a network request")
+
+        def forbidden_sleep(*args, **kwargs):
+            calls.append(("sleep", args, kwargs))
+            raise AssertionError("the Step 1 gate must not wait for a network retry")
+
+        with tempfile.TemporaryDirectory() as out:
+            code = run_step1(
+                cfg, out_dir=out, opener=forbidden_opener,
+                sleep=forbidden_sleep, local_now=1_700_000_000,
+            )
+            with open(os.path.join(out, "dataset_report.json"), encoding="utf-8") as f:
+                report = json.load(f)
+            with open(os.path.join(out, "dataset_report.md"), encoding="utf-8") as f:
+                markdown = f.read()
+
+            self.assertEqual(code, 1)
+            self.assertEqual(report["gate"], "FAIL")
+            self.assertIsNone(report["dataset"])
+            self.assertFalse(report["backtest_allowed"])
+            self.assertEqual(report["network_requests"], 0)
+            self.assertEqual(report["http_log"], [])
+            self.assertEqual(len(report["checks"]), 1)
+            self.assertEqual(report["checks"][0]["name"], "market_identity")
+            self.assertEqual(report["checks"][0]["status"], "FAIL")
+            self.assertEqual(report["checks"][0]["detail"], report["stop_reason"])
+            self.assertIn(expected_reason, report["stop_reason"])
+            self.assertIn("**GATE: FAIL**", markdown)
+            self.assertEqual(set(os.listdir(out)), {"dataset_report.json", "dataset_report.md"})
+            self.assertEqual(calls, [])
+
+    def test_exact_approved_config_still_fails_without_market_identity_proof(self):
+        self.run_and_assert_fail_closed({
+            "mode": "read_only",
+            "provider": "tokocrypto",
+            "host": "https://www.tokocrypto.site",
+            "symbol": "BTCUSDT",
+            "base_asset": "BTC",
+            "quote_asset": "USDT",
+            "timeframe": "1d",
+        }, "Market identity is unverified")
+
+    def test_unapproved_config_fails_without_network_or_dataset_output(self):
+        self.run_and_assert_fail_closed({
+            "mode": "read_only",
+            "provider": "unapproved-test-provider",
+            "host": None,
+            "symbol": None,
+            "base_asset": None,
+            "quote_asset": None,
+        }, "outside the exact approved read-only Tokocrypto BTC/USDT scope")
 
 
 if __name__ == "__main__":
