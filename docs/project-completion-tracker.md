@@ -866,3 +866,23 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - `tests/test_history.py` is already part of the Q0 offline workflow's six-module approved subset. The expected behavior is now machine-checkable on future workflow runs.
 - PR #60 current head at this update: `cef049ebbf9f1390a4f14c618e6a12a53621761e`, still open/draft/unmerged with exactly 26 changed paths and M6 base `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
 - The new static regression has not yet been run under Python 3.11; the previous 51/51 run belongs to old head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` and is not evidence for this head.
+
+
+### Current security-instruction alignment and CI state (2026-11-19)
+
+- Rechecked current main commit 9bf95e28171447faa910ecd5185b59a349555a52 and root CLAUDE.md blob fff092011f7fb67a2c413909991b32ab9dda560a. The shared instruction still authorized Tokocrypto server-time and candles, conflicting with the current owner mandate that permits only unauthenticated HTTPS GET candles at www.tokocrypto.site/api/v3/klines; it also omitted the additional protected paths markets/risk/, validator.py, report.py, and copies of signal/.
+- Created documentation-only PR #77 from main:
+  - URL: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/77
+  - Branch: docs/align-current-security-boundaries-2026-11-19
+  - Commit: aa71ecfb9d1a3aad955f3cea68ffcb5fbd498e8a
+  - Blob: ee5506ce725cc4eb9c41b4c7bae23d3cfa2be236
+  - One changed file: CLAUDE.md (13 additions, 10 deletions).
+  - The replacement text aligns protected paths, PAPER-only/LIVE-disabled, the exact Tokocrypto candle-only endpoint, no server-time, no .com, no private endpoints, and no test/import execution closure into protected modules. Re-fetched and statically checked each required statement. No tests/network operations were run for this documentation-only change.
+- PR #77 remains open/draft/unmerged. At the last check, GitHub Actions run 44484065388 had the Actions analysis job successful, CodeQL reported neutral, and the Python CodeQL job was still in progress. These are static-analysis jobs, not functional tests.
+- Latest Q0.8 branches were re-fetched:
+  - PR #60 head advanced to cef049ebbf9f1390a4f14c618e6a12a53621761e (one commit after bda4627...), changing only tests/test_history.py. The new AST-based test statically asserts the import closure of fetch_history.py and research/history.py, rejecting dynamic imports; it parses source as text and does not import or execute protected code. This new test has not yet been run on Python 3.11. The earlier 51/51 offline result and run 44470636642 remain tied to the older SHA and cannot verify this head.
+  - PR #64 head is 7532e8e5e449c9db7d4a507bee8119674083461f. Its CodeQL Python and Actions analyses completed successfully, but the review status check was skipped. The immutable runner still needs a manual synthetic-mode workflow run before the new review can be treated as runtime-verified; the full specialist review remains unaccepted until all verdict gates pass.
+  - PR #66 head 269fc112d13d6a0ed92195156ff22d55263e927b has successful CodeQL Python and Actions analyses; these are static-analysis results, not execution of its revised unit tests.
+- Current CI observations for the holdout stack: PR #34 head 301b90dca0fd1622d3ff69ee3bbf47d2b401d448, PR #68 head e280af8e9224ff3dd5ce282d7e9da3224c6a4136, and PR #76 head 5970d6d7b6bd99b83cb5dfb0eb502013b2f69678 had no check runs returned for those exact commits at the last query. PR #76 retains prior exact-blob local Python 3.13.5 evidence of 19/19 isolated publisher tests; Python 3.11 CI and integration remain unverified.
+- No workflow dispatch was available through the connected GitHub tools. No PR was merged. No protected source/data was opened, imported, executed, or changed. No exchange, account, credential, or trading action occurred.
+- Project-wide completion remains UNRATED. The current evidence is insufficient to claim 100%: mandatory Q0.8 synthetic/runtime review and new-head offline tests remain pending; holdout integration CI and protected Workstream B acceptance remain blocked; MEME_INTEL is not demonstrated; full owner-approved scope/weights still require approval.
