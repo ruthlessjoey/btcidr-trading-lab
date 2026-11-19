@@ -25,14 +25,18 @@ Never access `P1/`, `signal/data/`, any copy of `signal/`, `markets/risk/`, or a
 - Dependencies: license, provenance, pinning, hashes, transitive dependencies, install scripts, and binary artifacts.
 - Secrets: no credentials in source, logs, artifacts, prompts, or MCP configuration.
 - Network: deny by default; allow only documented public unauthenticated endpoints within the exact approved scope.
-- Automation: no hidden dispatch, merge, release, deployment, account access, or destructive action.
+- Automation: no hidden dispatch, merge, release, deployment, account access, or destructive action. Do not dispatch workflows, change secrets or repository settings, merge/close PRs, force-push, reset, or delete branches without separate explicit authorization for that exact action.
 - Supply chain: distinguish signed provenance from unsigned tags and unverified assets.
 - Fail closed on stale, malformed, partial, unauthenticated, or unexpected inputs.
 - Review sparse-checkout patterns and checkout logs; a test that avoids importing a protected module may still violate the boundary if checkout materializes that module.
+- Keep implementation, verification, and project completion measurements separate. Overall completion remains UNRATED until project scope, weights, and evidence criteria are approved; never manufacture a percentage.
 
-## Trading prohibitions
+## Trading and execution invariants
 
-No exchange credentials, private endpoints, account login, balances, wallets, orders, funding, payments, withdrawals, leverage, derivatives, shorting, or LIVE execution. Trading architecture is PAPER-only; LIVE remains disabled and unavailable. Tokocrypto public-data access is limited to unauthenticated HTTPS GET candles at `www.tokocrypto.site/api/v3/klines`; server-time, `www.tokocrypto.com`, and private/authenticated endpoints are not authorized. Other providers are governed by their own current ADR/provider allowlists.
+- Spot-only, long-only. No shorting, leverage, margin, or derivatives.
+- PAPER-only. LIVE remains disabled and unavailable. No real-money activity, exchange credentials, private endpoints, account login, balance or wallet access, order placement/cancellation, funding, payments, or withdrawals.
+- An emergency stop must independently block new paper execution. Strategy generation and execution authorization remain separate; risk controls fail closed.
+- Tokocrypto public-data access is limited to unauthenticated HTTPS GET candles at `www.tokocrypto.site/api/v3/klines`; server-time, `www.tokocrypto.com`, and private/authenticated endpoints are not authorized. Other providers are governed by their own current ADR/provider allowlists.
 
 ## Output
 
