@@ -29,8 +29,8 @@ Project `Read`/`Edit` permission denials are defense-in-depth, not an OS sandbox
 ## Trading and exchange safety boundaries
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
-- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data access is unauthenticated GET candles at `www.tokocrypto.site/api/v3/klines`. Do not use `.com`, other `.site` endpoints, or private endpoints without separate explicit approval.
+- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, funding, payments, withdrawals, or real-money activity.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only approved Tokocrypto market-data access is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines`. Do not call server-time endpoints, use `www.tokocrypto.com`, or access private/authenticated endpoints. This Tokocrypto-specific rule does not itself authorize or revoke other providers; use other market-data hosts only where a separate current ADR or provider allowlist explicitly permits them.
 - PAPER-only. LIVE trading remains disabled and unavailable.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.
