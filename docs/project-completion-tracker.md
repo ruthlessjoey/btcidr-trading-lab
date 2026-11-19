@@ -1245,3 +1245,13 @@ These relationships are based on the current changed-file lists. They do not aut
 - The six offline test modules contain 56 test methods in total: fetcher 21, provider/live config 4, history 8, probe 2, pipeline containment 6, sanitization 15. This is test inventory, **not** a test-pass count. Exact-head Python 3.11 Actions execution has not yet been performed.
 - User-supplied run #44603985942 was the specialist-review workflow, not the Q0.8 offline workflow. PR #78's offline tests therefore still require a separate manual dispatch on branch `security/q0-empty-crosscheck-authset-followup-2026-11-20`. No test pass is claimed.
 - No protected paths were accessed or executed, no network/exchange calls were made, and no PR was merged. Project-wide completion remains **UNRATED**.
+
+
+### PR #78 Q0.8 runtime gate and disabled scanner regression expansion (2026-11-20)
+
+- Further expanded draft stacked PR [#78](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/78) to head `ee1535149b59206cbff4bfd3efdb67f03ee3b0b2`, 6 commits ahead and 0 behind frozen PR #60 head. Exactly five unprotected files changed: `.github/workflows/q08-offline-tests.yml`, `research/crosscheck.py`, `tests/test_history.py`, `tests/test_probe.py`, and `tests/test_sanitization.py`.
+- Added `tools/net_lab.py` (unchanged, stdlib-only disabled stub) to the offline workflow sparse checkout and one bounded subprocess regression in `tests/test_probe.py`: verify the script exits 2, emits its disabled message, has no `urllib`/`socket`/`requests` text imports, and writes no stderr. This addresses the specialist's disabled-network-lab uncertainty without enabling network access.
+- Current Q0.8 offline scope comprises 57 test methods across six modules (fetcher 21; provider/live config 4; history 8; probe 3; pipeline containment 6; sanitization 15). All selected modules and their file reads/imports were inspected; no selected import closure reaches protected modules. This is an inventory count, not an execution result.
+- Re-fetched all updated files from PR #78 head and confirmed exact workflow sparse-checkout coverage for the empty package initializer, history source, disabled network-lab stub, two static workflow fixtures, and all selected modules; protected paths remain excluded. PR #78 description has been updated. Current exact-head Python 3.11 offline Actions execution remains pending; do not claim the suite passed.
+- PR #78 remains open/draft, stacked on PR #60; no merge was performed.
+
