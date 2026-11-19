@@ -30,7 +30,7 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 - PAPER-only. LIVE trading remains disabled and unavailable.
 - No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, funding, payments, or withdrawals.
 - Tokocrypto is a user funding/custody venue, not a bot account. The only approved Tokocrypto market-data access is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines`. Do not call server-time endpoints, use `www.tokocrypto.com`, or access private/authenticated endpoints.
-- No other external market-data host or endpoint is authorized by this instruction. Obtain separate approval before expanding the provider or endpoint allowlist.
+- This Tokocrypto-specific rule does not itself authorize or revoke other providers; use other market-data hosts only where a separate current ADR or provider allowlist explicitly permits them.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.
 - Do not change custody, execution, risk, or exchange boundaries as part of a tooling task.
