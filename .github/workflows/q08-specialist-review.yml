@@ -7,6 +7,18 @@ on:
         description: "Exact immutable PR #60 commit SHA to review"
         required: true
         type: string
+      resume_from_run_id:
+        description: "Optional prior run ID containing a checkpoint for this exact review head"
+        required: false
+        type: string
+      mode:
+        description: "Run synthetic preflight only, or continue to the full 19-role review"
+        required: true
+        type: choice
+        options:
+          - synthetic
+          - review
+        default: synthetic
 
 permissions:
   contents: read
@@ -23,19 +35,39 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     steps:
-      - name: Sparse checkout only the immutable reviewer and its guidance
+      - name: Validate checkpoint run ID before artifact restore
+        if: ${{ inputs.mode == 'review' && inputs.resume_from_run_id != '' }}
+        env:
+          RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RESUME_FROM_RUN_ID" =~ ^[0-9]{1,20}$ ]]; then
+            echo "::error::resume_from_run_id must be a numeric GitHub Actions run ID."
+            exit 1
+          fi
+
+      - name: Sparse checkout only the immutable self-contained reviewer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: 92bda8aef7e3243062e038f157d44374801ab41e
+          ref: ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /tools/q08_specialist_review.py
-            /.claude/agents/
-            /.claude/skills/
+
+      - name: Restore checkpoint from an earlier run
+        if: ${{ inputs.mode == 'review' && inputs.resume_from_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: q08-review-checkpoint-${{ inputs.resume_from_run_id }}
+          path: ${{ runner.temp }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.resume_from_run_id }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -49,10 +81,22 @@ jobs:
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
+        if: ${{ inputs.mode == 'review' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
+          Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
         run: python3 runner/tools/q08_specialist_review.py --mode review
+
+      - name: Persist resumable review checkpoint
+        if: ${{ always() && inputs.mode == 'review' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: q08-review-checkpoint-${{ github.run_id }}
+          path: ${{ runner.temp }}/q08-review-checkpoint.json
+          if-no-files-found: ignore
+          retention-days: 7
