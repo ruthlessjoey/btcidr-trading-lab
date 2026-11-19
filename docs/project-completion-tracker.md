@@ -886,3 +886,20 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Current CI observations for the holdout stack: PR #34 head 301b90dca0fd1622d3ff69ee3bbf47d2b401d448, PR #68 head e280af8e9224ff3dd5ce282d7e9da3224c6a4136, and PR #76 head 5970d6d7b6bd99b83cb5dfb0eb502013b2f69678 had no check runs returned for those exact commits at the last query. PR #76 retains prior exact-blob local Python 3.13.5 evidence of 19/19 isolated publisher tests; Python 3.11 CI and integration remain unverified.
 - No workflow dispatch was available through the connected GitHub tools. No PR was merged. No protected source/data was opened, imported, executed, or changed. No exchange, account, credential, or trading action occurred.
 - Project-wide completion remains UNRATED. The current evidence is insufficient to claim 100%: mandatory Q0.8 synthetic/runtime review and new-head offline tests remain pending; holdout integration CI and protected Workstream B acceptance remain blocked; MEME_INTEL is not demonstrated; full owner-approved scope/weights still require approval.
+
+
+### Q0.8 non-final model completion rejection (2026-11-19)
+
+- A further static audit of the current reviewer source found that ask_model logged the OpenRouter finish_reason but did not reject non-final completions. A truncated response with finish_reason=length could still be accepted if it contained a verdict line. This regressed the earlier fail-closed truncation correction and would undermine the new acceptance gate.
+- Added require_complete_finish_reason() to the immutable reviewer:
+  - Runner commit: 1def3be27a6870fd356119d4794b4ac887b1623d
+  - Runner blob: 8a88bd857fba9a65dec6e06e6a9824e16adfb10a
+  - The production ask_model path now rejects every finish_reason except exact "stop" before parsing or checkpointing the response.
+  - Synthetic cases accept "stop" and reject "length", "content_filter", "tool_calls", missing, and empty finish reasons.
+  - Existing diff bound (192,000 characters), production enforce_diff_limit call, request cap (256,000 bytes), unchanged fetch_history.py context, and all-role verdict gate remain present in the exact fetched blob.
+- Updated both workflow copies to pin runner commit 1def3be27a6870fd356119d4794b4ac887b1623d; workflow blob is identical on both branches: 97e11a4d5efaad20948ab56a2218d60c8884213d.
+  - PR #60 latest head: 6f9ab508710272f99c34508a565c214f6adbc9ee.
+  - PR #64 latest head: 4af6478a29110115d94e46d755035bb451c5d62f.
+  - Both remain open/draft/unmerged. The latest PR #64 CodeQL analyses were still in progress at the last status check; its automatic review status was skipped. PR #60 also has only an automatic skipped review status at this new head.
+- **Runtime remains unverified:** no local Python 3.11 runtime was available through the connected GitHub tools and no workflow dispatch action is exposed. The required next checks are PR #64 synthetic mode against the pinned runner, followed by PR #60's six-module offline workflow on exact head 6f9ab508710272f99c34508a565c214f6adbc9ee, then a fresh full review on that same SHA with resume_from_run_id blank. Do not reuse artifacts or test results from previous PR #60 heads.
+- No protected file/path was opened or changed; no repository code was executed; no model API, exchange endpoint, account, credential, or trading operation was used. No PR was merged.
