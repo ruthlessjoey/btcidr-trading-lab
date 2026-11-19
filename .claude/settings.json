@@ -3,8 +3,14 @@
     "deny": [
       "Read(P1/**)",
       "Edit(P1/**)",
-      "Read(signal/data/**)",
-      "Edit(signal/data/**)"
+      "Read(signal/**)",
+      "Edit(signal/**)",
+      "Read(markets/risk/**)",
+      "Edit(markets/risk/**)",
+      "Read(validator.py)",
+      "Edit(validator.py)",
+      "Read(report.py)",
+      "Edit(report.py)"
     ]
   }
 }
