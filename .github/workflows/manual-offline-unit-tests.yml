@@ -2,6 +2,13 @@ name: Manual Offline Holdout Publisher Tests (protected-path-safe)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - security/implement-durable-holdout-reservations
+    paths:
+      - research/holdout_publish.py
+      - tests/test_holdout_publish.py
+      - .github/workflows/manual-offline-unit-tests.yml
 
 permissions:
   contents: read
@@ -22,6 +29,7 @@ jobs:
       - name: Sparse checkout only the publisher and its isolated test
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 1
           sparse-checkout-cone-mode: false
