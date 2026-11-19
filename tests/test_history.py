@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 
-from research.history import run_step1
+from research.history import _gate_status, run_step1
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -141,6 +141,15 @@ class HistoryContainmentTests(unittest.TestCase):
 
 
 class HistoryRuntimeGateTests(unittest.TestCase):
+    def test_gate_status_requires_nonempty_all_pass_checks(self):
+        self.assertEqual(_gate_status([]), "FAIL")
+        self.assertEqual(_gate_status([{"status": "PASS"}]), "PASS")
+        self.assertEqual(_gate_status([{"status": "FAIL"}]), "FAIL")
+        self.assertEqual(
+            _gate_status([{"status": "PASS"}, {"status": "FAIL"}]),
+            "FAIL",
+        )
+
     def run_and_assert_fail_closed(self, cfg, expected_reason):
         calls = []
 
