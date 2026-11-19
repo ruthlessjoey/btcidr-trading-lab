@@ -59,6 +59,10 @@ jobs:
               if len(matches) != 1:
                   raise SystemExit("archive must contain exactly one ruff member")
               member = matches[0]
+              parts = member.name.split("/")
+              if (member.name.startswith("/") or "\\" in member.name
+                      or any(part in ("", ".", "..") for part in parts)):
+                  raise SystemExit("ruff member path is not a safe relative archive path")
               if not member.isfile() or not 0 < member.size <= max_binary:
                   raise SystemExit("ruff member is not a bounded regular file")
               source = archive.extractfile(member)
