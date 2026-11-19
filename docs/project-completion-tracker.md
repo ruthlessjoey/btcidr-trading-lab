@@ -922,3 +922,21 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - research_config.json blob 58ff32379a7f4fbc0ca5d75ff10e20e82bbaf3ff is read-only and scoped to Tokocrypto BTC/USDT.
 - providers.py contains a Tokocrypto documentation URL on .com, but the inspected runtime transport allowlist rejects .com hosts; the documentation URL is not an API request or authorization.
 - This was static source inspection only. No repository code was imported or executed, no test was run, and no external network/exchange request was made. Exact-head Python 3.11 offline tests remain pending.
+
+
+### Q0.8 unambiguous verdict and refusal handling (2026-11-19)
+
+- A final source-level review found two further ways a model response could be misclassified: the verdict regex accepted a verdict anywhere in the response even though the prompt requires the first non-empty line to be the verdict; and refusal metadata was logged but not rejected.
+- Added strict helpers to the immutable runner:
+  - Runner commit: 41c824d31e679b7b81a3821b7740eeab35539f0f
+  - Runner blob: bf4979a52034b47fdaa7cd06f181dfdad2dc0284
+  - extract_verdict() accepts exactly one verdict line and requires it to be the first non-empty line. Model-response classification, checkpoint validation, and final acceptance now share this parser.
+  - require_no_refusal() rejects non-empty refusal metadata before the response can be checkpointed or counted.
+  - Synthetic cases cover first-line verdicts, verdicts buried after body text, contradictory multiple verdicts, missing verdicts, and refusal metadata.
+  - A fixture newline-escaping issue in the first draft was caught by static source inspection and corrected in a follow-up commit before pinning.
+- Both workflow copies now pin runner commit 41c824d31e679b7b81a3821b7740eeab35539f0f; identical workflow blob b59bd037640a29f3510d0722c34989289dc193fc.
+  - PR #60 latest head: 6ce6857ee2cb9638d71c6b92598f2e6af261fa1a.
+  - PR #64 latest head: cd8596b3036daa57b0730731b3e2f49fbed37376.
+  - Both remain open/draft/unmerged. Static checks for these newest heads are pending; no reviewer synthetic or offline workflow has run against them.
+- Runtime verification remains a hard gate. Run the synthetic workflow first, then the six-module Python 3.11 offline suite on the latest PR #60 head, then the full 19-role review against that same exact head with no checkpoint resume. Do not reuse prior-head artifacts.
+- No protected source/data was opened, imported, executed, or changed; no LLM request, exchange request, account, credential, or trading action occurred. No PR was merged.
