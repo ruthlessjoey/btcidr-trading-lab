@@ -483,6 +483,9 @@ def load_role(name: str) -> tuple[str, str]:
 
 
 EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
+EXPECTED_WORKFLOW_ID = 421573712
+EXPECTED_WORKFLOW_PATH = ".github/workflows/q08-specialist-review.yml"
+EXPECTED_REVIEW_BRANCH = "security/q0-provider-sanitization-2026-11-18"
 EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 
 MAX_CHECKPOINT = 2_000_000
@@ -527,6 +530,42 @@ def review_verdict_failures(reports: dict, commander, acceptance, verification) 
         if verdict not in ("PASS", "PASS WITH FINDINGS"):
             failures.append(name + "=" + verdict)
     return failures
+
+
+def validate_checkpoint_source_metadata(run: dict, run_id: str,
+                                         current_branch: str,
+                                         expected_head_sha: str) -> None:
+    """Bind a restored checkpoint to a completed run of this exact workflow and head."""
+    if not re.fullmatch(r"[0-9]{1,20}", run_id):
+        raise RuntimeError("Checkpoint source run ID is invalid")
+    if current_branch != EXPECTED_REVIEW_BRANCH:
+        raise RuntimeError("Checkpoint resume is allowed only from the approved PR #60 branch")
+    repository = run.get("repository") if isinstance(run, dict) else None
+    if not isinstance(repository, dict):
+        raise RuntimeError("Checkpoint source run metadata is incomplete")
+    if (run.get("id") != int(run_id)
+        or run.get("workflow_id") != EXPECTED_WORKFLOW_ID
+        or run.get("path") != EXPECTED_WORKFLOW_PATH
+        or run.get("event") != "workflow_dispatch"
+        or run.get("status") != "completed"
+        or repository.get("full_name") != REPO
+        or run.get("head_sha") != expected_head_sha
+        or run.get("head_branch") != current_branch):
+        raise RuntimeError(
+            "Checkpoint source run does not match this repository, workflow, branch, and exact review head")
+
+
+def validate_checkpoint_source(token: str) -> None:
+    run_id = os.environ.get("Q08_RESUME_FROM_RUN_ID", "").strip()
+    if not run_id:
+        return
+    current_run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if current_run_id and current_run_id == run_id:
+        raise RuntimeError("A review run cannot resume its own checkpoint")
+    current_branch = os.environ.get("GITHUB_REF_NAME", "")
+    source_run = github_json("/repos/" + REPO + "/actions/runs/" + run_id, token)
+    validate_checkpoint_source_metadata(source_run, run_id, current_branch, HEAD_SHA)
+    print("STAGE checkpoint_source_run_verified run_id=" + run_id, flush=True)
 
 
 def _unique_json_object(pairs):
@@ -894,6 +933,46 @@ def synthetic():
         "base":{"sha":BASE_SHA,"ref":"feature/m6-risk-engine"},
     }
     validate_pull_request_target(sample_pr, expected_pr_head)
+    sample_run = {
+        "id":123456, "workflow_id":EXPECTED_WORKFLOW_ID,
+        "path":EXPECTED_WORKFLOW_PATH, "event":"workflow_dispatch",
+        "status":"completed", "head_sha":expected_pr_head,
+        "head_branch":EXPECTED_REVIEW_BRANCH,
+        "repository":{"full_name":REPO},
+    }
+    validate_checkpoint_source_metadata(
+        sample_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+    for field, bad_value in (
+        ("workflow_id", EXPECTED_WORKFLOW_ID + 1),
+        ("path", ".github/workflows/other.yml"),
+        ("event", "push"),
+        ("status", "in_progress"),
+        ("head_sha", "b" * 40),
+        ("head_branch", "other-branch"),
+    ):
+        bad_run = {**sample_run, field:bad_value}
+        try:
+            validate_checkpoint_source_metadata(
+                bad_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("mismatched checkpoint source metadata was accepted: " + field)
+    wrong_repo = {**sample_run, "repository":{"full_name":"attacker/repo"}}
+    try:
+        validate_checkpoint_source_metadata(
+            wrong_repo, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("checkpoint source from another repository was accepted")
+    try:
+        validate_checkpoint_source_metadata(
+            sample_run, "123456", "other-branch", expected_pr_head)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("checkpoint source from another branch was accepted")
     stale_pr = {**sample_pr, "head":{**sample_pr["head"], "sha":"b" * 40}}
     try:
         validate_pull_request_target(stale_pr, expected_pr_head)
@@ -978,6 +1057,7 @@ def review():
     print("STAGE pull_request_head_validation_start", flush=True)
     validate_pr_head(gh)
     print("STAGE pull_request_head_validation_complete", flush=True)
+    validate_checkpoint_source(gh)
     print("STAGE comparison_and_snapshot_start", flush=True)
     added_paths = validate_comparison(gh)
     base_snapshot = fetch_snapshot(gh, BASE_SHA, added_paths)
