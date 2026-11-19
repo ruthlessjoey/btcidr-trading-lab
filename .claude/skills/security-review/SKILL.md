@@ -7,7 +7,7 @@ description: Use when assessing code, workflows, dependencies, permissions, secr
 
 ## Mandatory exclusions
 
-Never access `P1/`, any `signal/` path, `markets/risk/`, the protected root modules `validator.py` and `report.py`, or protected Workstream B source/data. Exclude these paths and modules before traversal. If a tool cannot guarantee exclusion, do not run it. Also respect any additional exact protected modules or artifacts designated by the owner.
+Never access `P1/`, `signal/data/`, any copy of `signal/`, `markets/risk/`, or any file named `validator.py` or `report.py` (including copies), or protected Workstream B source/data. Do not enumerate, read, modify, expose, import, or execute protected content. Exclude these paths and modules before traversal. Do not run tests or scripts whose import/execution closure reaches protected content. If a tool cannot guarantee exclusion, do not run it. Also respect any additional exact protected modules or artifacts designated by the owner.
 
 ## Scope and evidence
 
@@ -32,7 +32,7 @@ Never access `P1/`, any `signal/` path, `markets/risk/`, the protected root modu
 
 ## Trading prohibitions
 
-No exchange credentials, private endpoints, account login, balances, wallets, orders, withdrawals, leverage, derivatives, shorting, or live execution. Tokocrypto public-data exception is limited to unauthenticated server-time/candles on `www.tokocrypto.site`; `www.tokocrypto.com` remains excluded. Other provider hosts require their own current approval.
+No exchange credentials, private endpoints, account login, balances, wallets, orders, funding, payments, withdrawals, leverage, derivatives, shorting, or LIVE execution. Trading architecture is PAPER-only; LIVE remains disabled and unavailable. Tokocrypto public-data access is limited to unauthenticated HTTPS GET candles at `www.tokocrypto.site/api/v3/klines`; server-time, `www.tokocrypto.com`, and private/authenticated endpoints are not authorized. Other providers are governed by their own current ADR/provider allowlists.
 
 ## Output
 
