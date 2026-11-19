@@ -843,3 +843,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
   - PR #65: this tracker remains open/draft/unmerged; current previous head was `80d3ffb8046fe81ff099e229cfc1d353c25df1b6` before this addendum.
 - Runtime verification is still pending for the new reviewer commit and both new PR heads. The old Q0.8 review artifact and old 51/51 offline test evidence are bound to SHA `0dd17609305d1e738d4c4c2f65129ccf30f39d7f` and must not be reused as proof for the new PR #60 head.
 - PR #60 remains unaccepted because the protected `research.pipeline.py -> research.engine -> validator.py` dependency boundary is unresolved and unauthorized, regardless of the improved reviewer context. Do not test or access that chain. No PRs were merged and no workflow dispatch performed.
+
+
+### PR #66 isolated test correction (2026-11-19)
+
+- Static inspection of PR #66 (`security/q08-unprotected-live-check-tests-2026-11-18`) found its original test both asserted that Tokocrypto's `time_url()` passed URL validation and expected a Tokocrypto-only `live_providers` list not present in its `main` base. The latter meant the test could fail on its own target branch; the former conflicted with the currently approved candle-only `/api/v3/klines` route.
+- Updated only `tests/test_live_check.py` on PR #66:
+  - Commit `269fc112d13d6a0ed92195156ff22d55263e927b`
+  - Blob `cf0fdc200865d4f9692aa8b9f1666b2547db77ff`
+  - Tests now cover local Tokocrypto adapter construction (no network), unknown-provider rejection, and read-only default configuration while checking inclusion (not exclusivity) of Tokocrypto on the existing `main` baseline.
+  - Removed every `time_url()` or endpoint-authorization assertion from this default-branch isolation PR; endpoint security assertions remain within Q0 transport tests.
+- Re-fetched exact PR #66 head and file. The visible test imports only standard-library modules and `providers`; `providers` imports `fetcher`, so the visible closure stays outside protected modules. No test was run. PR #66 remains open/draft/unmerged.
