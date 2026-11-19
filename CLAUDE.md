@@ -24,6 +24,8 @@ The following restrictions are mandatory:
 
 If protected content appears in output accidentally, stop. Do not quote, summarize, copy, or continue processing it.
 
+Project `Read`/`Edit` permission denials are defense-in-depth, not an OS sandbox. They do not constrain arbitrary subprocesses or every indirect file access. Never treat them as authorization to run scripts or tests whose execution/import closure may reach protected content; use only a verified OS-enforced boundary or keep the work static and read-only.
+
 ## Trading and exchange safety boundaries
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
