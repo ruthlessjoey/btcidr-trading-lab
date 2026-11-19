@@ -844,10 +844,10 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
-    assert extract_verdict("VERDICT: PASS\\n\\nReview body") == "PASS"
-    assert extract_verdict("  VERDICT: PASS WITH FINDINGS  \\nReview body") == "PASS WITH FINDINGS"
-    assert extract_verdict("Review starts first\\nVERDICT: PASS") is None
-    assert extract_verdict("VERDICT: PASS\\nVERDICT: BLOCKED") is None
+    assert extract_verdict("VERDICT: PASS\n\nReview body") == "PASS"
+    assert extract_verdict("  VERDICT: PASS WITH FINDINGS  \nReview body") == "PASS WITH FINDINGS"
+    assert extract_verdict("Review starts first\nVERDICT: PASS") is None
+    assert extract_verdict("VERDICT: PASS\nVERDICT: BLOCKED") is None
     assert extract_verdict("Review has no verdict") is None
     require_no_refusal(None)
     require_no_refusal("")
