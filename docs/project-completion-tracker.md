@@ -962,3 +962,45 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - No workaround was applied. Using local system time, deriving time from a response header, or changing the application boundary would alter the time/freshness architecture and requires a separately reviewed acceptance decision. The approved candle endpoint itself remains the only Tokocrypto network scope; no server-time endpoint or other host was called.
 - Exact current offline tests and Q0.8 specialist review remain pending. The safe offline workflow can test the unprotected transport/sanitization/history subset, but cannot establish end-to-end run.py behavior while the protected imports and server-time dependency remain.
 - Required owner decision before end-to-end Q0 integration can be accepted: authorize a precise safe review/refactor scope that preserves protected modules, or approve a documented candle-freshness design that does not call an unapproved endpoint. Do not test or modify validator.py/report.py without separate explicit authorization.
+
+
+### Q0.8 review disposition and import-boundary remediation (2026-11-19)
+
+#### Run 44470636642 — review completed, acceptance BLOCKED
+
+- Workflow URL: https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44470636642
+- GitHub job conclusion: `success`, but this was a false-positive process result, not review acceptance. Job logs show it checked out reviewer source commit `c0ed377c82d4f0586dceb20eeaffd3725b568101`, which did not contain the all-role acceptance gate. The checkpoint itself is authoritative for the review outcome:
+  - ZIP SHA-256: `e41db1d59a3a59bdab559905af847f5223596b0e67262563b5ec6ecf909325b6`
+  - JSON SHA-256: `a4db7155855591afc38afb9345291790fefb1ab66774063667c6373540135c30`
+  - Repository/base/head: `ruthlessjoey/btcidr-trading-lab` / `cd451972e3a641ad6fa78e64abf3968655a4b82a` / `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`.
+  - 16 specialist reports completed. Architecture = INCONCLUSIVE (finish_reason=length); implementation-engineer, strategy-validation, systematic-debugging = BLOCKED. Commander, independent acceptance, and final verification = BLOCKED.
+- Therefore Q0.8 review is **NOT ACCEPTED**. The earlier 51/51 offline result and this review are both tied to the older head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`.
+
+#### Reviewer workflow correction
+
+- Updated the same immutable reviewer workflow on PR #60 and PR #64:
+  - PR #60 commit `4a3f9cebe36280d75b6b4cc4402147a6ff1e8e3e`; PR #64 commit `c9adf486dea64c70a5c5a534d59545bae4f222fb`.
+  - Shared workflow blob: `4089b8524099cb0266c6ab06a7174b9229888465`.
+  - Pin now targets corrected self-contained reviewer commit `1def3be27a6870fd356119d4794b4ac887b1623d`, blob `8a88bd857fba9a65dec6e06e6a9824e16adfb10a`, which rejects every model finish reason except exact `stop` and fails the job unless all 16 specialist roles plus Commander, independent acceptance, and verification return PASS or PASS WITH FINDINGS.
+  - Checkpoint restore and persistence now use a dedicated directory under `runner.temp`, not the repository workspace. Runner validates exact repository/base/head/model identity, strict schema, progress ordering, report size, secret-screen patterns, and explicit verdicts before reuse.
+- Workflow edits have not yet been run in GitHub Actions. PR #60 latest head at this tracker update: `2902581071025bb0cf4cedb11d1cc16a6e01d588`; PR #64 latest head: `c9adf486dea64c70a5c5a534d59545bae4f222fb`.
+
+#### Current-head offline import-closure hardening
+
+- On PR #60, disabled the dormant Coinbase/Bitstamp cross-check acquisition path:
+  - `research/crosscheck.py` commit `8dc2ab2e838584c4895a763a9d9894d989ce6fc7`, final blob `948004fda318c4958f4d17eb69783d11feaa0506`.
+  - Removed Coinbase/Bitstamp fetch functions and URLs, the mutable `AUTHORIZED_CROSSCHECK_PROVIDERS` gate, and provider transport imports. `run_crosscheck()` now unconditionally raises a fixed safe authorization error before filesystem or network activity. Pure comparison/report helpers remain.
+  - `tests/test_sanitization.py` commit `4deafcb031dc958e2a108c378c044d487edd2e64`, blob `2559b11288011bf31996ef436d4516de59af4a8b`, replaces the prior monkeypatch-enabled cross-check test with a regression proving that injecting the legacy authorization attribute cannot enable network or artifact writes.
+- Added a static AST import-closure assertion to `tests/test_history.py`:
+  - Commit `2902581071025bb0cf4cedb11d1cc16a6e01d588`; blob `615ee8041fab1b7d63537d3827ab2fcc4e9d6684`.
+  - The test checks the exact local import edges for all six modules selected by `q08-offline-tests.yml` and `research-data.yml`, plus their unprotected transitive dependencies and the `fetch_history.py` entrypoint. It parses source only, rejects dynamic imports, and rejects edges into `validator`, `report`, `markets`, `research.engine`, and `research.pipeline`.
+  - Static source inspection of the exact current files shows the intended closure: `test_fetcher -> fetcher`; `test_live_check -> providers -> fetcher`; `test_history` and `test_pipeline` use only standard-library/static source inspection; `test_probe -> probe`; `test_sanitization -> fetcher/providers/research.crosscheck -> fetcher`; `fetch_history.py -> research.history` (standard library only).
+- These changes have **not yet been executed under Python 3.11**. No test pass is claimed for PR #60's current head. Workflow dispatch is not available through the connected GitHub tools; a fresh offline run and fresh specialist review must be started manually on the latest PR #60 SHA, with no checkpoint reused from the older head.
+
+#### Remaining Q0.8 acceptance blockers
+
+- Obtain separate owner authorization for any review that would access protected modules or Workstream B artifacts; none were opened, imported, or executed.
+- Run the exact six-module offline workflow on current PR #60 head.
+- Run PR #64 synthetic mode against the pinned reviewer and inspect its runtime result.
+- Run a fresh 19-stage review on the exact same current PR #60 head. Do not reuse run `44470636642` because its head differs and its workflow used the older reviewer source.
+- Overall project completion remains UNRATED; no project-wide 100% claim is supported.
