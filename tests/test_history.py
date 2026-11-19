@@ -110,7 +110,7 @@ class HistoryContainmentTests(unittest.TestCase):
             source = f.read()
         self.assertIn('"name": "market_identity", "status": "FAIL"', source)
         self.assertIn('"network_requests": 0', source)
-        self.assertIn('"backtest_allowed": False', source)
+        self.assertIn('backtest_allowed = gate == "PASS" and dataset is not None', source)
         self.assertIn("route is undocumented", source)
         self.assertIn("Configuration alone is insufficient", source)
 
