@@ -1104,3 +1104,8 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #76 head/commit: `bb31ede4886e24231f9428fbbda0291984d19ab8`; test blob `7d63089c11ca5c7331f76f55e2e49ec91cdf052b`. Publisher source remains blob `b2c27931b5b4a86b84cd9dc0892d2c8032a6c0b5`. Exactly two paths remain changed in PR #76.
 - Test suite now contains 22 cases. The prior 19/19 local result belongs to the earlier 19-test version at head `5970d6d7b6bd99b83cb5dfb0eb502013b2f69678`; it does not verify the three new tests. No test has yet been run on the current 22-test head; Python 3.11 CI is still pending.
 - Import closure remains limited to `research.holdout_publish.py` and Python standard library. No protected module is imported or executed.
+### PR #69 Ruff installer local syntax and synthetic safety checks (2026-11-19)
+
+- The exact Ruff installer block authored in PR #69 was copied into an isolated local shell fixture and passed `bash -n`; its embedded Python extractor passed `compile()`.
+- Synthetic tar tests accepted a bounded regular `ruff` member and rejected parent traversal, symlink, duplicate basename, and over-limit binary entries. The test exercised the same fixed-destination extraction algorithm; it did not download or execute the Ruff binary.
+- PR #69 Actions workflow itself has not run; full CI and Ruff lint results remain UNVERIFIED.
