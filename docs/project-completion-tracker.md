@@ -804,3 +804,24 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #60 remains open/draft/unmerged. Keep all research/backtest/live/probe/cross-check execution blocked where its import closure or approval is unresolved. Do not treat the successful Actions conclusion as a Q0.8 acceptance pass.
 - The existing exact-head offline run `44373013889` remains the recorded 51/51 result on Python 3.11 for this PR #60 head; the specialist-review run did not execute those project tests.
 - No repository code, workflow, protected module, exchange endpoint, credential, account, order, or trading function was accessed/executed/changed during this review recheck. No PR was merged. Overall project completion remains **UNRATED** pending owner-approved scope/weights and complete evidence.
+
+
+### Q0.8 reviewer diff and acceptance-gate correction (2026-11-19)
+
+- A post-run audit found that the immutable reviewer defined `MAX_DIFF = 160_000` and a synthetic test for `enforce_diff_limit()`, but the production `review()` path did not call that helper. Run `44470636642` logged `diff_chars=176188`, proving the intended diff ceiling was bypassed (the separate 256,000-byte serialized-request limit still applied).
+- A second correctness issue: the runner returned exit code 0 after completing all prompts regardless of verdicts. Thus run `44470636642` was green even though Commander, independent acceptance, and final verification all returned `BLOCKED`.
+- Corrected the runner on PR #64 branch `security/q08-reviewer-pin-correction-2026-11-18`:
+  - New immutable runner commit: `33df164138afc7d6037097357e073cec97ddda34`
+  - Runner blob: `700cdb856f424f2973060c1fb6c9f229a9e75fec`
+  - The diff ceiling is now 192,000 characters, which admits the measured 176,188-character PR #60 diff while retaining a hard bound; the serialized request remains capped at 256,000 bytes.
+  - The actual review path now calls `enforce_diff_limit(review_diff)` before any model request.
+  - Added `review_verdict_failures()` and synthetic cases for accepted verdicts, blocked/inconclusive roles, and missing specialist roles.
+  - After the full review summary is written, any missing role or verdict other than `PASS` / `PASS WITH FINDINGS` causes a nonzero exit. The workflow's `if: always()` artifact step still preserves the checkpoint for diagnosis/resume.
+- Updated both workflow copies to pin that exact immutable runner commit and to restore checkpoints only in `review` mode:
+  - PR #64 head: `71ef3b721d095cefd5561d24d86f5ab30561fff9`
+  - PR #60 head: `a72c5287b5df64bfb1fb9385e0e1423f89ea8722`
+  - Both workflow blobs are byte-identical: `a24836a478d5c6cfc06e93def5eac943e59b3be5`.
+- Re-fetched both PRs and their changed-file lists: PR #60 remains exactly 26 changed paths; PR #64 remains exactly two changed paths. Both remain open/draft/unmerged. Re-fetched the new runner blob and statically verified the cap, production call site, acceptance gate, and synthetic test cases.
+- **Runtime verification pending:** no Python 3.11 `py_compile` or synthetic workflow has yet run against commit `33df164...`; no Actions dispatch was available through the connected GitHub tools. The owner must manually run `Q0.8 immutable 19-role specialist review` in `synthetic` mode on PR #64 branch first. This mode does not call the LLM. Then run the approved offline tests against the new PR #60 head and, after synthetic succeeds, run the specialist review against exact head `a72c5287b5df64bfb1fb9385e0e1423f89ea8722` with `resume_from_run_id` blank. The old artifacts from runs `44386019954` and `44470636642` are bound to the previous head and must not be resumed against the new SHA.
+- The earlier 51/51 Q0.8 offline result is tied to old head `0dd17609305d1e738d4c4c2f65129ccf30f39d7f`; it is not promoted to a pass for the new head until the offline workflow is rerun.
+- No protected file/path was opened or changed; no repository module was imported/executed; no exchange, account, credential, or trading operation occurred. PRs were not merged.
