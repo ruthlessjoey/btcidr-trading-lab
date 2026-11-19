@@ -614,6 +614,15 @@ def model_config():
         raise RuntimeError("Configured model settings do not match Robin's approved OpenRouter endpoint/model")
     return key, EXPECTED_BASE_URL + "/chat/completions", EXPECTED_MODEL
 
+def require_complete_finish_reason(finish_reason) -> None:
+    """Reject truncated, filtered, or otherwise non-final model completions."""
+    if finish_reason != "stop":
+        label = (finish_reason if isinstance(finish_reason, str) and
+                 re.fullmatch(r"[a-z_]{1,32}", finish_reason) else "other")
+        raise RuntimeError(
+            "OpenRouter completion was not final (finish_reason=" + label + ")")
+
+
 def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, label: str) -> str:
     body = json.dumps({
         "model":model, "temperature":0.1, "max_tokens":5000, "reasoning":{"effort":"none"},
@@ -724,6 +733,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
               " first_choice_type=" + type(choice).__name__, flush=True)
         raise RuntimeError("OpenRouter completion choice had an unexpected structure")
     finish_reason = choice.get("finish_reason")
+    require_complete_finish_reason(finish_reason)
     finish_label = (finish_reason if isinstance(finish_reason, str) and
                     re.fullmatch(r"[a-z_]{1,32}", finish_reason) else "other")
     message = choice.get("message")
@@ -813,6 +823,15 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
+    require_complete_finish_reason("stop")
+    for incomplete_reason in ("length", "content_filter", "tool_calls", None, ""):
+        try:
+            require_complete_finish_reason(incomplete_reason)
+        except RuntimeError as exc:
+            assert "was not final" in str(exc)
+        else:
+            raise AssertionError(
+                "non-final model completion was accepted: " + str(incomplete_reason))
     accepted_reports = {name:"VERDICT: PASS" for name in SPECIALISTS}
     assert review_verdict_failures(
         accepted_reports, "VERDICT: PASS WITH FINDINGS",
