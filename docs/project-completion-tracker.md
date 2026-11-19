@@ -1071,3 +1071,16 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 - PR #70 is an earlier overlapping protected-path settings/documentation change; PR #71 carries the more complete current scope and nested-copy patterns. Neither PR has been merged.
 - Overall project completion remains UNRATED. These are implementation/static-review results, not project-wide acceptance or 100% completion.
+
+### Q0.8 final pin, PR #66, and PR #74 reconciliation (2026-11-19)
+
+- Latest re-fetch after concurrent changes:
+  - PR #60 head `d89f4c007f034d0639c55db1c3e6da1d9a18e5d4`, base `cd451972e3a641ad6fa78e64abf3968655a4b82a`, open/draft/unmerged, exactly 26 changed paths at last changed-file inspection.
+  - PR #64 head `51a89922c1f5e0f2aad62aa24af4ed527b432774`, base `9bf95e28171447faa910ecd5185b59a349555a52`, open/draft/unmerged.
+  - PR #66 head `269fc112d13d6a0ed92195156ff22d55263e927b`, open/draft/unmerged.
+  - PR #74 head `6a8997d4881c85b9ebdf73ec60be54a765362d91`, open/draft/unmerged.
+- PR #60 and #64 Q0.8 workflow files are byte-identical (blob `ef58dc8dcf99e90cc336a09c7c9ccd6615e150d1`) and pin immutable reviewer commit `c9adf486dea64c70a5c5a534d59545bae4f222fb`, runner blob `bf4979a52034b47fdaa7cd06f181dfdad2dc0284`. The pinned source rejects any model `finish_reason` other than exact `stop`, rejects refusal metadata, accepts only one explicit verdict on the first non-empty line, enforces diff/request size bounds, validates checkpoint identity, and returns nonzero when any required specialist or synthesis role is missing/BLOCKED/INCONCLUSIVE.
+- PR #66's corrected isolated test blob remains `cf0fdc200865d4f9692aa8b9f1666b2547db77ff`; no test has yet been run against this PR head.
+- PR #74's bounded Actionlint installer is at commit `6a8997d4881c85b9ebdf73ec60be54a765362d91`, blob `4886f77be36e969677e063041ccc23e3d11292b6`; exact 16 MiB archive/32 MiB executable ceilings and fixed-destination extraction are statically and locally synthetic-tested. Full workflow execution remains pending.
+- These changes remain draft pull requests. No PR was merged, no workflow dispatched, no protected file inspected or executed, and no live exchange or account operation performed.
+- Required manual Q0.8 verification must use the current PR #60 head `d89f4c007f034d0639c55db1c3e6da1d9a18e5d4`: first PR #64 synthetic mode, then PR #60's six-module offline tests, then PR #60 specialist review with blank resume ID. Never reuse previous run artifacts bound to older PR #60 heads.
