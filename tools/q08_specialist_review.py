@@ -488,6 +488,27 @@ EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 MAX_CHECKPOINT = 2_000_000
 VERDICT_RE = re.compile(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$")
 
+def extract_verdict(report) -> str | None:
+    """Accept exactly one verdict on the first non-empty response line."""
+    if not isinstance(report, str):
+        return None
+    lines = [line.strip() for line in report.splitlines() if line.strip()]
+    if not lines:
+        return None
+    first = VERDICT_RE.fullmatch(lines[0])
+    matches = [VERDICT_RE.fullmatch(line) for line in lines]
+    matches = [match for match in matches if match is not None]
+    if first is None or len(matches) != 1:
+        return None
+    return first.group(1)
+
+
+def require_no_refusal(refusal) -> None:
+    """Refusal metadata must never be interpreted as an accepted review."""
+    if refusal:
+        raise RuntimeError("OpenRouter returned a refusal response")
+
+
 def review_verdict_failures(reports: dict, commander, acceptance, verification) -> list[str]:
     """Return every missing/non-accepting role so BLOCKED reviews cannot exit green."""
     failures = []
@@ -502,8 +523,7 @@ def review_verdict_failures(reports: dict, commander, acceptance, verification) 
     required.extend(((COMMANDER, commander), (ACCEPTANCE, acceptance),
                      (VERIFICATION, verification)))
     for name, report in required:
-        match = VERDICT_RE.search(report) if isinstance(report, str) else None
-        verdict = match.group(1) if match else "MISSING"
+        verdict = extract_verdict(report) or "MISSING"
         if verdict not in ("PASS", "PASS WITH FINDINGS"):
             failures.append(name + "=" + verdict)
     return failures
@@ -523,8 +543,8 @@ def _validate_checkpoint_report(value: str, label: str) -> None:
         raise RuntimeError("Checkpoint report is missing or exceeds the output limit: " + label)
     if contains_secret(value):
         raise RuntimeError("Checkpoint secret-screen pattern detected: " + label)
-    if not VERDICT_RE.search(value):
-        raise RuntimeError("Checkpoint report has no explicit verdict: " + label)
+    if extract_verdict(value) is None:
+        raise RuntimeError("Checkpoint report has no single first-line verdict: " + label)
 
 
 def _validate_checkpoint_progress(reports: dict, commander,
@@ -746,6 +766,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
     content_type = type(content).__name__
     content_length = len(content) if isinstance(content, str) else -1
     refusal_present = bool(message.get("refusal"))
+    require_no_refusal(message.get("refusal"))
     usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
     completion_tokens = usage.get("completion_tokens")
     completion_details = usage.get("completion_tokens_details")
@@ -775,7 +796,7 @@ def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, l
         raise RuntimeError("Model output exceeded " + str(MAX_OUTPUT) +
                            " characters (received " + str(len(text)) +
                            "; finish_reason=" + finish_label + ")")
-    if not re.search(r"(?im)^\s*VERDICT:\s*(PASS WITH FINDINGS|PASS|BLOCKED|INCONCLUSIVE)\s*$", text):
+    if extract_verdict(text) is None:
         print("MODEL_VERDICT_MISSING role=" + label +
               " classification=INCONCLUSIVE not_pass=true", flush=True)
         text = ("VERDICT: INCONCLUSIVE\n\n"
@@ -823,6 +844,20 @@ def synthetic():
     assert re.search(verdict_pattern, "VERDICT: BLOCKED")
     assert re.search(verdict_pattern, "VERDICT: INCONCLUSIVE")
     assert not re.search(verdict_pattern, "This review is a PASS")
+    assert extract_verdict("VERDICT: PASS\\n\\nReview body") == "PASS"
+    assert extract_verdict("  VERDICT: PASS WITH FINDINGS  \\nReview body") == "PASS WITH FINDINGS"
+    assert extract_verdict("Review starts first\\nVERDICT: PASS") is None
+    assert extract_verdict("VERDICT: PASS\\nVERDICT: BLOCKED") is None
+    assert extract_verdict("Review has no verdict") is None
+    require_no_refusal(None)
+    require_no_refusal("")
+    for refusal_value in ("refused", True, {"reason":"policy"}):
+        try:
+            require_no_refusal(refusal_value)
+        except RuntimeError as exc:
+            assert "refusal response" in str(exc)
+        else:
+            raise AssertionError("refusal metadata was accepted")
     require_complete_finish_reason("stop")
     for incomplete_reason in ("length", "content_filter", "tool_calls", None, ""):
         try:
