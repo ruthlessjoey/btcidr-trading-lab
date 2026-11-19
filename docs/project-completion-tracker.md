@@ -900,7 +900,7 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Updated both workflow copies to pin runner commit 1def3be27a6870fd356119d4794b4ac887b1623d; workflow blob is identical on both branches: 97e11a4d5efaad20948ab56a2218d60c8884213d.
   - PR #60 latest head: 6f9ab508710272f99c34508a565c214f6adbc9ee.
   - PR #64 latest head: 4af6478a29110115d94e46d755035bb451c5d62f.
-  - Both remain open/draft/unmerged. The latest PR #64 CodeQL analyses were still in progress at the last status check; its automatic review status was skipped. PR #60 also has only an automatic skipped review status at this new head.
+  - Both remain open/draft/unmerged. PR #64's latest CodeQL, Python analysis, and Actions analysis checks have now completed successfully; its automatic review status was skipped, and no synthetic/runtime test has run. PR #60 has only an automatic skipped review status at its new head.
 - **Runtime remains unverified:** no local Python 3.11 runtime was available through the connected GitHub tools and no workflow dispatch action is exposed. The required next checks are PR #64 synthetic mode against the pinned runner, followed by PR #60's six-module offline workflow on exact head 6f9ab508710272f99c34508a565c214f6adbc9ee, then a fresh full review on that same SHA with resume_from_run_id blank. Do not reuse artifacts or test results from previous PR #60 heads.
 - No protected file/path was opened or changed; no repository code was executed; no model API, exchange endpoint, account, credential, or trading operation was used. No PR was merged.
 
