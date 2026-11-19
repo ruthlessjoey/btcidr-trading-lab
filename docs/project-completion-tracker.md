@@ -1,7 +1,7 @@
 # AI Trading & Automation Laboratory — project-wide completion tracker
 
 **Status:** Provisional scope register; not yet a valid percentage score  
-**Last checked:** 2026-11-18  
+**Last checked:** 2026-11-19  
 
 > **Snapshot rule:** Sections dated later in this document are authoritative for current PR heads, merge state, workflow pins, and verification status. Earlier PR descriptions and status tables preserve historical snapshots; when they conflict with a later reconciliation addendum, the later addendum supersedes them.
 **Repository:** `ruthlessjoey/btcidr-trading-lab`
