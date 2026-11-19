@@ -4,7 +4,6 @@ This module imports only fetcher, providers, and research.crosscheck. It does no
 import live_check, validator, report, dataset, or any protected module.
 """
 import io
-import json
 import os
 import tempfile
 import unittest
@@ -175,29 +174,7 @@ class ProviderSanitizationTests(unittest.TestCase):
 
 
 class CrosscheckSanitizationTests(unittest.TestCase):
-    def test_crosscheck_parser_errors_are_fixed_and_safe(self):
-        class FakeHttp:
-            def __init__(self, response):
-                self.response = response
-
-            def get(self, url):
-                return self.response
-
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            crosscheck.fetch_coinbase_daily(
-                FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]), 1_700_000_000, 1_700_086_400)
-        self.assertEqual(str(ctx.exception), "Coinbase daily-candle row has an unexpected format")
-
-        malformed = {"data": {"ohlc": [{
-            "timestamp": MARKER, "open": "1", "high": "2",
-            "low": "1", "close": "1", "volume": "1"
-        }]}}
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            crosscheck.fetch_bitstamp_window(FakeHttp(malformed), 1_700_000_000, 1)
-        self.assertEqual(str(ctx.exception), "Bitstamp candle response has an unexpected format")
-        self.assertNotIn(MARKER, str(ctx.exception))
-
-    def test_crosscheck_run_refuses_before_filesystem_or_network_when_unapproved(self):
+    def test_crosscheck_cannot_be_enabled_by_mutating_legacy_authorization_state(self):
         calls = []
 
         def forbidden_opener(url, timeout):
@@ -206,44 +183,20 @@ class CrosscheckSanitizationTests(unittest.TestCase):
 
         candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
-        with tempfile.TemporaryDirectory() as out:
-            with self.assertRaisesRegex(
-                    fetcher.ApiError, "required independent cross-check providers are not authorized"):
-                crosscheck.run_crosscheck(
-                    manifest, [candle], [], out, opener=forbidden_opener,
-                    sleep=NO_SLEEP, timeout=1, retries=1)
-            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
-            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
-
-        self.assertEqual(calls, [])
-
-    def test_crosscheck_artifact_records_exact_sources_that_returned_data(self):
-        candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
-        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
-        original_authorized = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
-        original_fetch = crosscheck.fetch_coinbase_daily
-
-        def synthetic_coinbase(http, first_ts, last_ts):
-            return {candle.time: candle}
-
-        def forbidden_opener(url, timeout):
-            raise AssertionError("synthetic cross-check must not access the network")
-
-        crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase"})
-        crosscheck.fetch_coinbase_daily = synthetic_coinbase
+        crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
         try:
             with tempfile.TemporaryDirectory() as out:
-                result = crosscheck.run_crosscheck(
-                    manifest, [candle], [], out, opener=forbidden_opener,
-                    sleep=NO_SLEEP, timeout=1, retries=1)
-                with open(os.path.join(out, "crosscheck.json"), encoding="utf-8") as f:
-                    artifact = json.load(f)
+                with self.assertRaisesRegex(
+                        fetcher.ApiError, "independent cross-check providers are not authorized"):
+                    crosscheck.run_crosscheck(
+                        manifest, [candle], [], out, opener=forbidden_opener,
+                        sleep=NO_SLEEP, timeout=1, retries=1)
+                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
+                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
         finally:
-            crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = original_authorized
-            crosscheck.fetch_coinbase_daily = original_fetch
+            del crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
 
-        self.assertEqual(result["providers"], ["coinbase"])
-        self.assertEqual(artifact["providers"], ["coinbase"])
+        self.assertEqual(calls, [])
 
     def test_zero_reference_prices_do_not_crash_comparison(self):
         zero = fetcher.Candle(1_700_000_000, 0.0, 0.0, 0.0, 0.0, 0.0)
