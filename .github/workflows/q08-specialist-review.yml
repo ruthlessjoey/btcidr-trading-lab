@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: 2e91008e48bd8512a10d5ec8780ed14956ba4572
+          ref: 3f3b0bbefa53ccdfbdfbc5634af7118882a44841
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -64,7 +64,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: q08-review-checkpoint-${{ inputs.resume_from_run_id }}
-          path: ${{ runner.temp }}/q08-review-checkpoint-restore
+          path: ${{ runner.temp }}
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.resume_from_run_id }}
@@ -88,7 +88,7 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint-restore/q08-review-checkpoint.json
+          Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
           Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
@@ -97,6 +97,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: q08-review-checkpoint-${{ github.run_id }}
-          path: ${{ runner.temp }}/q08-review-checkpoint-restore/q08-review-checkpoint.json
+          path: ${{ runner.temp }}/q08-review-checkpoint.json
           if-no-files-found: ignore
           retention-days: 7
