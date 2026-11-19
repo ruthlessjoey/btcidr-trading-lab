@@ -15,9 +15,9 @@ These instructions apply across the repository, including shared tooling used by
 The following restrictions are mandatory:
 
 1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`.
-2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path.
+2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path, including copies nested elsewhere in the repository.
 3. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `markets/risk/`.
-4. Never read, write, edit, execute, import, or otherwise process the root-level `validator.py` or `report.py`.
+4. Never read, write, edit, execute, import, or otherwise process any file named `validator.py` or `report.py`, including copies nested elsewhere in the repository.
 5. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the owner gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
 6. Before any repository-wide search, recursive listing, archive, test discovery, or broad checkout, explicitly exclude every protected path and file above. If a tool cannot guarantee exclusion, do not run it.
 7. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
