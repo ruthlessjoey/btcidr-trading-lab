@@ -1075,11 +1075,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 ### Q0.8 final pin, checkpoint-source validation, PR #66, and PR #74 reconciliation (2026-11-19)
 
 - Latest re-fetch after concurrent changes:
-  - PR #60 head `84b9d6ba0af8d9ed18d2658e2a724d889df00d9d`, base `cd451972e3a641ad6fa78e64abf3968655a4b82a`, open/draft/unmerged, exactly 26 changed paths.
-  - PR #64 head `1fc7c3047201a0276d7ea5c7182b1d413a7303ff`, base `9bf95e28171447faa910ecd5185b59a349555a52`, open/draft/unmerged.
+  - PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`, base `cd451972e3a641ad6fa78e64abf3968655a4b82a`, open/draft/unmerged, exactly 26 changed paths.
+  - PR #64 head `795fa89e7041363715db42963709d7c856b2c78e`, base `9bf95e28171447faa910ecd5185b59a349555a52`, open/draft/unmerged.
   - PR #66 head `269fc112d13d6a0ed92195156ff22d55263e927b`, open/draft/unmerged.
   - PR #74 head `6a8997d4881c85b9ebdf73ec60be54a765362d91`, open/draft/unmerged.
-- PR #60 and #64 Q0.8 workflow files are byte-identical (blob `5252a57ef24285c57a6fed69b1c64263389b39cc`) and pin immutable reviewer commit `75685c7aa75633bd090a7a63ab14b687432b7d31`, runner blob `0aef46357709ad81d256bfd5712c73da24cecbce`.
+- PR #60 and #64 Q0.8 workflow files are byte-identical (blob `178b041e1a1e4e37c552b301f8eea2dc0e700d0a`) and pin immutable reviewer commit `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`, runner blob `92fc820128bba8cf8fa9e7d3de51838fe2672a1c`.
 - The pinned runner rejects every model finish reason except exact `stop`, rejects refusal metadata, requires a single explicit verdict on the first non-empty line, enforces diff/request/response bounds, and fails the job unless all 16 specialist roles plus Commander, independent acceptance, and verification return PASS or PASS WITH FINDINGS.
 - Checkpoint resume is now bound to its source run before checkpoint JSON is trusted. `Q08_RESUME_FROM_RUN_ID` is passed to the runner, which uses read-only GitHub Actions metadata and requires: the exact repository; workflow ID `421573712`; workflow path `.github/workflows/q08-specialist-review.yml`; `workflow_dispatch`; completed run status; exact review head SHA; and the approved PR #60 branch. Failure conclusion is allowed because a quota-blocked run may still hold a valid partial checkpoint. The source run must not be the current run.
 - Checkpointed specialist reports are explicitly treated as untrusted evidence, never instructions; Commander, acceptance, and verification are told to independently validate claims.
@@ -1088,7 +1088,7 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #66 corrected isolated test blob remains `cf0fdc200865d4f9692aa8b9f1666b2547db77ff`; no test has yet been run against its current head.
 - PR #74 bounded Actionlint installer remains at commit `6a8997d4881c85b9ebdf73ec60be54a765362d91`, blob `4886f77be36e969677e063041ccc23e3d11292b6`; exact 16 MiB archive/32 MiB executable ceilings and fixed-destination extraction were statically and locally synthetic-tested. Full workflow execution remains pending.
 - These changes remain draft pull requests. No PR was merged, no workflow dispatched, no protected file inspected or executed, and no live exchange or account operation performed.
-- Required manual Q0.8 verification must use current PR #60 head `84b9d6ba0af8d9ed18d2658e2a724d889df00d9d`: first run PR #64 synthetic mode; then PR #60's six-module offline tests; then PR #60 specialist review with blank resume ID. If that fresh review later stops on quota after uploading its checkpoint, a subsequent review may use that new run ID only if it is for the same exact PR #60 head and branch; the runner now verifies source-run metadata before reuse. Never reuse run `44470636642` or any artifact tied to an older PR #60 head.
+- Required manual Q0.8 verification must use current PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`: first run PR #64 synthetic mode; then PR #60's six-module offline tests; then PR #60 specialist review with blank resume ID. If that fresh review later stops on quota after uploading its checkpoint, a subsequent review may use that new run ID only if it is for the same exact PR #60 head and branch; the runner now verifies source-run metadata before reuse. Never reuse run `44470636642` or any artifact tied to an older PR #60 head.
 
 #### Additional fail-closed workflow regression tests (PR #60 current head)
 
@@ -1145,3 +1145,9 @@ These relationships are based on the current changed-file lists. They do not aut
 - Refined the runner's synthetic cases so they separately verify: blocked specialist invalidates all downstream synthesis; blocked Commander invalidates Commander/acceptance/verification while retaining PASS specialists; blocked acceptance retains accepted specialists and Commander but retries acceptance/verification; inconclusive verification retains accepted upstream stages and retries only verification.
 - Final reviewer commit is `75685c7aa75633bd090a7a63ab14b687432b7d31`, runner blob `0aef46357709ad81d256bfd5712c73da24cecbce`. PR #60 workflow commit `84b9d6ba0af8d9ed18d2658e2a724d889df00d9d`; PR #64 workflow commit `1fc7c3047201a0276d7ea5c7182b1d413a7303ff`; shared workflow blob `5252a57ef24285c57a6fed69b1c64263389b39cc`.
 - Separate local checks of the stage-filter logic passed all four dependency scenarios. Full Python 3.11 runner compilation and synthetic workflow execution remain pending.
+#### Final checkpoint path confinement (2026-11-19)
+
+- Latest reviewer source commit `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9` (blob `92fc820128bba8cf8fa9e7d3de51838fe2672a1c`) requires `Q08_CHECKPOINT_PATH` to be exactly `RUNNER_TEMP/q08-review-checkpoint.json`; it rejects a symlinked temp root/parent, wrong filename, nested directory, or path outside the job temp directory.
+- Synthetic local path checks accepted the canonical direct-child path and rejected wrong filename, nested/outside paths, and a symlink parent. Full runner synthetic mode remains pending.
+- PR #60 workflow head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`; PR #64 workflow head `795fa89e7041363715db42963709d7c856b2c78e`; both pin the same immutable runner and share workflow blob `178b041e1a1e4e37c552b301f8eea2dc0e700d0a`.
+- Fresh offline tests and specialist review must use PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`; all earlier run/checkpoint SHAs are stale.
