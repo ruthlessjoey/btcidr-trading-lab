@@ -1126,13 +1126,24 @@ def synthetic():
         assert restored["acceptance"] is None
         assert restored["verification"] is None
 
-        save_checkpoint(checkpoint_path, all_reports,
+        all_pass_reports = {name:"VERDICT: PASS" for name in SPECIALISTS}
+        save_checkpoint(checkpoint_path, all_pass_reports,
+                        commander="VERDICT: BLOCKED",
+                        acceptance="VERDICT: BLOCKED",
+                        verification="VERDICT: BLOCKED")
+        restored = load_checkpoint(checkpoint_path)
+        assert restored["reports"] == all_pass_reports
+        assert restored["commander"] is None
+        assert restored["acceptance"] is None
+        assert restored["verification"] is None
+
+        save_checkpoint(checkpoint_path, all_pass_reports,
                         commander="VERDICT: PASS",
                         acceptance="VERDICT: BLOCKED",
                         verification="VERDICT: BLOCKED")
         restored = load_checkpoint(checkpoint_path)
-        assert "architecture-architect" not in restored["reports"]
-        assert restored["commander"] is None
+        assert restored["reports"] == all_pass_reports
+        assert restored["commander"] == "VERDICT: PASS"
         assert restored["acceptance"] is None
         assert restored["verification"] is None
 
