@@ -1075,7 +1075,7 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 ### Q0.8 final pin, checkpoint-source validation, PR #66, and PR #74 reconciliation (2026-11-19)
 
 - Latest re-fetch after concurrent changes:
-  - PR #60 head `949af9fc4e67b9e9dc322590eea8f4ce2ac12b28`, base `cd451972e3a641ad6fa78e64abf3968655a4b82a`, open/draft/unmerged, exactly 26 changed paths.
+  - PR #60 head `921c1dfda465a4a0a94af315c2d249728633ba67`, base `cd451972e3a641ad6fa78e64abf3968655a4b82a`, open/draft/unmerged, exactly 26 changed paths.
   - PR #64 head `f4676f9a5a52260cae50d549883c8b6ca43957c0`, base `9bf95e28171447faa910ecd5185b59a349555a52`, open/draft/unmerged.
   - PR #66 head `269fc112d13d6a0ed92195156ff22d55263e927b`, open/draft/unmerged.
   - PR #74 head `6a8997d4881c85b9ebdf73ec60be54a765362d91`, open/draft/unmerged.
@@ -1088,4 +1088,13 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #66 corrected isolated test blob remains `cf0fdc200865d4f9692aa8b9f1666b2547db77ff`; no test has yet been run against its current head.
 - PR #74 bounded Actionlint installer remains at commit `6a8997d4881c85b9ebdf73ec60be54a765362d91`, blob `4886f77be36e969677e063041ccc23e3d11292b6`; exact 16 MiB archive/32 MiB executable ceilings and fixed-destination extraction were statically and locally synthetic-tested. Full workflow execution remains pending.
 - These changes remain draft pull requests. No PR was merged, no workflow dispatched, no protected file inspected or executed, and no live exchange or account operation performed.
-- Required manual Q0.8 verification must use current PR #60 head `949af9fc4e67b9e9dc322590eea8f4ce2ac12b28`: first run PR #64 synthetic mode; then PR #60's six-module offline tests; then PR #60 specialist review with blank resume ID. If that fresh review later stops on quota after uploading its checkpoint, a subsequent review may use that new run ID only if it is for the same exact PR #60 head and branch; the runner now verifies source-run metadata before reuse. Never reuse run `44470636642` or any artifact tied to an older PR #60 head.
+- Required manual Q0.8 verification must use current PR #60 head `921c1dfda465a4a0a94af315c2d249728633ba67`: first run PR #64 synthetic mode; then PR #60's six-module offline tests; then PR #60 specialist review with blank resume ID. If that fresh review later stops on quota after uploading its checkpoint, a subsequent review may use that new run ID only if it is for the same exact PR #60 head and branch; the runner now verifies source-run metadata before reuse. Never reuse run `44470636642` or any artifact tied to an older PR #60 head.
+
+#### Additional fail-closed workflow regression tests (PR #60 current head)
+
+- Added two static tests to `tests/test_pipeline.py` (blob `d9c5543f3af5030e5cbed2df182d4821520531e0`; six test methods total):
+  - Assert `market-data-check.yml` remains disabled without checkout or execution of `live_check.py`, because `live_check.py` imports protected `validator.py` and `report.py`.
+  - Assert `research-data.yml` runs only the approved offline `fetch_history.py` Step 1 gate and the six-module offline tests; it must not execute `run.py` or `live_check.py`.
+- Static inspection reconfirmed `run.py` imports protected `validator.py` and `report.py`, and currently calls the intentionally refused Tokocrypto server-time helper before candle retrieval. No change was made to this path because the protected validation/report modules cannot be inspected or executed under current authorization, and substituting local time without validating those semantics would be unsafe.
+- `fetcher.py` allows only `/api/v3/klines`; `fetch_server_time()` refuses before transport. `market-data-check.yml` performs no checkout or network request and exits with an explicit protected-boundary explanation. `research-data.yml` sparse-checks the approved source/test files and runs only `fetch_history.py` after offline tests.
+- No tests were run against the new PR #60 head. The new static tests are included in the six-module Q0 offline workflow and require a fresh Python 3.11 Actions result.
