@@ -598,6 +598,18 @@ def _validate_checkpoint_progress(reports: dict, commander,
         raise RuntimeError("Checkpoint verification exists without independent acceptance")
 
 
+def validate_checkpoint_path(path: Path, runner_temp: str) -> Path:
+    """Require the checkpoint to be the single fixed file directly under RUNNER_TEMP."""
+    root_path = Path(runner_temp)
+    if not runner_temp or root_path.is_symlink() or not root_path.is_dir():
+        raise RuntimeError("RUNNER_TEMP must be a real directory")
+    if path.name != "q08-review-checkpoint.json" or path.parent.is_symlink():
+        raise RuntimeError("Checkpoint path must be the fixed file directly under RUNNER_TEMP")
+    if path.parent.resolve() != root_path.resolve():
+        raise RuntimeError("Checkpoint path must be the fixed file directly under RUNNER_TEMP")
+    return path
+
+
 def save_checkpoint(path: Path, reports: dict, commander=None,
                     acceptance=None, verification=None) -> None:
     if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
@@ -1069,6 +1081,30 @@ def synthetic():
     assert 28.0 <= retry_delay_seconds(
         {"ratelimit-reset":str(future_epoch)}, 0) <= 30.0
     with tempfile.TemporaryDirectory() as checkpoint_dir:
+        checkpoint_root = Path(checkpoint_dir)
+        fixed_checkpoint = checkpoint_root / "q08-review-checkpoint.json"
+        assert validate_checkpoint_path(fixed_checkpoint, checkpoint_dir) == fixed_checkpoint
+        try:
+            validate_checkpoint_path(checkpoint_root / "other.json", checkpoint_dir)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("noncanonical checkpoint filename was accepted")
+        try:
+            validate_checkpoint_path(checkpoint_root / "nested" / "q08-review-checkpoint.json",
+                                      checkpoint_dir)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("nested checkpoint path was accepted")
+        outside_checkpoint = checkpoint_root.parent / "q08-review-checkpoint.json"
+        try:
+            validate_checkpoint_path(outside_checkpoint, checkpoint_dir)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("checkpoint path outside RUNNER_TEMP was accepted")
+    with tempfile.TemporaryDirectory() as checkpoint_dir:
         checkpoint_path = Path(checkpoint_dir) / "checkpoint.json"
         save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
         restored = load_checkpoint(checkpoint_path)
@@ -1202,7 +1238,8 @@ def review():
               "protected_exclusions":["P1/","signal/data/","any copy of signal/",
                 "markets/risk/","validator.py","report.py","protected Workstream B artifacts",
                 ".github/workflows/batch1-isolated-tests.yml"]}
-    checkpoint_path = Path(os.environ.get("Q08_CHECKPOINT_PATH", "q08-review-checkpoint.json"))
+    checkpoint_path = validate_checkpoint_path(
+        Path(os.environ.get("Q08_CHECKPOINT_PATH", "")), os.environ.get("RUNNER_TEMP", ""))
     checkpoint = load_checkpoint(checkpoint_path)
     reports = checkpoint["reports"]
     commander = checkpoint["commander"]
