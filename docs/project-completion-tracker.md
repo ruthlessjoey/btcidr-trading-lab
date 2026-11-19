@@ -1219,3 +1219,11 @@ These relationships are based on the current changed-file lists. They do not aut
 - Re-fetched both files at PR #76 head `fe3182730f8a4a19327d5fd6bb25693f22416ae2`. Publisher blob remains `b2c27931b5b4a86b84cd9dc0892d2c8032a6c0b5`; current test blob is `4a1a296d8dd45c7ec7778665c6fe11cc499ea7ef`. The test module contains 22 cases and imports only standard-library modules plus `research.holdout_publish`; `research/__init__.py` at this branch is empty. The publisher source itself imports only standard-library modules.
 - No exact-head Python 3.11 Actions test result was located. The prior reconstructed local 22/22 run is preliminary only, not byte-for-byte test execution. PR #76 remains draft/unverified pending exact-source CI.
 - Whole-project completion remains **UNRATED**. No protected path was accessed or executed, no trading activity occurred, and no PR was merged.
+
+
+### PR #78 Q0.8 sparse-checkout fixture correction (2026-11-20)
+
+- Further review of the approved Q0.8 offline workflow showed that `tests/test_pipeline.py` opens two workflow fixture files, `.github/workflows/market-data-check.yml` and `.github/workflows/research-data.yml`, but the workflow's sparse checkout omitted both. The test itself is static/file-based; it does not import `research.pipeline` or protected trading modules. The empty `research/__init__.py` is also now explicitly included for deterministic package resolution.
+- Updated draft stacked PR #78 to head `b0dd81ebd3dd3439839a71684fbc6e52ac1e2c3f`, adding only the two unprotected fixture paths and `research/__init__.py` to `.github/workflows/q08-offline-tests.yml` sparse checkout. The existing two source/test file changes remain. Compare against frozen PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4` confirms 3 commits ahead, 0 behind, exactly three changed files.
+- Re-fetched the exact workflow and fixtures; confirmed the two files contain the markers required by the static tests and the workflow sparse checkout still excludes protected paths. PR #78 description was updated to three-file scope. Python 3.11 workflow has not been dispatched on this head; no test pass is claimed. PR #60 remains unchanged and frozen.
+
