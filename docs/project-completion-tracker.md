@@ -1038,3 +1038,36 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The shared text explicitly protects P1, every signal path (including nested copies), markets/risk, any validator.py/report.py copies, and Workstream B; it states that Read/Edit denials are defense-in-depth and not an OS sandbox; it prohibits protected import/execution closures; it is PAPER-only/LIVE-disabled; and it limits Tokocrypto to unauthenticated HTTPS GET candles at www.tokocrypto.site/api/v3/klines, explicitly excluding server-time, .com, and private endpoints while leaving other providers governed by their own current ADR/allowlists.
 - PR #71 latest head: b33e9c6bb6755473ec6f35e6bc425fdc820805f1. PR #77 latest head: 2b1dd6ce139f6a626128afaaff9bbc8a0ad24445. Both remain open/draft/unmerged; static analysis was still in progress/queued after the matching content update.
 - No protected paths were accessed or tested. No repository runtime, workflow dispatch, exchange request, or trading operation occurred.
+
+### Security tooling and protected-path boundary follow-through (2026-11-19)
+
+#### PR #69 — Ruff artifact handling hardening
+
+- PR #69 current head: `1c277eb0112758b652fc4a3b0578d1b6d53a0476`; remains open/draft/unmerged.
+- Updated `.github/workflows/python-static-quality.yml`:
+  - Workflow commit `6f9b9563b1867e36a574a834b93de0e16dba1d07`, then path-validation hardening commit `1c277eb0112758b652fc4a3b0578d1b6d53a0476`; final workflow blob `b213321b4a99f1da34f8cef18e243d57a81bb8c8`.
+  - 16 MiB maximum archive size, checked both by curl and a post-download `stat` check before SHA-256 verification.
+  - Reads exactly one regular-file member whose basename is `ruff`; rejects absolute, backslash, empty, dot, or parent path components; rejects links, duplicate matches, zero-size, truncated, and over-64-MiB binaries.
+  - Writes only to a fixed temporary destination; no archive-controlled member path is extracted.
+- Official GitHub release metadata for Ruff 0.17.5 confirms the archive is 10,215,036 bytes with SHA-256 `7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90`; release tag commit `c91de8a012cb87efe279b762020a0d28dd75ddb5` is signed/verified.
+- Documentation updated in commit `510b48c45b36595b7a1fde935cb8cfef64bd52e1` and line-break correction `51e43b3d4d8c84776ecee27fd173c121aadb2e58`; final docs blob `28831ac1d9e0b530ff949e5818c8e9c95fde408d`.
+- Ruff was not downloaded or executed; workflow remains manual-only and runtime result UNVERIFIED.
+
+#### PR #71 — nested protected-copy denial
+
+- PR #71 current head: `b33e9c6bb6755473ec6f35e6bc425fdc820805f1`; remains open/draft/unmerged.
+- `.claude/settings.json` blob `f4456d8db81e4d8b7c61e299b2012d2142e8d223` now contains 16 deny rules, including root protections and recursive patterns `Read/Edit(**/signal/**)`, `Read/Edit(**/validator.py)`, and `Read/Edit(**/report.py)`.
+- `CLAUDE.md` includes the explicit nested-copy restrictions and clarifies that permission denials are defense-in-depth, not an OS sandbox; arbitrary subprocesses and indirect file access are not constrained.
+- Static settings JSON parse succeeded. Current official Claude Code permission documentation confirms Read/Edit paths use gitignore-style glob matching, `**` spans directories, deny patterns match nested directories, and Read denials also cover Grep/Glob and recognized shell file reads. It explicitly says these rules do not cover arbitrary subprocesses; OS sandboxing is required for that level of enforcement. Source: https://code.claude.com/docs/en/permissions
+- No Claude Code runtime session was available to verify loaded settings with `/status` or `claude doctor`; enforcement remains UNVERIFIED at runtime.
+
+#### PR #75 — Cloudflare security-audit skill provenance review
+
+- PR #75 current head: `61a15ee8007d8588294dac7e7086b27c598bcb4c`; remains open/draft/unmerged.
+- Provenance pins upstream `cloudflare/security-audit-skill` commit `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8`; GitHub reports the commit as unsigned (`verified: false`). The pin is reproducibility evidence, not signature verification.
+- Compared 19 copied upstream files against raw GitHub content at that exact commit: all 19 matched byte-for-byte. The local `SKILL.md` is exactly the upstream file plus the documented local safety-overlay pointer; the included MIT LICENSE matches upstream.
+- Static inspection of the two Node validator scripts found only built-in `fs`, `path`, and `util` modules; no `child_process`, network client, `eval`, or dynamic code execution use was found.
+- Repository-local `PROJECT-SAFETY.md` correctly limits use to read-only guidance. Full audit mode and validator/test execution remain prohibited until a suitable OS-enforced sandbox and separate authorization are established. No validator or test script was run. Tool presence is not audit evidence.
+
+- PR #70 is an earlier overlapping protected-path settings/documentation change; PR #71 carries the more complete current scope and nested-copy patterns. Neither PR has been merged.
+- Overall project completion remains UNRATED. These are implementation/static-review results, not project-wide acceptance or 100% completion.
