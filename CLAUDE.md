@@ -16,7 +16,7 @@ The following restrictions are mandatory:
 
 1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, import, execute, or otherwise process anything under `P1/`.
 2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, import, execute, or otherwise process anything under `signal/data/`.
-3. Do not access, modify, expose, import, execute, or test `markets/risk/`, `validator.py`, `report.py`, or any copy of `signal/` without separate, explicit authorization identifying the exact scope.
+3. Do not access, modify, expose, import, execute, or test `markets/risk/`, any file named `validator.py` or `report.py` (including copies), or any copy of `signal/` without separate, explicit authorization identifying the exact scope.
 4. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the user gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may still guide separately approved Workstream B work without opening or changing its protected implementation.
 5. Do not run tests, imports, builds, or scripts whose import/execution closure reaches a protected path or Workstream B artifact. Static inspection of unprotected files is allowed only when it does not enumerate or expose protected content.
 6. Before any repository-wide search, recursive listing, archive, or test discovery, explicitly exclude all protected paths. If a tool cannot guarantee exclusion, do not run it.
