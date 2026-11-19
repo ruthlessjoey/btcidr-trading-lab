@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: c9adf486dea64c70a5c5a534d59545bae4f222fb
+          ref: 2e91008e48bd8512a10d5ec8780ed14956ba4572
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -89,6 +89,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint-restore/q08-review-checkpoint.json
+          Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
       - name: Persist resumable review checkpoint
