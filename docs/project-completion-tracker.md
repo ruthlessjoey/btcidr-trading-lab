@@ -1116,3 +1116,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Added synthetic runner cases for one blocked specialist with blocked synthesis, a blocked independent-acceptance stage, and an inconclusive verification stage. Separate local logic checks confirmed accepted stages are retained and blocked/inconclusive stages plus dependent downstream synthesis are retried. Full runner synthetic mode has not yet been run.
 - PR #60 and #64 workflow files now both pin runner commit `22f06d9940440cceefde93e0b4e8f7f08d262f84`; workflow blob `96b80575983292c268253649b6343f01e4f627d1`. Latest PR heads: #60 `aedeebd506200c3d70fb626501fa3c49c3c18265`; #64 `a39faf771aaaf890e87bc16a3a833ac5b46ec66e`.
 - Manual next step remains: run PR #64 synthetic mode, then Q0 offline tests on PR #60 head `aedeebd506200c3d70fb626501fa3c49c3c18265`, then fresh 19-stage review on that exact head with blank resume ID. If it quota-blocks, use only that new run ID for resume.
+### PR #72 repository-specific security-review skill (2026-11-19)
+
+- Updated `.claude/skills/security-review/SKILL.md` on PR #72: commit `42e7fa1bdf9d5a808d2ac290ed45881f2629bd28`, blob `61b44c7dc967cf1efa8422559d02b326da296a1e`. PR #72 remains open/draft/unmerged and changes one file only.
+- The 3.8 KB skill is repository-specific guidance with no scripts, package dependencies, or external service calls. It requires exact path/baseline scoping, protected-path exclusions, import/checkout-closure review, untrusted-input handling, evidence separation, supply-chain review, and no unapproved workflow dispatch/merge/settings/branch actions.
+- Trading boundaries explicitly cover spot-only/long-only, no shorts/leverage/margin/derivatives, PAPER-only with LIVE unavailable, no real-money/account/order/funding/payment/withdrawal activity, emergency-stop enforcement, and Tokocrypto candle-only access.
+- The skill also prohibits manufactured project completion percentages and keeps overall completion UNRATED until scope, weights, and evidence criteria are approved. No Claude Code runtime installation/load test occurred; PR remains unmerged.
+
+### Latest manual-CI inventory (2026-11-19)
+
+- Read-only GitHub Actions lookup returned no PR-triggered workflow runs for the latest heads of PRs #60, #64, #69, #71, #72, #74, #75, or #76. These workflows are manual-only or have no matching PR event; do not infer CI success from their definitions.
+- Current review/quality evidence therefore remains limited to the exact historical runs and local isolated checks recorded above. Fresh Python 3.11 Q0 tests, reviewer synthetic mode, full Q0.8 review, Ruff, Actionlint/zizmor, and the updated 22-case holdout suite still need manual or authorized runtime execution.
