@@ -1,0 +1,90 @@
+name: Python static quality (manual, protected-path safe)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+    name: Ruff lint (unprotected root modules only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout only approved unprotected Python modules
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /live_check.py
+            /probe.py
+            /run.py
+
+      - name: Download verified Ruff 0.17.5 release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ruff-x86_64-unknown-linux-gnu.tar.gz"
+          binary="$RUNNER_TEMP/ruff"
+          max_archive_bytes=16777216
+          max_binary_bytes=67108864
+          url="https://github.com/astral-sh/ruff/releases/download/0.17.5/ruff-x86_64-unknown-linux-gnu.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 --max-filesize "$max_archive_bytes" --retry 2 --retry-all-errors --output "$archive" "$url"
+          archive_bytes="$(stat -c '%s' "$archive")"
+          if [[ ! "$archive_bytes" =~ ^[0-9]+$ ]] || (( archive_bytes == 0 || archive_bytes > max_archive_bytes )); then
+            echo "::error::Ruff archive size is invalid or exceeds the 16 MiB limit."
+            exit 1
+          fi
+          echo "7d261fc981a784668e19e9fa6ad437bfd95b67f2dc263fc1eab87d54d72fcc90  $archive" | sha256sum -c -
+
+          # Read only the single regular-file member named ruff and write it to
+          # a fixed destination. Never extract archive-controlled member paths.
+          python3 - "$archive" "$binary" "$max_binary_bytes" <<'PY'
+          import os
+          import sys
+          import tarfile
+
+          archive_path, binary_path, max_binary_text = sys.argv[1:]
+          max_binary = int(max_binary_text)
+          with tarfile.open(archive_path, "r:gz") as archive:
+              matches = [member for member in archive.getmembers()
+                         if member.name.rsplit("/", 1)[-1] == "ruff"]
+              if len(matches) != 1:
+                  raise SystemExit("archive must contain exactly one ruff member")
+              member = matches[0]
+              parts = member.name.split("/")
+              if (member.name.startswith("/") or "\\" in member.name
+                      or any(part in ("", ".", "..") for part in parts)):
+                  raise SystemExit("ruff member path is not a safe relative archive path")
+              if not member.isfile() or not 0 < member.size <= max_binary:
+                  raise SystemExit("ruff member is not a bounded regular file")
+              source = archive.extractfile(member)
+              if source is None:
+                  raise SystemExit("unable to read ruff member")
+              with source, open(binary_path, "xb") as output:
+                  remaining = member.size
+                  while remaining:
+                      chunk = source.read(min(1024 * 1024, remaining))
+                      if not chunk:
+                          raise SystemExit("truncated ruff member")
+                      output.write(chunk)
+                      remaining -= len(chunk)
+                  if source.read(1):
+                      raise SystemExit("ruff member exceeded its declared size")
+          os.chmod(binary_path, 0o755)
+          PY
+          "$binary" --version | grep -Fx "ruff 0.17.5"
+
+      - name: Lint approved modules (no auto-fixes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ruff" check --no-cache --target-version py311 --output-format=github \
+            fetcher.py providers.py live_check.py probe.py run.py
