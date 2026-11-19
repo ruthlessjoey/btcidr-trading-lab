@@ -679,21 +679,43 @@ def load_checkpoint(path: Path) -> dict:
         or payload["base_sha"] != BASE_SHA or payload["head_sha"] != HEAD_SHA
         or payload["model"] != EXPECTED_MODEL):
         raise RuntimeError("Checkpoint does not match the exact repository, base, head, and model")
-    reports = payload["reports"]
-    if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
+    raw_reports = payload["reports"]
+    if not isinstance(raw_reports, dict) or not set(raw_reports).issubset(set(SPECIALISTS)):
         raise RuntimeError("Checkpoint specialist role set is invalid")
-    _validate_checkpoint_progress(reports, payload["commander"],
+    _validate_checkpoint_progress(raw_reports, payload["commander"],
                                   payload["acceptance"], payload["verification"])
-    for name, report in reports.items():
+    for name, report in raw_reports.items():
         _validate_checkpoint_report(report, name)
-    for name, report in ((COMMANDER, payload["commander"]),
-                         (ACCEPTANCE, payload["acceptance"]),
-                         (VERIFICATION, payload["verification"])):
+    raw_stages = ((COMMANDER, payload["commander"]),
+                  (ACCEPTANCE, payload["acceptance"]),
+                  (VERIFICATION, payload["verification"]))
+    for name, report in raw_stages:
         if report is not None:
             _validate_checkpoint_report(report, name)
-    return {"reports": reports, "commander": payload["commander"],
-            "acceptance": payload["acceptance"],
-            "verification": payload["verification"]}
+
+    # Reuse only accepted stages. BLOCKED/INCONCLUSIVE results are retried;
+    # downstream synthesis is invalidated whenever an upstream stage is retried.
+    accepted = {"PASS", "PASS WITH FINDINGS"}
+    reports = {name: report for name, report in raw_reports.items()
+               if extract_verdict(report) in accepted}
+    commander = payload["commander"]
+    acceptance = payload["acceptance"]
+    verification = payload["verification"]
+    if commander is not None and extract_verdict(commander) not in accepted:
+        commander = None
+    if acceptance is not None and extract_verdict(acceptance) not in accepted:
+        acceptance = None
+    if verification is not None and extract_verdict(verification) not in accepted:
+        verification = None
+    if set(reports) != set(SPECIALISTS):
+        commander = acceptance = verification = None
+    elif commander is None:
+        acceptance = verification = None
+    elif acceptance is None:
+        verification = None
+    _validate_checkpoint_progress(reports, commander, acceptance, verification)
+    return {"reports": reports, "commander": commander,
+            "acceptance": acceptance, "verification": verification}
 
 
 
@@ -1089,6 +1111,41 @@ def synthetic():
             pass
         else:
             raise AssertionError("duplicate checkpoint keys were not rejected")
+    with tempfile.TemporaryDirectory() as checkpoint_dir:
+        checkpoint_path = Path(checkpoint_dir) / "checkpoint.json"
+        all_reports = {name:"VERDICT: PASS" for name in SPECIALISTS}
+        all_reports["architecture-architect"] = "VERDICT: INCONCLUSIVE"
+        save_checkpoint(checkpoint_path, all_reports,
+                        commander="VERDICT: BLOCKED",
+                        acceptance="VERDICT: BLOCKED",
+                        verification="VERDICT: BLOCKED")
+        restored = load_checkpoint(checkpoint_path)
+        assert "architecture-architect" not in restored["reports"]
+        assert len(restored["reports"]) == len(SPECIALISTS) - 1
+        assert restored["commander"] is None
+        assert restored["acceptance"] is None
+        assert restored["verification"] is None
+
+        save_checkpoint(checkpoint_path, all_reports,
+                        commander="VERDICT: PASS",
+                        acceptance="VERDICT: BLOCKED",
+                        verification="VERDICT: BLOCKED")
+        restored = load_checkpoint(checkpoint_path)
+        assert "architecture-architect" not in restored["reports"]
+        assert restored["commander"] is None
+        assert restored["acceptance"] is None
+        assert restored["verification"] is None
+
+        all_pass = {name:"VERDICT: PASS WITH FINDINGS" for name in SPECIALISTS}
+        save_checkpoint(checkpoint_path, all_pass,
+                        commander="VERDICT: PASS",
+                        acceptance="VERDICT: PASS WITH FINDINGS",
+                        verification="VERDICT: INCONCLUSIVE")
+        restored = load_checkpoint(checkpoint_path)
+        assert restored["reports"] == all_pass
+        assert restored["commander"] == "VERDICT: PASS"
+        assert restored["acceptance"] == "VERDICT: PASS WITH FINDINGS"
+        assert restored["verification"] is None
     # Provider reset is Unix epoch milliseconds; seconds remain supported.
     future_epoch = time.time() + 30.0
     millis_delay = retry_delay_seconds(
