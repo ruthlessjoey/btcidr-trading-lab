@@ -678,8 +678,15 @@ def validate_checkpoint_path(path: Path, runner_temp: str) -> Path:
     return path
 
 
+def _validate_review_evidence_sha256(value: str) -> None:
+    if type(value) is not str or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise RuntimeError("Checkpoint review-evidence SHA-256 is invalid")
+
+
 def save_checkpoint(path: Path, reports: dict, commander=None,
-                    acceptance=None, verification=None) -> None:
+                    acceptance=None, verification=None, *,
+                    review_evidence_sha256: str) -> None:
+    _validate_review_evidence_sha256(review_evidence_sha256)
     if not isinstance(reports, dict) or not set(reports).issubset(set(SPECIALISTS)):
         raise RuntimeError("Checkpoint specialist role set is invalid")
     _validate_checkpoint_progress(reports, commander, acceptance, verification)
@@ -690,9 +697,10 @@ def save_checkpoint(path: Path, reports: dict, commander=None,
         if report is not None:
             _validate_checkpoint_report(report, name)
     payload = {
-        "schema_version": 1, "repository": REPO, "base_sha": BASE_SHA,
-        "head_sha": HEAD_SHA, "model": EXPECTED_MODEL, "reports": reports,
-        "commander": commander, "acceptance": acceptance,
+        "schema_version": 2, "repository": REPO, "base_sha": BASE_SHA,
+        "head_sha": HEAD_SHA, "model": EXPECTED_MODEL,
+        "review_evidence_sha256": review_evidence_sha256,
+        "reports": reports, "commander": commander, "acceptance": acceptance,
         "verification": verification,
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -723,9 +731,10 @@ def save_checkpoint(path: Path, reports: dict, commander=None,
         raise
 
 
-def load_checkpoint(path: Path) -> dict:
+def load_checkpoint(path: Path, review_evidence_sha256: str) -> dict:
+    _validate_review_evidence_sha256(review_evidence_sha256)
     empty = {"reports": {}, "commander": None, "acceptance": None,
-             "verification": None}
+             "verification": None, "review_evidence_sha256": review_evidence_sha256}
     if path.is_symlink():
         raise RuntimeError("Checkpoint must be a regular non-symlink file")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
@@ -751,14 +760,17 @@ def load_checkpoint(path: Path) -> dict:
     except Exception:
         raise RuntimeError("Checkpoint is not valid UTF-8 JSON") from None
     expected_keys = {"schema_version", "repository", "base_sha", "head_sha",
-                     "model", "reports", "commander", "acceptance", "verification"}
+                     "model", "review_evidence_sha256", "reports", "commander",
+                     "acceptance", "verification"}
     if not isinstance(payload, dict) or set(payload) != expected_keys:
         raise RuntimeError("Checkpoint schema is invalid")
-    if (type(payload["schema_version"]) is not int or payload["schema_version"] != 1
+    if (type(payload["schema_version"]) is not int or payload["schema_version"] != 2
         or payload["repository"] != REPO
         or payload["base_sha"] != BASE_SHA or payload["head_sha"] != HEAD_SHA
-        or payload["model"] != EXPECTED_MODEL):
-        raise RuntimeError("Checkpoint does not match the exact repository, base, head, and model")
+        or payload["model"] != EXPECTED_MODEL
+        or payload["review_evidence_sha256"] != review_evidence_sha256):
+        raise RuntimeError(
+            "Checkpoint does not match the exact repository, base, head, model, and review-evidence packet")
     raw_reports = payload["reports"]
     if not isinstance(raw_reports, dict) or not set(raw_reports).issubset(set(SPECIALISTS)):
         raise RuntimeError("Checkpoint specialist role set is invalid")
@@ -795,7 +807,8 @@ def load_checkpoint(path: Path) -> dict:
         verification = None
     _validate_checkpoint_progress(reports, commander, acceptance, verification)
     return {"reports": reports, "commander": commander,
-            "acceptance": acceptance, "verification": verification}
+            "acceptance": acceptance, "verification": verification,
+            "review_evidence_sha256": review_evidence_sha256}
 
 
 
@@ -1206,14 +1219,26 @@ def synthetic():
             pass
         else:
             raise AssertionError("checkpoint path outside RUNNER_TEMP was accepted")
+    synthetic_evidence_sha256 = hashlib.sha256(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True,
+                   separators=(",", ":")).encode("utf-8")).hexdigest()
     with tempfile.TemporaryDirectory() as checkpoint_dir:
         checkpoint_path = Path(checkpoint_dir) / "checkpoint.json"
-        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
-        restored = load_checkpoint(checkpoint_path)
+        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"},
+                        review_evidence_sha256=synthetic_evidence_sha256)
+        restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"]["architecture-architect"] == "VERDICT: PASS"
+        assert restored["review_evidence_sha256"] == synthetic_evidence_sha256
+        try:
+            load_checkpoint(checkpoint_path, hashlib.sha256(b"wrong evidence").hexdigest())
+        except RuntimeError as exc:
+            assert "review-evidence packet" in str(exc)
+        else:
+            raise AssertionError("checkpoint with mismatched review evidence was accepted")
         try:
             save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"},
-                            commander="VERDICT: PASS")
+                            commander="VERDICT: PASS",
+                            review_evidence_sha256=synthetic_evidence_sha256)
         except RuntimeError:
             pass
         else:
@@ -1221,7 +1246,7 @@ def synthetic():
         symlink_path = Path(checkpoint_dir) / "symlink.json"
         symlink_path.symlink_to(checkpoint_path)
         try:
-            load_checkpoint(symlink_path)
+            load_checkpoint(symlink_path, synthetic_evidence_sha256)
         except RuntimeError as exc:
             assert "non-symlink" in str(exc)
         else:
@@ -1229,7 +1254,7 @@ def synthetic():
         oversized_path = Path(checkpoint_dir) / "oversized.json"
         oversized_path.write_bytes(b"x" * (MAX_CHECKPOINT + 1))
         try:
-            load_checkpoint(oversized_path)
+            load_checkpoint(oversized_path, synthetic_evidence_sha256)
         except RuntimeError as exc:
             assert "size limit" in str(exc)
         else:
@@ -1238,13 +1263,13 @@ def synthetic():
         predictable_temp = checkpoint_path.with_name(checkpoint_path.name + ".tmp")
         target_path.write_bytes(b"must remain unchanged")
         predictable_temp.symlink_to(target_path)
-        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"})
+        save_checkpoint(checkpoint_path, {"architecture-architect":"VERDICT: PASS"}, review_evidence_sha256=synthetic_evidence_sha256)
         assert target_path.read_bytes() == b"must remain unchanged"
         assert predictable_temp.is_symlink()
         malformed_path = Path(checkpoint_dir) / "malformed.json"
-        malformed_path.write_text('{"schema_version":1,"schema_version":1}', encoding="utf-8")
+        malformed_path.write_text('{"schema_version":2,"schema_version":2}', encoding="utf-8")
         try:
-            load_checkpoint(malformed_path)
+            load_checkpoint(malformed_path, synthetic_evidence_sha256)
         except RuntimeError:
             pass
         else:
@@ -1256,8 +1281,9 @@ def synthetic():
         save_checkpoint(checkpoint_path, all_reports,
                         commander="VERDICT: BLOCKED",
                         acceptance="VERDICT: BLOCKED",
-                        verification="VERDICT: BLOCKED")
-        restored = load_checkpoint(checkpoint_path)
+                        verification="VERDICT: BLOCKED",
+                        review_evidence_sha256=synthetic_evidence_sha256)
+        restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert "architecture-architect" not in restored["reports"]
         assert len(restored["reports"]) == len(SPECIALISTS) - 1
         assert restored["commander"] is None
@@ -1268,8 +1294,9 @@ def synthetic():
         save_checkpoint(checkpoint_path, all_pass_reports,
                         commander="VERDICT: BLOCKED",
                         acceptance="VERDICT: BLOCKED",
-                        verification="VERDICT: BLOCKED")
-        restored = load_checkpoint(checkpoint_path)
+                        verification="VERDICT: BLOCKED",
+                        review_evidence_sha256=synthetic_evidence_sha256)
+        restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"] == all_pass_reports
         assert restored["commander"] is None
         assert restored["acceptance"] is None
@@ -1278,8 +1305,9 @@ def synthetic():
         save_checkpoint(checkpoint_path, all_pass_reports,
                         commander="VERDICT: PASS",
                         acceptance="VERDICT: BLOCKED",
-                        verification="VERDICT: BLOCKED")
-        restored = load_checkpoint(checkpoint_path)
+                        verification="VERDICT: BLOCKED",
+                        review_evidence_sha256=synthetic_evidence_sha256)
+        restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"] == all_pass_reports
         assert restored["commander"] == "VERDICT: PASS"
         assert restored["acceptance"] is None
@@ -1289,8 +1317,9 @@ def synthetic():
         save_checkpoint(checkpoint_path, all_pass,
                         commander="VERDICT: PASS",
                         acceptance="VERDICT: PASS WITH FINDINGS",
-                        verification="VERDICT: INCONCLUSIVE")
-        restored = load_checkpoint(checkpoint_path)
+                        verification="VERDICT: INCONCLUSIVE",
+                        review_evidence_sha256=synthetic_evidence_sha256)
+        restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"] == all_pass
         assert restored["commander"] == "VERDICT: PASS"
         assert restored["acceptance"] == "VERDICT: PASS WITH FINDINGS"
@@ -1349,14 +1378,18 @@ def review():
               "protected_exclusions":["P1/","signal/data/","any copy of signal/",
                 "markets/risk/","validator.py","report.py","protected Workstream B artifacts",
                 ".github/workflows/batch1-isolated-tests.yml"]}
+    review_evidence_sha256 = hashlib.sha256(
+        json.dumps(review_manifest, ensure_ascii=False, sort_keys=True,
+                   separators=(",", ":")).encode("utf-8")).hexdigest()
     checkpoint_path = validate_checkpoint_path(
         Path(os.environ.get("Q08_CHECKPOINT_PATH", "")), os.environ.get("RUNNER_TEMP", ""))
-    checkpoint = load_checkpoint(checkpoint_path)
+    checkpoint = load_checkpoint(checkpoint_path, review_evidence_sha256)
     reports = checkpoint["reports"]
     commander = checkpoint["commander"]
     acceptance = checkpoint["acceptance"]
     verification = checkpoint["verification"]
-    save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+    save_checkpoint(checkpoint_path, reports, commander, acceptance, verification,
+                    review_evidence_sha256=review_evidence_sha256)
 
     for name in SPECIALISTS:
         if name in reports:
@@ -1367,7 +1400,8 @@ def review():
             RULES + "\nUse the following role definition and skill as domain guidance.\n",
             {"agent":name,"agent_definition":agent,"preloaded_skill":skill,**common},
             key,endpoint,model,name)
-        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification,
+                    review_evidence_sha256=review_evidence_sha256)
 
     if commander is None:
         agent, skill = load_role(COMMANDER)
@@ -1380,7 +1414,8 @@ def review():
              "specialist_reports":reports,
              "evidence_limit":"Commander receives specialist reports and a hash-bound coverage manifest, not raw diffs; do not claim direct source re-review."},
             key,endpoint,model,COMMANDER)
-        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification,
+                    review_evidence_sha256=review_evidence_sha256)
 
     if acceptance is None:
         agent, skill = load_role(ACCEPTANCE)
@@ -1394,7 +1429,8 @@ def review():
              "commander_report":commander,
              "evidence_limit":"Independent acceptance receives reports and a hash-bound coverage manifest, not raw diffs; assess report sufficiency and consistency, but do not claim direct source re-review."},
             key,endpoint,model,ACCEPTANCE)
-        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification,
+                    review_evidence_sha256=review_evidence_sha256)
 
     if verification is None:
         agent, skill = load_role(VERIFICATION)
@@ -1408,7 +1444,8 @@ def review():
              "independent_acceptance_report":acceptance,
              "evidence_limit":"Final verification receives reports and a hash-bound coverage manifest, not raw diffs; verify claims and stage consistency without claiming direct source re-review."},
             key,endpoint,model,VERIFICATION)
-        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification)
+        save_checkpoint(checkpoint_path, reports, commander, acceptance, verification,
+                    review_evidence_sha256=review_evidence_sha256)
 
     parts = [
         "# AI Trading Lab — Specialist Army Review",
