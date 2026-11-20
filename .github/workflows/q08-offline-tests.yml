@@ -31,6 +31,16 @@ jobs:
             /config.json
             /research_config.json
             /research/history.py
+            /research/__init__.py
+            /research/pipeline.py
+            /research/engine.py
+            /research/dataset.py
+            /research/selection.py
+            /research/splits.py
+            /research/strategy.py
+            /research/backtest_report.py
+            /validator.py
+            /tests/test_research_gates.py
             /research/crosscheck.py
             /fetch_history.py
             /tests/test_fetcher.py
@@ -54,3 +64,4 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
           python3 -m unittest discover -s tests -p 'test_sanitization.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
