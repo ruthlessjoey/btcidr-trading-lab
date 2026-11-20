@@ -752,3 +752,9 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #80 exact head: `b0e075321ac9f254d8c7097f819e9e498e84da9d`; exactly two changed paths; four commits ahead of main, zero behind. The branch has been statically inspected, but no Python test or workflow run has been executed. Because the workflow is manual-only and its corrected definition is not on default `main`, runtime verification is still pending. PR #80 remains draft/unmerged.
 - PR #78's 59/59 result remains valid only for its own exact candidate head `e0bb7a03ae1260a29ca8abf9dfb09556a34aad6d`; it does not establish the safety or test result of PR #60's older frozen source or of PR #80's new workflow.
 
+
+## 2026-11-20 PR #80 static CI evidence
+
+- Exact PR #80 head `b0e075321ac9f254d8c7097f819e9e498e84da9d` produced successful CodeQL, Analyze (actions), and Analyze (python) checks in workflow run `44666539585`. These are static analysis checks, not execution of the new Python tests.
+- The separate `review` check was skipped because the PR remained draft. `fetch_commit_workflow_runs` returned no PR-triggered test runs, and the workflow is manual-only. Runtime test status remains NOT RUN.
+- No project-wide acceptance credit above candidate maturity is assigned from these static checks.
