@@ -1,6 +1,7 @@
 """Cross-check entry point intentionally disabled pending approved independent sources.
 
 Coinbase and Bitstamp are excluded. This command performs no network requests.
+Exit status 2 is the shared CLI convention for disabled or approval-blocked commands.
 """
 import sys
 
