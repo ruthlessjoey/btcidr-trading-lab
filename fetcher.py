@@ -9,6 +9,7 @@ All other hosts, paths, endpoint styles and redirects are refused.
 """
 import json
 import math
+import socket
 import time
 import urllib.error
 import urllib.parse
@@ -30,6 +31,10 @@ class ApiError(Exception):
 
 class DisallowedRequestError(ApiError):
     """Raised before network access when a URL is outside the approved public API."""
+
+
+class ResponseDeadlineError(TimeoutError):
+    """Raised when the absolute HTTP response-body deadline expires."""
 
 
 def validate_public_url(url):
@@ -112,15 +117,110 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def read_bounded_body(response, max_bytes, timeout_seconds):
+    """Read a bounded HTTP body with an absolute deadline across socket reads.
+
+    The deadline begins after response headers. urllib's open timeout still applies
+    per socket operation during connect/TLS/header parsing; it is not a total-request
+    deadline. Content-Length is checked when present; transfer-encoded bodies are
+    rejected rather than delegated to unbounded chunk-framing reads.
+    """
+    if type(max_bytes) is not int or max_bytes < 0:
+        raise ApiError("response size limit is invalid")
+    if type(timeout_seconds) not in (int, float):
+        raise ApiError("response deadline is invalid")
+    try:
+        timeout_value = float(timeout_seconds)
+    except (TypeError, ValueError, OverflowError):
+        raise ApiError("response deadline is invalid")
+    if not math.isfinite(timeout_value) or timeout_value <= 0:
+        raise ApiError("response deadline is invalid")
+
+    # urllib returns addinfourl(HTTPResponse); direct HTTPResponse objects are
+    # also supported for offline tests. Capture the underlying socket once.
+    wrapped = getattr(response, "fp", None)
+    if (wrapped is not None and hasattr(wrapped, "headers")
+            and callable(getattr(wrapped, "read1", None))):
+        http_response = wrapped
+    else:
+        http_response = response
+    stream = getattr(http_response, "fp", None)
+    if stream is None or not callable(getattr(stream, "read1", None)):
+        raise ApiError("response does not support bounded single-read operation")
+    try:
+        sock = stream.raw._sock
+    except (AttributeError, TypeError):
+        raise ApiError("cannot enforce response body deadline") from None
+
+    headers = getattr(http_response, "headers", None)
+    declared_length = None
+    if headers is not None:
+        get_all = getattr(headers, "get_all", None)
+        content_lengths = get_all("Content-Length") if callable(get_all) else None
+        if content_lengths is None:
+            value = headers.get("Content-Length")
+            content_lengths = [] if value is None else [value]
+        transfer_encodings = get_all("Transfer-Encoding") if callable(get_all) else None
+        if transfer_encodings is None:
+            value = headers.get("Transfer-Encoding")
+            transfer_encodings = [] if value is None else [value]
+        if transfer_encodings:
+            raise ApiError("response transfer encoding is not approved")
+        if isinstance(content_lengths, str):
+            content_lengths = [content_lengths]
+        if len(content_lengths) > 1:
+            raise ApiError("response Content-Length is duplicated")
+        if content_lengths:
+            value = str(content_lengths[0])
+            if not value or not value.isascii() or not value.isdecimal():
+                raise ApiError("response Content-Length is invalid")
+            declared_length = int(value, 10)
+            if declared_length > max_bytes:
+                raise ApiError("response exceeded the 1 MiB public-data limit")
+
+    deadline = time.monotonic() + timeout_value
+    chunks = []
+    total = 0
+    isclosed = getattr(http_response, "isclosed", None)
+    while True:
+        if callable(isclosed) and isclosed():
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ResponseDeadlineError("response body deadline exceeded")
+        try:
+            sock.settimeout(remaining)
+        except (AttributeError, OSError, TypeError, ValueError):
+            raise ApiError("cannot enforce response body deadline") from None
+        read_size = min(64 * 1024, max_bytes + 1 - total)
+        try:
+            chunk = stream.read1(read_size)
+        except (TimeoutError, socket.timeout) as exc:
+            raise ResponseDeadlineError("response body deadline exceeded") from exc
+        if time.monotonic() > deadline:
+            raise ResponseDeadlineError("response body deadline exceeded")
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise ApiError("response body is invalid")
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise ApiError("response exceeded the 1 MiB public-data limit")
+        chunks.append(bytes(chunk))
+    if declared_length is not None and total != declared_length:
+        raise ApiError("response body length does not match Content-Length")
+    return b"".join(chunks)
+
+
 def default_opener(url, timeout):
-    """Do one bounded HTTPS GET without following redirects."""
+    """Do one bounded HTTPS GET without proxies or redirects."""
     validate_public_url(url)
     req = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    opener = urllib.request.build_opener(_NoRedirect())
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
     resp = opener.open(req, timeout=timeout)
     try:
-        body = resp.read(MAX_RESPONSE_BYTES + 1)
+        body = read_bounded_body(resp, MAX_RESPONSE_BYTES, timeout)
         return resp.status, body
     finally:
         resp.close()
