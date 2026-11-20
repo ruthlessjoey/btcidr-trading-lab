@@ -1,5 +1,6 @@
 """Offline tests for the deliberately disabled legacy probe."""
 import os
+import ast
 import subprocess
 import sys
 import unittest
@@ -27,9 +28,14 @@ class DisabledProbeTests(unittest.TestCase):
         script = os.path.join(ROOT, "tools/net_lab.py")
         with open(script, encoding="utf-8") as f:
             source = f.read()
-        self.assertNotIn("urllib", source)
-        self.assertNotIn("socket", source)
-        self.assertNotIn("requests", source)
+        tree = ast.parse(source, filename=script)
+        imports = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.update(alias.name.split(".", 1)[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module.split(".", 1)[0])
+        self.assertFalse(imports & {"urllib", "socket", "requests", "httpx", "aiohttp"})
         result = subprocess.run(
             [sys.executable, script], cwd=ROOT, capture_output=True,
             text=True, timeout=5, check=False,
