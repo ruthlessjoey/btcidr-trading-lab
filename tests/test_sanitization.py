@@ -11,7 +11,6 @@ import urllib.error
 
 import fetcher
 import providers
-from research import crosscheck
 
 MARKER = "UNTRUSTED_PROVIDER_MARKER_7f3a9c"
 CANDLE_URL = ("https://www.tokocrypto.site/api/v3/klines?"
