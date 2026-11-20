@@ -190,13 +190,13 @@ jobs:
           for name, report in reports.items():
               if not isinstance(report, str) or not report or len(report) > 24000:
                   sys.exit("Refusing auto-resume: malformed specialist report: " + name)
-              if not re.match(r"^VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)(?:\\n|$)", report):
+              if not report.splitlines() or not re.fullmatch(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)", report.splitlines()[0]):
                   sys.exit("Refusing auto-resume: invalid specialist verdict: " + name)
           for name in ("commander", "acceptance", "verification"):
               report = payload.get(name)
               if report is not None and (
                   not isinstance(report, str) or not report or len(report) > 24000
-                  or not re.match(r"^VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)(?:\\n|$)", report)
+                  or not report.splitlines() or not re.fullmatch(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)", report.splitlines()[0])
               ):
                   sys.exit("Refusing auto-resume: malformed " + name + " report")
           try:
@@ -237,13 +237,13 @@ jobs:
               },
           }))
           PY
-          status=$(curl --silent --show-error --output "$RUNNER_TEMP/dispatch-response.json" \\
-            --write-out '%{http_code}' --request POST \\
-            --header "Accept: application/vnd.github+json" \\
-            --header "Authorization: Bearer $GH_TOKEN" \\
-            --header "X-GitHub-Api-Version: 2022-11-28" \\
-            --header "Content-Type: application/json" \\
-            --data-binary @"$RUNNER_TEMP/dispatch.json" \\
+          status=$(curl --silent --show-error --output "$RUNNER_TEMP/dispatch-response.json" \
+            --write-out '%{http_code}' --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --header "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/dispatch.json" \
             "https://api.github.com/repos/ruthlessjoey/btcidr-trading-lab/actions/workflows/421573712/dispatches")
           if [ "$status" != "200" ]; then
             echo "Workflow dispatch failed with HTTP $status; response body withheld."
@@ -255,9 +255,9 @@ jobs:
           data = json.loads(Path(os.environ["RUNNER_TEMP"] + "/dispatch-response.json").read_text())
           run_id = data.get("workflow_run_id")
           url = data.get("html_url")
-          if type(run_id) is not int or not isinstance(url, str) or not re.fullmatch(
-              r"https://github\\.com/ruthlessjoey/btcidr-trading-lab/actions/runs/[0-9]+", url
-          ):
+          if type(run_id) is not int or not isinstance(url, str) or not url.startswith(
+              "https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/"
+          ) or not url.rsplit("/", 1)[-1].isdigit():
               sys.exit("Dispatch response did not contain a valid GitHub Actions run identity")
           print("AUTO_RESUME_DISPATCHED run_id=" + str(run_id) + " url=" + url)
           PY
