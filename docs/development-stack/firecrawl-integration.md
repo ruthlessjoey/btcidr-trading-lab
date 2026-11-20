@@ -25,7 +25,8 @@ The connected Firecrawl server exposed these tools in this session:
 - Autonomous research: `firecrawl_agent`, `firecrawl_agent_status`
 - Budget and feedback: `firecrawl_credit_usage`, `firecrawl_search_feedback`, `firecrawl_feedback`
 - Alexandria catalogue: `alexandria_library_search`, `alexandria_library_read`
-- Additional hosted capabilities: `firecrawl_parse`, `firecrawl_monitor_create/list/get/update/delete/run/check/checks`, `firecrawl_developer_search`, `firecrawl_gov_search`, `firecrawl_research_search_papers`, `firecrawl_research_inspect_paper`, `firecrawl_research_related_papers`, `firecrawl_research_read_paper`, `firecrawl_research_lookup_protein`, `people_company_search`, `people_company_enrich`, `jobs_search`, `firecrawl_save_skill`.
+- Parsing and monitoring: `firecrawl_parse`, `firecrawl_monitor_create`, `firecrawl_monitor_list`, `firecrawl_monitor_get`, `firecrawl_monitor_update`, `firecrawl_monitor_delete`, `firecrawl_monitor_run`, `firecrawl_monitor_checks`, `firecrawl_monitor_check`
+- Research indexes and data: `firecrawl_developer_search`, `firecrawl_gov_search`, `firecrawl_research_search_papers`, `firecrawl_research_inspect_paper`, `firecrawl_research_related_papers`, `firecrawl_research_read_paper`, `firecrawl_research_lookup_protein`, `people_company_search`, `people_company_enrich`, `jobs_search`, `firecrawl_save_skill`.
 
 Tool availability in this ChatGPT session does not automatically grant those tools to Claude or repository agents. The official docs state that hosted OAuth and API-key modes expose the full surface subject to plan/team policy, while hosted keyless mode exposes only Search, Scrape, and Parse.
 
@@ -40,13 +41,13 @@ The official pricing page states:
 - Agent: five free runs per day.
 
 Observed account usage at the beginning and after testing:
-- `planCredits=1000`, `remainingCredits=1000`, billing period `2026-11-20T21:22:07.639Z` through `2026-12-20T21:22:07.639Z`.
+- `planCredits=1000`; the initial and post-test current view reported `remainingCredits=1000`, then a later check reported `remainingCredits=1001` after a search-feedback event recorded one credit refund. Billing period: `2026-11-20T21:22:07.639Z` through `2026-12-20T21:22:07.639Z`.
 - Search response reported `creditsUsed=2`.
 - Two-page Crawl response reported `creditsUsed=2`.
 - Scrape and Map responses did not expose a per-call credit-cost field in the returned payloads.
 - Historical `byEndpoint` usage returned an empty `periods` array.
-- The current balance endpoint continued to report 1,000 remaining after the tests, which does not reconcile with the two call-level cost reports. Treat the dashboard/accounting reconciliation as **PARTIALLY VERIFIED**; do not infer that all test calls were free.
-- One Agent test with `maxCredits=1` stopped at the explicit cap with zero credits reported. A bounded continuation at `maxCredits=5` was started; its final status must be checked before claiming Agent success.
+- The current balance endpoint reported 1,000 after initial tests and 1,001 after a feedback refund, which does not reconcile with the two call-level cost reports. Treat the dashboard/accounting reconciliation as **PARTIALLY VERIFIED**; do not infer that all test calls were free.
+- Agent attempts with `maxCredits=1` and `maxCredits=5` stopped at their explicit caps with zero credits reported. A fresh bounded attempt with `maxCredits=25` is processing; its terminal status must be checked before claiming Agent success.
 
 Hard controls:
 1. Check `firecrawl_credit_usage({view:"current"})` before substantial work.
