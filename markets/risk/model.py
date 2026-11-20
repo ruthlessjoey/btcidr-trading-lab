@@ -64,7 +64,7 @@ class PendingProposal:
 class AccountSnapshot:
     equity: object           # decimal, > 0
     cash: object             # decimal, >= 0; available buying power (no leverage)
-    risk_budget: object      # decimal, > 0; remaining risk this account may take on
+    risk_budget: object      # decimal, >= 0; remaining risk this account may take on (zero blocks new BUYs)
     positions: tuple = ()    # tuple of PositionState
     pending: tuple = ()      # tuple of PendingProposal
 
