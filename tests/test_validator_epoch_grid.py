@@ -16,6 +16,23 @@ class TestAbsoluteEpochGrid(unittest.TestCase):
         grid = next(check for check in result.checks if check.name == "timestamp_grid")
         self.assertEqual(grid.status, PASS)
 
+    def test_epoch_grid_is_checked_for_intraday_timeframes(self):
+        for timeframe in (60, 900, 3600):
+            with self.subTest(timeframe=timeframe):
+                candles = [candle(timeframe), candle(2 * timeframe), candle(3 * timeframe)]
+                result = validate(candles, timeframe, 4 * timeframe, 4 * timeframe,
+                                  timeframe, 3 * timeframe, {})
+                grid = next(check for check in result.checks if check.name == "timestamp_grid")
+                self.assertEqual(grid.status, PASS)
+
+    def test_intraday_uniform_offset_fails_epoch_grid(self):
+        timeframe = 900
+        candles = [candle(901), candle(1801), candle(2701)]
+        result = validate(candles, timeframe, 3601, 3601, 900, 2700, {})
+        grid = next(check for check in result.checks if check.name == "timestamp_grid")
+        self.assertEqual(grid.status, FAIL)
+        self.assertIn("3 candle(s) not on the 900s grid", grid.detail)
+
     def test_uniformly_offset_candles_fail_even_when_spacing_matches(self):
         # Relative spacing is exactly one day, but every open time is one second off the epoch grid.
         candles = [candle(86401), candle(172801), candle(259201)]
