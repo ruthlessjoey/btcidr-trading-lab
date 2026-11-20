@@ -65,6 +65,14 @@ def dataset_source_label(result):
     return f"{provider} {pair_label}"
 
 
+def dataset_timeframe_label(result):
+    """Return only a known timeframe token from the pinned manifest."""
+    dataset = result.get("dataset")
+    market = dataset.get("market") if isinstance(dataset, dict) else None
+    timeframe = market.get("timeframe") if isinstance(market, dict) else None
+    allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
+    return timeframe if type(timeframe) is str and timeframe in allowed else "unknown timeframe"
+
 def build_markdown(r):
     L = ["# BTC/USDT trend-filter backtest (research only)",
          f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
@@ -79,7 +87,7 @@ def build_markdown(r):
     d = r["dataset"]
     L += ["## Data (preserved version, pinned)", "",
           f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
-          f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
+          f"- {dataset_source_label(r)} {dataset_timeframe_label(r)} spot · "
           f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
           "- Re-verified at load: hash, market identity, order, no duplicates, no gaps, only completed candles."]
     # flagged candle

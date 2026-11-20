@@ -124,6 +124,15 @@ class HistoryContainmentTests(unittest.TestCase):
                          "tokocrypto BTC/USDT")
         self.assertEqual(dataset_source_label({"dataset": {"market": {}}}),
                          "unverified dataset source")
+        for market in (
+            {"provider": "**injected**", "pair_label": "BTC/USDT"},
+            {"provider": "tokocrypto", "pair_label": "BTC/USDT\nmalicious"},
+        ):
+            self.assertEqual(dataset_source_label({"dataset": {"market": market}}),
+                             "unverified dataset source")
+        self.assertEqual(dataset_timeframe_label({"dataset": {"market": {"timeframe": "1d"}}}), "1d")
+        self.assertEqual(dataset_timeframe_label({"dataset": {"market": {"timeframe": "**bad**"}}}),
+                         "unknown timeframe")
         rendered = build_markdown({
             "run_id": "source-label-regression",
             "status": "STOPPED",
@@ -135,6 +144,9 @@ class HistoryContainmentTests(unittest.TestCase):
         with open(os.path.join(ROOT, "research", "backtest_report.py"), encoding="utf-8") as f:
             source = f.read()
         self.assertNotIn("vs Binance ", source)
+        self.assertIn("dataset_source_label(r)} {dataset_timeframe_label(r)}", source)
+        self.assertNotIn("d['market']['provider']", source)
+        self.assertNotIn("d['market']['pair_label']", source)
 
     def test_research_config_names_only_the_approved_provider_and_host(self):
         with open(os.path.join(ROOT, "research_config.json"), encoding="utf-8") as f:
