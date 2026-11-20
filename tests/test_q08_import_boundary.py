@@ -86,6 +86,20 @@ class Q08ImportBoundaryTests(unittest.TestCase):
                     if edge.split(".", 1)[0] in SOURCE_FILES
                 }, allowed)
 
+    def test_fetcher_is_the_only_selected_module_with_an_http_client(self):
+        network_client_roots = {
+            "requests", "httpx", "aiohttp", "socket", "urllib3", "httpx",
+        }
+        forbidden_exact = {"urllib.request", "http.client"}
+        for path in ("providers.py", "probe.py", "run.py", "live_check.py", "tools/net_lab.py"):
+            with self.subTest(path=path):
+                imports = _source_imports(path)
+                self.assertFalse(any(
+                    edge.split(".", 1)[0] in network_client_roots
+                    or edge in forbidden_exact
+                    for edge in imports
+                ), f"{path} must not own a network client; use fetcher.py only")
+
     def test_disabled_subprocess_script_has_no_network_or_protected_imports(self):
         path = "tools/net_lab.py"
         edges = _source_imports(path)
