@@ -243,6 +243,8 @@ jobs:
                   "mode": "review",
                   "auto_resume_count": os.environ["NEXT_RESUME_COUNT"],
               },
+              # Without this flag GitHub returns 204 with no run metadata; the controller requires the 200 response.
+              "return_run_details": True,
           }))
           PY
           status=$(curl --silent --show-error --output "$RUNNER_TEMP/dispatch-response.json" \
