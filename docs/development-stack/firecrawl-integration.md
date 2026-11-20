@@ -16,6 +16,8 @@ Firecrawl is the approved primary public-web research layer for the Commander an
 
 The project `.mcp.json` registers Firecrawl with browser OAuth and contains no API key. A supported MCP client must approve the project server and complete sign-in. OAuth exposes the full hosted tool surface subject to the team's plan and policy. The connected ChatGPT integration is already available in the Commander session.
 
+Claude Code custom subagents support an explicit `mcpServers` field and a `tools` allowlist in agent frontmatter (official reference: https://code.claude.com/docs/en/sub-agents). The restored definitions use `mcpServers: [firecrawl]` and exact namespaced `mcp__firecrawl__...` tool identifiers, rather than granting all tools from every MCP server. Static frontmatter validation passed; live tool resolution still requires a compatible Claude Code session and OAuth approval.
+
 Claude Code custom subagents support an explicit `mcpServers` field and a `tools` allowlist in agent frontmatter (official reference: https://code.claude.com/docs/en/sub-agents). When the specialist roster is integrated, use `mcpServers: [firecrawl]` and exact namespaced `mcp__firecrawl__...` tool identifiers rather than granting all tools from every MCP server.
 
 ## Actual connected MCP tool inventory
@@ -76,7 +78,7 @@ Tested against public Firecrawl pages only; no logins, account pages, exchange w
 | Credit usage inspection | PARTIALLY VERIFIED | Current free balance returned; historical endpoint usage empty and current balance did not reconcile with call-level costs |
 | Free-tier enforcement | PARTIALLY VERIFIED | Calls were bounded; no payment, upgrade, paid provider, or pay-as-you-go action was taken |
 | Error handling | VERIFIED | Agent cap refusal returned a clear failed status and zero reported credits; no automatic paid retry |
-| Specialist access | NOT VERIFIED | No specialist-agent roster is committed on current `main`; repository OAuth must be approved in a compatible runtime |
+| Specialist access | PARTIALLY VERIFIED | This dependent PR restores 19 named project agents and 19 domain skills; selected research roles have explicit Firecrawl tool allowlists and retain `permissionMode: plan`; Claude Code OAuth runtime is pending |
 
 ### Representative source URLs inspected
 
@@ -98,7 +100,7 @@ A bounded review of the current `main` branch's active workflow files, root proj
 | Active TinyFish integrations in current main workflows | None found | NOT APPLICABLE | All 11 active workflow files checked; zero TinyFish references |
 | Active TinyFish package/config in current main | None found | NOT APPLICABLE | No TinyFish package/config path in the active main file inventory |
 | Active TinyFish instructions/skills in current main | None found | NOT APPLICABLE | Checked CLAUDE.md, README, handoff, roadmap, automation-pilot docs, and Claude settings; zero matches |
-| Active TinyFish specialist definitions in current main | None found | NOT APPLICABLE | Current main has no committed specialist-agent roster or agent definition files |
+| Active TinyFish specialist definitions | None found | NOT APPLICABLE | No TinyFish-specific agent integration was found; this dependent PR restores the existing 19-agent architecture and gives selected roles Firecrawl access |
 | Commander web research | Firecrawl connected integration | VERIFIED | Live ChatGPT Firecrawl tools available and core retrieval tested |
 | Claude Code project MCP | Hosted Firecrawl OAuth endpoint | PARTIALLY VERIFIED | Config staged in `.mcp.json`; user trust approval and browser OAuth remain manual |
 | Claude.ai web research | Native Firecrawl connector | NOT VERIFIED | User must connect it in Claude.ai; repository files cannot connect an external account |
@@ -110,7 +112,7 @@ This is a no-op migration for active main-branch TinyFish integrations because n
 
 The reusable specialist procedure is `.claude/skills/firecrawl-research/SKILL.md`. It covers Market Intelligence, memecoin due diligence, token/project research, Security Research, Documentation Research, Provider Research, and independent source verification.
 
-The current `main` branch contains shared Claude instructions but no committed specialist-agent roster. Therefore the shared skill is staged for future specialist runtimes; no claim is made that each specialist has been connected or tested. Do not create duplicate agents solely for this integration.
+This dependent PR selectively restores the existing 19-agent / 19-domain-skill architecture from the historical `chore/claude-engineering-tooling` branch without merging that stale branch or importing its unrelated/protected changes. All 19 agents retain `permissionMode: plan`; no agent receives repository `Edit`, `Write`, or `Bash` access. The Commander and selected research/verification specialists receive an explicit Firecrawl MCP allowlist and the shared `firecrawl-research` skill. Only the Commander receives Firecrawl Interact browser controls. Other specialists retain their original Read/Grep/Glob-only boundary. The tool allowlists and skill references have been statically checked; actual Claude Code MCP OAuth and agent invocation remain pending a supported runtime and user sign-in. No duplicate agents were created.
 
 ## Security review
 
@@ -160,7 +162,7 @@ Firecrawl is already connected in this ChatGPT session. Use its live tool invent
 
 **Repository Claude Code integration:** PARTIALLY VERIFIED; OAuth configuration is committed to this draft branch, but client approval and live tool discovery are pending.
 
-**Specialist integration:** NOT VERIFIED; no active specialist roster exists on current main.
+**Specialist integration:** PARTIALLY VERIFIED; 19 named agent definitions and their domain skills are restored in this dependent PR; selected agents have explicit Firecrawl allowlists and retain plan mode/read-only repository permissions. Live Claude Code OAuth and actual subagent tool invocation remain unverified.
 
 **TinyFish replacement:** NOT APPLICABLE for current main active workflows because no active TinyFish dependency was found. Firecrawl is the approved primary research tool going forward.
 
