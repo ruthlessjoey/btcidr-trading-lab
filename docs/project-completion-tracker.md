@@ -746,3 +746,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The proposed 40-requirement / 100-point weights remain unapproved. Project completion is **UNRATED**; no implementation, verification, or project-wide percentage is asserted.
 - Historical strategy evidence remains negative: prior handoff reported `-11%` return and `0.36` profit factor on proxy data with incompletely verified costs. Profitability is **NOT PROVEN**. The objective remains reproducible out-of-sample and PAPER-only evaluation; no profit guarantee or LIVE trading.
 - No protected path was accessed, modified, imported, or executed. No exchange request, real-money action, order, withdrawal, or LIVE/PAPER trade occurred.
+
+
+### PR #86 offline-test boundary correction and exact-head verification (20 November 2026)
+
+- PR #86 latest head is `e1be9595ed4808218e94bb1d8e45d1271bf3621e`. Its Q0.8 offline workflow originally sparse-checked out root `validator.py` and ran `tests/test_research_gates.py`, whose imports reach the protected `validator.py` dependency chain. Workstream B authorization did not grant access to that separate protected module.
+- Corrected the workflow to run only the six approved offline modules and removed the protected import closure from the sparse checkout. Updated `tests/test_history.py` to assert that the workflow excludes `validator.py`, `report.py`, `P1/`, `signal/`, `markets/`, and `tests/test_research_gates.py`.
+- First run [#44730839583](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730839583) exposed one missing sparse-checkout entry: the new containment test read its own workflow file. Added that workflow file to the bounded allowlist.
+- Exact-head run [#44731107861](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731107861) completed successfully on exact head `e1be9595ed4808218e94bb1d8e45d1271bf3621e`: **57 passed, 0 failed**, Python 3.11 (fetcher 21, provider authorization 4, history 8, probe 3, pipeline containment 6, sanitization 15).
+- This verifies only the six selected unprotected offline modules. The protected research-gate module and protected pipeline integration remain **UNVERIFIED / BLOCKED**. PR #86 remains open/draft; no merge.
