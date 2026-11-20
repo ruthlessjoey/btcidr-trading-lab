@@ -69,7 +69,7 @@ Tested against public Firecrawl pages only; no logins, account pages, exchange w
 | Map | VERIFIED | Mapped `docs.firecrawl.dev` and returned relevant MCP documentation URLs |
 | Crawl | VERIFIED | Bounded crawl completed 2/2 MCP documentation pages; response reported 2 credits |
 | Browser interaction | VERIFIED (read-only) | Public homepage title and main heading retrieved without clicking or submitting |
-| Agent research | PARTIALLY VERIFIED | Tool is present; first run hit deliberately strict 1-credit cap; 5-credit continuation was still processing at last check |
+| Agent research | VERIFIED | Bounded official-doc comparison completed; `maxCredits=25`, zero reported credits used, strict URLs, providers disabled; sources preserved |
 | Source URL provenance | VERIFIED | Search, Map, Crawl, and Scrape outputs retained source URLs |
 | Credit usage inspection | PARTIALLY VERIFIED | Current free balance returned; historical endpoint usage empty and current balance did not reconcile with call-level costs |
 | Free-tier enforcement | PARTIALLY VERIFIED | Calls were bounded; no payment, upgrade, paid provider, or pay-as-you-go action was taken |
@@ -154,7 +154,7 @@ Firecrawl is already connected in this ChatGPT session. Use its live tool invent
 
 **Commander integration:** VERIFIED for Search, Scrape, Map, bounded Crawl, read-only Interact, and live credit-balance lookup.
 
-**Autonomous Agent research:** PARTIALLY VERIFIED; bounded job continuation pending.
+**Autonomous Agent research:** VERIFIED for a bounded official-document comparison; the successful job used zero reported credits. Larger or open-ended research remains subject to the same hard cap and free balance.
 
 **Repository Claude Code integration:** PARTIALLY VERIFIED; OAuth configuration is committed to this draft branch, but client approval and live tool discovery are pending.
 
