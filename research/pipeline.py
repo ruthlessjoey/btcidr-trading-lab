@@ -147,7 +147,7 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         entries[item["date"]] = item
     for date in flagged:
         item = entries.get(date)
-        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
+        if not item or not crosscheck.is_confirmed_verdict(item.get("verdict")):
             verdict = item.get("verdict", "MISSING") if item else "MISSING"
             raise EngineError(f"flagged date {date} lacks confirmed independent evidence ({verdict})")
     return evidence
