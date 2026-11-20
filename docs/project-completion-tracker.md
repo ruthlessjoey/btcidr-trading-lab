@@ -1173,3 +1173,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Post-commit static verification confirms the expected branch head, exactly three changed files, the exact predicate in the pipeline call, and the new sanitizer regression. Runtime tests are **PENDING**; the GitHub runner must re-run the exact-head offline suite on Python 3.11 before the candidate can receive test credit. No workflow dispatch capability is exposed to this session.
 - The approximate USD-vs-USDT verdict remains explicitly named and accepted only as an exact, qualified status. It does not convert the data into equivalent quote-asset evidence or authorize cross-check acquisition. Independent providers remain unauthorized and the production cross-check gate remains empty/fail-closed.
 - PR #86 remains open/draft/unmerged and based on frozen PR #60. Q0.8 remains BLOCKED / NOT ACCEPTED. No project maturity increase or profitability claim is made.
+
+
+## 2026-11-21 Q0.8 live-check blocker source confirmation
+
+- Static inspection of the unprotected `live_check.py` on PR #86 exact head `6dd9c3aa8b1bbb1ac43b9e841432a9ab3965995e` confirms its import list includes root modules `report` and `validator` (lines 24–25 of the fetched candidate file). These are separately protected; neither module was opened or imported.
+- The candidate `.github/workflows/market-data-check.yml` therefore correctly exits before checkout, tests, network calls, or exchange requests. Its reason for disabling live diagnostics is now directly supported by the entrypoint's static imports rather than an unsupported workflow assertion.
+- PR #86's replacement offline `tests/test_live_check.py` avoids importing `live_check.py`; it tests only `providers.py` / `fetcher.py` and approved configuration. This preserves the protected boundary.
+- This closes the source-evidence gap for that blocker only. It does not authorize execution of `live_check.py`, `validator.py`, or `report.py`, and does not establish live market-data verification. Runtime/live validation remains blocked and fail-closed.
