@@ -1,6 +1,6 @@
 # Repository instructions for Claude
 
-These instructions apply across this repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
+These instructions apply across the repository, including shared tooling used by Workstream A and Workstream B. They do not grant permission to inspect or change protected workstreams or data.
 
 ## Mission and working style
 
@@ -15,19 +15,23 @@ These instructions apply across this repository, including shared tooling used b
 The following restrictions are mandatory:
 
 1. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `P1/`.
-2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `signal/data/`.
-3. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the user gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
-4. Before any repository-wide search, recursive listing, archive, or test discovery, explicitly exclude all protected paths. If a tool cannot guarantee exclusion, do not run it.
-5. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
+2. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under any `signal/` path, including copies nested elsewhere in the repository.
+3. Never enumerate, traverse, search, read, write, edit, delete, rename, copy, archive, upload, or otherwise process anything under `markets/risk/`.
+4. Never read, write, edit, execute, import, or otherwise process any file named `validator.py` or `report.py`, including copies nested elsewhere in the repository.
+5. Workstream B source, data, artifacts, and implementation remain protected. Do not inspect, traverse, search, read, execute, or modify Workstream B content unless the owner gives separate, explicit authorization that identifies the specific scope. Shared root-level instructions and tooling may support Workstream B without opening or changing its protected implementation.
+6. Before any repository-wide search, recursive listing, archive, test discovery, or broad checkout, explicitly exclude every protected path and file above. If a tool cannot guarantee exclusion, do not run it.
+7. Do not infer that permission to improve shared tooling authorizes access to protected source or data.
 
 If protected content appears in output accidentally, stop. Do not quote, summarize, copy, or continue processing it.
+
+Project `Read`/`Edit` permission denials are defense-in-depth, not an OS sandbox. They do not constrain arbitrary subprocesses or every indirect file access. Never treat them as authorization to run scripts or tests whose execution/import closure may reach protected content; use only a verified OS-enforced boundary or keep the work static and read-only.
 
 ## Trading and exchange safety boundaries
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
-- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data exception is unauthenticated server-time/candles access scoped to `www.tokocrypto.site`. Do not use `www.tokocrypto.com` or private endpoints.
-- `PAPER` is permitted only after its safeguards are separately approved. `LIVE` remains unavailable and must not be enabled.
+- No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, funding, payments, withdrawals, or real-money activity.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only approved Tokocrypto market-data access is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines`. Do not call server-time endpoints, use `www.tokocrypto.com`, or access private/authenticated endpoints. This Tokocrypto-specific rule does not itself authorize or revoke other providers; use other market-data hosts only where a separate current ADR or provider allowlist explicitly permits them.
+- PAPER-only. LIVE trading remains disabled and unavailable.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.
 - Do not change custody, execution, risk, or exchange boundaries as part of a tooling task.
