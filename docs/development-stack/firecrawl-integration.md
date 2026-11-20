@@ -16,6 +16,8 @@ Firecrawl is the approved primary public-web research layer for the Commander an
 
 The project `.mcp.json` registers Firecrawl with browser OAuth and contains no API key. A supported MCP client must approve the project server and complete sign-in. OAuth exposes the full hosted tool surface subject to the team's plan and policy. The connected ChatGPT integration is already available in the Commander session.
 
+Claude Code custom subagents support an explicit `mcpServers` field and a `tools` allowlist in agent frontmatter (official reference: https://code.claude.com/docs/en/sub-agents). The restored definitions use `mcpServers: [firecrawl]` and exact namespaced `mcp__firecrawl__...` tool identifiers, rather than granting all tools from every MCP server. Static frontmatter validation passed; live tool resolution still requires a compatible Claude Code session and OAuth approval.
+
 ## Actual connected MCP tool inventory
 
 The connected Firecrawl server exposed these tools in this session:
