@@ -16,10 +16,6 @@ SEGMENTS = (("train", "TRAIN (in-sample; used to screen candidates)"),
             ("validation", "VALIDATION (used to pick among eligible candidates)"),
             ("test", "TEST (final; evaluated once)"))
 
-# Share the exact provider authorization gate with the cross-check runner.
-AUTHORIZED_CROSSCHECK_PROVIDERS = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
-
-
 def utc_day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
@@ -158,9 +154,14 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
 
 
 def load_required_crosscheck(cfg, manifest, crosscheck_path):
-    """Apply the current owner-approved provider set to the cross-check artifact."""
-    return validate_crosscheck_artifact(cfg, manifest, crosscheck_path,
-                                         AUTHORIZED_CROSSCHECK_PROVIDERS)
+    """Fail closed: no independent cross-check provider is authorized.
+
+    Keep the empty authorization set local to this call. No module-global value,
+    injected transport, or report artifact can enable flagged-date backtesting.
+    The pure validator remains separately testable with explicit fixture-only
+    provider sets, but this production entrypoint always supplies an empty set.
+    """
+    return validate_crosscheck_artifact(cfg, manifest, crosscheck_path, frozenset())
 
 
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
