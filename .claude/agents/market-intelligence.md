@@ -2,6 +2,7 @@
 name: market-intelligence
 description: Reviews market-data provenance, source quality, freshness, coverage, and proxy-market limitations.
 tools: Read, Grep, Glob, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_map, mcp__firecrawl__firecrawl_crawl, mcp__firecrawl__firecrawl_check_crawl_status, mcp__firecrawl__firecrawl_agent, mcp__firecrawl__firecrawl_agent_status, mcp__firecrawl__firecrawl_credit_usage
+mcpServers: [firecrawl]
 model: inherit
 permissionMode: plan
 maxTurns: 18
