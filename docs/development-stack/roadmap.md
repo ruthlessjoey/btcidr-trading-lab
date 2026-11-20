@@ -56,9 +56,11 @@ Evaluate QuantStats, PyPortfolioOpt, and Riskfolio-Lib separately. Add none mere
 
 ### Stage 6 — Browser and agent automation
 
-- Prefer Playwright for free, local, deterministic browser tests where a suitable runtime exists.
-- Evaluate Browser Use and Stagehand only if a genuinely free, local model/runtime path is available; exclude paid APIs and hosted usage.
-- Defer OpenHands until its runtime, sandbox, compute requirements, and no-cost operation are demonstrated.
+- Use the approved Firecrawl hosted MCP only for web research and public-site extraction, within the included free allowance and with a verified nonzero balance. It is the primary replacement for any future TinyFish web-research/browser dependency.
+- Use Firecrawl Search/Scrape/Map/Crawl for source discovery and bounded public-page collection. Use Interact only for public, read-only navigation; do not sign in, submit consequential forms, or operate exchange or financial websites.
+- Use Firecrawl Agent only for multi-source tasks with a strict `maxCredits` cap and Alexandria provider execution disabled unless separately approved as free. Poll every job to a terminal state and preserve source URLs.
+- Prefer Playwright for free, local, deterministic browser tests where a suitable runtime exists; Firecrawl is not a substitute for local UI regression testing.
+- Evaluate Browser Use and Stagehand only if a genuinely free, local model/runtime path is available; exclude paid APIs and hosted usage. Defer OpenHands until its runtime, sandbox, compute requirements, and no-cost operation are demonstrated.
 - Browser automation must not access exchange accounts, credentials, protected workstream data, or perform consequential GitHub actions without explicit approval.
 
 ### Stage 7 — End-to-end verification
