@@ -31,6 +31,7 @@ jobs:
             /config.json
             /research_config.json
             /research/history.py
+            /research/backtest_report.py
             /research/__init__.py
             /research/crosscheck.py
             /fetch_history.py
