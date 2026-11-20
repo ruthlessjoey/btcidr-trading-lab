@@ -1415,8 +1415,38 @@ def synthetic():
         {"x-ratelimit-reset":str(int(future_epoch * 1000))}, 0)
     seconds_delay = retry_delay_seconds(
         {"ratelimit-reset":str(future_epoch)}, 0)
-    assert 28.0 <= millis_delay <= 30.0
-    assert 28.0 <= seconds_delay <= 30.0
+    # Offline transport regression: a bounded 240-second provider reset must be retried.
+    import io
+    class SyntheticResponse:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, _limit):
+            return json.dumps({
+                "model":"synthetic-model",
+                "choices":[{"finish_reason":"stop","message":{"content":"VERDICT: PASS"}}],
+            }).encode("utf-8")
+    class SyntheticOpener:
+        def __init__(self): self.calls = 0
+        def open(self, request, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests",
+                                             {"Retry-After":"240"}, io.BytesIO(b""))
+            return SyntheticResponse()
+    synthetic_opener = SyntheticOpener()
+    synthetic_sleeps = []
+    original_make_opener, original_sleep = make_opener, time.sleep
+    try:
+        make_opener = lambda: synthetic_opener
+        time.sleep = lambda delay: synthetic_sleeps.append(delay)
+        retried = ask_model("synthetic system", {}, "synthetic-key",
+                            "https://example.invalid", "synthetic-model", "synthetic-rate-limit")
+    finally:
+        make_opener, time.sleep = original_make_opener, original_sleep
+    assert retried == "VERDICT: PASS"
+    assert synthetic_opener.calls == 2
+    assert synthetic_sleeps == [240.0]
     write_summary(
         "# Specialist Army Runner — Synthetic Smoke Test\n\n"
         "**PASS:** local policy checks completed. No repository source was fetched; "
