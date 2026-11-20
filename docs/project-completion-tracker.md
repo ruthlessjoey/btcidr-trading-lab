@@ -977,3 +977,13 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The sparse-checkout workflow now includes those two guidance files. A new AST/import-boundary test checks the exact current wording and continues to reject protected imports and dynamic import/evaluation.
 - Exact-head workflow run [#44731395708](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731395708) checked out exact SHA `9e5572752b5a60b493075ad263b395d16326a389` and passed **50/50 tests** on Python 3.11.18 (policy/import boundary 6; fetcher 21; provider/config 4; probe 3; sanitization 12; pipeline/legacy 4). No network data request or trading operation occurred.
 - PR #82 remains draft/open/unmerged; test and static review evidence is candidate-only. No score increase is recorded. Current main still requires an authorized merge to receive the corrected guidance and implementation.
+
+
+## 2026-11-20 Q0.8 reviewer progress update — run #44730063361
+
+- The full v2 Q0.8 review run [#44730063361](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730063361) restored the exact checkpoint #14624753539 from run #44728818302, passed Python syntax and corrected synthetic preflight, validated PR #60 exact head, and rebuilt the 178,323-character / 26-record evidence packet with the same SHA-256 `385375cba9abbf0b4fc58b70e1c1806004da54cd2c99828885e440935ca96c32`.
+- **Four specialist reports now exist** in schema-v2 checkpoint artifact [#14625709210](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730063361/artifacts/14625709210): architecture-architect, implementation-engineer, provider-integration, market-intelligence. Each is `PASS WITH FINDINGS`. The implementation-engineer report was reused from the prior checkpoint; three new roles completed in this run.
+- The next role, quant-research, stopped on OpenRouter HTTP 429 after 15/30/60/120-second bounded waits and a 240-second reset request. The runner correctly refused to exceed its 120-second retry cap. The new checkpoint was uploaded; Commander, independent acceptance and final verification remain absent. Q0.8 stays **BLOCKED / NOT ACCEPTED**.
+- No model API key or secret was exposed; no repository write, market request, dataset, backtest, PAPER/LIVE operation, order, or merge occurred during review.
+- Continue from run `44730063361` only after the quota reset. Do not increase the retry cap as a deadline shortcut.
+
