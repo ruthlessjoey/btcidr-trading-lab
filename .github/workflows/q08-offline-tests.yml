@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Sparse checkout only the six approved offline test modules and dependencies
+      - name: Sparse checkout only approved offline modules and authorized research-gate dependencies
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -56,7 +56,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run the approved offline tests only
+      - name: Run approved offline and research-gate regression modules
         run: |
           python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
           python3 -m unittest discover -s tests -p 'test_live_check.py' -v
