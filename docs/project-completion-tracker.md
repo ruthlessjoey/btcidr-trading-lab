@@ -1043,3 +1043,30 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Exact-head workflow [#44733388671](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44733388671) completed successfully on exact SHA \`343234b1f79684e4e2302f37277040d46a1f00d5\`: **58 passed / 0 failed** on Python 3.11 (fetcher 21, provider authorization 4, history/report 9, disabled probe 3, pipeline containment 6, sanitization 15).
 - Earlier run #44733201139 failed because the expected static import map did not yet include the new report helper import. The test map was corrected and the succeeding exact-head run passed. Do not count the failed attempt as passing.
 - This is still stacked candidate evidence. PR #86 remains open/draft/unmerged; protected pipeline runtime and end-to-end integration remain UNVERIFIED. Project score remains 15.00/100 candidate-weighted, 0/40 exact-main requirements at 0.50, with no score increase. Profitability remains NOT PROVEN.
+
+
+## 2026-11-20 Q0.8 resumed specialist review — run 44735866288
+
+- Exact workflow run [#44735866288](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44735866288) ran on branch `security/q08-review-runner-v2-pin-2026-11-20`, workflow head `91ab93c5ae0957a32b9bc007d252b92388fe450f`, immutable reviewer pin `0ebe25b4aa4a0f9c04fa86a28303d107429cf655`, and frozen PR #60 target `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`.
+- Restored schema-v2 checkpoint from run `44730063361` and reused four previously completed reports. Three more roles completed: `quant-research`, `strategy-validation`, and `risk-invariants`. The checkpoint now has seven reports total: six `PASS WITH FINDINGS` and `quant-research: BLOCKED`.
+- The next role (`portfolio-accounting`) encountered OpenRouter HTTP 429 after bounded 15/30/60/120-second waits; provider then requested 240 seconds, beyond the unchanged 120-second retry cap. The run is **BLOCKED / NOT ACCEPTED**, not a completed 19-role review.
+- New checkpoint artifact [`14628637469`](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44735866288/artifacts/14628637469) uploaded successfully, ZIP SHA-256 `3e79d2dc1c95e43d9d9736a1f778d4a281b65ebf9c0f512285cd69b6259599d1`. It preserves the seven reports and exact review identity. No Commander, independent acceptance, or final-verification report exists.
+- Next valid resume source is run `44735866288` / artifact `14628637469`, after provider quota reset. Keep the retry cap unchanged.
+
+## 2026-11-20 Workstream B Step 6 v11 independent offline reproduction
+
+- User-supplied v11 archive SHA-256 matches the declared digest exactly: `2ee2aac29c51dc82aae658f28a2cb4ca46a3d1c691a05a09f460b9bf6aecb542`.
+- All six checks in the supplied v9 review package `SHA256SUMS.txt` pass. The v9 patch applies cleanly to its 20-file baseline and recreates the v9 archive byte-for-byte across all 20 files. V11 differs from v9 in the documented ledger, ledger tests, and handoff only.
+- The unprotected Step 6 test import closure was statically checked. No `P1/`, `signal/`, root validator/report, protected research-gate, network, exchange, or trading path was accessed or executed.
+- Exact local command `python3 -B -m unittest markets.portfolio.test_model markets.portfolio.test_ledger markets.portfolio.test_risk_bridge` passed **88/88** on Python **3.13.5**. A Python 3.11 runtime was not available locally, so Python 3.11 verification is still outstanding.
+- Independent numerical cross-checks: integer oracle covered 300 sequences, 15,930 accepted fills and 2,070 refusals with zero mismatches; tie-rounding cross-check covered 20,000 cases (2,000 exact half-way) with zero mismatches.
+- Targeted mutation checks killed 8/9 mutations. The one survivor removed an `apply_fill` duplicate quantity-equality check already enforced when the event is reconstructed; this is a redundant check, not a demonstrated bypass.
+- **Critical reproduced blocker:** deleting the instance `origin` field from a `HISTORICAL` event exposes the dataclass class default `PAPER`. The v11 ledger then accepts the event into a PAPER ledger. Separately, deleting several required fields causes raw `AttributeError` because `apply_fill` reads event attributes before validation and `_revalidated_event` extracts fields outside its exception handler. This is a fail-closed defect, not merely a static concern.
+- Required remediation: validate the exact event instance before any field access; reject missing instance fields (including defaulted `origin`); move extraction under guarded error conversion to structured `LedgerError("INVALID_INPUT", ...)`; preserve explicit Decimal-type checks; and add missing-field regressions asserting both structured refusal and unchanged ledger state.
+- Further acceptance gaps remain: Step 10 authentication route and approval TTL decisions have not been approved; approval references are not authenticated; durable storage/restart recovery is not implemented by the in-memory replay tests. The tested risk bridge is not an integration test of the risk engine or strategy path.
+- **Step 6 remains NOT ACCEPTED; Step 7 remains BLOCKED.** Do not begin Step 10 until Step 6 is accepted, the exact owner-only storage path is supplied, and separate written build approval is received.
+
+## Measurement unchanged after the above evidence
+
+- Weighted candidate maturity remains **15.00/100**; **0/40** requirements meet the exact-main 0.50 threshold. These offline tests and the Q0.8 partial checkpoint do not increase integrated project maturity.
+- Project-wide acceptance remains absent. Profitability remains **NOT PROVEN**. No PR merge, live/paper execution, order, market-data request, funding, withdrawal, or payment occurred.
