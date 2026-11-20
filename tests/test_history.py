@@ -10,7 +10,8 @@ import unittest
 import tempfile
 
 from research.history import run_step1
-from research.backtest_report import build_markdown, dataset_source_label
+from research.backtest_report import (build_markdown, dataset_source_label,
+                                       dataset_timeframe_label)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

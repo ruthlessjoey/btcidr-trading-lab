@@ -73,6 +73,7 @@ def dataset_timeframe_label(result):
     allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
     return timeframe if type(timeframe) is str and timeframe in allowed else "unknown timeframe"
 
+
 def build_markdown(r):
     L = ["# BTC/USDT trend-filter backtest (research only)",
          f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
