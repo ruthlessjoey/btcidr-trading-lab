@@ -1,7 +1,7 @@
-"""Static offline tests for the Step 1 fail-closed gate.
+"""Offline regressions for the Step 1 fail-closed gate and dataset-source reporting.
 
-These tests deliberately avoid importing protected validator.py or invoking network code.
-They parse source text with Python's AST; they never import the Step 1 entrypoint.
+These tests import only standard-library-only, unprotected research helpers. They do
+not import protected validator.py or invoke network code.
 """
 import ast
 import json
@@ -10,6 +10,7 @@ import unittest
 import tempfile
 
 from research.history import run_step1
+from research.backtest_report import build_markdown, dataset_source_label
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -77,6 +78,7 @@ class HistoryContainmentTests(unittest.TestCase):
             "probe.py": set(),
             "research/__init__.py": set(),
             "research/history.py": set(),
+            "research/backtest_report.py": set(),
             "research/crosscheck.py": {"fetcher"},
         }
         # Protected roots and separately protected modules stay outside this offline test closure.
@@ -106,7 +108,7 @@ class HistoryContainmentTests(unittest.TestCase):
             "/validator.py", "/report.py", "/P1/", "/signal/", "/markets/",
             "/research/pipeline.py", "/research/engine.py", "/research/dataset.py",
             "/research/selection.py", "/research/splits.py", "/research/strategy.py",
-            "/research/backtest_report.py", "/tests/test_research_gates.py",
+            "/tests/test_research_gates.py",
             "test_research_gates.py",
         )
         for path in forbidden:
@@ -114,6 +116,24 @@ class HistoryContainmentTests(unittest.TestCase):
                 self.assertNotIn(path, workflow)
         self.assertIn("test_history.py", workflow)
         self.assertNotIn("python3 -m unittest discover -s tests -p 'test_research_gates.py'", workflow)
+
+    def test_backtest_report_uses_the_preserved_dataset_source_label(self):
+        market = {"provider": "tokocrypto", "pair_label": "BTC/USDT"}
+        self.assertEqual(dataset_source_label({"dataset": {"market": market}}),
+                         "tokocrypto BTC/USDT")
+        self.assertEqual(dataset_source_label({"dataset": {"market": {}}}),
+                         "unverified dataset source")
+        rendered = build_markdown({
+            "run_id": "source-label-regression",
+            "status": "STOPPED",
+            "error": "market identity gate closed",
+            "dataset": {"market": market},
+        })
+        self.assertIn("recorded dataset source is tokocrypto BTC/USDT", rendered)
+        self.assertNotIn("market is Binance", rendered)
+        with open(os.path.join(ROOT, "research", "backtest_report.py"), encoding="utf-8") as f:
+            source = f.read()
+        self.assertNotIn("vs Binance ", source)
 
     def test_research_config_names_only_the_approved_provider_and_host(self):
         with open(os.path.join(ROOT, "research_config.json"), encoding="utf-8") as f:
