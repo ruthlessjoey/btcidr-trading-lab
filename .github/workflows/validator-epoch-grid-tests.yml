@@ -1,0 +1,42 @@
+name: Root validator epoch-grid regression tests
+
+on:
+  push:
+    branches:
+      - fix/validator-absolute-epoch-grid-2026-11-20
+    paths:
+      - validator.py
+      - tests/test_validator_epoch_grid.py
+      - .github/workflows/validator-epoch-grid-tests.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validator-epoch-grid-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validator-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout only validator and its isolated regression test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /validator.py
+            /tests/test_validator_epoch_grid.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Run isolated validator regression test
+        run: python3 -B -m unittest discover -s tests -p 'test_validator_epoch_grid.py' -v
