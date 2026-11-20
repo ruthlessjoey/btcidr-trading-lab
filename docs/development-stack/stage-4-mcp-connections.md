@@ -24,7 +24,7 @@
 - The project `.mcp.json` registers Firecrawl alongside Context7 and read-only GitHub MCP.
 - OAuth exposes the full hosted tool surface subject to the account plan and team policy. The keyless endpoint `https://mcp.firecrawl.dev/v2/mcp` is a separate mode limited to Search, Scrape, and Parse; it is not used by this project configuration.
 - Firecrawl is approved only within its included free allowance. Check `firecrawl_credit_usage` before substantial work, use bounded Agent `maxCredits`, disable unapproved provider execution, and stop at zero or uncertain balance. Never enable pay-as-you-go or paid overage.
-- Relevant specialist roles should follow `.claude/skills/firecrawl-research/SKILL.md`. The current `main` branch has no committed specialist-agent roster, so this configuration does not claim those agents have been individually wired or runtime-tested.
+- Relevant specialist roles should follow `.claude/skills/firecrawl-research/SKILL.md`. The dependent Firecrawl specialist PR restores 19 named project subagents and their domain skills, and adds explicit Firecrawl tool allowlists to the Commander and selected research/verification roles while retaining `permissionMode: plan` and read-only repository access. The live Claude Code OAuth and agent tool invocation remain unverified until the owner approves the project MCP server in a compatible runtime.
 - The connected ChatGPT Firecrawl integration is verified in the Commander session. Claude Code project MCP requires user trust approval and browser OAuth; Claude.ai web uses its separate native connector flow.
 
 ## Runtime setup required
