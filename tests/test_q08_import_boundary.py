@@ -22,7 +22,9 @@ TEST_FILES = (
     "tests/test_fetcher.py",
     "tests/test_probe.py",
     "tests/test_sanitization.py",
+    "tests/test_q08_import_boundary.py",
 )
+PACKAGE_INIT = "research/__init__.py"
 # test_probe launches this standalone disabled script. Include it in the audited
 # runtime closure even though it is not imported as a Python module.
 EXECUTED_SCRIPTS = ("tools/net_lab.py",)
@@ -95,6 +97,8 @@ def _resolve_closure(path, seen=None):
         return seen
     seen.add(path)
     for module in _local_edges(path):
+        if module.startswith("research."):
+            _resolve_closure(PACKAGE_INIT, seen)
         child = SOURCE_FILES[module]
         _resolve_closure(child, seen)
     return seen
@@ -149,7 +153,7 @@ class Q08ImportBoundaryTests(unittest.TestCase):
         ])
         self.assertIn("contents: read", source)
         self.assertIn("persist-credentials: false", source)
-        self.assertIn('REVIEW_HEAD_SHA != "$ACTUAL_HEAD_SHA"', source)
+        self.assertIn('"$REVIEW_HEAD_SHA" != "$ACTUAL_HEAD_SHA"', source)
 
 
 if __name__ == "__main__":
