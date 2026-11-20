@@ -12,6 +12,16 @@ from fetcher import ApiError
 DAY = 86400
 TOLERANCE_PCT = 3.0
 
+CONFIRMED_VERDICTS = frozenset({
+    "CONFIRMED",
+    "CONFIRMED (approximate: USD is not USDT)",
+})
+
+
+def is_confirmed_verdict(value):
+    """Accept only the exact verdict values emitted by the comparison schema."""
+    return type(value) is str and value in CONFIRMED_VERDICTS
+
 
 
 def day(ts):
