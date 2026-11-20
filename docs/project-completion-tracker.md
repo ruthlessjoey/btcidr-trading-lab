@@ -987,3 +987,38 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - No model API key or secret was exposed; no repository write, market request, dataset, backtest, PAPER/LIVE operation, order, or merge occurred during review.
 - Continue from run `44730063361` only after the quota reset. Do not increase the retry cap as a deadline shortcut.
 
+
+
+## 2026-11-20 evening re-reconciliation — exact verified heads
+
+### PR #82 — current public-data boundary
+- Latest head: \`9e5572752b5a60b493075ad263b395d16326a389\`, draft/open/unmerged, base main \`731fc9fbb892dadccc64bf52da2f91ff069da124\`.
+- Exact-head run [#44731395708](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731395708) passed 50/50 Python 3.11.18 tests: import/policy 6, fetcher 21, provider configuration 4, disabled probe 3, sanitization 12, pipeline/legacy containment 4.
+- Repository guidance now expressly limits Tokocrypto to unauthenticated HTTPS GET candles at \`www.tokocrypto.site/api/v3/klines\` for BTCUSDT; legacy server-time, metadata, \`.com\`, private, and other routes are not authorized. Candidate-only evidence; no merge or score increase.
+
+### PR #86 — Q0.8 offline security remediation
+- Latest head \`e1be9595ed4808218e94bb1d8e45d1271bf3621e\`, draft/open/unmerged, 19 commits ahead and 0 behind the frozen PR #60 head \`d5d5db6cc5d3f11bf579eed45c873b630ed560a4\`; exactly ten changed paths.
+- A first containment run [#44730839583](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730839583) exposed an omitted sparse-checkout entry; the workflow definition itself was then included in the bounded allowlist. Exact-head run [#44731107861](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731107861) passed **57/57 Python 3.11 tests**: fetcher 21, provider authorization 4, history 8, disabled probe 3, pipeline containment 6, sanitization 15.
+- Workflow sparse checkout and test selection exclude \`validator.py\`, \`report.py\`, \`P1/\`, all \`signal/\`, \`markets/\`, and \`tests/test_research_gates.py\`. A regression asserts the exclusions. A behavioral fail-closed history test uses a forbidden opener and proves zero network calls, no dataset, and backtest disabled.
+- Protected research-gate/pipeline integration remains UNVERIFIED and was not executed. No mainline integration or independent acceptance is claimed.
+
+### PR #83 — Q0.8 specialist review v2
+- Latest workflow branch/head remain \`security/q08-review-runner-v2-pin-2026-11-20\` / \`91ab93c5ae0957a32b9bc007d252b92388fe450f\`; immutable runner pin \`0ebe25b4aa4a0f9c04fa86a28303d107429cf655\`. PR remains draft/open/unmerged.
+- Exact-head synthetic preflight [#44728221555](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44728221555) passed. This is offline runner/policy evidence only.
+- Full review run [#44728818302](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44728818302) restored the prior v2 checkpoint, validated exact workflow ancestry/source/evidence packet, and then stopped on OpenRouter HTTP 429 after four bounded waits. New checkpoint artifact \`14624753539\` was downloaded and validated: ZIP SHA-256 \`334c9b7791d45317549b39cf49b9dcab0c358f0f95356fa7f56aba973ae82648\`; schema-v2 payload SHA-256 \`a38ddeaa51e419a0f25be23c6dd7c2e2450dfb1dc6a9ae39b1f9ddd23c5a458b\`; one role report; no Commander/acceptance/verification.
+- Further resumed run [#44730063361](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730063361) restored artifact \`14624753539\`, passed synthetic and exact source/evidence validation, and progressed to four specialist reports: architecture-architect, implementation-engineer, market-intelligence, provider-integration. All four verdicts are PASS WITH FINDINGS. The next role (quant-research) stopped on HTTP 429 after the same bounded 15/30/60/120-second wait policy; no Commander, independent acceptance or final verification exists.
+- The new checkpoint artifact \`14625709210\` was downloaded and independently parsed. ZIP SHA-256: \`6e62226f844db45790505590d6ebd0c62d66715234d19c1ad8fba361c5de87ff\`; JSON payload SHA-256: \`609e6c66e3dd8af84d23a2a3260863c8569783097934390d3a8336ad5efa0a53\`. Identity is exact: repo \`ruthlessjoey/btcidr-trading-lab\`, base \`cd451972e3a641ad6fa78e64abf3968655a4b82a\`, target \`d5d5db6cc5d3f11bf579eed45c873b630ed560a4\`, model \`inclusionai/ling-3.2-flash:free\`, evidence SHA \`385375cba9abbf0b4fc58b70e1c1806004da54cd2c99828885e440935ca96c32\`. Q0.8 remains **BLOCKED / NOT ACCEPTED** by provider quota; preserve the four reports and resume only after quota reset. Keep the 120-second retry cap.
+
+### PR #85 — validator epoch grid
+- Latest head remains \`09fd30a2d4d477a3ac42ad77641122f8a6e7c5e9\`; exact-head Python 3.11.18 run [#44688838846](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44688838846) passed four focused tests for epoch-aligned daily/intraday candles and uniformly offset candle rejection. Draft/unmerged.
+
+### Workstream B Step 6 v11
+- Raw v11 and v9 archive bytes remain unavailable to independent runtime verification. The visible author test output (88 tests) is not independent proof; hash checks, patch reconstruction, exact Python 3.11 run, mutation suite and bypass probes remain unperformed.
+- Static diff retains the possible deleted-dataclass-attribute \`AttributeError\` escape in \`apply_fill()\` / \`_revalidated_event()\`; exact-byte reproduction is outstanding. Step 6 remains **NOT ACCEPTED**, Step 7 remains **BLOCKED**. Step 10 build still requires Step 6 acceptance, exact owner-only storage path, and separate written build authorization.
+
+### Project-wide accepted scope and current measurements
+- Owner-approved inventory: 40 requirements A1–K5, 100 weight points, approved maturity rubric.
+- Candidate-weighted maturity remains **15.00/100** (24 requirements representing 60 weight points at 0.25 each; 16 at 0.00). **0/40** meet the exact-main 0.50 threshold. The passing PR #82/#86 runs are exact-head candidate evidence only and do not warrant a score increase.
+- Project-wide integrated completion is not accepted. No independent full-scope acceptance exists. Implementation, candidate testing, integrated verification and independent acceptance remain separate.
+- Profitability is **NOT PROVEN**; historical proxy evidence remains negative (−11% return, 0.36 profit factor) with incompletely verified cost assumptions. No reproducible realistic-cost untouched-holdout or PAPER forward evidence proves positive expectancy.
+- No PR merge, exchange/data request, dataset publication, backtest, PAPER/LIVE action, private-account access, credential use, order, funding, withdrawal or payment occurred in these tasks.
