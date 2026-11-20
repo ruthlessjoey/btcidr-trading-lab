@@ -1082,3 +1082,24 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - The workflow implementation has **not yet been executed or independently validated**. PR #83 remains open/draft/unmerged. This does not count as Q0.8 acceptance or increase maturity.
 
 - Final controller correction: latest PR #83 head `2b04799e50c3cf95f2a00fe1f1a1134fe71f1637`; the checkpoint gate now mirrors the reviewer’s first-nonempty-line/single-verdict rule and validates Commander/acceptance/verification progression before dispatch.
+
+
+## 2026-11-20 Workstream B Step 6 v11 origin-field fail-closed remediation — local candidate only
+
+- Immutable input archive: `workstream-b-step6-candidate-v11-full.tar.gz`, SHA-256 `2ee2aac29c51dc82aae658f28a2cb4ca46a3d1c691a05a09f460b9bf6aecb542`.
+- Root cause confirmed in `markets/portfolio/ledger.py`: `apply_fill` inspected event attributes before full validation, and `_revalidated_event` used `getattr` over dataclass fields. Removing the instance `origin` value allows the class-level `PAPER` default to appear present. A tampered HISTORICAL event with matching approval metadata can therefore be reconstructed as PAPER; deleting other fields can escape as raw `AttributeError`.
+- Local correction requires the actual event instance dictionary to contain exactly the declared `FillEvent` fields before reading any values. Missing or unexpected fields and non-Decimal amount values now produce `LedgerError("INVALID_INPUT")`; reconstruction and all existing constructor validation run on the copied values. `apply_fill` uses only the rebuilt event.
+- Added three regression methods covering deletion of each of the 12 declared fields, the HISTORICAL-origin-to-PAPER-default bypass, an unexpected instance field, and unchanged ledger state digest on refusal.
+- Evidence: Python 3.13.5 `py_compile` passed for the touched ledger/test modules and direct dependencies; Step 6 suite passed **91/91**. The three new regression methods fail against the original candidate (5 assertion failures and 9 raw-AttributeError errors across the deleted-field subcases), then pass on the corrected candidate.
+- Patch application was tested against a fresh extraction of the original archive; all 3 changed files matched the fixed candidate byte-for-byte. Patch SHA-256: `24151fef5b57fa3f7d4586b3f5e51a783d6e965d533829a237005b1fd1097ea7`. Fixed candidate archive SHA-256: `834dbeee3212c79f3c6f761da0d034159375cc60179aaf85789e9c32fd6aaa8a`.
+- Python 3.11 remains UNVERIFIED: it is not installed in this runtime, and `uv python install 3.11` failed because external DNS resolution was unavailable. No Python 3.11 workflow has yet run against this detached candidate.
+- Repository integration remains UNVERIFIED. The `markets/portfolio/ledger.py` path is absent from the checked `main`, `feature/m6-risk-engine`, and Q0 provider branches; no matching Workstream B Step 6 PR/branch was found by the branch and PR searches performed in this session. The fixed archive/patch are candidate artifacts, not a commit or merged implementation.
+- **Step 6 remains NOT ACCEPTED; Step 7 remains BLOCKED.** The fix resolves one critical reproduced defect only. Approval-reference authentication, durable restart-safe storage, risk/strategy integration evidence, and the Step 10 prerequisites remain open. Do not begin Step 10 without its separate written build approval and the exact owner-only storage path.
+- Project measurements remain unchanged: **15.00/100 candidate-weighted maturity; 0/40 requirements at the exact-main 0.50 threshold; profitability NOT PROVEN.** This detached candidate does not increase integrated project completion.
+
+## 2026-11-20 PR #83 auto-resume dispatch API correction
+
+- Commit `1cb8e62dce38cd166bf063464cfb0bd13bcd8aaa` changes only `.github/workflows/q08-specialist-review.yml` on `security/q08-review-runner-v2-pin-2026-11-20`.
+- The controller previously expected HTTP 200 plus a run ID, but its request omitted the documented `return_run_details` body parameter. GitHub REST API version `2022-11-28` returns HTTP 204 with no body when that parameter is false; the controller now sends `"return_run_details": true` to request HTTP 200 and run metadata. This is aligned with GitHub's current API contract: https://docs.github.com/en/rest/actions/workflows?apiVersion=2022-11-28#parameters-for-create-a-workflow-dispatch-event
+- Branch comparison after the correction: 14 commits ahead, 0 behind `main`; changed PR scope remains the workflow and immutable reviewer runner. The commit diff confirms only the workflow file changed.
+- The corrected controller has not yet been executed. PR #83 remains open/draft/unmerged; no Q0.8 acceptance or project maturity increase is claimed.
