@@ -19,6 +19,11 @@ on:
           - synthetic
           - review
         default: synthetic
+      auto_resume_count:
+        description: "Internal bounded automatic resume counter; do not edit manually"
+        required: false
+        type: number
+        default: 0
 
 permissions:
   contents: read
@@ -32,6 +37,8 @@ jobs:
     name: Bounded read-only 19-role review
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      rate_limited: ${{ steps.model-review.outputs.rate_limited }}
     permissions:
       contents: read
       pull-requests: read
@@ -83,6 +90,7 @@ jobs:
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
+        id: model-review
         if: ${{ inputs.mode == 'review' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -92,7 +100,18 @@ jobs:
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
           Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
-        run: python3 runner/tools/q08_specialist_review.py --mode review
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 runner/tools/q08_specialist_review.py --mode review 2>&1 | tee "$RUNNER_TEMP/q08-model-review.log"
+          review_status=${PIPESTATUS[0]}
+          if grep -Eq '^MODEL_REQUEST_FAILED role=[a-z0-9-]+ .*reason=OpenRouter rate limit \\(HTTP 429\\)' "$RUNNER_TEMP/q08-model-review.log"; then
+            echo "rate_limited=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rate_limited=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$review_status"
 
       - name: Persist resumable review checkpoint
         if: ${{ always() && inputs.mode == 'review' }}
@@ -102,3 +121,143 @@ jobs:
           path: ${{ runner.temp }}/q08-review-checkpoint.json
           if-no-files-found: ignore
           retention-days: 7
+
+  auto_resume:
+    name: Bounded automatic resume after confirmed provider HTTP 429
+    needs: review
+    if: ${{ always() && needs.review.result == 'failure' && needs.review.outputs.rate_limited == 'true' && inputs.mode == 'review' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Download this run's checkpoint artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: q08-review-checkpoint-${{ github.run_id }}
+          path: ${{ runner.temp }}/q08-checkpoint
+
+      - name: Validate checkpoint identity and enforce resume cap
+        id: validate
+        env:
+          CHECKPOINT_PATH: ${{ runner.temp }}/q08-checkpoint/q08-review-checkpoint.json
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
+          AUTO_RESUME_COUNT: ${{ inputs.auto_resume_count }}
+          CURRENT_BRANCH: ${{ github.ref_name }}
+          CURRENT_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+
+          expected = {
+              "repository": "ruthlessjoey/btcidr-trading-lab",
+              "base_sha": "cd451972e3a641ad6fa78e64abf3968655a4b82a",
+              "head_sha": "d5d5db6cc5d3f11bf579eed45c873b630ed560a4",
+              "model": "inclusionai/ling-3.2-flash:free",
+          }
+          if os.environ.get("CURRENT_REPOSITORY") != expected["repository"]:
+              sys.exit("Refusing auto-resume: repository identity mismatch")
+          if os.environ.get("CURRENT_BRANCH") != "security/q08-review-runner-v2-pin-2026-11-20":
+              sys.exit("Refusing auto-resume: branch identity mismatch")
+          if os.environ.get("REVIEW_HEAD_SHA") != expected["head_sha"]:
+              sys.exit("Refusing auto-resume: frozen review SHA mismatch")
+          path = Path(os.environ["CHECKPOINT_PATH"])
+          if path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576:
+              sys.exit("Refusing auto-resume: checkpoint missing, unsafe, or oversized")
+          try:
+              payload = json.loads(path.read_text(encoding="utf-8"))
+          except Exception:
+              sys.exit("Refusing auto-resume: checkpoint is not valid JSON")
+          keys = {"schema_version", "repository", "base_sha", "head_sha", "model",
+                  "review_evidence_sha256", "reports", "commander", "acceptance", "verification"}
+          if not isinstance(payload, dict) or set(payload) != keys:
+              sys.exit("Refusing auto-resume: checkpoint schema mismatch")
+          if payload.get("schema_version") != 2 or any(payload.get(k) != v for k, v in expected.items()):
+              sys.exit("Refusing auto-resume: checkpoint does not match frozen review identity")
+          if not re.fullmatch(r"[0-9a-f]{64}", str(payload.get("review_evidence_sha256", ""))):
+              sys.exit("Refusing auto-resume: evidence digest invalid")
+          roles = {
+              "architecture-architect", "implementation-engineer", "provider-integration",
+              "market-intelligence", "quant-research", "strategy-validation", "risk-invariants",
+              "portfolio-accounting", "execution-boundary", "operations-observability",
+              "security-review", "dependency-supply-chain", "offline-testing",
+              "systematic-debugging", "release-ci-security", "documentation-consistency",
+          }
+          reports = payload.get("reports")
+          if not isinstance(reports, dict) or not set(reports).issubset(roles):
+              sys.exit("Refusing auto-resume: checkpoint specialist set invalid")
+          for name, report in reports.items():
+              if not isinstance(report, str) or not report or len(report) > 24000:
+                  sys.exit("Refusing auto-resume: malformed specialist report: " + name)
+              if not re.match(r"^VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)(?:\\n|$)", report):
+                  sys.exit("Refusing auto-resume: invalid specialist verdict: " + name)
+          for name in ("commander", "acceptance", "verification"):
+              report = payload.get(name)
+              if report is not None and (
+                  not isinstance(report, str) or not report or len(report) > 24000
+                  or not re.match(r"^VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)(?:\\n|$)", report)
+              ):
+                  sys.exit("Refusing auto-resume: malformed " + name + " report")
+          try:
+              count = int(os.environ.get("AUTO_RESUME_COUNT", "0"))
+          except ValueError:
+              sys.exit("Refusing auto-resume: counter is not numeric")
+          if count < 0 or count > 3:
+              sys.exit("Refusing auto-resume: counter outside allowed range")
+          if count >= 3:
+              print("Automatic resume cap reached (3); no further dispatch.")
+              print("should_dispatch=false" , file=open(os.environ["GITHUB_OUTPUT"], "a"))
+          else:
+              print("next_count=" + str(count + 1), file=open(os.environ["GITHUB_OUTPUT"], "a"))
+              print("should_dispatch=true", file=open(os.environ["GITHUB_OUTPUT"], "a"))
+          print("Checkpoint identity and structure validated; reports preserved:", len(reports))
+          PY
+
+      - name: Dispatch the next bounded review attempt
+        if: ${{ steps.validate.outputs.should_dispatch == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
+          NEXT_RESUME_COUNT: ${{ steps.validate.outputs.next_count }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_REF: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/dispatch.json"
+          import json, os
+          print(json.dumps({
+              "ref": os.environ["WORKFLOW_REF"],
+              "inputs": {
+                  "review_head_sha": os.environ["REVIEW_HEAD_SHA"],
+                  "resume_from_run_id": os.environ["SOURCE_RUN_ID"],
+                  "mode": "review",
+                  "auto_resume_count": os.environ["NEXT_RESUME_COUNT"],
+              },
+          }))
+          PY
+          status=$(curl --silent --show-error --output "$RUNNER_TEMP/dispatch-response.json" \\
+            --write-out '%{http_code}' --request POST \\
+            --header "Accept: application/vnd.github+json" \\
+            --header "Authorization: Bearer $GH_TOKEN" \\
+            --header "X-GitHub-Api-Version: 2022-11-28" \\
+            --header "Content-Type: application/json" \\
+            --data-binary @"$RUNNER_TEMP/dispatch.json" \\
+            "https://api.github.com/repos/ruthlessjoey/btcidr-trading-lab/actions/workflows/421573712/dispatches")
+          if [ "$status" != "200" ]; then
+            echo "Workflow dispatch failed with HTTP $status; response body withheld."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+          data = json.loads(Path(os.environ["RUNNER_TEMP"] + "/dispatch-response.json").read_text())
+          run_id = data.get("workflow_run_id")
+          url = data.get("html_url")
+          if type(run_id) is not int or not isinstance(url, str) or not re.fullmatch(
+              r"https://github\\.com/ruthlessjoey/btcidr-trading-lab/actions/runs/[0-9]+", url
+          ):
+              sys.exit("Dispatch response did not contain a valid GitHub Actions run identity")
+          print("AUTO_RESUME_DISPATCHED run_id=" + str(run_id) + " url=" + url)
+          PY
