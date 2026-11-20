@@ -106,7 +106,7 @@ jobs:
           set -o pipefail
           python3 runner/tools/q08_specialist_review.py --mode review 2>&1 | tee "$RUNNER_TEMP/q08-model-review.log"
           review_status=${PIPESTATUS[0]}
-          if grep -Eq '^MODEL_REQUEST_FAILED role=[a-z0-9-]+ .*reason=OpenRouter rate limit \\(HTTP 429\\)' "$RUNNER_TEMP/q08-model-review.log"; then
+          if grep -Eq '^MODEL_REQUEST_FAILED role=[a-z0-9-]+ .*reason=OpenRouter rate limit \(HTTP 429\)' "$RUNNER_TEMP/q08-model-review.log"; then
             echo "rate_limited=true" >> "$GITHUB_OUTPUT"
           else
             echo "rate_limited=false" >> "$GITHUB_OUTPUT"
