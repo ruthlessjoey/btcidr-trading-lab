@@ -14,6 +14,10 @@
         "X-MCP-Toolsets": "repos,pull_requests,actions",
         "X-MCP-Readonly": "true"
       }
+    },
+    "firecrawl": {
+      "type": "http",
+      "url": "https://mcp.firecrawl.dev/v2/mcp-oauth"
     }
   }
 }
