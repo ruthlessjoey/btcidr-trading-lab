@@ -509,3 +509,14 @@ Do not make changes yet.
 Your first deliverable should be a concise state-recovery report, followed by the next safe code-review section.
 
 Remember: preserve the project. Do not restart it. Do not commit, push, migrate, merge, or run the backtest.
+
+
+## Superseding Tokocrypto public-market-data boundary — 20 November 2026
+
+This dated section is the current operational rule and supersedes older statements in this handoff that mention server-time or broader Tokocrypto API access.
+
+- The only authorized Tokocrypto request is unauthenticated HTTPS GET candles at `https://www.tokocrypto.site/api/v3/klines`, fixed to `BTCUSDT` and an explicitly allowed interval/query.
+- Tokocrypto server-time (`/api/v3/time`), symbol metadata/exchange-info, any `/open/v1` route, WebSocket/user-data routes, account/balance endpoints, and any `www.tokocrypto.com` API endpoint are **not authorized**.
+- Older references to `www.tokocrypto.com` are historical/documentation references only; they do not authorize network access to that host. Historical HTTP 451 observations remain historical and do not authorize bypassing network restrictions.
+- No network call, dataset publication, or backtest is allowed until the market-identity and data-quality gates pass under the approved boundary. Unit tests must remain offline and synthetic.
+- Tokocrypto remains a funding/custody venue only, not a bot account. No credentials, authentication, orders, withdrawals, or account synchronization.
