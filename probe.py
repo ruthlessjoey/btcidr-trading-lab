@@ -1,4 +1,7 @@
-"""Disabled legacy probe: the previous implementation queried unapproved symbol metadata routes."""
+"""Disabled legacy probe: the previous implementation queried unapproved symbol metadata routes.
+
+Exit status 2 is the shared CLI convention for disabled or approval-blocked commands.
+"""
 import sys
 
 
