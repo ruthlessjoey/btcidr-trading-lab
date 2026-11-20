@@ -102,7 +102,7 @@ class HistoryContainmentTests(unittest.TestCase):
                 edges = source_import_edges(path)
                 local = {
                     edge for edge in edges
-                    if edge.split(".", 1)[0] in {"fetcher", "providers", "probe", "research"}
+                    if edge.split(".", 1)[0] in {"fetcher", "providers", "probe", "research", "validator"}
                 }
                 self.assertEqual(local, expected)
                 self.assertFalse(
