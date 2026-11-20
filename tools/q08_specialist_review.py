@@ -999,8 +999,8 @@ def synthetic():
         {"fetch_history.py":"from research.history import run_step1"})
     assert context == {"fetch_history.py":"from research.history import run_step1"}
     sample_diffs = {
-        path: (f"--- {path}@{BASE_SHA[:12]}\\n"
-               f"+++ {path}@{HEAD_SHA[:12]}\\n@@ -1 +1 @@\\n-old\\n+new")
+        path: (f"--- {path}@{BASE_SHA[:12]}\n"
+               f"+++ {path}@{HEAD_SHA[:12]}\n@@ -1 +1 @@\n-old\n+new")
         if path in EXPECTED_CHANGED else ""
         for path in REVIEW_PATHS
     }
@@ -1010,9 +1010,11 @@ def synthetic():
     assert packet["changed_file_count"] == len(EXPECTED_STATUS) == 26
     assert [item["path"] for item in packet["changed_files"]] == expected_paths
     assert [item["path"] for item in manifest["changed_files"]] == expected_paths
+    assert packet["base_sha"] == BASE_SHA and packet["head_sha"] == HEAD_SHA
     assert all(item["change_status"] == EXPECTED_STATUS[item["path"]]
                and len(item["patch_sha256"]) == 64
-               and item["patch_chars"] > 0
+               and item["patch_sha256"] == hashlib.sha256(item["unified_diff"].encode("utf-8")).hexdigest()
+               and item["patch_chars"] == len(item["unified_diff"])
                for item in packet["changed_files"])
     assert manifest["unchanged_context_count"] == 1
     assert manifest["unchanged_context_files"][0]["path"] == "fetch_history.py"
