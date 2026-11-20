@@ -1,0 +1,61 @@
+name: M6 risk engine isolated offline tests
+
+on:
+  push:
+    branches:
+      - fix/m6-risk-zero-budget-provenance-2026-11-20
+    paths:
+      - markets/risk/**
+      - markets/identity.py
+      - markets/strategies/__init__.py
+      - markets/strategies/contract.py
+      - markets/strategies/decision.py
+      - markets/strategies/engine.py
+      - markets/strategies/registry.py
+      - .github/workflows/m6-risk-isolated-tests.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m6-risk-isolated-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  risk-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout only the M6 risk engine and pure M5 dependencies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /markets/__init__.py
+            /markets/identity.py
+            /markets/risk/__init__.py
+            /markets/risk/amounts.py
+            /markets/risk/config.py
+            /markets/risk/engine.py
+            /markets/risk/model.py
+            /markets/risk/test_risk.py
+            /markets/strategies/__init__.py
+            /markets/strategies/contract.py
+            /markets/strategies/decision.py
+            /markets/strategies/engine.py
+            /markets/strategies/registry.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Run the isolated M6 risk regression suite
+        run: python3 -B -m unittest discover -s markets/risk -p 'test_*.py' -v
