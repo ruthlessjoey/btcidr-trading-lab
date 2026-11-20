@@ -5,7 +5,7 @@ tools: Read, Grep, Glob
 model: inherit
 permissionMode: plan
 maxTurns: 18
-skills: [risk-invariants]
+skills: [risk-engine-invariants]
 ---
 
 # risk-invariants
