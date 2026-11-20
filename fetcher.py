@@ -172,9 +172,13 @@ def read_bounded_body(response, max_bytes, timeout_seconds):
             raise ApiError("response Content-Length is duplicated")
         if content_lengths:
             value = str(content_lengths[0])
-            if not value or not value.isascii() or not value.isdecimal():
+            if (not value or not value.isascii() or not value.isdecimal()
+                    or len(value) > 20):
                 raise ApiError("response Content-Length is invalid")
-            declared_length = int(value, 10)
+            try:
+                declared_length = int(value, 10)
+            except (ValueError, OverflowError):
+                raise ApiError("response Content-Length is invalid") from None
             if declared_length > max_bytes:
                 raise ApiError("response exceeded the 1 MiB public-data limit")
 

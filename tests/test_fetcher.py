@@ -1,4 +1,4 @@
-"""Offline tests for the approved public transport boundary; no sockets are used."""
+"""Offline transport tests with synthetic responses and local socketpairs; no external network calls."""
 import http.client
 import io
 import json
@@ -270,6 +270,34 @@ class BoundedResponseTests(unittest.TestCase):
         finally:
             client.close()
             server.close()
+
+    def test_duplicate_content_length_is_rejected(self):
+        client, server, response = self._response(
+            b"x", b"Content-Length: 1\r\nContent-Length: 1\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "duplicated"):
+                fetcher.read_bounded_body(response, 5, 1)
+        finally:
+            client.close()
+            server.close()
+
+    def test_malformed_content_length_is_rejected(self):
+        client, server, response = self._response(
+            b"x", b"Content-Length: 1x\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "Content-Length is invalid"):
+                fetcher.read_bounded_body(response, 5, 1)
+        finally:
+            client.close()
+            server.close()
+
+    def test_non_finite_or_non_positive_body_deadline_is_rejected(self):
+        for timeout in (float("nan"), float("inf"), 0, -1, True):
+            with self.subTest(timeout=timeout):
+                with self.assertRaisesRegex(fetcher.ApiError, "deadline is invalid"):
+                    fetcher.read_bounded_body(None, 5, timeout)
 
     def test_default_opener_disables_proxies_and_redirects(self):
         client, server, response = self._response(
