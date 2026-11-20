@@ -1202,3 +1202,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Claude Code project OAuth and live subagent tool invocation remain **NOT VERIFIED** until the owner approves the Firecrawl server in a compatible Claude Code runtime. Claude.ai Safari uses the separate native Firecrawl connector; account connection remains a manual user action. ChatGPT Commander access is already live.
 - Verified main at this update: `731fc9fbb892dadccc64bf52da2f91ff069da124`. No trading source, market-data provider, risk control, execution system, protected path, GitHub Actions workflow, or credential was changed. No PR was merged.
 - This tooling milestone does **not** change the weighted project maturity or profitability assessment. Overall completion remains UNRATED until scope, weights, and evidence are approved; the previously recorded candidate-weighted maturity remains 15.00/100, exact-main 0.50 requirements remain 0/40, and profitability remains NOT PROVEN.
+
+
+## 2026-11-21 Firecrawl clean-main dependency correction
+
+- The first Firecrawl draft chain (#87 → #88) inherited PR #43 → #42 → #41. Current-main comparison showed PR #41 was 80 commits behind main, so the chain was not suitable for safe integration. PRs #87 and #88 were marked **SUPERSEDED / DO NOT MERGE** in their descriptions and left open for audit; they were not closed or merged.
+- Clean replacement PR #89 is based directly on main `731fc9fbb892dadccc64bf52da2f91ff069da124`, branch `chore/firecrawl-primary-research-clean-2026-11-21`, head `341b629d4e7b89bb5250aaa9ea49ae3791fcea8c`, five changed files. It adds the Firecrawl OAuth MCP configuration, shared skill, free-tier policy, roadmap update, and migration/evidence document.
+- Clean specialist PR #90 is based on PR #89, branch `chore/firecrawl-specialists-clean-2026-11-21`, head `2744dd8b0ac08790d4bae34881fb204c420c235b`, 40 changed files. It restores the 19-agent / 19-domain-skill architecture and scopes Firecrawl to the Commander and ten relevant specialists while retaining plan mode and no repository write/shell tools.
+- Safe merge dependency, if approved later: **PR #89 → PR #90** only. Both remain draft/open/unmerged. Claude Code OAuth and actual specialist runtime invocation remain manual/unverified.
+- No protected files, trading code, risk controls, execution systems, exchange APIs, GitHub Actions workflows, or credentials were changed. Project maturity and profitability assessment are unchanged.
