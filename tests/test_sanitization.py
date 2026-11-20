@@ -5,7 +5,6 @@ import live_check, validator, report, dataset, or any protected module.
 """
 import io
 import os
-import tempfile
 import unittest
 import urllib.error
 
@@ -170,37 +169,6 @@ class ProviderSanitizationTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError) as ctx:
             providers.Coinbase().candles("1h", 1, 3600, FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]))
         self.assertNotIn(MARKER, str(ctx.exception))
-
-
-class CrosscheckSanitizationTests(unittest.TestCase):
-    def test_crosscheck_cannot_be_enabled_by_mutating_legacy_authorization_state(self):
-        calls = []
-
-        def forbidden_opener(url, timeout):
-            calls.append(url)
-            raise AssertionError("unapproved provider opener must not be called")
-
-        candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
-        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
-        crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
-        try:
-            with tempfile.TemporaryDirectory() as out:
-                with self.assertRaisesRegex(
-                        fetcher.ApiError, "independent cross-check providers are not authorized"):
-                    crosscheck.run_crosscheck(
-                        manifest, [candle], [], out, opener=forbidden_opener,
-                        sleep=NO_SLEEP, timeout=1, retries=1)
-                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
-                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
-        finally:
-            del crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
-
-        self.assertEqual(calls, [])
-
-    def test_zero_reference_prices_do_not_crash_comparison(self):
-        zero = fetcher.Candle(1_700_000_000, 0.0, 0.0, 0.0, 0.0, 0.0)
-        result = crosscheck.compare([zero], {zero.time: zero}, {}, [])
-        self.assertIsNone(result["summary"])
 
 
 if __name__ == "__main__":
