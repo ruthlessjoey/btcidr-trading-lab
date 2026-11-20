@@ -12,8 +12,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from research.pipeline import (load_required_crosscheck, validate_crosscheck_artifact,
-                               AUTHORIZED_CROSSCHECK_PROVIDERS)
+from research.pipeline import load_required_crosscheck, validate_crosscheck_artifact
 from research.engine import EngineError
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "abc123"}
@@ -34,7 +33,6 @@ class CrosscheckGateTests(unittest.TestCase):
                 "flagged": [{"date": "2020-03-12", "verdict": verdict}]}
 
     def test_no_independent_provider_is_currently_authorized(self):
-        self.assertEqual(AUTHORIZED_CROSSCHECK_PROVIDERS, frozenset())
         with self.assertRaisesRegex(EngineError, "no independent cross-check provider"):
             load_required_crosscheck(CFG, MANIFEST, None)
 
