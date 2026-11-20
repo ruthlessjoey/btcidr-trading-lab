@@ -47,6 +47,8 @@ jobs:
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /CLAUDE.md
+            /PROJECT_HANDOFF.MD
             /config.json
             /fetcher.py
             /providers.py
