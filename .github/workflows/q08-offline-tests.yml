@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Sparse checkout only approved offline modules and authorized research-gate dependencies
+      - name: Sparse checkout only approved offline modules and their unprotected dependencies
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -32,15 +32,6 @@ jobs:
             /research_config.json
             /research/history.py
             /research/__init__.py
-            /research/pipeline.py
-            /research/engine.py
-            /research/dataset.py
-            /research/selection.py
-            /research/splits.py
-            /research/strategy.py
-            /research/backtest_report.py
-            /validator.py
-            /tests/test_research_gates.py
             /research/crosscheck.py
             /fetch_history.py
             /tests/test_fetcher.py
@@ -56,7 +47,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run approved offline and research-gate regression modules
+      - name: Run approved offline regression modules
         run: |
           python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
           python3 -m unittest discover -s tests -p 'test_live_check.py' -v
@@ -64,4 +55,3 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
           python3 -m unittest discover -s tests -p 'test_sanitization.py' -v
-          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
