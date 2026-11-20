@@ -18,8 +18,8 @@ These are actual runtime-recognized definitions, not just role descriptions. The
 | `provider-integration` | `provider-integration`, `firecrawl-research` | Reviews public market-data provider contracts, URL containment, parsing, timestamps, and candle integrity. |
 | `market-intelligence` | `market-intelligence`, `firecrawl-research` | Reviews market-data provenance, source quality, freshness, coverage, and proxy-market limitations. |
 | `quant-research` | `quant-research-review`, `firecrawl-research` | Challenges quantitative research design, statistical validity, leakage, baselines, and reproducibility. |
-| `strategy-validation` | `strategy-validation` | Reviews strategy hypotheses, signal definitions, parameter controls, and out-of-sample validation. |
-| `risk-invariants` | `risk-invariants` | Reviews fail-closed risk rules, sizing, stops, stale-input handling, and invariant coverage. |
+| `strategy-validation` | `strategy-validation`, `firecrawl-research` | Reviews strategy hypotheses, signal definitions, parameter controls, and out-of-sample validation. |
+| `risk-invariants` | `risk-engine-invariants` | Reviews fail-closed risk rules, sizing, stops, stale-input handling, and invariant coverage. |
 | `portfolio-accounting` | `portfolio-accounting-review` | Reviews exact-decimal portfolio accounting, partial closures, event idempotency, and conservation. |
 | `execution-boundary` | `execution-boundary-review` | Reviews simulator/PAPER/LIVE boundaries, execution lifecycle, bypass risks, and kill-switch requirements. |
 | `operations-observability` | `operations-observability` | Reviews health, data freshness, sanitized observability, incident handling, and recovery design. |
@@ -43,7 +43,7 @@ These are actual runtime-recognized definitions, not just role descriptions. The
 - Commander instructions prohibit built-in Explore, Plan, general-purpose, or unnamed agents.
 - Project settings deny reads of protected paths and block built-in agent types. Review the active permission state before relying on it.
 
-**Limitation:** Claude Code permission rules are client-enforced, not an OS sandbox. Read-deny rules protect built-in file tools and related searches, but not arbitrary external processes. Agents have no shell or MCP tools. Human review and repository access controls remain necessary.
+**Limitation:** Claude Code permission rules are client-enforced, not an OS sandbox. Read-deny rules protect built-in file tools and related searches, but not arbitrary external processes. Agents have no shell tools; only selected research specialists receive the explicitly allowlisted Firecrawl MCP tools. Human review and repository access controls remain necessary.
 
 ## Activation
 1. Open this repository in a compatible Claude Code environment.
