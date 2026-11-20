@@ -1309,7 +1309,7 @@ def synthetic():
         "no model API was called; no secret values were read; no trading tests or "
         "exchange requests were run.\n\n"
         f"- Immutable review: {BASE_SHA[:12]}... → {HEAD_SHA[:12]}...\n"
-        "- Source scope: 26 changed paths + one separate unchanged context file\n- Role count: 19 (16 specialists + Commander + acceptance + verification)"
+        "- Source scope: 26 changed paths + one separate unchanged context file\n- Packet schema v1: explicit path/status/diff/hash records with synthetic coverage guards\n- Role count: 19 (16 specialists + Commander + acceptance + verification)"
     )
 
 def review():
