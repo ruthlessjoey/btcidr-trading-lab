@@ -2,6 +2,7 @@
 name: lab-commander
 description: Coordinates bounded specialist reviews, assigns tasks to named project agents, reconciles findings, and maintains the evidence ledger.
 tools: Read, Grep, Glob, Agent, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_map, mcp__firecrawl__firecrawl_crawl, mcp__firecrawl__firecrawl_check_crawl_status, mcp__firecrawl__firecrawl_agent, mcp__firecrawl__firecrawl_agent_status, mcp__firecrawl__firecrawl_interact, mcp__firecrawl__firecrawl_interact_stop, mcp__firecrawl__firecrawl_credit_usage
+mcpServers: [firecrawl]
 model: inherit
 permissionMode: plan
 maxTurns: 18
