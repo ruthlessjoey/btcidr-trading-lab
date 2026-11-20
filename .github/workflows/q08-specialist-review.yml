@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9
+          ref: 28cd695145a30a8114791f962fa52474dd450c56
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -78,6 +78,8 @@ jobs:
         run: python3 -m py_compile runner/tools/q08_specialist_review.py
 
       - name: Run synthetic policy smoke test
+        env:
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
