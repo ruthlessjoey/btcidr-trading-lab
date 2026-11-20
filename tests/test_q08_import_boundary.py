@@ -110,7 +110,7 @@ class Q08ImportBoundaryTests(unittest.TestCase):
 
     def test_workflow_sparse_checkout_matches_exact_approved_file_set(self):
         source = WORKFLOW.read_text(encoding="utf-8")
-        match = re.search(r"(?ms)^          sparse-checkout: \|\n((?:^            .*\n)+)", source)
+        match = re.search(r"(?m)^          sparse-checkout: \|\n((?:^            [^\n]*\n)+)", source)
         self.assertIsNotNone(match, "sparse-checkout allowlist is missing or malformed")
         actual = {line.strip()[1:] for line in match.group(1).splitlines() if line.strip()}
         self.assertEqual(actual, WORKFLOW_CHECKOUT)
