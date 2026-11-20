@@ -187,18 +187,26 @@ jobs:
           reports = payload.get("reports")
           if not isinstance(reports, dict) or not set(reports).issubset(roles):
               sys.exit("Refusing auto-resume: checkpoint specialist set invalid")
-          for name, report in reports.items():
+          verdict_re = re.compile(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)")
+          def valid_report(report):
               if not isinstance(report, str) or not report or len(report) > 24000:
+                  return False
+              nonempty = [line.strip() for line in report.splitlines() if line.strip()]
+              verdicts = [line for line in nonempty if verdict_re.fullmatch(line)]
+              return bool(nonempty) and verdict_re.fullmatch(nonempty[0]) is not None and len(verdicts) == 1
+          for name, report in reports.items():
+              if not valid_report(report):
                   sys.exit("Refusing auto-resume: malformed specialist report: " + name)
-              if not report.splitlines() or not re.fullmatch(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)", report.splitlines()[0]):
-                  sys.exit("Refusing auto-resume: invalid specialist verdict: " + name)
           for name in ("commander", "acceptance", "verification"):
               report = payload.get(name)
-              if report is not None and (
-                  not isinstance(report, str) or not report or len(report) > 24000
-                  or not report.splitlines() or not re.fullmatch(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)", report.splitlines()[0])
-              ):
+              if report is not None and not valid_report(report):
                   sys.exit("Refusing auto-resume: malformed " + name + " report")
+          if payload["commander"] is not None and set(reports) != roles:
+              sys.exit("Refusing auto-resume: Commander exists before all specialist roles")
+          if payload["acceptance"] is not None and payload["commander"] is None:
+              sys.exit("Refusing auto-resume: acceptance exists without Commander")
+          if payload["verification"] is not None and payload["acceptance"] is None:
+              sys.exit("Refusing auto-resume: verification exists without acceptance")
           try:
               count = int(os.environ.get("AUTO_RESUME_COUNT", "0"))
           except ValueError:
