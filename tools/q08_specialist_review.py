@@ -1436,14 +1436,14 @@ def synthetic():
             return SyntheticResponse()
     synthetic_opener = SyntheticOpener()
     synthetic_sleeps = []
-    original_make_opener, original_sleep = make_opener, time.sleep
+    original_make_opener, original_sleep = globals()["make_opener"], time.sleep
     try:
-        make_opener = lambda: synthetic_opener
+        globals()["make_opener"] = lambda: synthetic_opener
         time.sleep = lambda delay: synthetic_sleeps.append(delay)
         retried = ask_model("synthetic system", {}, "synthetic-key",
                             "https://example.invalid", "synthetic-model", "synthetic-rate-limit")
     finally:
-        make_opener, time.sleep = original_make_opener, original_sleep
+        globals()["make_opener"], time.sleep = original_make_opener, original_sleep
     assert retried == "VERDICT: PASS"
     assert synthetic_opener.calls == 2
     assert synthetic_sleeps == [240.0]
