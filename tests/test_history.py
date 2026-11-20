@@ -68,7 +68,7 @@ class HistoryContainmentTests(unittest.TestCase):
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": {"research.history"},
+            "tests/test_history.py": {"research.history", "research.backtest_report"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
