@@ -1033,3 +1033,13 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - First attempt [#44733201139](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44733201139) failed because the expected AST import closure was stale after adding the report helper; this was corrected. Only the later 58-test run is counted as passed.
 - PR #86 remains draft/unmerged and stacked on PR #60. The protected research pipeline remains unexecuted; these focused candidate tests do not equal integration acceptance.
 - Candidate-weighted score remains 15.00/100; no score increase. Profitability remains NOT PROVEN.
+
+
+## 2026-11-20 PR #86 exact-head source-label acceptance evidence
+
+- Latest PR #86 head: \`343234b1f79684e4e2302f37277040d46a1f00d5\`; 25 commits ahead / 0 behind the frozen PR #60 source head; eleven changed paths.
+- The backtest report now derives the source label from the preserved dataset manifest through \`dataset_source_label()\`. It uses that value in the main disclaimer, optional cross-check comparisons, and the unresolved-source section. Missing/malformed source metadata reports \`unverified dataset source\`; the text explicitly states the dataset label is not proof of current Tokocrypto execution prices or rules.
+- The import-free report module is now included in the bounded offline sparse checkout, and an AST closure test plus a rendered-report test cover this permitted dependency. The approved suite still excludes \`validator.py\`, root \`report.py\`, \`P1/\`, all \`signal/\`, \`markets/\`, and the protected research-gate test module.
+- Exact-head workflow [#44733388671](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44733388671) completed successfully on exact SHA \`343234b1f79684e4e2302f37277040d46a1f00d5\`: **58 passed / 0 failed** on Python 3.11 (fetcher 21, provider authorization 4, history/report 9, disabled probe 3, pipeline containment 6, sanitization 15).
+- Earlier run #44733201139 failed because the expected static import map did not yet include the new report helper import. The test map was corrected and the succeeding exact-head run passed. Do not count the failed attempt as passing.
+- This is still stacked candidate evidence. PR #86 remains open/draft/unmerged; protected pipeline runtime and end-to-end integration remain UNVERIFIED. Project score remains 15.00/100 candidate-weighted, 0/40 exact-main requirements at 0.50, with no score increase. Profitability remains NOT PROVEN.
