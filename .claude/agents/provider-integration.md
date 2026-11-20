@@ -2,6 +2,7 @@
 name: provider-integration
 description: Reviews public market-data provider contracts, URL containment, parsing, timestamps, and candle integrity.
 tools: Read, Grep, Glob, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_map, mcp__firecrawl__firecrawl_crawl, mcp__firecrawl__firecrawl_check_crawl_status, mcp__firecrawl__firecrawl_credit_usage
+mcpServers: [firecrawl]
 model: inherit
 permissionMode: plan
 maxTurns: 18
