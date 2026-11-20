@@ -608,14 +608,14 @@ def review_verdict_failures(reports: dict, commander, acceptance, verification) 
 
 
 def validate_checkpoint_source_metadata(run: dict, run_id: str,
-                                         current_branch: str,
-                                         expected_head_sha: str) -> None:
-    """Bind a restored checkpoint to a completed run of this exact workflow and head."""
+                                         current_branch: str) -> str:
+    """Bind a checkpoint source to a completed run of this workflow on an approved branch."""
     if not re.fullmatch(r"[0-9]{1,20}", run_id):
         raise RuntimeError("Checkpoint source run ID is invalid")
     if current_branch not in EXPECTED_WORKFLOW_BRANCHES:
         raise RuntimeError("Checkpoint resume is allowed only from an explicitly approved workflow branch")
     repository = run.get("repository") if isinstance(run, dict) else None
+    source_sha = run.get("head_sha") if isinstance(run, dict) else None
     if not isinstance(repository, dict):
         raise RuntimeError("Checkpoint source run metadata is incomplete")
     if (run.get("id") != int(run_id)
@@ -624,10 +624,31 @@ def validate_checkpoint_source_metadata(run: dict, run_id: str,
         or run.get("event") != "workflow_dispatch"
         or run.get("status") != "completed"
         or repository.get("full_name") != REPO
-        or run.get("head_sha") != expected_head_sha
-        or run.get("head_branch") != current_branch):
+        or run.get("head_branch") != current_branch
+        or not isinstance(source_sha, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", source_sha)):
         raise RuntimeError(
-            "Checkpoint source run does not match this repository, workflow, branch, and exact review head")
+            "Checkpoint source run does not match this repository, workflow, approved branch, and immutable workflow commit")
+    return source_sha
+
+
+def validate_checkpoint_source_ancestry(source_sha: str, current_sha: str,
+                                        comparison: dict) -> None:
+    """Require the checkpoint-producing workflow commit to be an ancestor of the current workflow commit."""
+    if (not isinstance(source_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", source_sha)
+        or not isinstance(current_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", current_sha)
+        or not isinstance(comparison, dict)):
+        raise RuntimeError("Checkpoint workflow commit ancestry metadata is invalid")
+    base_sha = comparison.get("base_commit", {}).get("sha")
+    merge_base_sha = comparison.get("merge_base_commit", {}).get("sha")
+    status = comparison.get("status")
+    if source_sha == current_sha:
+        if status != "identical" or base_sha != source_sha or merge_base_sha != source_sha:
+            raise RuntimeError("Checkpoint workflow commit identity comparison is inconsistent")
+        return
+    if (status != "ahead" or base_sha != source_sha or merge_base_sha != source_sha
+        or comparison.get("too_large") is True):
+        raise RuntimeError("Checkpoint source workflow commit is not an ancestor of the current approved branch head")
 
 
 def validate_checkpoint_source(token: str) -> None:
@@ -638,9 +659,16 @@ def validate_checkpoint_source(token: str) -> None:
     if current_run_id and current_run_id == run_id:
         raise RuntimeError("A review run cannot resume its own checkpoint")
     current_branch = os.environ.get("GITHUB_REF_NAME", "")
+    current_sha = os.environ.get("GITHUB_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", current_sha):
+        raise RuntimeError("Current workflow commit SHA is unavailable or invalid")
     source_run = github_json("/repos/" + REPO + "/actions/runs/" + run_id, token)
-    validate_checkpoint_source_metadata(source_run, run_id, current_branch, HEAD_SHA)
-    print("STAGE checkpoint_source_run_verified run_id=" + run_id, flush=True)
+    source_sha = validate_checkpoint_source_metadata(source_run, run_id, current_branch)
+    comparison = github_json(
+        "/repos/" + REPO + "/compare/" + source_sha + "..." + current_sha, token)
+    validate_checkpoint_source_ancestry(source_sha, current_sha, comparison)
+    print("STAGE checkpoint_source_run_verified run_id=" + run_id +
+          " workflow_sha=" + source_sha[:12] + " current_sha=" + current_sha[:12], flush=True)
 
 
 def _unique_json_object(pairs):
@@ -1135,19 +1163,49 @@ def synthetic():
         "base":{"sha":BASE_SHA,"ref":"feature/m6-risk-engine"},
     }
     validate_pull_request_target(sample_pr, expected_pr_head)
+    synthetic_workflow_sha = "c" * 40
     sample_run = {
         "id":123456, "workflow_id":EXPECTED_WORKFLOW_ID,
         "path":EXPECTED_WORKFLOW_PATH, "event":"workflow_dispatch",
-        "status":"completed", "head_sha":expected_pr_head,
+        "status":"completed", "head_sha":synthetic_workflow_sha,
         "head_branch":SYNTHETIC_WORKFLOW_BRANCH,
         "repository":{"full_name":REPO},
     }
     assert SYNTHETIC_WORKFLOW_BRANCH in EXPECTED_WORKFLOW_BRANCHES
-    validate_checkpoint_source_metadata(
-        sample_run, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
+    source_sha = validate_checkpoint_source_metadata(
+        sample_run, "123456", SYNTHETIC_WORKFLOW_BRANCH)
+    assert source_sha == synthetic_workflow_sha
+    synthetic_advance = {
+        "status":"ahead",
+        "base_commit":{"sha":synthetic_workflow_sha},
+        "merge_base_commit":{"sha":synthetic_workflow_sha},
+        "too_large":False,
+    }
+    validate_checkpoint_source_ancestry(
+        synthetic_workflow_sha, "d" * 40, synthetic_advance)
+    synthetic_identical = {
+        "status":"identical",
+        "base_commit":{"sha":synthetic_workflow_sha},
+        "merge_base_commit":{"sha":synthetic_workflow_sha},
+        "too_large":False,
+    }
+    validate_checkpoint_source_ancestry(
+        synthetic_workflow_sha, synthetic_workflow_sha, synthetic_identical)
+    for bad_comparison in (
+        {**synthetic_advance, "merge_base_commit":{"sha":"e" * 40}},
+        {**synthetic_advance, "status":"behind"},
+        {**synthetic_advance, "too_large":True},
+    ):
+        try:
+            validate_checkpoint_source_ancestry(
+                synthetic_workflow_sha, "d" * 40, bad_comparison)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("invalid checkpoint workflow ancestry was accepted")
     try:
         validate_checkpoint_source_metadata(
-            sample_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+            sample_run, "123456", EXPECTED_REVIEW_BRANCH)
     except RuntimeError as exc:
         assert "approved workflow branch" in str(exc)
     else:
@@ -1164,7 +1222,7 @@ def synthetic():
         bad_run = {**sample_run, field:bad_value}
         try:
             validate_checkpoint_source_metadata(
-                bad_run, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
+                bad_run, "123456", SYNTHETIC_WORKFLOW_BRANCH)
         except RuntimeError:
             pass
         else:
@@ -1172,14 +1230,14 @@ def synthetic():
     wrong_repo = {**sample_run, "repository":{"full_name":"attacker/repo"}}
     try:
         validate_checkpoint_source_metadata(
-            wrong_repo, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
+            wrong_repo, "123456", SYNTHETIC_WORKFLOW_BRANCH)
     except RuntimeError:
         pass
     else:
         raise AssertionError("checkpoint source from another repository was accepted")
     try:
         validate_checkpoint_source_metadata(
-            sample_run, "123456", "other-branch", expected_pr_head)
+            sample_run, "123456", "other-branch")
     except RuntimeError:
         pass
     else:
