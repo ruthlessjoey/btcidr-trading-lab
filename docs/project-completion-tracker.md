@@ -801,3 +801,65 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - M4a Binance Vision and Kraken adapters are provider parsing/normalization candidates, but Kraken's own adapter docstring says fixture-only/no live use, and the M4a milestone describes these adapters as fixture-tested. They were not used for network access in this review. They are not a basis for a current profitability claim.
 - This static review did not enter the protected `signal/` source, `markets/risk/`, `validator.py`, `report.py`, or Workstream B; it did not run any M5 strategy tests because the adapter's import closure reaches protected signal code.
 - Profitability therefore remains **UNVERIFIED**: the known strategy is narrow, the verified historical test result is negative, source/venue identity remains gated, publication grace is assumed, and no integrated chronological out-of-sample fee/slippage-aware evaluation is currently accepted.
+
+
+## 2026-11-20 first-pass row-level status and weighted evidence audit
+
+**Selected integration baseline:** `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`.  
+**Scope / weights:** owner-approved 40 requirements, total 100 points.  
+**Method:** candidate code on unmerged branches earns no more than 0.25; documentation alone earns zero; protected or unassessed requirements earn zero; no row reaches 0.50 until implementation is on the selected baseline and focused exact-head offline tests pass.
+
+| ID | Wt. | Implementation status | Test / verification | Security status | Integration status | Maturity | Evidence and remaining acceptance work |
+|---|---:|---|---|---|---|---:|---|
+| A1 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.25 | Project instructions, handoff and PR #82 document research-only / spot-long-only / PAPER-only boundaries; safe entrypoint correction still unmerged. Need versioned scope and executable mode/phase acceptance on main. |
+| A2 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.25 | M4a/M5 provider-neutral candles and strategy contracts exist on the divergent M6 candidate line; current main remains legacy M1. Need current-main integration and dependency-direction tests. |
+| A3 | 3 | IN PROGRESS | UNVERIFIED | BLOCKED in part | Candidate only | 0.25 | Strategy contract records research-only decisions and a strategy/risk/portfolio separation; stop ownership and portfolio boundary are protected/unverified. Need a complete current ADR/invariant matrix and interface acceptance without opening protected code. |
+| B1 | 3 | IN PROGRESS | PARTIAL / candidate | IN PROGRESS | Candidate only | 0.25 | PR #82 safely scopes BTCUSDT candle transport; M4a Binance Vision/Kraken adapters are fixture-only candidates. Meme, newly listed and DEX coverage is not integrated or authorized. Need per-source approval, identity, freshness and tests. |
+| B2 | 3 | NOT STARTED | NOT STARTED | UNVERIFIED | NOT STARTED | 0.00 | No approved equities/ETFs, FX, indices or commodities adapters evidenced. Define owner-approved instruments and public providers before implementation. |
+| B3 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.25 | M4a candle/provider normalization and canonical market structures exist on the M6 candidate line. Need exact-main schema/provenance tests across supported instruments. |
+| B4 | 2 | IN PROGRESS | UNVERIFIED for provider runtime | IN PROGRESS | Candidate only | 0.25 | M4b COMPLETE/PARTIAL/UNAVAILABLE/REFUSED states are candidate code; six-hour publication grace is explicitly an assumption. Need approved-source rate-limit, retry, timeout, freshness and stale-data verification. |
+| C1 | 3 | BLOCKED | FAIL/CLOSED gate only | IN PROGRESS | Not integrated | 0.25 | Q0 research candidate deliberately rejects market identity, performs zero requests and writes no dataset. Need an owner-approved identity method and independent evidence before publication. |
+| C2 | 3 | IN PROGRESS | UNVERIFIED at integrated head | IN PROGRESS | Candidate only | 0.25 | M4a validation module and boundary tests are candidate artifacts. Need exact-head positive/negative tests for gaps, duplicates, closure, numeric values, timestamps and completeness on integrated source. |
+| C3 | 3 | IN PROGRESS | 22 isolated tests PASS on PR #76 | IN PROGRESS | Candidate / stacked | 0.25 | PR #76 run #44642158427 passed 22/22 bounded-publisher tests, but remains stacked on unmerged PR #34; no integrated dataset publisher/rollback acceptance. |
+| D1 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.25 | M5 provider-neutral strategy contract and decision serializer exist on M6 candidate line. Need integrated deterministic multi-strategy research framework and fixtures. |
+| D2 | 3 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.25 | Research split/backtest candidate files exist; full backtest path is blocked by protected import dependencies. Need chronological leakage, selection and boundary tests on an authorized isolated evaluator. |
+| D3 | 2 | IN PROGRESS | UNVERIFIED against venue rules | IN PROGRESS | Candidate only | 0.25 | Historical backtest config contains fee/slippage assumptions, but venue costs were explicitly unverified; historical test return was -11%. Need documented scenarios and sensitivity/realistic-cost evidence. |
+| D4 | 3 | IN PROGRESS | 22 isolated publisher tests PASS; end-to-end UNVERIFIED | IN PROGRESS | Candidate / stacked | 0.25 | PR #76 run #44642158427 passed 22/22 publisher tests. Full once-only reservation, TEST refusal, immutable inputs and pipeline integration remain unaccepted. |
+| E1 | 3 | NOT STARTED | NOT STARTED | UNVERIFIED | NOT STARTED | 0.00 | No bounded multi-market universe discovery/eligibility implementation verified. Define scope, identity, deduplication and exclusions. |
+| E2 | 4 | NOT STARTED | NOT STARTED | UNVERIFIED | NOT STARTED | 0.00 | No integrated cross-market scoring/ranking or benchmark/false-positive evaluation. |
+| E3 | 3 | NOT STARTED | NOT STARTED | UNVERIFIED | NOT STARTED | 0.00 | No accepted scanner orchestration/candidate lifecycle. Keep order execution out of scope. |
+| F1 | 2 | IN PROGRESS | UNVERIFIED integrated | IN PROGRESS | Candidate only | 0.25 | M5 strategy contract/decision types define BUY/SELL/HOLD and explanatory fields. Need accepted versioned signal contract with confidence, provenance, invalidation and expiry. |
+| F2 | 3 | IN PROGRESS | NOT RUN under protected import boundary | IN PROGRESS | Candidate only | 0.25 | Static M5 review found only the pinned BTC daily S1 adapter; it imports the protected `signal` source and is not executed. Need safe, approved strategy implementation and out-of-sample tests. |
+| F3 | 2 | IN PROGRESS | UNVERIFIED integrated | IN PROGRESS | Candidate only | 0.25 | M5 engine/decision candidates contain reason codes and indicator explanations. Need exact-main tests for invalid/conflicting/stale inputs and calibrated uncertainty. |
+| F4 | 2 | NOT STARTED | NOT STARTED | UNVERIFIED | NOT STARTED | 0.00 | No accepted signal-expiry contract or delayed/partial-data non-revival tests found. Data freshness state alone is not signal expiry. |
+| G1 | 3 | UNVERIFIED | NOT RUN | Protected scope preserved | BLOCKED from inspection | 0.00 | Risk-sizing implementation is under protected risk/Workstream B scope. No source or test was inspected or executed; separate authorization or independent non-disclosing evidence required. |
+| G2 | 3 | UNVERIFIED | NOT RUN | Protected scope preserved | BLOCKED from inspection | 0.00 | Stop proposal/validation/portfolio ownership cannot be assessed without protected risk/portfolio evidence. Do not infer acceptance from the historical M6 milestone. |
+| G3 | 2 | UNVERIFIED | NOT RUN | Protected scope preserved | BLOCKED from inspection | 0.00 | Portfolio aggregate exposure, concentration and position caps are protected/unverified. |
+| G4 | 2 | UNVERIFIED | NOT RUN | Protected scope preserved | BLOCKED from inspection | 0.00 | Current fail-closed risk gates cannot be independently assessed without protected risk modules. No execution enabled. |
+| H1 | 4 | UNVERIFIED | NOT RUN | Protected Workstream B preserved | BLOCKED from inspection | 0.00 | FIFO accounting and partial-close conservation are protected. No ledger source or test accessed. |
+| H2 | 2 | UNVERIFIED | NOT RUN | Protected Workstream B preserved | BLOCKED from inspection | 0.00 | Fee/slippage posting through entries, partial exits and closures is protected/unverified. |
+| H3 | 2 | UNVERIFIED | NOT RUN | Protected Workstream B preserved | BLOCKED from inspection | 0.00 | Ten-position capacity and concurrent allocation are not independently evidenced; protected implementation not accessed. |
+| H4 | 2 | UNVERIFIED | NOT RUN | Protected Workstream B preserved | BLOCKED from inspection | 0.00 | One-approval-per-fill binding and duplicate/mismatch rejection remain protected/unverified. |
+| I1 | 3 | NOT STARTED | NOT RUN | PAPER remains unavailable | NOT INTEGRATED | 0.00 | No accepted end-to-end PAPER lifecycle; no execution performed. |
+| I2 | 3 | UNVERIFIED | NOT RUN | PAPER remains unavailable | BLOCKED | 0.00 | Independent emergency-stop behavior is not accepted. Do not inspect protected control implementation or enable PAPER. |
+| I3 | 2 | NOT STARTED | NOT RUN | UNVERIFIED | NOT INTEGRATED | 0.00 | No accepted integrated event replay, recovery or corruption-handling lifecycle. |
+| J1 | 2 | NOT STARTED | NOT RUN | UNVERIFIED | NOT INTEGRATED | 0.00 | No mobile-first operator dashboard evidenced. |
+| J2 | 2 | NOT STARTED | NOT RUN | UNVERIFIED | NOT INTEGRATED | 0.00 | No accepted ongoing monitoring/health surface for scans, stale data and provider degradation. |
+| J3 | 1 | NOT STARTED | NOT RUN | UNVERIFIED | NOT INTEGRATED | 0.00 | No accepted pause/stop/review controls. No operator control may bypass risk gates. |
+| K1 | 3 | IN PROGRESS | 49 offline tests PASS on PR #82 | IN PROGRESS | Candidate only | 0.25 | PR #82 exact head #2818... passed 49/49 offline tests and CodeQL/Analyze checks; unmerged. Need integration to main and independent security acceptance. |
+| K2 | 3 | IN PROGRESS | 49 offline tests PASS on PR #82; synthetic reviewer PASS | IN PROGRESS | Candidate only | 0.25 | PR #82 run #44682581650 passed 49/49; PR #81 runner synthetic run #44683018384 passed. No integrated end-to-end/project-wide verification. |
+| K3 | 2 | IN PROGRESS | Static checks PASS on candidates | IN PROGRESS | Candidate only | 0.25 | Several workflows/actions are pinned and CodeQL/Analyze passed on PR #82/#81/#83. Complete dependency/provenance/license inventory and integrated supply-chain acceptance remain outstanding. |
+| K4 | 2 | IN PROGRESS | PR #83 synthetic workflow PASS; 19-role source review pending | IN PROGRESS | Candidate only | 0.25 | PR #83 pins runner v2 and passes synthetic mode. Full review run #44683200007 has not finished; reviewer/Commander/acceptance gates remain pending. |
+| K5 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.00 | Tracker, README and handoff contain useful context, but a complete accepted rollback/incident/recovery runbook and operational proof are not established. Documentation alone earns no maturity credit. |
+
+### First-pass weighted result (2026-11-20)
+
+- Candidate implementation evidence exists for 20 requirements representing 50 of the 100 approved weight points. The artifacts remain draft/feature-branch candidates; this is **candidate coverage**, not integrated implementation completion.
+- Those 20 candidates each receive 0.25 maturity under the approved rubric. The remaining 20 rows receive 0.00 because they are unimplemented, protected/unverified, or blocked.
+- Weighted maturity numerator: `50 × 0.25 = 12.50 points`; denominator: 100 points.
+- **First-pass project completion: 12.50%.** This is a conservative, evidence-backed snapshot against current main, not a profitability score and not independent project acceptance.
+- **Integrated verification completion:** 0/40 requirements meet the 0.50 exact-main implementation-plus-focused-test threshold. This does not erase the 49/49 and synthetic results; those remain exact candidate-branch evidence capped at 0.25 until integrated and further accepted.
+- **Candidate implementation coverage:** 50/100 weight points have at least some candidate artifact. This is not a claim that those requirements are fully implemented.
+- **Profitability: UNVERIFIED.** The one identified strategy is BTC-USDT daily S1; historical test stats in the master handoff are negative (-11% return, 0.36 profit factor) and venue cost assumptions are unverified.
+- This first pass is intentionally conservative. It does not credit protected implementation from historical milestone labels, and it does not remove any requirement from the denominator. Independent audit may revise a row only with exact evidence and a dated explanation.
+
