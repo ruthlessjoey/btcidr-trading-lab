@@ -24,7 +24,7 @@ class DisabledProbeTests(unittest.TestCase):
         self.assertNotIn("open/v1", source)
 
     def test_network_lab_exits_disabled_without_network_access(self):
-        script = os.path.join(ROOT, "tools", "net_lab.py")
+        script = os.path.join(ROOT, "tools/net_lab.py")
         with open(script, encoding="utf-8") as f:
             source = f.read()
         self.assertNotIn("urllib", source)
