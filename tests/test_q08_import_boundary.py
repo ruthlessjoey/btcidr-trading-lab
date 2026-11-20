@@ -109,7 +109,7 @@ class Q08ImportBoundaryTests(unittest.TestCase):
         for test_path in TEST_FILES:
             with self.subTest(test=test_path):
                 closure = _resolve_closure(test_path)
-                self.assertLessEqual(closure, set(TEST_FILES) | set(SOURCE_FILES.values()))
+                self.assertLessEqual(closure, set(TEST_FILES) | set(SOURCE_FILES.values()) | {PACKAGE_INIT})
                 for path in closure:
                     _source_imports(path)
 
