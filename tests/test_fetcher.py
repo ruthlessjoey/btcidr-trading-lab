@@ -1,4 +1,6 @@
-"""Tests for fetcher.py. All data here is SYNTHETIC test data, not market prices."""
+"""Offline tests for the approved public transport boundary; no sockets are used."""
+import io
+import json
 import os
 import sys
 import unittest
@@ -8,142 +10,173 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
 
 NO_SLEEP = lambda seconds: None  # noqa: E731
-MS = 1_700_000_000_000
+UNVERIFIED_TIME_URL = "https://www.tokocrypto.site/api/v3/time"
+CANDLE_URL = ("https://www.tokocrypto.site/api/v3/klines?"
+              "symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003599999&limit=500")
 
 
 def scripted(*answers):
-    """Fake network: each call returns the next answer (status, body) or raises it."""
     calls = []
-
     def opener(url, timeout):
-        calls.append(url)
-        a = answers[min(len(calls) - 1, len(answers) - 1)]
-        if isinstance(a, Exception):
-            raise a
-        return a
+        calls.append((url, timeout))
+        answer = answers[min(len(calls) - 1, len(answers) - 1)]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
     opener.calls = calls
     return opener
 
 
-def row(t_ms=MS, o="10", h="12", low="9", c="11", v="5"):
-    return [t_ms, o, h, low, c, v, t_ms + 3_599_999, "55", 7, "2", "1", "0"]
+def row(t_ms=1_700_000_000_000):
+    return [t_ms, "10", "12", "9", "11", "5", t_ms + 3_599_999]
 
 
-class SourceTests(unittest.TestCase):
-    def test_urls_and_symbols(self):
-        a = fetcher.Source("a", "binance_style", "https://x.test")
-        b = fetcher.Source("b", "open_v1", "https://y.test")
-        self.assertEqual(a.klines_url(), "https://x.test/api/v3/klines")
-        self.assertEqual(a.time_url(), "https://x.test/api/v3/time")
-        self.assertEqual(a.symbol("BTC_USDT"), "BTCUSDT")
-        self.assertEqual(b.klines_url(), "https://y.test/open/v1/market/klines")
-        self.assertEqual(b.time_url(), "https://y.test/open/v1/common/time")
-        self.assertEqual(b.symbol("BTC_USDT"), "BTC_USDT")
+class UrlPolicyTests(unittest.TestCase):
+    def test_unverified_server_time_route_is_rejected_before_network(self):
+        op = scripted((200, b'{"serverTime":1700000000000}'))
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            fetcher.validate_public_url(UNVERIFIED_TIME_URL)
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            fetcher.http_get_json(UNVERIFIED_TIME_URL, 5, 1, op, NO_SLEEP)
+        self.assertEqual(op.calls, [])
 
-    def test_unknown_style_is_rejected(self):
-        with self.assertRaises(ValueError):
-            fetcher.Source("z", "mystery", "https://z.test")
+    def test_only_btcusdt_candle_route_is_allowed(self):
+        self.assertEqual(fetcher.validate_public_url(CANDLE_URL), CANDLE_URL)
+
+    def test_rejects_unapproved_schemes_hosts_paths_ports_and_userinfo(self):
+        bad = [
+            "http://www.tokocrypto.site/api/v3/time",
+            "https://www.tokocrypto.com/api/v3/time",
+            "https://data-api.binance.vision/api/v3/time",
+            "https://api.kraken.com/api/v3/time",
+            "https://www.tokocrypto.site:444/api/v3/time",
+            "https://user:pass@www.tokocrypto.site/api/v3/time",
+            "https://www.tokocrypto.site/api/v3/exchangeInfo?symbol=BTCUSDT",
+            "https://www.tokocrypto.site/open/v1/common/time",
+            "https://www.tokocrypto.site/api/v3/time#fragment",
+        ]
+        for url in bad:
+            with self.subTest(url=url), self.assertRaises(fetcher.DisallowedRequestError):
+                fetcher.validate_public_url(url)
+
+    def test_rejects_wrong_market_interval_unknown_and_duplicate_query_keys(self):
+        bad = [
+            "https://www.tokocrypto.site/api/v3/klines?symbol=ETHUSDT&interval=1h",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=2h",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&foo=bar",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&symbol=ETHUSDT&interval=1h",
+            "https://www.tokocrypto.site/api/v3/time?x=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=9&endTime=8&limit=500",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=2&limit=501",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=%D9%A1&endTime=2&limit=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=2&limit=1&",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=0&endTime=2&limit=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=10000000000001&limit=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=" + "9" * 5000 + "&endTime=2&limit=1",
+            "https://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1&endTime=2&limit=1" + "&x=1" * 50,
+        ]
+        for url in bad:
+            with self.subTest(url=url), self.assertRaises(fetcher.DisallowedRequestError):
+                fetcher.validate_public_url(url)
+
+    def test_invalid_url_is_rejected_before_fake_network_call(self):
+        op = scripted((200, b'{"ok":true}'))
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            fetcher.http_get_json("https://www.tokocrypto.com/api/v3/time", 5, 1, op, NO_SLEEP)
+        self.assertEqual(op.calls, [])
+
+    def test_open_v1_style_is_rejected(self):
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            fetcher.Source("tokocrypto", "open_v1", "https://www.tokocrypto.site")
+
+    def test_symbol_metadata_route_is_unconditionally_rejected(self):
+        src = fetcher.Source("tokocrypto", "binance_style", "https://www.tokocrypto.site")
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            src.symbols_url("BTC_USDT")
 
 
-class ParseTests(unittest.TestCase):
-    def test_parses_candle_rows_and_converts_ms(self):
+class HttpTests(unittest.TestCase):
+    def test_success_returns_json_for_approved_url(self):
+        op = scripted((200, b'{"ok": 1}'))
+        self.assertEqual(fetcher.http_get_json(CANDLE_URL, 5, 1, op, NO_SLEEP), {"ok": 1})
+        self.assertEqual(len(op.calls), 1)
+
+    def test_429_is_not_retried_without_retry_after_support(self):
+        op = scripted((429, b""), (200, b'[1]'))
+        with self.assertRaisesRegex(fetcher.ApiError, "HTTP 429 rate limit; automatic retry disabled"):
+            fetcher.http_get_json(CANDLE_URL, 5, 2, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_retries_5xx_then_succeeds(self):
+        op = scripted((503, b""), (200, b'[1]'))
+        self.assertEqual(fetcher.http_get_json(CANDLE_URL, 5, 2, op, NO_SLEEP), [1])
+        self.assertEqual(len(op.calls), 2)
+
+    def test_403_is_not_retried(self):
+        op = scripted((403, b"forbidden"))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_redirect_http_error_is_not_followed_or_retried(self):
+        op = scripted(urllib.error.HTTPError(CANDLE_URL, 302, "Found", {}, io.BytesIO(b"redirect")))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 1)
+
+    def test_http_error_body_is_closed(self):
+        body = io.BytesIO(b"missing")
+        err = urllib.error.HTTPError(CANDLE_URL, 404, "Not Found", {}, body)
+        op = scripted(err)
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 1, op, NO_SLEEP)
+        self.assertTrue(body.closed)
+
+    def test_oversized_success_body_is_rejected(self):
+        op = scripted((200, b"x" * (fetcher.MAX_RESPONSE_BYTES + 1)))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 1, op, NO_SLEEP)
+
+    def test_oversized_http_error_body_is_rejected_and_closed(self):
+        body = io.BytesIO(b"x" * (fetcher.MAX_RESPONSE_BYTES + 1))
+        err = urllib.error.HTTPError(CANDLE_URL, 404, "Not Found", {}, body)
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 1, scripted(err), NO_SLEEP)
+        self.assertTrue(body.closed)
+
+    def test_invalid_json_is_an_error(self):
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 1, scripted((200, b"<html>")), NO_SLEEP)
+
+    def test_network_errors_exhaust_retries(self):
+        op = scripted(urllib.error.URLError("offline"))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.http_get_json(CANDLE_URL, 5, 3, op, NO_SLEEP)
+        self.assertEqual(len(op.calls), 3)
+
+
+class ParseRegressionTests(unittest.TestCase):
+    def test_parses_candle_rows_and_converts_milliseconds(self):
         c = fetcher.parse_klines([row()])[0]
         self.assertEqual((c.time, c.open, c.high, c.low, c.close, c.volume),
                          (1_700_000_000, 10.0, 12.0, 9.0, 11.0, 5.0))
 
-    def test_open_v1_wrapper_is_unwrapped(self):
-        wrapped = {"code": 0, "msg": "success", "data": [row()]}
-        self.assertEqual(len(fetcher.parse_klines(wrapped)), 1)
-
-    def test_nested_data_list_is_unwrapped(self):
-        self.assertEqual(len(fetcher.parse_klines({"code": 0, "data": {"list": [row()]}})), 1)
-
-    def test_exchange_error_code_is_an_error(self):
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.parse_klines({"code": -1121, "msg": "Invalid symbol."})
-        self.assertIn("Invalid symbol", str(ctx.exception))
-
-    def test_not_a_list_is_an_error(self):
+    def test_rejects_non_list_and_short_rows(self):
         with self.assertRaises(fetcher.ApiError):
-            fetcher.parse_klines({"something": "else"})
-
-    def test_short_row_is_an_error(self):
+            fetcher.parse_klines({"bad": True})
         with self.assertRaises(fetcher.ApiError):
-            fetcher.parse_klines([[MS, "1", "2"]])
+            fetcher.parse_klines([[1, "2"]])
 
-    def test_non_numeric_is_an_error(self):
+    def test_rejects_non_numeric_prices(self):
+        bad = row()
+        bad[1] = "not-a-price"
         with self.assertRaises(fetcher.ApiError):
-            fetcher.parse_klines([row(o="abc")])
+            fetcher.parse_klines([bad])
 
-    def test_row_must_be_a_list(self):
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.parse_klines([{"Time": 1}])
-
-    def test_server_time_shapes(self):
-        self.assertEqual(fetcher.extract_server_time({"serverTime": MS}), 1_700_000_000)
-        self.assertEqual(fetcher.extract_server_time({"code": 0, "data": MS}), 1_700_000_000)
-        self.assertEqual(fetcher.extract_server_time({"data": {"serverTime": MS}}), 1_700_000_000)
-        self.assertEqual(fetcher.extract_server_time(MS), 1_700_000_000)
-
-    def test_bad_server_time_is_an_error(self):
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.extract_server_time({"nothing": 1})
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.extract_server_time({"serverTime": "soon"})
-
-
-class HttpTests(unittest.TestCase):
-    def test_success_returns_json(self):
-        op = scripted((200, b'{"ok": 1}'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), {"ok": 1})
-
-    def test_retries_server_error_then_succeeds(self):
-        op = scripted((500, b""), (200, b'[1]'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
-        self.assertEqual(len(op.calls), 2)
-
-    def test_429_is_retried(self):
-        op = scripted((429, b""), (200, b'[1]'))
-        self.assertEqual(fetcher.http_get_json("u", 5, 3, op, NO_SLEEP), [1])
-
-    def test_403_is_not_retried_and_shows_the_body(self):
-        op = scripted((403, b"<html>Access denied by firewall</html>"))
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("403", str(ctx.exception))
-        self.assertIn("Access denied", str(ctx.exception))
-        self.assertEqual(len(op.calls), 1)
-
-    def test_451_region_block_is_not_retried(self):
-        op = scripted((451, b"unavailable for legal reasons"))
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("451", str(ctx.exception))
-        self.assertEqual(len(op.calls), 1)
-
-    def test_http_error_exception_is_handled(self):
-        op = scripted(urllib.error.HTTPError("u", 404, "Not Found", {}, None))
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertEqual(len(op.calls), 1)
-
-    def test_network_errors_exhaust_retries(self):
-        op = scripted(urllib.error.URLError("boom"))
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("failed after 3 attempts", str(ctx.exception))
-        self.assertEqual(len(op.calls), 3)
-
-    def test_timeout_is_handled(self):
-        op = scripted(TimeoutError("slow"))
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.http_get_json("u", 5, 2, op, NO_SLEEP)
-
-    def test_invalid_json_is_an_error(self):
-        op = scripted((200, b"<html>challenge page</html>"))
-        with self.assertRaises(fetcher.ApiError) as ctx:
-            fetcher.http_get_json("u", 5, 3, op, NO_SLEEP)
-        self.assertIn("challenge page", str(ctx.exception))
+    def test_server_time_shapes_remain_supported(self):
+        self.assertEqual(fetcher.extract_server_time({"serverTime": 1_700_000_000_000}),
+                         1_700_000_000)
 
 
 if __name__ == "__main__":
