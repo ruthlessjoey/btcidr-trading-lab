@@ -556,6 +556,11 @@ EXPECTED_MODEL = "inclusionai/ling-3.2-flash:free"
 EXPECTED_WORKFLOW_ID = 421573712
 EXPECTED_WORKFLOW_PATH = ".github/workflows/q08-specialist-review.yml"
 EXPECTED_REVIEW_BRANCH = "security/q0-provider-sanitization-2026-11-18"
+EXPECTED_WORKFLOW_BRANCHES = frozenset({
+    "main",
+    "security/q08-review-runner-v2-pin-2026-11-20",
+})
+SYNTHETIC_WORKFLOW_BRANCH = "security/q08-review-runner-v2-pin-2026-11-20"
 EXPECTED_BASE_URL = "https://openrouter.ai/api/v1"
 
 MAX_CHECKPOINT = 2_000_000
@@ -608,8 +613,8 @@ def validate_checkpoint_source_metadata(run: dict, run_id: str,
     """Bind a restored checkpoint to a completed run of this exact workflow and head."""
     if not re.fullmatch(r"[0-9]{1,20}", run_id):
         raise RuntimeError("Checkpoint source run ID is invalid")
-    if current_branch != EXPECTED_REVIEW_BRANCH:
-        raise RuntimeError("Checkpoint resume is allowed only from the approved PR #60 branch")
+    if current_branch not in EXPECTED_WORKFLOW_BRANCHES:
+        raise RuntimeError("Checkpoint resume is allowed only from an explicitly approved workflow branch")
     repository = run.get("repository") if isinstance(run, dict) else None
     if not isinstance(repository, dict):
         raise RuntimeError("Checkpoint source run metadata is incomplete")
@@ -1134,11 +1139,19 @@ def synthetic():
         "id":123456, "workflow_id":EXPECTED_WORKFLOW_ID,
         "path":EXPECTED_WORKFLOW_PATH, "event":"workflow_dispatch",
         "status":"completed", "head_sha":expected_pr_head,
-        "head_branch":EXPECTED_REVIEW_BRANCH,
+        "head_branch":SYNTHETIC_WORKFLOW_BRANCH,
         "repository":{"full_name":REPO},
     }
+    assert SYNTHETIC_WORKFLOW_BRANCH in EXPECTED_WORKFLOW_BRANCHES
     validate_checkpoint_source_metadata(
-        sample_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+        sample_run, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
+    try:
+        validate_checkpoint_source_metadata(
+            sample_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+    except RuntimeError as exc:
+        assert "approved workflow branch" in str(exc)
+    else:
+        raise AssertionError("PR #60 source branch was accepted as a workflow branch")
     for field, bad_value in (
         ("id", 123457),
         ("workflow_id", EXPECTED_WORKFLOW_ID + 1),
@@ -1151,7 +1164,7 @@ def synthetic():
         bad_run = {**sample_run, field:bad_value}
         try:
             validate_checkpoint_source_metadata(
-                bad_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+                bad_run, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
         except RuntimeError:
             pass
         else:
@@ -1159,7 +1172,7 @@ def synthetic():
     wrong_repo = {**sample_run, "repository":{"full_name":"attacker/repo"}}
     try:
         validate_checkpoint_source_metadata(
-            wrong_repo, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+            wrong_repo, "123456", SYNTHETIC_WORKFLOW_BRANCH, expected_pr_head)
     except RuntimeError:
         pass
     else:
@@ -1170,7 +1183,7 @@ def synthetic():
     except RuntimeError:
         pass
     else:
-        raise AssertionError("checkpoint source from another branch was accepted")
+        raise AssertionError("checkpoint source from an unapproved workflow branch was accepted")
     stale_pr = {**sample_pr, "head":{**sample_pr["head"], "sha":"b" * 40}}
     try:
         validate_pull_request_target(stale_pr, expected_pr_head)
