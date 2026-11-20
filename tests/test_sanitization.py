@@ -174,6 +174,23 @@ class ProviderSanitizationTests(unittest.TestCase):
 
 
 class CrosscheckSanitizationTests(unittest.TestCase):
+    def test_crosscheck_verdict_accepts_only_exact_schema_values(self):
+        self.assertTrue(crosscheck.is_confirmed_verdict("CONFIRMED"))
+        self.assertTrue(crosscheck.is_confirmed_verdict(
+            "CONFIRMED (approximate: USD is not USDT)"))
+        for value in (
+            "CONFIRMED_UNTRUSTED",
+            "CONFIRMED-malformed",
+            "CONFIRMED but not actually confirmed",
+            "NOT CONFIRMED",
+            "UNAVAILABLE",
+            "",
+            None,
+            {"verdict": "CONFIRMED"},
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(crosscheck.is_confirmed_verdict(value))
+
     def test_crosscheck_refuses_without_authorized_provider_before_side_effects(self):
         calls = []
 
