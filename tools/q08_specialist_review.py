@@ -1002,9 +1002,23 @@ def write_summary(text: str):
     else:
         print(text)
 
+def validate_review_head_sha(value: str) -> None:
+    if type(value) is not str or not re.fullmatch(r"[0-9a-f]{40}", value) or value == BASE_SHA:
+        raise RuntimeError("Immutable review head SHA is missing or invalid")
+
+
 def synthetic():
+    validate_review_head_sha(HEAD_SHA)
     assert len(REVIEW_PATHS) == 27 and len(EXPECTED_STATUS) == 26 and len(SPECIALISTS) == 16
     assert len(SPECIALISTS) + 3 == 19
+    validate_review_head_sha("a" * 40)
+    for invalid_head in ("", BASE_SHA, "z" * 40, "a" * 39):
+        try:
+            validate_review_head_sha(invalid_head)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("invalid immutable review head was accepted")
     assert EXPECTED_CHANGED.issubset(set(REVIEW_PATHS))
     assert "fetch_history.py" in REVIEW_PATHS and "fetch_history.py" not in EXPECTED_STATUS
     context = build_unchanged_context(
@@ -1342,8 +1356,7 @@ def synthetic():
     )
 
 def review():
-    if not re.fullmatch(r"[0-9a-f]{40}", HEAD_SHA) or HEAD_SHA == BASE_SHA:
-        raise RuntimeError("Immutable review head SHA is missing or invalid")
+    validate_review_head_sha(HEAD_SHA)
     gh = os.environ.get("GITHUB_TOKEN", "")
     if len(gh) < 20:
         raise RuntimeError("Read-only GitHub token unavailable")
