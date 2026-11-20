@@ -40,6 +40,7 @@ jobs:
             /tests/test_probe.py
             /tests/test_pipeline.py
             /tests/test_sanitization.py
+            /.github/workflows/q08-offline-tests.yml
             /.github/workflows/market-data-check.yml
             /.github/workflows/research-data.yml
 
