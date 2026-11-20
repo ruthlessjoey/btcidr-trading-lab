@@ -12,9 +12,9 @@ TEST_FILES = (
     "tests/test_sanitization.py", "tests/test_pipeline.py", "tests/test_q08_import_boundary.py",
 )
 WORKFLOW_CHECKOUT = {
-    "config.json", "fetcher.py", "providers.py", "probe.py", "run.py", "live_check.py",
-    "tools/net_lab.py", *TEST_FILES, ".github/workflows/market-data-check.yml",
-    ".github/workflows/q08-offline-tests.yml",
+    "CLAUDE.md", "PROJECT_HANDOFF.MD", "config.json", "fetcher.py", "providers.py",
+    "probe.py", "run.py", "live_check.py", "tools/net_lab.py", *TEST_FILES,
+    ".github/workflows/market-data-check.yml", ".github/workflows/q08-offline-tests.yml",
 }
 FORBIDDEN_IMPORT_ROOTS = {
     "P1", "signal", "markets", "validator", "report", "run", "live_check", "research",
@@ -120,6 +120,20 @@ class Q08ImportBoundaryTests(unittest.TestCase):
             "/tests/test_research_gates.py",
         ):
             self.assertNotIn(forbidden, source)
+
+    def test_repository_guidance_matches_current_candles_only_boundary(self):
+        claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "unauthenticated HTTPS GET candles from "
+            "`https://www.tokocrypto.site/api/v3/klines` for `BTCUSDT`",
+            claude,
+        )
+        self.assertNotIn("server-time/candles access", claude)
+
+        handoff = (ROOT / "PROJECT_HANDOFF.MD").read_text(encoding="utf-8")
+        self.assertIn("Superseding Tokocrypto public-market-data boundary", handoff)
+        self.assertIn("server-time (`/api/v3/time`) ... are **not authorized**", handoff)
+        self.assertIn("any `www.tokocrypto.com` API endpoint are **not authorized**", handoff)
 
     def test_workflow_runs_only_exact_approved_offline_modules(self):
         source = WORKFLOW.read_text(encoding="utf-8")
