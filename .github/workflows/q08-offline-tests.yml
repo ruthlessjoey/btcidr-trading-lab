@@ -25,6 +25,8 @@ jobs:
             /fetcher.py
             /providers.py
             /probe.py
+            /run_crosscheck.py
+            /tools/net_lab.py
             /run.py
             /config.json
             /research_config.json
