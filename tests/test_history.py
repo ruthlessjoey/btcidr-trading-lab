@@ -71,17 +71,32 @@ class HistoryContainmentTests(unittest.TestCase):
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
+            "tests/test_research_gates.py": {"research.pipeline", "research.engine"},
             "fetch_history.py": {"research.history"},
             "fetcher.py": set(),
             "providers.py": {"fetcher"},
             "probe.py": set(),
+            "research/__init__.py": set(),
             "research/history.py": set(),
             "research/crosscheck.py": {"fetcher"},
+            "research/pipeline.py": {
+                "research.crosscheck", "research.dataset", "research.engine",
+                "research.selection", "research.splits", "research.strategy",
+                "research.backtest_report",
+            },
+            "research/engine.py": {"validator"},
+            "research/dataset.py": {"fetcher", "validator"},
+            "research/selection.py": {"research.engine", "research.strategy"},
+            "research/splits.py": {"research.engine"},
+            "research/strategy.py": {"fetcher", "research.engine"},
+            "research/backtest_report.py": set(),
+            "validator.py": set(),
         }
-        forbidden_roots = {
-            "P1", "signal", "markets", "validator", "report", "__relative_import__",
-        }
-        forbidden_research = ("research.engine", "research.pipeline")
+        # P1/, all signal/ paths, and markets/ remain excluded. Owner approval
+        # now explicitly covers root validator.py and report.py; the research
+        # pipeline test exercises the exact authorized dependency closure.
+        forbidden_roots = {"P1", "signal", "markets", "__relative_import__"}
+        forbidden_research = ()
         for path, expected in expected_local_edges.items():
             with self.subTest(path=path):
                 edges = source_import_edges(path)
