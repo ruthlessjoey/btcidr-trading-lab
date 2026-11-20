@@ -1216,7 +1216,7 @@ def synthetic():
         ("path", ".github/workflows/other.yml"),
         ("event", "push"),
         ("status", "in_progress"),
-        ("head_sha", "b" * 40),
+        ("head_sha", "z" * 40),
         ("head_branch", "other-branch"),
     ):
         bad_run = {**sample_run, field:bad_value}
