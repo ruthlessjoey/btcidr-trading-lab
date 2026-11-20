@@ -1022,3 +1022,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Project-wide integrated completion is not accepted. No independent full-scope acceptance exists. Implementation, candidate testing, integrated verification and independent acceptance remain separate.
 - Profitability is **NOT PROVEN**; historical proxy evidence remains negative (−11% return, 0.36 profit factor) with incompletely verified cost assumptions. No reproducible realistic-cost untouched-holdout or PAPER forward evidence proves positive expectancy.
 - No PR merge, exchange/data request, dataset publication, backtest, PAPER/LIVE action, private-account access, credential use, order, funding, withdrawal or payment occurred in these tasks.
+
+
+## 2026-11-20 PR #86 dataset-source reporting correction
+
+- PR #86 latest head \`343234b1f79684e4e2302f37277040d46a1f00d5\`; 25 commits ahead / 0 behind PR #60 frozen source head; exactly eleven changed paths.
+- Corrected the backtest report's fixed venue wording. \`research.backtest_report.dataset_source_label()\` now renders the provider/pair recorded in the preserved dataset manifest, with a safe "unverified dataset source" fallback when absent or malformed. The disclaimer, optional cross-check comparison label and unresolved-source note use that value and explicitly state that a manifest label is not evidence of current Tokocrypto execution prices or rules.
+- The pure report helper was added to the narrow offline sparse checkout and AST import-closure test; no protected root \`report.py\`, \`validator.py\`, \`P1/\`, \`signal/\` or \`markets/\` path was selected.
+- Exact-head run [#44733388671](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44733388671) passed **58/58 Python 3.11 tests**: fetcher 21, provider authorization 4, history/report 9, disabled probe 3, pipeline containment 6, sanitization 15. Run metadata confirms exact head \`343234b1f79684e4e2302f37277040d46a1f00d5\`.
+- First attempt [#44733201139](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44733201139) failed because the expected AST import closure was stale after adding the report helper; this was corrected. Only the later 58-test run is counted as passed.
+- PR #86 remains draft/unmerged and stacked on PR #60. The protected research pipeline remains unexecuted; these focused candidate tests do not equal integration acceptance.
+- Candidate-weighted score remains 15.00/100; no score increase. Profitability remains NOT PROVEN.
