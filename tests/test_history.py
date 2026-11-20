@@ -7,6 +7,9 @@ import ast
 import json
 import os
 import unittest
+import tempfile
+
+from research.history import run_step1
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -64,7 +67,7 @@ class HistoryContainmentTests(unittest.TestCase):
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": set(),
+            "tests/test_history.py": {"research.history"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
@@ -102,7 +105,7 @@ class HistoryContainmentTests(unittest.TestCase):
         self.assertEqual(cfg["host"], "https://www.tokocrypto.site")
         self.assertEqual(cfg["symbol"], "BTCUSDT")
 
-    def test_history_gate_fails_without_symbol_metadata_authorization(self):
+    def test_static_source_asserts_history_gate_fails_without_symbol_metadata_authorization(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:
             source = f.read()
         self.assertIn('"name": "market_identity", "status": "FAIL"', source)
@@ -110,6 +113,32 @@ class HistoryContainmentTests(unittest.TestCase):
         self.assertIn('"backtest_allowed": False', source)
         self.assertIn("route is undocumented", source)
         self.assertIn("Configuration alone is insufficient", source)
+
+    def test_step1_entrypoint_behaviorally_fails_closed_without_network_or_dataset(self):
+        calls = []
+
+        def forbidden_opener(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("fail-closed Step 1 must not contact the network")
+
+        cfg = {
+            "mode": "read_only", "provider": "tokocrypto",
+            "host": "https://www.tokocrypto.site", "symbol": "BTCUSDT",
+            "base_asset": "BTC", "quote_asset": "USDT", "timeframe": "1h",
+        }
+        with tempfile.TemporaryDirectory() as out_dir:
+            status = run_step1(cfg, out_dir=out_dir, opener=forbidden_opener,
+                               local_now=1_700_000_000)
+            self.assertEqual(status, 1)
+            with open(os.path.join(out_dir, "dataset_report.json"), encoding="utf-8") as f:
+                report = json.load(f)
+            self.assertEqual(report["gate"], "FAIL")
+            self.assertEqual(report["checks"][0]["status"], "FAIL")
+            self.assertEqual(report["network_requests"], 0)
+            self.assertIsNone(report["dataset"])
+            self.assertFalse(report["backtest_allowed"])
+            self.assertEqual(sorted(os.listdir(out_dir)), ["dataset_report.json", "dataset_report.md"])
+        self.assertEqual(calls, [])
 
     def test_history_module_has_only_standard_library_imports(self):
         self.assertEqual(
