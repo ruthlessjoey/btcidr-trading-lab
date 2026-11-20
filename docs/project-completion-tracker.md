@@ -863,3 +863,20 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - **Profitability: UNVERIFIED.** The one identified strategy is BTC-USDT daily S1; historical test stats in the master handoff are negative (-11% return, 0.36 profit factor) and venue cost assumptions are unverified.
 - This first pass is intentionally conservative. It does not credit protected implementation from historical milestone labels, and it does not remove any requirement from the denominator. Independent audit may revise a row only with exact evidence and a dated explanation.
 
+
+
+## 2026-11-20 owner authorization: Workstream B access review
+
+- The owner explicitly authorized Workstream B access on 2026-11-20. This permission was applied to the review, but it does not silently override the separately named path restrictions for `P1/`, all `signal/` paths, `markets/risk/`, root/nested `validator.py`, or root/nested `report.py`.
+- Read-only navigation targeted `feature/m6-risk-engine`. The branch contains no explicit Workstream B directory, manifest, file labels, or source-level workstream ownership markers. It is not safe to infer a complete Workstream B file allowlist from the branch name alone.
+- The feature history identifies the risk-engine feature as residing under `markets/risk/`. That directory remains separately restricted. No file under it was opened, read, copied, imported, executed, changed, or tested. The same exclusions remain in force for `P1/`, every `signal/` path, and protected validator/report modules.
+- Therefore the owner’s Workstream B authorization is recorded, but **risk-engine implementation review remains blocked** until the owner explicitly authorizes the exact separately restricted paths needed. The minimum likely path request is `markets/risk/`; `validator.py` and `report.py` are separate dependencies and would require their own explicit authorization if needed. This note does not request or imply access to `P1/` or any `signal/` path.
+- As a safe cross-boundary check only, unprotected M5 strategy files were statically re-fetched on `feature/m6-risk-engine`: `markets/strategies/contract.py` (blob `33a179704e260221448b76938c0637bcf5770786`), `decision.py` (blob `b375e90c0940026c33c206975849edd287047c60`), `engine.py` (blob `fa086674a61a2dae33627443110f38d1df30f6ab`), and `registry.py` (blob `3138b56b981d159cb274a804671989b6ffdcc644`). These are feature-branch candidates, not current-main integration evidence.
+- The M5 contract states strategy implementations return only research BUY/SELL/HOLD decisions; `StrategyDecision` is explicitly not an order, position, risk approval, or size. The engine invokes a strategy only for COMPLETE data with sufficient history. This establishes a required boundary for future integration: a strategy decision cannot substitute for an independent risk approval or portfolio-owned state.
+- `markets/strategies/test_strategies.py` imports `btc_signal` from the protected `signal/` tree. Its import closure is therefore not approved for execution. No M5 or Workstream B tests were run in this review.
+- No source code, protected implementation, data, workflows, or trading state was changed. No backtest, dataset write, market-data request, PAPER execution, LIVE operation, order, or payment occurred.
+
+## 2026-11-20 Q0.8 exact review progress update
+
+- PR #83's exact-head workflow run `44683200007` is still **IN PROGRESS**. The job's Python 3.11 setup, immutable runner syntax validation, and synthetic policy smoke test completed successfully; the model-based immutable source-review stage is still running. Checkpoint persistence is pending and the run currently has no uploaded artifact.
+- No 19-stage acceptance result is available yet. Do not resume or mark Q0.8 accepted based on the synthetic preflight alone.
