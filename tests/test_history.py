@@ -115,6 +115,7 @@ class HistoryContainmentTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertNotIn(path, workflow)
         self.assertIn("test_history.py", workflow)
+        self.assertIn("/research/backtest_report.py", workflow)
         self.assertNotIn("python3 -m unittest discover -s tests -p 'test_research_gates.py'", workflow)
 
     def test_backtest_report_uses_the_preserved_dataset_source_label(self):
