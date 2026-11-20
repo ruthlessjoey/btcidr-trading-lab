@@ -62,7 +62,7 @@ def source_import_edges(path):
 
 class HistoryContainmentTests(unittest.TestCase):
     def test_q08_workflow_test_import_closure_stays_outside_protected_modules(self):
-        # These are the exact six modules selected by q08-offline-tests.yml and
+        # These are the approved modules selected by q08-offline-tests.yml and
         # research-data.yml. Resolve only source imports; do not import or execute them.
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
