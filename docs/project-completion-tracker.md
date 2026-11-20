@@ -18,7 +18,7 @@ A project percentage must not be published until all 40 approved requirement row
 
 ### Evidence sources
 
-- `main`: `3d478a37ce2963abbc9d89f6843d6f806d6d28f5` at the time of this tracker.
+- `main` evidence baseline (2026-11-20): `731fc9fbb892dadccc64bf52da2f91ff069da124`.
 - M6 engineering baseline: `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
 - Q0.3–Q0.8 corrections plus provider sanitization are integrated as a candidate in draft PR #60, based on `feature/m6-risk-engine`; it is not merged.
 - PR #56 is retained as a historical draft and is explicitly superseded by PR #60.
@@ -734,3 +734,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #76 exact head `1a966ddcfef686918bdb257b73874779776c80ba` passed its isolated Python 3.11.18 publisher suite in run [#44642158427](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44642158427): 22 passed, 0 failed. It remains stacked on unmerged PR #34 and does not establish integrated holdout acceptance.
 - PR #77 adds current security-boundary instructions only; no runtime enforcement or feature completion is inferred. PRs #60, #66, #68, #69, #71, #72, #74, #75, #76, #77, and #78 remain unmerged unless a later dated entry proves otherwise.
 - Protected paths and Workstream B remain excluded from inspection and execution. No test with a protected import closure, private exchange endpoint, exchange credential, market-data request, trade, deposit, withdrawal, payment, or PAPER/LIVE execution occurred during this tracker update.
+
+
+## 2026-11-20 baseline-divergence and historical profitability reconciliation
+
+- GitHub compare evidence shows that current main (`731fc9fbb892dadccc64bf52da2f91ff069da124`) and the historical M6 branch head (`cd451972e3a641ad6fa78e64abf3968655a4b82a`) have **diverged**. Comparison main...M6 has merge base `733abeb931eddcb442220f9b73b092833282e671`, with M6 11 commits ahead of that base and main 92 commits ahead. M6 is therefore not an ancestor baseline silently assumed to be part of current main.
+- PR #60 is based on `feature/m6-risk-engine` at the M6 SHA, not current main. It remains a distinct historical candidate. Do not merge it directly into current main; first reconcile the branch divergence and re-review the intended net diff against the current integration baseline. No reset, rebase, force-push, or merge was performed.
+- The recovered PROJECT_HANDOFF.MD historical BTC/USDT moving-average test reports: strategy test return -11.0%, buy-and-hold -16.2%, cash benchmark 0%, 10% win rate, and profit factor 0.36. It also states transaction-cost assumptions have not been verified against actual Tokocrypto fees and that the dataset is Binance BTC/USDT proxy data, not Tokocrypto fills. These historical figures are not a verified current strategy result and do **not** establish profitability; they are a warning against representing the current strategy as profitable.
+- The current user-approved trading boundaries are stricter than the historical handoff: approved Tokocrypto public data is limited to unauthenticated GET candles at www.tokocrypto.site/api/v3/klines; no server-time route, tokocrypto.com, private access, or real trading.
+- All 40 weighted requirements remain in the approved denominator. The project-wide calculation must be performed against current main unless a new integration baseline is explicitly recorded and independently reviewed. M6 branch or draft-PR evidence remains candidate evidence only; it cannot silently replace the current baseline.
