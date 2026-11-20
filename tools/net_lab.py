@@ -1,4 +1,7 @@
-"""Disabled broad network scanner. No network access is performed by this module."""
+"""Disabled broad network scanner. No network access is performed by this module.
+
+Exit status 2 is the shared CLI convention for disabled or approval-blocked commands.
+"""
 import sys
 
 

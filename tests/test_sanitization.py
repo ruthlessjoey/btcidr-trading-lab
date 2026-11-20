@@ -174,7 +174,24 @@ class ProviderSanitizationTests(unittest.TestCase):
 
 
 class CrosscheckSanitizationTests(unittest.TestCase):
-    def test_crosscheck_cannot_be_enabled_by_mutating_legacy_authorization_state(self):
+    def test_crosscheck_verdict_accepts_only_exact_schema_values(self):
+        self.assertTrue(crosscheck.is_confirmed_verdict("CONFIRMED"))
+        self.assertTrue(crosscheck.is_confirmed_verdict(
+            "CONFIRMED (approximate: USD is not USDT)"))
+        for value in (
+            "CONFIRMED_UNTRUSTED",
+            "CONFIRMED-malformed",
+            "CONFIRMED but not actually confirmed",
+            "NOT CONFIRMED",
+            "UNAVAILABLE",
+            "",
+            None,
+            {"verdict": "CONFIRMED"},
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(crosscheck.is_confirmed_verdict(value))
+
+    def test_crosscheck_refuses_without_authorized_provider_before_side_effects(self):
         calls = []
 
         def forbidden_opener(url, timeout):
@@ -183,20 +200,29 @@ class CrosscheckSanitizationTests(unittest.TestCase):
 
         candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
-        crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
-        try:
-            with tempfile.TemporaryDirectory() as out:
-                with self.assertRaisesRegex(
-                        fetcher.ApiError, "independent cross-check providers are not authorized"):
-                    crosscheck.run_crosscheck(
-                        manifest, [candle], [], out, opener=forbidden_opener,
-                        sleep=NO_SLEEP, timeout=1, retries=1)
-                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
-                self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
-        finally:
-            del crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
+        with tempfile.TemporaryDirectory() as out:
+            with self.assertRaisesRegex(
+                    fetcher.ApiError, "independent cross-check providers are not authorized"):
+                crosscheck.run_crosscheck(
+                    manifest, [candle], [], out, opener=forbidden_opener,
+                    sleep=NO_SLEEP, timeout=1, retries=1)
+            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
+            self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
 
         self.assertEqual(calls, [])
+
+    def test_disabled_crosscheck_report_never_implies_external_data_was_acquired(self):
+        report = {
+            "dataset_version": "synthetic-v1", "dataset_sha256": "a" * 64,
+            "rule": "offline fixture only", "coinbase_error": None,
+            "bitstamp_error": None, "summary": None, "common_days": 0,
+            "worst_days": [], "flagged": [],
+        }
+        markdown = crosscheck.build_markdown(report)
+        self.assertIn("External acquisition status: **DISABLED**", markdown)
+        self.assertIn("No external source was contacted", markdown)
+        self.assertIn("Coinbase and Bitstamp data were not acquired", markdown)
+        self.assertNotIn("Sources: **Coinbase", markdown)
 
     def test_zero_reference_prices_do_not_crash_comparison(self):
         zero = fetcher.Candle(1_700_000_000, 0.0, 0.0, 0.0, 0.0, 0.0)

@@ -12,6 +12,16 @@ from fetcher import ApiError
 DAY = 86400
 TOLERANCE_PCT = 3.0
 
+CONFIRMED_VERDICTS = frozenset({
+    "CONFIRMED",
+    "CONFIRMED (approximate: USD is not USDT)",
+})
+
+
+def is_confirmed_verdict(value):
+    """Accept only the exact verdict values emitted by the comparison schema."""
+    return type(value) is str and value in CONFIRMED_VERDICTS
+
 
 
 def day(ts):
@@ -107,8 +117,9 @@ def build_markdown(r):
     L = ["# Cross-check of flagged candles", "",
          f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The source candles "
          "were **not changed**.", "",
-         "Sources: **Coinbase BTC/USD** daily candles (USD is not USDT) and "
-         "**Bitstamp BTC/USD** around flagged days. Cross-check providers remain disabled pending authorization.",
+         "External acquisition status: **DISABLED**. No external source was contacted; "
+         "Coinbase and Bitstamp data were not acquired. Comparison helpers are retained for offline fixtures only. "
+         "Any provider acquisition requires separate owner authorization.",
          f"Pre-stated rule: {r['rule']}.", ""]
     if r["coinbase_error"]:
         L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")

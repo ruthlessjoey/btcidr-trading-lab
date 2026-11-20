@@ -48,12 +48,39 @@ def seg_table(block):
     return L
 
 
+def dataset_source_label(result):
+    """Use the pinned manifest label; never hard-code or infer the target venue."""
+    dataset = result.get("dataset")
+    market = dataset.get("market") if isinstance(dataset, dict) else None
+    if not isinstance(market, dict):
+        return "unverified dataset source"
+    provider = market.get("provider")
+    pair_label = market.get("pair_label")
+    if (type(provider) is not str or type(pair_label) is not str
+            or not provider or not pair_label
+            or not provider.isascii() or not pair_label.isascii()
+            or not provider.replace("-", "").isalnum()
+            or not pair_label.replace("/", "").isalnum()):
+        return "unverified dataset source"
+    return f"{provider} {pair_label}"
+
+
+def dataset_timeframe_label(result):
+    """Return only a known timeframe token from the pinned manifest."""
+    dataset = result.get("dataset")
+    market = dataset.get("market") if isinstance(dataset, dict) else None
+    timeframe = market.get("timeframe") if isinstance(market, dict) else None
+    allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
+    return timeframe if type(timeframe) is str and timeframe in allowed else "unknown timeframe"
+
+
 def build_markdown(r):
     L = ["# BTC/USDT trend-filter backtest (research only)",
          f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
          "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
          "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
-         "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+         f"and the recorded dataset source is {dataset_source_label(r)}. This does not establish "
+         "Tokocrypto execution prices, spreads, fees, liquidity or fills.", ""]
     if r["status"] != "OK":
         L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
               "Nothing was simulated and no results are shown."]
@@ -61,7 +88,7 @@ def build_markdown(r):
     d = r["dataset"]
     L += ["## Data (preserved version, pinned)", "",
           f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
-          f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
+          f"- {dataset_source_label(r)} {dataset_timeframe_label(r)} spot · "
           f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
           "- Re-verified at load: hash, market identity, order, no duplicates, no gaps, only completed candles."]
     # flagged candle
@@ -73,7 +100,7 @@ def build_markdown(r):
             for name in ("coinbase", "bitstamp"):
                 j = e[name]
                 if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs Binance "
+                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs {dataset_source_label(r)} "
                              f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
                              f"low diff {j['low_diff_pct']:+.2f}%")
         if c.get("summary"):
@@ -174,7 +201,8 @@ def build_markdown(r):
           "- Before trusting anything: more trades, other periods or assets, real fees, and paper trading with live prices.",
           "", "## Metric limitations", ""] + [f"- {m}" for m in METRIC_LIMITS]
     L += ["", "## Unresolved concerns", "",
-          "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
+          f"- Recorded dataset source: {dataset_source_label(r)}. This is a manifest label, not proof "
+          "of Tokocrypto execution prices, spreads, fees or order rules.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
           "- No independent cross-check was run: Coinbase and Bitstamp are excluded pending separate provider authorization. The flagged candle remains unverified."]

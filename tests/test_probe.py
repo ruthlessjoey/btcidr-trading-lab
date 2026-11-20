@@ -14,6 +14,14 @@ class DisabledProbeTests(unittest.TestCase):
             raise AssertionError("disabled probe must not make a network request")
         self.assertEqual(probe.run_probe(opener=forbidden_network), 2)
 
+    def test_all_disabled_cli_entrypoints_document_shared_exit_code(self):
+        for path in ("probe.py", "run_crosscheck.py", os.path.join("tools", "net_lab.py")):
+            with self.subTest(path=path):
+                with open(os.path.join(ROOT, path), encoding="utf-8") as f:
+                    source = f.read()
+                self.assertIn("Exit status 2 is the shared CLI convention", source)
+                self.assertIn("return 2", source)
+
     def test_probe_has_no_legacy_symbol_metadata_or_http_client(self):
         with open(os.path.join(ROOT, "probe.py"), encoding="utf-8") as f:
             source = f.read()
