@@ -818,26 +818,15 @@ def load_checkpoint(path: Path, review_evidence_sha256: str) -> dict:
         if report is not None:
             _validate_checkpoint_report(report, name)
 
-    # Reuse only accepted stages. BLOCKED/INCONCLUSIVE results are retried;
-    # downstream synthesis is invalidated whenever an upstream stage is retried.
-    accepted = {"PASS", "PASS WITH FINDINGS"}
-    reports = {name: report for name, report in raw_reports.items()
-               if extract_verdict(report) in accepted}
+    # Reuse every validated stage for this exact immutable evidence packet.
+    # BLOCKED/INCONCLUSIVE reports are durable findings, not provider transport
+    # failures. Reissuing an unchanged role wastes quota and can obscure prior
+    # evidence. Final acceptance remains blocked by review_verdict_failures().
+    # A source/evidence change rejects the checkpoint before this point.
+    reports = dict(raw_reports)
     commander = payload["commander"]
     acceptance = payload["acceptance"]
     verification = payload["verification"]
-    if commander is not None and extract_verdict(commander) not in accepted:
-        commander = None
-    if acceptance is not None and extract_verdict(acceptance) not in accepted:
-        acceptance = None
-    if verification is not None and extract_verdict(verification) not in accepted:
-        verification = None
-    if set(reports) != set(SPECIALISTS):
-        commander = acceptance = verification = None
-    elif commander is None:
-        acceptance = verification = None
-    elif acceptance is None:
-        verification = None
     _validate_checkpoint_progress(reports, commander, acceptance, verification)
     return {"reports": reports, "commander": commander,
             "acceptance": acceptance, "verification": verification,
@@ -1369,11 +1358,19 @@ def synthetic():
                         verification="VERDICT: BLOCKED",
                         review_evidence_sha256=synthetic_evidence_sha256)
         restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
-        assert "architecture-architect" not in restored["reports"]
-        assert len(restored["reports"]) == len(SPECIALISTS) - 1
-        assert restored["commander"] is None
-        assert restored["acceptance"] is None
-        assert restored["verification"] is None
+        assert restored["reports"] == all_reports
+        assert len(restored["reports"]) == len(SPECIALISTS)
+        assert restored["commander"] == "VERDICT: BLOCKED"
+        assert restored["acceptance"] == "VERDICT: BLOCKED"
+        assert restored["verification"] == "VERDICT: BLOCKED"
+        blocked = review_verdict_failures(
+            restored["reports"], restored["commander"],
+            restored["acceptance"], restored["verification"])
+        assert "architecture-architect=INCONCLUSIVE" in blocked
+        assert "commander=BLOCKED" in blocked
+        assert "independent-acceptance=BLOCKED" in blocked
+        assert "verification=BLOCKED" in blocked
+        assert not any(role.startswith("missing-specialist:") for role in blocked)
 
         all_pass_reports = {name:"VERDICT: PASS" for name in SPECIALISTS}
         save_checkpoint(checkpoint_path, all_pass_reports,
@@ -1383,9 +1380,12 @@ def synthetic():
                         review_evidence_sha256=synthetic_evidence_sha256)
         restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"] == all_pass_reports
-        assert restored["commander"] is None
-        assert restored["acceptance"] is None
-        assert restored["verification"] is None
+        assert restored["commander"] == "VERDICT: BLOCKED"
+        assert restored["acceptance"] == "VERDICT: BLOCKED"
+        assert restored["verification"] == "VERDICT: BLOCKED"
+        assert "commander=BLOCKED" in review_verdict_failures(
+            restored["reports"], restored["commander"],
+            restored["acceptance"], restored["verification"])
 
         save_checkpoint(checkpoint_path, all_pass_reports,
                         commander="VERDICT: PASS",
@@ -1395,8 +1395,11 @@ def synthetic():
         restored = load_checkpoint(checkpoint_path, synthetic_evidence_sha256)
         assert restored["reports"] == all_pass_reports
         assert restored["commander"] == "VERDICT: PASS"
-        assert restored["acceptance"] is None
-        assert restored["verification"] is None
+        assert restored["acceptance"] == "VERDICT: BLOCKED"
+        assert restored["verification"] == "VERDICT: BLOCKED"
+        assert "independent-acceptance=BLOCKED" in review_verdict_failures(
+            restored["reports"], restored["commander"],
+            restored["acceptance"], restored["verification"])
 
         all_pass = {name:"VERDICT: PASS WITH FINDINGS" for name in SPECIALISTS}
         save_checkpoint(checkpoint_path, all_pass,
@@ -1408,7 +1411,10 @@ def synthetic():
         assert restored["reports"] == all_pass
         assert restored["commander"] == "VERDICT: PASS"
         assert restored["acceptance"] == "VERDICT: PASS WITH FINDINGS"
-        assert restored["verification"] is None
+        assert restored["verification"] == "VERDICT: INCONCLUSIVE"
+        assert "verification=INCONCLUSIVE" in review_verdict_failures(
+            restored["reports"], restored["commander"],
+            restored["acceptance"], restored["verification"])
     # Provider reset is Unix epoch milliseconds; seconds remain supported.
     future_epoch = time.time() + 30.0
     millis_delay = retry_delay_seconds(
