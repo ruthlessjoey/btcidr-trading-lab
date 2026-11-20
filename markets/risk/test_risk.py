@@ -426,10 +426,25 @@ class TestAccountValidation(unittest.TestCase):
         self.assertNotIn("INVALID_CASH", codes(d))
 
     def test_invalid_risk_budget_fails_closed(self):
-        for value in ("0", "-5", 500.0, False, "NaN", None):
+        for value in ("-5", 500.0, False, "NaN", None):
             with self.subTest(budget=value):
                 d = run(request(acct=account(budget=value)))
                 self.assertIn("INVALID_RISK_BUDGET", codes(d))
+
+    def test_zero_risk_budget_blocks_new_buys_but_allows_reducing_a_long(self):
+        buy = run(request(acct=account(budget="0")))
+        self.assertEqual(buy.status, REJECTED)
+        self.assertIn("MAX_RISK_EXCEEDED", codes(buy))
+        self.assertNotIn("INVALID_RISK_BUDGET", codes(buy))
+        self.assertEqual(buy.permitted_quantity, "0")
+        self.assertIsNone(buy.approved_quantity)
+
+        held = (PositionState(BTC, "10", "100"),)
+        sell_account = account(cash="9000", budget="0", positions=held)
+        sell = run(request(decision=SELL, qty="4", stop=None, acct=sell_account))
+        self.assertEqual(sell.status, ELIGIBLE)
+        self.assertEqual(sell.approved_quantity, "4")
+        self.assertNotIn("INVALID_RISK_BUDGET", codes(sell))
 
     def test_inconsistent_account_is_refused(self):
         # 9000 cash with no positions, equity 10000: the 1000 is unexplained.
@@ -525,6 +540,21 @@ class TestStrategyDecisionGates(unittest.TestCase):
         self.assertEqual(d.status, REJECTED)
         self.assertIn("NOT_ACTIONABLE", codes(d))
         self.assertIsNone(d.permitted_quantity)
+
+    def test_non_mapping_provenance_fails_closed(self):
+        for value in (None, [], "COMPLETE"):
+            with self.subTest(provenance=value):
+                malformed = dataclasses.replace(sdec(), provenance=value)
+                d = run(request(sd=malformed))
+                self.assertEqual(d.status, REJECTED)
+                self.assertIn("INVALID_STRATEGY_DECISION", codes(d))
+                self.assertIsNone(d.approved_quantity)
+
+    def test_non_text_data_status_is_not_complete(self):
+        malformed = dataclasses.replace(sdec(), provenance={"data_status": object()})
+        d = run(request(sd=malformed))
+        self.assertEqual(d.status, REJECTED)
+        self.assertIn("DATA_NOT_COMPLETE", codes(d))
 
     def test_non_strategy_decision_object_is_refused(self):
         for value in ("BUY", None, {"decision": "BUY"}):
@@ -743,7 +773,7 @@ class TestFailClosed(unittest.TestCase):
             "bad price": request(price="0"),
             "bad equity": request(acct=account(equity="0")),
             "bad cash": request(acct=account(cash="-1")),
-            "bad budget": request(acct=account(budget="0")),
+            "bad budget": request(acct=account(budget="-1")),
             "bad time": request(now=-1),
             "bad quantity": request(qty="0"),
             "bad stop": request(stop="200"),

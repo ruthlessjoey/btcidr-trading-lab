@@ -138,6 +138,9 @@ def evaluate_risk(request, config):
         problem("STRATEGY_DECISION_VALID", "INVALID_STRATEGY_DECISION",
                 "strategy decision must be an M5 StrategyDecision")
     decision = sd.decision if isinstance(sd, StrategyDecision) else None
+    if isinstance(sd, StrategyDecision) and type(sd.provenance) is not dict:
+        problem("STRATEGY_PROVENANCE_VALID", "INVALID_STRATEGY_DECISION",
+                "strategy decision provenance must be a plain mapping")
     if isinstance(sd, StrategyDecision) and canonical is not None and sd.listing != canonical:
         problem("LISTING_MATCH", "LISTING_MISMATCH",
                 f"strategy decision is for {sd.listing!r}, the request is for {canonical!r}")
@@ -176,7 +179,7 @@ def evaluate_risk(request, config):
         cash, err = _attempt(parse_non_negative, "cash", acct.cash)
         if err:
             problem("ACCOUNT_VALID", "INVALID_CASH", err)
-        budget, err = _attempt(parse_positive, "risk_budget", acct.risk_budget)
+        budget, err = _attempt(parse_non_negative, "risk_budget", acct.risk_budget)
         if err:
             problem("ACCOUNT_VALID", "INVALID_RISK_BUDGET", err)
         if not isinstance(acct.positions, tuple) or not isinstance(acct.pending, tuple):
@@ -271,9 +274,11 @@ def evaluate_risk(request, config):
         age = now - as_of
         rules.append(_rule("PRICE_FRESH", age <= config.max_price_age_s, "STALE_PRICE",
                            f"price is {age} s old; the limit is {config.max_price_age_s} s"))
-    rules.append(_rule("DATA_PROVENANCE", sd.provenance.get("data_status") == "COMPLETE", "DATA_NOT_COMPLETE",
-                       f"the strategy decision was produced from {sd.provenance.get('data_status')!r} data; only "
-                       f"COMPLETE data may be sized"))
+    provenance = sd.provenance
+    data_status = provenance.get("data_status") if type(provenance) is dict else None
+    data_complete = type(data_status) is str and data_status == "COMPLETE"
+    rules.append(_rule("DATA_PROVENANCE", data_complete, "DATA_NOT_COMPLETE",
+                       "the strategy decision must carry exact COMPLETE data provenance; only COMPLETE data may be sized"))
     rules.append(_rule("DECISION_ACTIONABLE", decision in (BUY, SELL, HOLD), "NOT_ACTIONABLE",
                        f"strategy decision {decision} is not actionable"))
 
