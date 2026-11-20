@@ -755,3 +755,9 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - First run [#44730839583](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44730839583) exposed one missing sparse-checkout entry: the new containment test read its own workflow file. Added that workflow file to the bounded allowlist.
 - Exact-head run [#44731107861](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731107861) completed successfully on exact head `e1be9595ed4808218e94bb1d8e45d1271bf3621e`: **57 passed, 0 failed**, Python 3.11 (fetcher 21, provider authorization 4, history 8, probe 3, pipeline containment 6, sanitization 15).
 - This verifies only the six selected unprotected offline modules. The protected research-gate module and protected pipeline integration remain **UNVERIFIED / BLOCKED**. PR #86 remains open/draft; no merge.
+
+
+### Q0.8 checkpoint resume attempt #2 (20 November 2026)
+
+- After the first resumed run stopped at the OpenRouter 429 limit, dispatched a second exact-head review [#44731612974](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44731612974) on workflow commit `91ab93c5ae0957a32b9bc007d252b92388fe450f`, target PR #60 SHA `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`, resuming run `44728818302` / checkpoint artifact `14624753539`.
+- GitHub job metadata confirms checkpoint restore and synthetic preflight succeeded; the model-review step is still **IN PROGRESS** at this snapshot. No role completion or acceptance is inferred until logs and the resulting checkpoint are inspected.
