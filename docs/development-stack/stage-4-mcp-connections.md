@@ -18,14 +18,24 @@
 - Write tools, workflow dispatch, merge, and other mutations are intentionally unavailable in this configuration.
 - Claude Code still requires the user to approve the project MCP server and complete GitHub OAuth.
 
+## Firecrawl
+
+- Official hosted remote MCP endpoint: `https://mcp.firecrawl.dev/v2/mcp-oauth` (OAuth sign-in; no API key or secret is stored in the repository).
+- The project `.mcp.json` registers Firecrawl alongside Context7 and read-only GitHub MCP.
+- OAuth exposes the full hosted tool surface subject to the account plan and team policy. The keyless endpoint `https://mcp.firecrawl.dev/v2/mcp` is a separate mode limited to Search, Scrape, and Parse; it is not used by this project configuration.
+- Firecrawl is approved only within its included free allowance. Check `firecrawl_credit_usage` before substantial work, use bounded Agent `maxCredits`, disable unapproved provider execution, and stop at zero or uncertain balance. Never enable pay-as-you-go or paid overage.
+- Relevant specialist roles should follow `.claude/skills/firecrawl-research/SKILL.md`. The current `main` branch has no committed specialist-agent roster, so this configuration does not claim those agents have been individually wired or runtime-tested.
+- The connected ChatGPT Firecrawl integration is verified in the Commander session. Claude Code project MCP requires user trust approval and browser OAuth; Claude.ai web uses its separate native connector flow.
+
 ## Runtime setup required
 
-1. Open the repository in Claude Code and accept the project trust prompt only after reviewing the project files.
-2. Approve the GitHub MCP server and complete the GitHub OAuth flow.
-3. Create a free Context7 API key through the official Context7 account flow.
-4. Set that key as the `CONTEXT7_API_KEY` environment variable in the Claude Code runtime. Never place the actual key in this repository or in chat.
-5. Restart/reconnect Claude Code and confirm both servers appear in `/mcp`.
-6. Confirm GitHub tools are read-only and Context7 can resolve a public library documentation query.
+1. Open the repository in a supported Claude Code MCP client and accept the project trust prompt only after reviewing the project files.
+2. Approve the Firecrawl server and complete the Firecrawl browser OAuth flow; confirm `firecrawl` appears in `/mcp` and its tools are available.
+3. Approve the GitHub MCP server and complete the GitHub OAuth flow.
+4. Create a free Context7 API key through the official Context7 account flow.
+5. Set that key as the `CONTEXT7_API_KEY` environment variable in the Claude Code runtime. Never place the actual key in this repository or in chat.
+6. Restart/reconnect Claude Code and confirm all three servers appear in `/mcp`.
+7. Confirm GitHub tools are read-only, Context7 can resolve a public library documentation query, and Firecrawl credit usage reports the expected free balance.
 
 ## Limitations
 
