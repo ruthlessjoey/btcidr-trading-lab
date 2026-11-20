@@ -959,3 +959,12 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Implementation maturity, verification maturity and project acceptance remain separate. Focused PR #86 tests, Q0.8 synthetic preflight, author-reported Step 6 tests, and a blocked model review do not equal whole-project integration.
 - Profitability remains **UNVERIFIED**. Historical proxy result `−11% / profit factor 0.36` is negative evidence; no reproducible, independent, realistic-cost untouched-holdout or PAPER forward evidence currently proves profitability.
 - Next highest-value actions: retry Q0.8 from checkpoint `44728818302` only after the quota reset window; obtain authorized raw v11 and v9 archive bytes in a materializable form for the offline Step 6 review; do not bypass either blocker. Continue other safe independent work meanwhile.
+
+
+## 2026-11-20 clean-main Q0 containment successor (PR #82) re-verification
+
+- PR #82 current head `2818e900c23d7de6e77ab9a581ded9c4981fb4a8`, base main `731fc9fbb892dadccc64bf52da2f91ff069da124`, draft/open/unmerged, 15 changed paths.
+- Exact-head offline workflow [#44682581650](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44682581650) passed 49 Python 3.11 tests: AST/import-boundary 5; fetcher 21; provider/config 4; disabled probe 3; sanitization 12; legacy/pipeline isolation 4. The run's log binds `REVIEW_HEAD_SHA` to `2818e900...`; all steps succeeded. This suite made no market-data requests.
+- Independent static inspection of unprotected `fetcher.py`, `providers.py`, `probe.py`, `run.py`, `live_check.py`, `tests/test_q08_import_boundary.py`, `tests/test_live_check.py`, and the Q0.8 offline workflow confirmed: exact Tokocrypto `.site/api/v3/klines` HTTPS GET allowlist, fixed BTCUSDT query values, duplicate/unknown query rejection, 1 MiB response cap, redirects disabled, 429 fail-closed behavior, no provider factory alternatives, inert legacy entrypoints, AST rejection of dynamic imports/eval/exec/importlib, exact workflow sparse-checkout/test-command allowlist, and no imports of protected `P1/`, `signal/`, `markets/`, `validator.py`, or `report.py` in the approved offline closure.
+- Static review is not independent security acceptance. The PR remains draft and has no non-skipped independent review. These 49 tests and static checks are candidate evidence only; they do not verify market identity, allow dataset publication/backtesting, or prove profitability.
+- No merge or project-score increase is recorded.
