@@ -1074,9 +1074,11 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 
 ## 2026-11-20 Q0.8 GitHub-native bounded auto-resume implementation
 
-- PR #83 now includes a dedicated `auto_resume` workflow job; latest workflow commit is `efe876af9369c108a68ce2680488cb4301e513b9`.
+- PR #83 now includes a dedicated `auto_resume` workflow job; latest workflow commit is `2b04799e50c3cf95f2a00fe1f1a1134fe71f1637`.
 - The controller is eligible only after the review job emits the runner's explicit OpenRouter HTTP 429 failure diagnostic. Other failures do not trigger it.
 - It downloads only the checkpoint artifact from the immediately preceding run and checks schema v2, repository, approved base, frozen PR #60 head, model, evidence-digest format, allowed role names, report size and verdict headers. The immutable reviewer independently verifies checkpoint provenance and evidence digest before reuse.
 - It dispatches the same workflow on the same approved branch and exact frozen PR #60 SHA, with a hard cap of three automatic resumptions.
 - `actions: write` is scoped only to the controller job; the reviewer remains read-only. No PAT, new secret, third-party action, external automation service, or TinyFish wallet was added.
 - The workflow implementation has **not yet been executed or independently validated**. PR #83 remains open/draft/unmerged. This does not count as Q0.8 acceptance or increase maturity.
+
+- Final controller correction: latest PR #83 head `2b04799e50c3cf95f2a00fe1f1a1134fe71f1637`; the checkpoint gate now mirrors the reviewer’s first-nonempty-line/single-verdict rule and validates Commander/acceptance/verification progression before dispatch.
