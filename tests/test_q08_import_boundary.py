@@ -133,6 +133,7 @@ class Q08ImportBoundaryTests(unittest.TestCase):
         handoff = (ROOT / "PROJECT_HANDOFF.MD").read_text(encoding="utf-8")
         self.assertIn("Superseding Tokocrypto public-market-data boundary", handoff)
         self.assertIn("server-time (`/api/v3/time`)", handoff)
+        self.assertIn("symbol metadata/exchange-info, any `/open/v1` route", handoff)
         self.assertIn("any `www.tokocrypto.com` API endpoint are **not authorized**", handoff)
         self.assertIn("any `www.tokocrypto.com` API endpoint are **not authorized**", handoff)
 
