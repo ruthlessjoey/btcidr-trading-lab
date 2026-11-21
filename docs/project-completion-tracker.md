@@ -1253,3 +1253,14 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - No protected dependency chain was executed, no market-data requests or trading activity occurred, and no PR was merged.
 
 The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold status, and NOT PROVEN profitability assessment are unchanged. No project completion credit is awarded for the current-head changes until exact-head tests and the full review/independent acceptance are complete.
+
+
+## Q0.8 safe offline-gate coverage extension — 2026-11-21
+
+- PR #60 current candidate head: `5f51b074e4a1996753de417090634dc4988f226b`, still draft/open/unmerged with 26 changed paths.
+- Safe regression coverage was extended: the approved offline suite statically parses `research/pipeline.py` and `research/crosscheck.py` to verify the immutable empty provider gate and its order before split creation, without importing either module. A separate behavior test runs only `research.history.run_step1` in a temporary directory with a forbidden fake opener and checks exit 1, zero network calls, no dataset, and backtest disabled.
+- The research-data and blocked research-backtest workflows were updated to include the two unprotected AST source fixtures because they also run `test_pipeline.py`. A scan found exactly three workflows executing that test; all three now include the source fixtures. None checks out or executes the protected engine/validator/report files.
+- Commits: `11aacbaf75e7649eba84dd48233b4f914261dc16` (coverage tests), `c328f52d6f2f57dee78e501943d7efdba3112f56` (sparse checkout fixtures), `5f51b074e4a1996753de417090634dc4988f226b` (test boundary wording).
+- The prior 53/53 Python 3.11 run #44850292169 is only for prior head `be190f...`. No exact-current-head tests have run on `5f51b...`.
+- The review checkpoint artifact from run #44850656837 is bound to `be190f...` and cannot be resumed against this head. A new full review must start without a resume ID. Three specialist reports from the prior head are historical candidate findings only; no Commander, independent acceptance, or final verification exists.
+- No project maturity credit changes. The previously recorded 15.00/100 candidate-weighted score, 0/40 exact-main threshold, and NOT PROVEN profitability remain unchanged. No PR merge, protected execution, exchange request, or trade occurred.
