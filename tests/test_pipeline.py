@@ -2,6 +2,7 @@
 
 Do not import run.py here: it imports the protected validator.py module.
 """
+import ast
 import json
 import os
 import unittest
@@ -10,6 +11,44 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class PipelineContainmentTests(unittest.TestCase):
+    def test_crosscheck_authorization_is_empty_immutable_and_wired_statically(self):
+        crosscheck_path = os.path.join(ROOT, "research", "crosscheck.py")
+        with open(crosscheck_path, encoding="utf-8") as f:
+            crosscheck_tree = ast.parse(f.read(), filename=crosscheck_path)
+        authorization = [
+            node for node in crosscheck_tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name)
+                    and target.id == "AUTHORIZED_CROSSCHECK_PROVIDERS"
+                    for target in node.targets)
+        ]
+        self.assertEqual(len(authorization), 1)
+        value = authorization[0].value
+        self.assertIsInstance(value, ast.Call)
+        self.assertIsInstance(value.func, ast.Name)
+        self.assertEqual(value.func.id, "frozenset")
+        self.assertEqual(value.args, [])
+        self.assertEqual(value.keywords, [])
+
+        # Inspect the pipeline as text only. Do not import it: its dependency
+        # chain reaches the protected research engine/validator boundary.
+        pipeline_path = os.path.join(ROOT, "research", "pipeline.py")
+        with open(pipeline_path, encoding="utf-8") as f:
+            pipeline_tree = ast.parse(f.read(), filename=pipeline_path)
+        wiring = [
+            node for node in pipeline_tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name)
+                    and target.id == "AUTHORIZED_CROSSCHECK_PROVIDERS"
+                    for target in node.targets)
+        ]
+        self.assertEqual(len(wiring), 1)
+        wired_value = wiring[0].value
+        self.assertIsInstance(wired_value, ast.Attribute)
+        self.assertEqual(wired_value.attr, "AUTHORIZED_CROSSCHECK_PROVIDERS")
+        self.assertIsInstance(wired_value.value, ast.Name)
+        self.assertEqual(wired_value.value.id, "crosscheck")
+
     def test_default_config_contains_only_exact_tokocrypto_source(self):
         with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
             cfg = json.load(f)

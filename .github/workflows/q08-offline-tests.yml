@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Sparse checkout only the six approved offline test modules and dependencies
+      - name: Sparse checkout only approved offline tests and unprotected static dependencies
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -30,6 +30,7 @@ jobs:
             /research_config.json
             /research/history.py
             /research/crosscheck.py
+            /research/pipeline.py
             /fetch_history.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
