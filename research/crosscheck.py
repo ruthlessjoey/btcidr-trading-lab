@@ -75,7 +75,9 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         raise CrosscheckError("independent cross-check artifact path must be a non-empty string")
     try:
         if not os.path.lexists(crosscheck_path):
-            raise FileNotFoundError("cross-check artifact does not exist")
+            raise CrosscheckError(
+                "independent cross-check evidence is required for flagged dates; no artifact was supplied"
+            )
         # lstat rejects symlinks even on platforms without O_NOFOLLOW. The
         # path/descriptor comparisons catch replacement during the open.
         path_metadata = os.lstat(crosscheck_path)
