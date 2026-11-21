@@ -1609,3 +1609,9 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - PR #60 current head is `b5b86caa5dd66d9f6e3e2544b4557317851267be`, 104 commits ahead/0 behind M6 baseline, draft/open/unmerged. The previous selected offline pass and COMMENTED review applied to earlier SHAs; neither is exact-head evidence or approval for this revision. Fresh exact-head offline tests and a fresh 19-role review are required.
 - The corrected reviewer workflow supports the required `review_head_sha` and optional `resume_from_run_id` inputs; its default mode is `synthetic`, so manual dispatch must explicitly select `mode=review` for actual model roles. First review must start with a blank resume ID.
 - PR #92 is still based on the older PR #60 head `243f17d09750fb14818fd0d04c78c3a17d380f74`; its branch relationship needs synchronization before integration. It is not a candidate to merge independently.
+
+
+## Stacked PR synchronization note — 2026-11-22
+
+- After the PR #60 workflow-pin commit, live branch comparison shows PR #92 (`fdcb8826eeadc6441776e6bc282ed2f392f845df`) is **19 commits ahead and 1 commit behind** its current target branch `security/q0-provider-sanitization-2026-11-18` (now PR #60 head `b5b86caa5dd66d9f6e3e2544b4557317851267be`). GitHub PR metadata still reports the older base SHA `243f17...`, matching the branch tip from PR #92 creation. The PR #92 diff remains five intended unprotected research/test files; synchronize the one-parent-commit drift before considering integration.
+- PR #92 remains draft/open/unmerged. A successful test run at its current `fdcb882...` head would validate its source/tests but would not resolve its base-branch drift or authorize merge.
