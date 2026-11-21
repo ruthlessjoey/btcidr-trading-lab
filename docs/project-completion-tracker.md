@@ -1239,3 +1239,17 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - PR #80's standalone import guard is not copied over: its allowlist is intentionally narrower and would not match PR #82's broader exact workflow. PR #82 already carries its own compatible guard.
 - PR #74 `security/bounded-actionlint-download-2026-11-19` head `6a8997d4881c85b9ebdf73ec60be54a765362d91` changes only `.github/workflows/free-security-lint.yml`. Static review confirms HTTPS-only download with connect/overall timeouts, a 16 MiB archive cap, SHA-256 pin verification, a 32 MiB extracted-binary cap, a requirement for exactly one regular-file `actionlint` archive member, fixed output path, and direct execution without archive-path extraction. No CI/status exists for this exact head. It is 2 commits ahead / 1 behind current main `731fc9fbb892dadccc64bf52da2f91ff069da124`; rebase/merge is not attempted.
 - Current exact-head CI/runtime evidence remains absent for the above candidates. No acceptance or project-completion credit is awarded. No protected modules, network endpoints, exchange accounts, or trading functions were accessed or executed.
+
+
+## Q0.8 checkpointed-review and cross-check correction — 2026-11-21
+
+- PR #60 current candidate head: `804fbe8e6331c4d785d9ee665a8f77861853a961`, on its historical M6 base `cd451972e3a641ad6fa78e64abf3968655a4b82a`; 26 changed paths, still draft/open/unmerged.
+- Offline run [#44850292169](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44850292169) passed **53/53 Python 3.11 tests** on the prior candidate head `be190f0ccd34471ee07657170df3570d8ceaa3d2`. The candidate changed afterward; this test pass is not exact-head evidence for `804fbe8...`.
+- Specialist run [#44850656837](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44850656837) passed runner syntax, synthetic preflight, PR-head validation, and scoped snapshot creation. Three of 16 specialist reports completed, each `PASS WITH FINDINGS`; OpenRouter HTTP 429 stopped the fourth role. No Commander, independent acceptance, or final verification ran.
+- Checkpoint artifact `14685397494` was downloaded and independently checked for schema, repository, base SHA, prior head SHA, model, role allowlist, and report verdict structure. It is identity-bound to `be190f...`; the current candidate head differs, so it must not be resumed.
+- Fix commit `2a844d748e93a979dddaa42ee222d0fd30880a71` adds an explicit immutable empty `AUTHORIZED_CROSSCHECK_PROVIDERS` set and restores the prior module value after the regression test's temporary mutation.
+- Commit `804fbe8e6331c4d785d9ee665a8f77861853a961` adds a source-only AST regression for the empty authorization set and static pipeline wiring. The test does not import or execute `research.pipeline.py`; that source is included in the workflow sparse checkout solely for AST inspection.
+- Exact-current-head Python 3.11 offline tests and a fresh 19-role specialist review remain pending. The next specialist run must use `review_head_sha=804fbe8e6331c4d785d9ee665a8f77861853a961` and blank `resume_from_run_id`.
+- No protected dependency chain was executed, no market-data requests or trading activity occurred, and no PR was merged.
+
+The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold status, and NOT PROVEN profitability assessment are unchanged. No project completion credit is awarded for the current-head changes until exact-head tests and the full review/independent acceptance are complete.
