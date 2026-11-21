@@ -1555,3 +1555,13 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - A focused in-session parser smoke check passed 4/4 cases (valid JSON, duplicate top-level key, duplicate nested key, and NaN). This is not execution of the repository regression suite. No exact-head CI/workflow result or independent review exists for the new branch; status remains **IMPLEMENTED / TEST NOT RUN / INDEPENDENT REVIEW PENDING**.
 - Production cross-check acquisition remains unconditionally disabled and the production authorization set remains empty. This change does not authorize Coinbase, Bitstamp, or any other provider.
 - No maturity credit or project completion change. The candidate is not merged and remains stacked on the unaccepted M6-based PR #60 line; current-main integration still requires architecture/ancestry reconciliation.
+
+
+## Strict cross-check JSON hardening PR opened — 2026-11-22
+
+- Opened draft PR [#92](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/92), head `ac033b852867e0a8a3e61fd934f03c252eff1c1e`, base PR #60 candidate head `243f17d09750fb14818fd0d04c78c3a17d380f74`. It is not based on main and must not be merged independently of its parent stack.
+- Exact PR diff paths: `research/crosscheck.py`, `research/pipeline.py`, `tests/test_pipeline.py`, `tests/test_research_gates.py`, `tests/test_sanitization.py`; no protected path names occur in the diff.
+- Static source review confirms duplicate-key rejection applies via JSON `object_pairs_hook` at all object depths, non-standard constants are rejected through `parse_constant`, and `ValueError` / `RecursionError` are converted to a sanitized `CrosscheckError`. The regression test module includes duplicate top-level/nested-key cases and a NaN case.
+- No exact-head test run was found for PR #92 head. The parent cross-check candidate run [#44953649548](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44953649548) passed 72/72 before these two JSON-hardening commits and must not be carried forward as an exact-head pass. The focused 4/4 parser smoke check remains separate evidence only.
+- GitHub reports PR #92 `mergeable=false` at this check. Its parent M6 candidate PR #60 remains open/draft/unmerged; current-main ancestry and protected engine boundaries remain unresolved. No provider authorization is added; cross-check acquisition stays disabled.
+- Status: **IMPLEMENTED / STATICALLY REVIEWED / EXACT-HEAD SUITE NOT RUN / INDEPENDENT REVIEW PENDING**. No maturity or profitability credit is awarded.
