@@ -90,6 +90,16 @@ class CrosscheckGateTests(unittest.TestCase):
                         CrosscheckError, "schema or producer"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "O_NOFOLLOW is not available")
+    def test_symlinked_crosscheck_artifact_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = self.write_evidence(d, self.payload())
+            path = os.path.join(d, "linked-crosscheck.json")
+            os.symlink(target, path)
+            with self.assertRaisesRegex(
+                    CrosscheckError, "artifact is unreadable: OSError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_oversized_crosscheck_artifact_is_rejected_before_json_parsing(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "crosscheck.json")
