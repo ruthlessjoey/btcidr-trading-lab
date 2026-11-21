@@ -12,9 +12,10 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from research.pipeline import (load_required_crosscheck, validate_crosscheck_artifact,
-                               AUTHORIZED_CROSSCHECK_PROVIDERS)
-from research.engine import EngineError
+from research.crosscheck import (
+    CrosscheckError, AUTHORIZED_CROSSCHECK_PROVIDERS,
+    load_required_crosscheck, validate_crosscheck_artifact,
+)
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "abc123"}
 CFG = {"flagged_dates": ["2020-03-12"]}
@@ -35,12 +36,12 @@ class CrosscheckGateTests(unittest.TestCase):
 
     def test_no_independent_provider_is_currently_authorized(self):
         self.assertEqual(AUTHORIZED_CROSSCHECK_PROVIDERS, frozenset())
-        with self.assertRaisesRegex(EngineError, "no independent cross-check provider"):
+        with self.assertRaisesRegex(CrosscheckError, "no independent cross-check provider"):
             load_required_crosscheck(CFG, MANIFEST, None)
 
     def test_missing_artifact_is_blocked_when_a_provider_is_authorized(self):
         with tempfile.TemporaryDirectory() as d:
-            with self.assertRaisesRegex(EngineError, "no artifact"):
+            with self.assertRaisesRegex(CrosscheckError, "no artifact"):
                 validate_crosscheck_artifact(CFG, MANIFEST, os.path.join(d, "missing.json"),
                                              TEST_APPROVED)
 
@@ -49,13 +50,13 @@ class CrosscheckGateTests(unittest.TestCase):
             p = self.payload()
             p["dataset_sha256"] = "wrong"
             path = self.write_evidence(d, p)
-            with self.assertRaisesRegex(EngineError, "does not match"):
+            with self.assertRaisesRegex(CrosscheckError, "does not match"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_provider_must_be_explicitly_authorized(self):
         with tempfile.TemporaryDirectory() as d:
             path = self.write_evidence(d, self.payload(provider="bitstamp"))
-            with self.assertRaisesRegex(EngineError, "authorized independent providers"):
+            with self.assertRaisesRegex(CrosscheckError, "authorized independent providers"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_malformed_or_duplicate_flagged_entries_are_rejected(self):
@@ -75,21 +76,21 @@ class CrosscheckGateTests(unittest.TestCase):
         for payload in malformed:
             with tempfile.TemporaryDirectory() as d:
                 path = self.write_evidence(d, payload)
-                with self.subTest(payload=payload), self.assertRaises(EngineError):
+                with self.subTest(payload=payload), self.assertRaises(CrosscheckError):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_flagged_day_must_be_confirmed(self):
         for verdict in ("UNAVAILABLE", "NOT CONFIRMED", "MISSING"):
             with tempfile.TemporaryDirectory() as d:
                 path = self.write_evidence(d, self.payload(verdict=verdict))
-                with self.subTest(verdict=verdict), self.assertRaisesRegex(EngineError, "lacks confirmed"):
+                with self.subTest(verdict=verdict), self.assertRaisesRegex(CrosscheckError, "lacks confirmed"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_every_flagged_date_must_be_confirmed(self):
         cfg = {"flagged_dates": ["2020-03-12", "2020-03-13"]}
         with tempfile.TemporaryDirectory() as d:
             path = self.write_evidence(d, self.payload())
-            with self.assertRaisesRegex(EngineError, "2020-03-13"):
+            with self.assertRaisesRegex(CrosscheckError, "2020-03-13"):
                 validate_crosscheck_artifact(cfg, MANIFEST, path, TEST_APPROVED)
 
     def test_valid_dataset_bound_authorized_evidence_is_accepted_by_validator(self):
