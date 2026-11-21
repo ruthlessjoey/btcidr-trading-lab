@@ -15,22 +15,44 @@ DAY = 86400
 TOLERANCE_PCT = 3.0
 
 # No independent cross-check provider is authorized under the current policy.
-# Keep the gate explicit and immutable; approval requires a reviewed source change.
+# Production entrypoints pass a fresh empty frozenset; this named constant is
+# informational and is not consulted to authorize production backtests.
 AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+CROSSCHECK_ARTIFACT_SCHEMA = "twin-money-maker.crosscheck/v1"
+CROSSCHECK_ARTIFACT_PRODUCER = "research.crosscheck"
+CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
 
 
 class CrosscheckError(RuntimeError):
     """Safe, unprotected error type for dataset-bound cross-check validation."""
 
 
+def is_confirmed_verdict(value):
+    """Accept only the exact verdict emitted by the two-source comparison rule."""
+    return type(value) is str and value == CONFIRMED_VERDICT
+
+
 def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
-    """Validate dataset-bound evidence without importing the protected backtest engine."""
+    """Validate versioned, dataset-bound evidence from at least two approved sources.
+
+    This pure helper accepts an explicit immutable provider set for isolated
+    fixtures. Production entrypoints below always pass a fresh empty frozenset.
+    """
     flagged = cfg.get("flagged_dates", [])
+    if type(flagged) is not list:
+        raise CrosscheckError("cross-check flagged_dates must be a list")
     if not flagged:
         return None
-    if not authorized_providers:
+    if (any(type(date) is not str or not date for date in flagged)
+            or len(flagged) != len(set(flagged))):
+        raise CrosscheckError("cross-check flagged_dates must contain unique non-empty strings")
+    if (type(authorized_providers) is not frozenset
+            or len(authorized_providers) < 2
+            or any(type(provider) is not str or not provider
+                   for provider in authorized_providers)):
         raise CrosscheckError(
-            "no independent cross-check provider is currently authorized; flagged-date backtests are blocked"
+            "no independent cross-check provider set is accepted; "
+            "at least two distinct authorized providers are required"
         )
     if not crosscheck_path or not os.path.isfile(crosscheck_path):
         raise CrosscheckError(
@@ -43,45 +65,59 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         raise CrosscheckError(
             f"independent cross-check artifact is unreadable: {type(e).__name__}"
         ) from None
-    if not isinstance(evidence, dict):
+    if type(evidence) is not dict:
         raise CrosscheckError("independent cross-check artifact must be a JSON object")
-    if (evidence.get("dataset_version") != manifest.get("version_id") or
-            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+    if (evidence.get("schema") != CROSSCHECK_ARTIFACT_SCHEMA
+            or evidence.get("producer") != CROSSCHECK_ARTIFACT_PRODUCER):
+        raise CrosscheckError(
+            "cross-check artifact schema or producer identity is unsupported"
+        )
+    if (evidence.get("dataset_version") != manifest.get("version_id")
+            or evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
         raise CrosscheckError(
             "cross-check evidence does not match the pinned dataset version and hash"
         )
     used = evidence.get("providers")
-    if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) for p in used) or
-            len(used) != len(set(used)) or
-            any(p not in authorized_providers for p in used)):
+    if (type(used) is not list or len(used) < 2
+            or any(type(provider) is not str or not provider for provider in used)
+            or len(used) != len(set(used))
+            or any(provider not in authorized_providers for provider in used)):
         raise CrosscheckError(
-            "cross-check artifact does not identify exclusively authorized independent providers"
+            "cross-check artifact must identify at least two distinct authorized independent providers"
         )
     flagged_entries = evidence.get("flagged")
-    if not isinstance(flagged_entries, list):
+    if type(flagged_entries) is not list:
         raise CrosscheckError("cross-check artifact flagged entries must be a list")
     entries = {}
     for item in flagged_entries:
-        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+        if type(item) is not dict or type(item.get("date")) is not str or not item["date"]:
             raise CrosscheckError("cross-check artifact contains a malformed flagged entry")
         if item["date"] in entries:
             raise CrosscheckError("cross-check artifact contains duplicate flagged dates")
         entries[item["date"]] = item
+    if set(entries) != set(flagged):
+        raise CrosscheckError(
+            "cross-check artifact flagged dates do not exactly match the requested dates"
+        )
     for date in flagged:
-        item = entries.get(date)
-        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
-            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+        item = entries[date]
+        for provider in used:
+            source = item.get(provider)
+            if type(source) is not dict or source.get("agrees") is not True:
+                raise CrosscheckError(
+                    f"flagged date {date} lacks affirmative agreement from provider {provider}"
+                )
+        if not is_confirmed_verdict(item.get("verdict")):
+            verdict = item.get("verdict", "MISSING")
             raise CrosscheckError(
-                f"flagged date {date} lacks confirmed independent evidence ({verdict})"
+                f"flagged date {date} lacks the exact confirmed verdict ({verdict})"
             )
     return evidence
 
-
 def load_required_crosscheck(cfg, manifest, crosscheck_path):
-    """Apply the current immutable provider policy to cross-check evidence."""
+    """Keep production flagged-date backtests fail-closed pending separate approval."""
     return validate_crosscheck_artifact(
-        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+        cfg, manifest, crosscheck_path, frozenset()
     )
 
 
@@ -155,10 +191,10 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
                     entry["table"].append({"date": day(tt), "source": name, "open": c.open, "high": c.high,
                                            "low": c.low, "close": c.close})
         cb, bs = entry["coinbase"], entry["bitstamp"]
-        if cb is None:
+        if cb is None or bs is None:
             entry["verdict"] = "UNAVAILABLE"
-        elif cb["agrees"] and (bs is None or bs["agrees"]):
-            entry["verdict"] = "CONFIRMED (approximate: USD is not USDT)"
+        elif cb.get("agrees") is True and bs.get("agrees") is True:
+            entry["verdict"] = CONFIRMED_VERDICT
         else:
             entry["verdict"] = "NOT CONFIRMED"
         res["flagged"].append(entry)
