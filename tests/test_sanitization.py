@@ -1,7 +1,7 @@
 """Safe regression tests for provider-controlled errors and report sinks.
 
-This module imports only fetcher, providers, and research.crosscheck. It does not
-import live_check, validator, report, dataset, or any protected module.
+This module imports only fetcher and providers. It does not import research,
+live_check, validator, report, dataset, or any protected module.
 """
 import io
 import os
