@@ -115,52 +115,20 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
 
 
 def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
-    """Validate dataset-bound evidence against an explicit provider authorization set."""
-    flagged = cfg.get("flagged_dates", [])
-    if not flagged:
-        return None
-    if not authorized_providers:
-        raise EngineError("no independent cross-check provider is currently authorized; flagged-date backtests are blocked")
-    if not crosscheck_path or not os.path.isfile(crosscheck_path):
-        raise EngineError("independent cross-check evidence is required for flagged dates; no artifact was supplied")
+    """Preserve the engine-facing error contract around the safe validator."""
     try:
-        with open(crosscheck_path, encoding="utf-8") as f:
-            evidence = json.load(f)
-    except (OSError, ValueError) as e:
-        raise EngineError(f"independent cross-check artifact is unreadable: {type(e).__name__}")
-    if not isinstance(evidence, dict):
-        raise EngineError("independent cross-check artifact must be a JSON object")
-    if (evidence.get("dataset_version") != manifest.get("version_id") or
-            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
-        raise EngineError("cross-check evidence does not match the pinned dataset version and hash")
-    used = evidence.get("providers")
-    if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) for p in used) or
-            len(used) != len(set(used)) or
-            any(p not in authorized_providers for p in used)):
-        raise EngineError("cross-check artifact does not identify exclusively authorized independent providers")
-    flagged_entries = evidence.get("flagged")
-    if not isinstance(flagged_entries, list):
-        raise EngineError("cross-check artifact flagged entries must be a list")
-    entries = {}
-    for item in flagged_entries:
-        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
-            raise EngineError("cross-check artifact contains a malformed flagged entry")
-        if item["date"] in entries:
-            raise EngineError("cross-check artifact contains duplicate flagged dates")
-        entries[item["date"]] = item
-    for date in flagged:
-        item = entries.get(date)
-        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
-            verdict = item.get("verdict", "MISSING") if item else "MISSING"
-            raise EngineError(f"flagged date {date} lacks confirmed independent evidence ({verdict})")
-    return evidence
+        return crosscheck.validate_crosscheck_artifact(
+            cfg, manifest, crosscheck_path, authorized_providers
+        )
+    except crosscheck.CrosscheckError as exc:
+        raise EngineError(str(exc)) from None
 
 
 def load_required_crosscheck(cfg, manifest, crosscheck_path):
     """Apply the current owner-approved provider set to the cross-check artifact."""
-    return validate_crosscheck_artifact(cfg, manifest, crosscheck_path,
-                                         AUTHORIZED_CROSSCHECK_PROVIDERS)
+    return validate_crosscheck_artifact(
+        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+    )
 
 
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
