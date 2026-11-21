@@ -1,7 +1,7 @@
 # AI Trading & Automation Laboratory — project-wide completion tracker
 
 **Status:** Owner-approved 40-requirement scope and 100-point weights; row-level evidence audit in progress  
-**Last checked:** 2026-11-21  
+**Last checked:** 2026-11-22  
 
 > **Snapshot rule:** Sections dated later in this document are authoritative for current PR heads, merge state, workflow pins, and verification status. Earlier PR descriptions and status tables preserve historical snapshots; when they conflict with a later reconciliation addendum, the later addendum supersedes them.
 **Repository:** `ruthlessjoey/btcidr-trading-lab`
@@ -1588,3 +1588,15 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - Latest PR #92 head is now `c6c5284c52a068babb8dac06e783069519e52939`; the previous 76/76 result is **not** exact-head evidence for this newer revision. Fresh exact-head workflow execution is pending. PR #92 remains draft/open/unmerged and stacked on PR #60 candidate head `243f17d09750fb14818fd0d04c78c3a17d380f74`, not on main. The PR currently has no submitted review entries or review threads.
 - Production cross-check acquisition remains disabled and the authorization set remains empty. No provider, exchange endpoint, dataset publication, backtest, PAPER operation, or LIVE operation was enabled or performed. No maturity credit is awarded from this candidate-only result.
 - Project completion remains **UNRATED** pending approved evidence reconciliation; the existing 15.00/100 candidate-weighted maturity snapshot and 0/40 exact-main verification threshold are unchanged. Profitability remains **NOT PROVEN**; PAPER readiness remains **NOT READY**.
+
+
+## Q0.8 strict cross-check current-head reconciliation — 2026-11-22 (latest)
+
+- Current PR #92 head: `fdcb8826eeadc6441776e6bc282ed2f392f845df`; branch `security/q08-crosscheck-strict-json-2026-11-22`; base remains PR #60 head `243f17d09750fb14818fd0d04c78c3a17d380f74`, not `main`. PR #92 is open, draft, unmerged; GitHub currently reports `mergeable=false`.
+- Exact prior-head CI remains run [#44957838261](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44957838261), which checked out `347afc9c73f15e678891391ee6fdec10b245bd0c` and passed 76/76 selected Python 3.11.18 offline tests across seven suites. It is not CI evidence for later commits.
+- Current follow-up changes are limited to `research/crosscheck.py` and `tests/test_research_gates.py`: `os.lstat` rejects symlinks/non-regular path entries even without `O_NOFOLLOW`; descriptor and path identity are checked against the pre-open path; non-string evidence paths are rejected as `CrosscheckError`; regression coverage exercises `O_NOFOLLOW=0` and invalid path types. A compatibility correction preserves the existing missing-artifact error contract. These commits have not yet been executed in the repository test suite.
+- Fresh exact-head CI on `fdcb8826eeadc6441776e6bc282ed2f392f845df` is pending. The connector cannot dispatch `workflow_dispatch`; the manual offline workflow remains `.github/workflows/q08-offline-tests.yml`. No 76/76 result is inherited for this SHA.
+- PR #92 has no submitted review entries or review threads. PR #60 has a `COMMENTED` review, not approval; it says Q0.8 is inconclusive, only five of 19 role reports are recoverable and no Commander/independent acceptance/final verification exists. PR #82 also has a bounded-scope `COMMENTED` review, not approval. PR #86 is based on stale PR #60 head `d5d5db6...`, is non-mergeable, and its reviewer advises against integration in its current form.
+- The v11 Workstream B Step 6 archive, patch, checksum manifest and handoff exist as indexed Library items, but raw-byte export was denied by the Files service in this session and no local attachment bytes are present. Therefore checksum verification, v9 patch reconstruction, 88-test Python 3.11 reproduction, bypass probes and mutation checks are still blocked. Step 6 remains NOT ACCEPTED; Step 7 remains BLOCKED; Step 10 implementation remains blocked pending Step 6 acceptance and the exact user-specified storage path/build approval.
+- Exact `main` baseline remains `731fc9fbb892dadccc64bf52da2f91ff069da124`. No PR merged or pushed to main in this session. No protected repository paths were read or executed. No market API, exchange or trading action occurred.
+- No maturity credit awarded. Whole-project completion remains **UNRATED**; prior candidate-weighted maturity snapshot **15.00/100** and exact-main verification threshold **0/40** remain unchanged pending a new row-by-row evidence audit. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE disabled.
