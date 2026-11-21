@@ -1544,3 +1544,14 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - The latest PR review remains `COMMENTED`, not `APPROVED`; the review states its bounded scope and does not accept the whole project. The GitHub connector's combined commit-status endpoint returned no status records for this SHA; this addendum claims only the retrieved successful Actions job, not additional CodeQL/Analyze checks.
 - This exact-head run supersedes the earlier stale note that the prior bounded-read follow-up head `10007e3aa632d19f4350b3aa709e63b2232251d7` was unverified. The branch subsequently advanced to `883bc7c3c500102405dad884dd0995ee4e0e887d`, and the later exact-head run above verifies the selected offline suite at that newer head.
 - PR #82 remains a containment candidate, not integrated mainline work. No merge, provider expansion, protected-path access, strategy/backtest run, dataset publication, PAPER operation, or LIVE operation occurred. No requirement maturity credit or project completion score changes. Whole-project completion remains **UNRATED**; profitability remains **NOT PROVEN**; PAPER remains **NOT READY**.
+
+
+## Q0.8 strict cross-check JSON parsing hardening — 2026-11-22
+
+- Created candidate branch `security/q08-crosscheck-strict-json-2026-11-22` from the exact 72/72-tested cross-check remediation head `641caef8242a94db4fba857003c153b2055d83b8` (itself based on PR #60 head `243f17d09750fb14818fd0d04c78c3a17d380f74`).
+- Added duplicate-key rejection through `object_pairs_hook`, rejection of non-standard `NaN`/`Infinity` JSON constants, and fail-closed handling of excessive JSON nesting in `research/crosscheck.py`.
+- Added two regression tests in `tests/test_research_gates.py` for duplicate keys at top-level/nested depth and non-standard numeric constants.
+- Candidate head: `ac033b852867e0a8a3e61fd934f03c252eff1c1e`; implementation commit `d95174b5e188a937a87cc17323efa197cc759d8f`; test commit `ac033b852867e0a8a3e61fd934f03c252eff1c1e`. The branch is 10 commits ahead and 0 behind PR #60's exact base; the five-file total comparison contains only unprotected research/test files. No protected path was read or changed.
+- A focused in-session parser smoke check passed 4/4 cases (valid JSON, duplicate top-level key, duplicate nested key, and NaN). This is not execution of the repository regression suite. No exact-head CI/workflow result or independent review exists for the new branch; status remains **IMPLEMENTED / TEST NOT RUN / INDEPENDENT REVIEW PENDING**.
+- Production cross-check acquisition remains unconditionally disabled and the production authorization set remains empty. This change does not authorize Coinbase, Bitstamp, or any other provider.
+- No maturity credit or project completion change. The candidate is not merged and remains stacked on the unaccepted M6-based PR #60 line; current-main integration still requires architecture/ancestry reconciliation.
