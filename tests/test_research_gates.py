@@ -1,8 +1,8 @@
-"""Protected-import research gate tests; excluded from the approved offline test suite.
+"""Safe cross-check gate tests using only the unprotected research.crosscheck module.
 
-This module imports research.pipeline and research.engine, whose runtime dependency
-chain reaches protected root-level validator.py. Do not execute under the current
-protected-path boundary without separate owner authorization.
+The production pipeline adapts CrosscheckError to its protected engine error type,
+but these tests exercise the same dataset-evidence validation without importing or
+executing research.pipeline, research.engine, validator.py, or report.py.
 """
 import json
 import os
