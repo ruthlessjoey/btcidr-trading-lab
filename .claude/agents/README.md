@@ -12,7 +12,7 @@ These are actual runtime-recognized definitions, not just role descriptions. The
 ## Agent roster
 | Agent | Preloaded skill | Responsibility |
 |---|---|---|
-| `lab-commander` | `trading-lab-orchestrator`, `firecrawl-research` | Coordinates bounded specialist reviews, assigns tasks to named project agents, reconciles findings, and maintains the evidence ledger. |
+| `lab-commander` | `trading-lab-orchestrator`, `firecrawl-research`, `browser-workflow-testing` | Coordinates bounded specialist reviews, assigns tasks to named project agents, reconciles findings, and maintains the evidence ledger. |
 | `architecture-architect` | `architecture-guardrails`, `firecrawl-research` | Reviews system architecture, ownership boundaries, interfaces, dependencies, and ADR consistency. |
 | `implementation-engineer` | `implementation-engineer` | Reviews implementation feasibility and proposes minimal scoped changes; never edits or executes code. |
 | `provider-integration` | `provider-integration`, `firecrawl-research` | Reviews public market-data provider contracts, URL containment, parsing, timestamps, and candle integrity. |
@@ -37,7 +37,7 @@ These are actual runtime-recognized definitions, not just role descriptions. The
 - All agents retain read-only repository access: no agent receives `Edit`, `Write`, or `Bash`.
 - Most specialists receive only `Read`, `Grep`, and `Glob`.
 - The Commander and selected research/verification specialists additionally receive an explicit allowlist of Firecrawl MCP tools for public web research only; no other MCP server tools are granted to specialists.
-- The Commander additionally receives `Agent` solely to dispatch named project specialists and is the only agent granted Firecrawl Interact browser controls.
+- The Commander additionally receives `Agent` solely to dispatch named project specialists and is the only agent granted Firecrawl Interact browser controls. Its public browser workflows are constrained by `.claude/skills/browser-workflow-testing/SKILL.md`, including free-credit checks, bounded sessions, post-action verification, and evidence reporting.
 - Firecrawl tools do not grant access to repository files, private exchange/account data, protected paths, or financial actions. The shared `firecrawl-research` skill imposes free-credit caps and source-provenance rules.
 - The implementation-engineer agent is intentionally read-only.
 - Commander instructions prohibit built-in Explore, Plan, general-purpose, or unnamed agents.
