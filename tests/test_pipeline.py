@@ -49,6 +49,30 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertIsInstance(wired_value.value, ast.Name)
         self.assertEqual(wired_value.value.id, "crosscheck")
 
+        # The owner-authorization gate must run before split creation. Inspect
+        # syntax only; do not import or execute the pipeline.
+        run_backtest = next(
+            node for node in pipeline_tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_backtest"
+        )
+        gate_calls = [
+            node for node in ast.walk(run_backtest)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "load_required_crosscheck"
+        ]
+        split_calls = [
+            node for node in ast.walk(run_backtest)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "splits_mod"
+            and node.func.attr == "make_splits"
+        ]
+        self.assertEqual(len(gate_calls), 1)
+        self.assertEqual(len(split_calls), 1)
+        self.assertLess(gate_calls[0].lineno, split_calls[0].lineno)
+
     def test_default_config_contains_only_exact_tokocrypto_source(self):
         with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
             cfg = json.load(f)

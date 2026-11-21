@@ -4,9 +4,14 @@ These tests deliberately avoid importing protected validator.py or invoking netw
 They parse source text with Python's AST; they never import the Step 1 entrypoint.
 """
 import ast
+import io
 import json
 import os
+import tempfile
 import unittest
+from contextlib import redirect_stdout
+
+from research import history
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -64,7 +69,7 @@ class HistoryContainmentTests(unittest.TestCase):
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": set(),
+            "tests/test_history.py": {"research.history"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
@@ -94,6 +99,39 @@ class HistoryContainmentTests(unittest.TestCase):
                         for edge in edges),
                     f"{path} imports a protected module or uses a relative import",
                 )
+
+    def test_step1_behavior_fails_closed_without_network_or_dataset(self):
+        cfg = {
+            "mode": "read_only",
+            "provider": "tokocrypto",
+            "host": "https://www.tokocrypto.site",
+            "symbol": "BTCUSDT",
+            "base_asset": "BTC",
+            "quote_asset": "USDT",
+            "timeframe": "1h",
+        }
+        calls = []
+
+        def forbidden_opener(url, timeout):
+            calls.append((url, timeout))
+            raise AssertionError("Step 1 must not make a network request")
+
+        with tempfile.TemporaryDirectory() as out:
+            with redirect_stdout(io.StringIO()):
+                status = history.run_step1(
+                    cfg, out_dir=out, opener=forbidden_opener,
+                    sleep=lambda seconds: None, local_now=1_700_000_000,
+                )
+            self.assertEqual(status, 1)
+            self.assertEqual(calls, [])
+            self.assertEqual(set(os.listdir(out)), {"dataset_report.json", "dataset_report.md"})
+            with open(os.path.join(out, "dataset_report.json"), encoding="utf-8") as f:
+                report = json.load(f)
+            self.assertEqual(report["gate"], "FAIL")
+            self.assertEqual(report["network_requests"], 0)
+            self.assertIsNone(report["dataset"])
+            self.assertFalse(report["backtest_allowed"])
+            self.assertIn("Market identity is unverified", report["stop_reason"])
 
     def test_research_config_names_only_the_approved_provider_and_host(self):
         with open(os.path.join(ROOT, "research_config.json"), encoding="utf-8") as f:
