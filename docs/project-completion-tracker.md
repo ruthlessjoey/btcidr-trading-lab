@@ -1491,3 +1491,39 @@ The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold statu
 - PR #82 disables legacy root entrypoints that previously crossed protected validator/report boundaries. Its tests intentionally do not validate protected research/risk execution, market identity, dataset publication, or strategy behavior. The candidate is a safe containment layer, not a replacement for the absent M6 research architecture.
 - Integration conclusion: keep PR #82 as the clean-main containment candidate and PR #60 / the cross-check hardening branch as M6-based research/security candidates. A safe integration sequence must first establish the approved mainline architecture and then transplant reviewed, minimal file-level changes while preserving the PR #82 transport framing/deadline fix. No rebase, cherry-pick, merge, workflow dispatch, protected access, or exchange request was performed.
 - No project score changes: 15.00/100 candidate maturity remains a historical first-pass figure, exact-main threshold remains 0/40, project completion remains **UNRATED**, and profitability remains **NOT PROVEN**.
+
+
+## Emergency delivery reconciliation — 2026-11-22
+
+**Verified baseline:** `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`. This is a live GitHub ref check from 2026-11-22. The owner-approved scope remains 40 requirements / 100 weight points.
+
+### Exact-head evidence
+
+- PR #82 clean-main containment candidate remains open/draft/unmerged at `883bc7c3c500102405dad884dd0995ee4e0e887d`, based directly on current main. Exact-head workflow run [#44861148424](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44861148424) completed successfully on Python 3.11.18. The job log records the requested SHA equals the checked-out SHA and confirms the allowlist/import-boundary step passed. Selected suite counts: import-boundary 6, fetcher 30, provider/configuration 4, probe 3, sanitization 12, pipeline 4 = **59/59**. This is a selected offline subset only, not a full repository or strategy test.
+- The current main default-branch offline test workflow remains broken at the recorded main SHA: run [#44681951337](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44681951337) failed because `tests/test_live_check.py` imports `live_check`, while the workflow sparse-checkout did not include `live_check.py`. PR #82 supplies a candidate correction, but it is unmerged; therefore this does not count as mainline repair.
+- Q0.8 cross-check remediation branch `security/q08-crosscheck-validator-hardening-2026-11-21` at `641caef8242a94db4fba857003c153b2055d83b8` passed exact-head run [#44953649548](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44953649548): seven selected Python 3.11.18 suites, **72/72**. It is based on PR #60's historical M6 branch, not current main; five unprotected files are changed. It is neither merged nor a current-main test result.
+- PR #60 remains open/draft at `243f17d09750fb14818fd0d04c78c3a17d380f74`, based on M6 `cd451972e3a641ad6fa78e64abf3968655a4b82a`. The 19-role review run [#44906083428](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44906083428) failed after OpenRouter HTTP 429. Checkpoint artifacts have at most five specialist reports and contain no Commander, independent acceptance, or final verification. Q0.8 is NOT ACCEPTED.
+- Rechecked the immutable reviewer revision currently used by the default-branch workflow: checkout ref `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`, runner blob `92fc820128bba8cf8fa9e7d3de51838fe2672a1c`. That runner includes inline role/skill guidance, millisecond/seconds reset handling, atomic checkpoint replacement, duplicate-key/schema validation, exact repository/base/head/model identity, and stage-order checks. The workflow pin is therefore not itself a missing-runner bug. The rate-limit interruption remains the blocker.
+- PR #83's automatic-resume draft hardcodes old PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4` and a historical branch identity. Current PR #60 head is `243f17d09750fb14818fd0d04c78c3a17d380f74`; do not use that auto-resume workflow without a reviewed identity correction.
+- Firecrawl/tooling candidates #89 and #90 are separate developer-tooling changes; #89 is clean-main and its PR event check succeeded, while #90 is stacked on #89 with no exact-head workflow result. PR #91 is based on superseded #88 and GitHub reports it unmergeable. These are not trading-system implementation or profitability evidence.
+
+### Delivery assessment unchanged
+
+- 40 approved requirements / 100 points.
+- Historical first-pass candidate maturity: **15.00/100**. This is not whole-project completion.
+- Exact-main requirement verification threshold: **0/40** at the recorded audit. No additional requirement earns integrated-main credit from the above unmerged candidates.
+- Whole-project completion: **UNRATED**.
+- Profitability: **NOT PROVEN**. The historical strategy record remains adverse (about -11% return and 0.36 profit factor) on proxy data with venue costs not established.
+- PAPER readiness: **NOT READY**. Market identity is FAIL/CLOSED; no accepted dataset publication or end-to-end strategy/risk/portfolio bridge is established; PAPER lifecycle and independent emergency stop are not accepted. LIVE remains disabled.
+- No PR merge, provider authorization, dataset publication, exchange request, paper execution, or real-money operation is recorded in this update.
+
+### Remaining critical acceptance areas
+
+1. Repair the current-main default offline workflow through reviewed, owner-approved integration of the PR #82 clean-main correction, then rerun the full approved unprotected suite on the resulting exact main commit.
+2. Complete Q0.8 19-role review, Commander synthesis, independent acceptance, and final verification for exact PR #60 head; do not use stale checkpoint identities or PR #83's old pinned SHA.
+3. Resolve M6-to-main architecture ancestry before attempting any Q0 cross-check or risk-system transplant. Keep provider authorization empty and market identity fail-closed.
+4. Complete approved market identity/provenance, data validation/publication, reproducible strategy and chronological out-of-sample evaluation with realistic costs.
+5. Obtain separately authorized and independently assessable portfolio, PAPER lifecycle, emergency-stop, replay/recovery, and operator-surface evidence without accessing excluded/protected paths.
+6. Reconcile all 40 rows against the selected current-main baseline and attach exact source/test/review evidence. Candidate-only work does not become integrated credit.
+
+This addendum corrects the 2026-11-21 checkpoint with exact live repository and workflow evidence. It does not increase any maturity score or claim delivery acceptance.
