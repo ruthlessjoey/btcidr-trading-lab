@@ -1565,3 +1565,16 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - No exact-head test run was found for PR #92 head. The parent cross-check candidate run [#44953649548](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44953649548) passed 72/72 before these two JSON-hardening commits and must not be carried forward as an exact-head pass. The focused 4/4 parser smoke check remains separate evidence only.
 - GitHub reports PR #92 `mergeable=false` at this check. Its parent M6 candidate PR #60 remains open/draft/unmerged; current-main ancestry and protected engine boundaries remain unresolved. No provider authorization is added; cross-check acquisition stays disabled.
 - Status: **IMPLEMENTED / STATICALLY REVIEWED / EXACT-HEAD SUITE NOT RUN / INDEPENDENT REVIEW PENDING**. No maturity or profitability credit is awarded.
+
+
+## PR #92 parser hardening follow-up — 2026-11-22
+
+- A second static security pass found that the cross-check JSON parser still read the entire file and followed symlinks even though duplicate keys and non-standard constants were rejected. The implementation was strengthened on the same draft branch:
+  - exact maximum evidence size: **1 MiB**, read with a one-byte-over limit check;
+  - open flags include `O_NOFOLLOW` and `O_NONBLOCK` where supported;
+  - `fstat` requires a regular file before parsing;
+  - JSON decoding retains duplicate-key, `NaN`/`Infinity`, and excessive-nesting rejection.
+- Added regression cases for oversized artifacts and symlink refusal (the symlink test is skipped only where `O_NOFOLLOW` is unavailable).
+- Latest PR #92 head: `347afc9c73f15e678891391ee6fdec10b245bd0c`; still five unprotected files relative to PR #60 head `243f17d09750fb14818fd0d04c78c3a17d380f74`. GitHub now reports mergeable=true, but PR remains draft/unmerged.
+- The earlier focused parser smoke 4/4 predates the new size/symlink changes. The new regression tests and full selected suite have **not** been executed. No exact-head run exists; do not infer a pass from the parent 72/72 run.
+- Production cross-check authorization remains a fresh empty `frozenset()`; `run_crosscheck` remains fail-closed. No provider or endpoint was enabled. No maturity credit is awarded.
