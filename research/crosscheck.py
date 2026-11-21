@@ -71,13 +71,13 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
             "no independent cross-check provider set is accepted; "
             "at least two distinct authorized providers are required"
         )
-    if not crosscheck_path or not os.path.lexists(crosscheck_path):
-        raise CrosscheckError(
-            "independent cross-check evidence is required for flagged dates; no artifact was supplied"
-        )
+    if type(crosscheck_path) is not str or not crosscheck_path:
+        raise CrosscheckError("independent cross-check artifact path must be a non-empty string")
     try:
+        if not os.path.lexists(crosscheck_path):
+            raise FileNotFoundError("cross-check artifact does not exist")
         # lstat rejects symlinks even on platforms without O_NOFOLLOW. The
-        # opened-file identity check below closes the lstat/open race.
+        # path/descriptor comparisons catch replacement during the open.
         path_metadata = os.lstat(crosscheck_path)
         if not stat.S_ISREG(path_metadata.st_mode):
             raise ValueError("cross-check artifact is not a regular file")
@@ -90,6 +90,10 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
                 raise ValueError("cross-check artifact is not a regular file")
             if not os.path.samestat(path_metadata, metadata):
                 raise ValueError("cross-check artifact changed during open")
+            current_path_metadata = os.lstat(crosscheck_path)
+            if (not stat.S_ISREG(current_path_metadata.st_mode)
+                    or not os.path.samestat(current_path_metadata, metadata)):
+                raise ValueError("cross-check artifact path changed during open")
             if metadata.st_size > MAX_CROSSCHECK_ARTIFACT_BYTES:
                 raise ValueError("cross-check artifact exceeds the size limit")
             raw = f.read(MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
