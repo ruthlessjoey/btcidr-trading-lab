@@ -18,6 +18,7 @@ TOLERANCE_PCT = 3.0
 # Production entrypoints pass a fresh empty frozenset; this named constant is
 # informational and is not consulted to authorize production backtests.
 AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+MAX_CROSSCHECK_ARTIFACT_BYTES = 1_048_576
 CROSSCHECK_ARTIFACT_SCHEMA = "twin-money-maker.crosscheck/v1"
 CROSSCHECK_ARTIFACT_PRODUCER = "research.crosscheck"
 CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
@@ -74,11 +75,14 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
             "independent cross-check evidence is required for flagged dates; no artifact was supplied"
         )
     try:
-        with open(crosscheck_path, encoding="utf-8") as f:
-            evidence = json.load(
-                f, object_pairs_hook=_unique_json_object,
-                parse_constant=_reject_json_constant,
-            )
+        with open(crosscheck_path, "rb") as f:
+            raw = f.read(MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
+        if len(raw) > MAX_CROSSCHECK_ARTIFACT_BYTES:
+            raise ValueError("cross-check artifact exceeds the size limit")
+        evidence = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
     except (OSError, ValueError, RecursionError) as e:
         raise CrosscheckError(
             f"independent cross-check artifact is unreadable: {type(e).__name__}"
