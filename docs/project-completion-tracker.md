@@ -1407,3 +1407,14 @@ The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold statu
 - Deadline recovery: the 20 November 2026 target has passed. No replacement completion date is claimed; the remaining workload is still substantial and cannot be credibly converted into a finish date until current-main integration dependencies and protected acceptance boundaries are resolved.
 - Evidence added in this section is a current-state comparison and reconciliation, not implementation credit. No weight or maturity score is increased by documentation, static inspection, unmerged candidates or the Q0.8 offline subset alone.
 
+
+
+## M6 canonical-identity/provider-registry dependency review — 2026-11-21
+
+- Static source scope: only unprotected `markets/identity.py`, `markets/providers/symbols.py`, and `markets/providers/registry.py` at preserved M6 baseline `cd451972e3a641ad6fa78e64abf3968655a4b82a`. The identity module imports only the standard library. No file under `markets/risk/` was opened; no provider or pipeline tests were executed; no network request was made.
+- The S2.1 identity model distinguishes an `Instrument` (what asset pair is traded) from a `Listing` (that instrument on a specified venue and market type). Its canonical `parse_listing` parser checks schema and formatting only. It cannot establish that a venue actually lists a pair or that returned candles originated from the claimed venue.
+- The explicit symbol registry maps `crypto:binance-spot:BTC-USDT` to Binance Vision `BTCUSDT` and `crypto:kraken-spot:BTC-USD` to Kraken `XBTUSD`. The provider registry contains Binance Vision and Kraken only; there is no Tokocrypto provider or `crypto:tokocrypto-spot:BTC-USDT` symbol mapping in this baseline.
+- Therefore the preserved Binance Vision/Kraken adapters may supply separate public reference datasets, but they do not prove Tokocrypto BTC/USDT listing identity. In particular, the Kraken mapping is BTC/USD, not BTC/USDT. Do not treat canonical-string parsing or cross-venue comparison as venue-listing attestation.
+- C1 remains **BLOCKED / FAIL-CLOSED** under the current Tokocrypto endpoint boundary. Clearing it requires an owner-approved identity evidence source and explicit verification that binds the market symbol, venue and listing; do not widen Tokocrypto endpoints, add providers, or infer identity from candles to make the gate pass.
+- This is static architecture evidence on the M6 candidate baseline, not current-main integration, runtime verification or completion credit. The project score and profitability assessment remain unchanged.
+
