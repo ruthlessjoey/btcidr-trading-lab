@@ -1,0 +1,57 @@
+name: Q0.8 offline security regression tests (sparse unprotected scope)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: q08-offline-security-tests
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Sparse checkout only approved offline tests and unprotected static dependencies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /probe.py
+            /run.py
+            /config.json
+            /research_config.json
+            /research/history.py
+            /research/crosscheck.py
+            /research/pipeline.py
+            /fetch_history.py
+            /tests/test_fetcher.py
+            /tests/test_live_check.py
+            /tests/test_history.py
+            /tests/test_probe.py
+            /tests/test_pipeline.py
+            /tests/test_research_gates.py
+            /tests/test_sanitization.py
+            /.github/workflows/market-data-check.yml
+            /.github/workflows/research-data.yml
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Run the approved offline tests only
+        run: |
+          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
+          python3 -m unittest discover -s tests -p 'test_history.py' -v
+          python3 -m unittest discover -s tests -p 'test_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
+          python3 -m unittest discover -s tests -p 'test_sanitization.py' -v

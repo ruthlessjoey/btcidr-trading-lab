@@ -1,61 +1,19 @@
-name: Market data check
+name: Market data check (blocked pending protected validator review)
 
 on:
-  workflow_dispatch:        # lets you press "Run workflow" by hand
-  push:
-    branches: [main]
-  schedule:
-    - cron: "23 3 * * *"    # once a day (GitHub may start it late)
+  workflow_dispatch:
 
 permissions:
-  contents: write           # only used to publish reports to the 'data' branch
+  contents: read
 
 jobs:
-  test-probe-fetch:
+  blocked:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Run unit tests
-        run: python3 -m unittest discover -s tests -v
-
-      - name: Live smoke test - real candles from each public provider (READ-ONLY)
-        # This is the REQUIRED live check. It fails the run if no provider delivers validated data.
-        run: python3 live_check.py
-
-      - name: Diagnostic - Tokocrypto only (expected to be refused from GitHub, see report)
-        if: always()
-        continue-on-error: true
+      - name: Explain why live market diagnostics are disabled
         run: |
-          python3 probe.py
-          python3 run.py
-
-      - name: Diagnostic - reachability lab (which public hosts answer from GitHub?)
-        if: always()
-        continue-on-error: true
-        run: python3 tools/net_lab.py
-
-      - name: Keep the reports and candle file
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: market-data-report
-          path: out/
-          if-no-files-found: ignore
-
-      - name: Publish reports to the data branch (readable without Actions logs)
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          rm -rf /tmp/pub && mkdir /tmp/pub
-          cp -r out/. /tmp/pub/ 2>/dev/null || true
-          cd /tmp/pub
-          git init -q -b data
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q --allow-empty -m "Reports from run ${{ github.run_id }}"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" data
+          echo "::error::Live diagnostics are blocked because live_check.py imports protected validator.py/report.py. This workflow must not check out or execute those modules."
+          echo "No checkout, test, protected file access, network request, or exchange call occurred."
+          echo "Resume only after the protected module boundary is separately reviewed and authorized."
+          exit 1

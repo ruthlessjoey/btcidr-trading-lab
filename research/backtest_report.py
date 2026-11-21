@@ -177,7 +177,7 @@ def build_markdown(r):
           "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
-          "- One cross-check of the flagged day uses USD venues, not USDT."]
+          "- No independent cross-check was run: Coinbase and Bitstamp are excluded pending separate provider authorization. The flagged candle remains unverified."]
     L += ["", "Logs for the frozen choice under base costs: `trades.csv`, `orders.csv`, `equity.csv`; "
           "the frozen record is `frozen_choice.json`."]
     return "\n".join(L) + "\n"

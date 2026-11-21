@@ -145,6 +145,8 @@ def run_live_check(cfg, out_dir="out", opener=fetcher.default_opener, sleep=time
                    local_now=None):
     if cfg.get("mode") != "read_only":
         raise SystemExit("Refusing to run: only mode 'read_only' is supported.")
+    if cfg.get("live_providers") != ["tokocrypto"]:
+        raise SystemExit("Refusing to run: only the explicitly approved Tokocrypto provider may be configured.")
     if cfg["timeframe"] not in fetcher.TF_SECONDS:
         raise SystemExit(f"Unknown timeframe {cfg['timeframe']!r}")
     os.makedirs(out_dir, exist_ok=True)

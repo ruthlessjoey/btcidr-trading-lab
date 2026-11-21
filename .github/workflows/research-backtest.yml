@@ -1,21 +1,13 @@
-name: Research backtest (Step 2)
+name: Research backtest (blocked pending protected engine review)
 
-# READ-ONLY research. Uses the pinned dataset version stored on the 'research-data' branch.
-# Whether the TEST window is evaluated is set in backtest_config.json ("evaluate_test"), so the
-# decision is a visible, reviewable commit. Results are appended to 'research-data'; nothing is
-# overwritten or force-pushed.
 on:
   workflow_dispatch:
-  push:
-    branches: [milestone-3-data]
-    paths: [run_backtest.py, run_crosscheck.py, backtest_config.json, "research/**",
-            ".github/workflows/research-backtest.yml"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: research-data
+  group: research-backtest
   cancel-in-progress: false
 
 jobs:
@@ -23,55 +15,61 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Offline unit tests (must pass before anything runs on real data)
-        run: python3 -m unittest discover -s tests -v
-
-      - name: Load preserved datasets and earlier test records
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p prev
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git fetch -q --depth=1 "$URL" research-data
-          git archive FETCH_HEAD datasets | tar -x -C prev
-          git archive FETCH_HEAD test_evaluations 2>/dev/null | tar -x -C prev || true
-          ls -R prev | head -30
-
-      - name: Cross-check flagged candles against independent sources
-        continue-on-error: true
-        run: python3 run_crosscheck.py --datasets-root prev/datasets
-
-      - name: Backtest on the pinned dataset
-        run: python3 run_backtest.py --datasets-root prev/datasets --prev-results prev --crosscheck out/crosscheck.json
-
-      - name: Keep the reports and logs
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Sparse checkout only approved unprotected offline test dependencies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          name: backtest-report
-          path: out/
-          if-no-files-found: ignore
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /probe.py
+            /run.py
+            /config.json
+            /research_config.json
+            /research/history.py
+            /research/crosscheck.py
+            /research/pipeline.py
+            /fetch_history.py
+            /tests/test_fetcher.py
+            /tests/test_live_check.py
+            /tests/test_history.py
+            /tests/test_probe.py
+            /tests/test_pipeline.py
+            /tests/test_research_gates.py
 
-      - name: Publish results to the research-data branch (append only)
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Run the approved offline tests only
         run: |
-          set -e
-          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          rm -rf /tmp/pub
-          git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
-          cd /tmp/pub
-          R=results/${{ github.run_id }}
-          mkdir -p "$R" test_evaluations
-          cp "$GITHUB_WORKSPACE"/out/*.md "$GITHUB_WORKSPACE"/out/*.json "$GITHUB_WORKSPACE"/out/*.csv "$R"/ 2>/dev/null || true
-          if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then cp -rn "$GITHUB_WORKSPACE/out/test_evaluations/." test_evaluations/; fi
-          cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
-          cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q --allow-empty -m "Backtest run ${{ github.run_id }}"
-          git push -q "$URL" HEAD:research-data
+          python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
+          python3 -m unittest discover -s tests -p 'test_live_check.py' -v
+          python3 -m unittest discover -s tests -p 'test_history.py' -v
+          python3 -m unittest discover -s tests -p 'test_probe.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
+
+      - name: Record why Step 2 is blocked without importing protected modules
+        run: |
+          mkdir -p out
+          cat > out/backtest-blocked.md <<'EOF'
+          # Research backtest blocked
+
+          Step 2 remains disabled because its current import chain reaches the protected
+          root-level validator.py through research.pipeline -> research.engine.
+
+          This workflow intentionally does not check out research-data, import the engine,
+          execute run_backtest.py, read protected files, or evaluate any backtest.
+
+          Resume only after the protected-module boundary is separately reviewed and
+          the owner authorizes the required access.
+          EOF
+          cat "$GITHUB_WORKSPACE/out/backtest-blocked.md" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Preserve the blocker report as a run artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backtest-blocked-report
+          path: out/backtest-blocked.md
+          if-no-files-found: ignore
