@@ -90,6 +90,15 @@ class CrosscheckGateTests(unittest.TestCase):
                         CrosscheckError, "schema or producer"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    def test_oversized_crosscheck_artifact_is_rejected_before_json_parsing(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "crosscheck.json")
+            with open(path, "wb") as f:
+                f.write(b" " * (crosscheck.MAX_CROSSCHECK_ARTIFACT_BYTES + 1))
+            with self.assertRaisesRegex(
+                    CrosscheckError, "artifact is unreadable: ValueError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_duplicate_json_object_keys_are_rejected_at_any_depth(self):
         valid = json.dumps(self.payload())
         duplicate_cases = (
