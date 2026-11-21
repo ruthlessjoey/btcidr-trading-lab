@@ -1382,3 +1382,14 @@ The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold statu
 - Do not resume from run #44882594006 as a recovery shortcut: it has no completed review work to reuse. The rate-limit stop is not a review pass or a source-code test failure. A new review attempt requires a fresh run after provider capacity is available or a separately reviewed bounded retry-policy change; do not silently increase limits, change the approved model/provider, add paid services, or automatically dispatch hosted workflows.
 - No PR was merged; no protected module was imported or executed; no exchange API call, market-data request, paper trade, live trade, or profitability test was performed in these runs. Q0.8 remains **INCOMPLETE / NOT ACCEPTED**. PR #60 remains open/draft. Overall project completion remains **UNRATED**; a trading edge remains **NOT PROVEN**.
 
+
+
+## PR #86 safe-scope static reconciliation — 2026-11-21
+
+- Current PR #86 head `d23909bd969f681cd3a3c9712f5ab3e89482a7fc`; open/draft/unmerged. The changed-path list contains 11 paths and no protected path names. Static inspection was limited to the unprotected workflow, report helper, history containment test, sanitization test, and CLI wrapper; no code was executed.
+- The report helper `research/backtest_report.py` has no imports, validates provider/pair labels as ASCII alphanumeric tokens with controlled separators, and emits only the allowlisted timeframe labels `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, or `1d`. Invalid labels fall back to `unverified dataset source` / `unknown timeframe`. Its report disclaimer explicitly says a manifest label does not establish Tokocrypto execution prices, spreads, fees, liquidity, or fills.
+- The branch's offline workflow sparse-checkout includes the report helper and selected unprotected dependencies; it does not select root `validator.py`, root `report.py`, `P1/`, `signal/`, `markets/`, the protected engine chain, or `tests/test_research_gates.py`. The updated import-boundary test statically checks the selected dependency edges. No protected import closure was executed.
+- Exact-head runtime/CI evidence for `d23909b...` remains **UNVERIFIED**. The most recent passing 58-test run cited in the PR body belongs to the earlier head `343234b1f79684e4e2302f37277040d46a1f00d5`, not the current head.
+- GitHub currently reports PR #86 `mergeable=false` / `mergeable_state=dirty`; its base SHA is the older PR #60 candidate `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`, while PR #60 has advanced to `243f17d09750fb14818fd0d04c78c3a17d380f74`. Reconcile the stacked branch against the current parent before considering integration. Do not merge.
+- This is static-scope evidence only, not code acceptance, not runtime verification, and not profitability evidence.
+
