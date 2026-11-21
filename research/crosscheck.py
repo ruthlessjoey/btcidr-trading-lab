@@ -12,6 +12,10 @@ from fetcher import ApiError
 DAY = 86400
 TOLERANCE_PCT = 3.0
 
+# No independent cross-check provider is authorized under the current policy.
+# Keep the gate explicit and immutable; approval requires a reviewed source change.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
 
 
 def day(ts):

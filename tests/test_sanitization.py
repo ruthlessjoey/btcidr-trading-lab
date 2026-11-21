@@ -183,6 +183,9 @@ class CrosscheckSanitizationTests(unittest.TestCase):
 
         candle = fetcher.Candle(1_700_000_000, 10.0, 11.0, 9.0, 10.0, 1.0)
         manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
+        original_authorization = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
+        self.assertIs(type(original_authorization), frozenset)
+        self.assertEqual(original_authorization, frozenset())
         crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
         try:
             with tempfile.TemporaryDirectory() as out:
@@ -194,7 +197,7 @@ class CrosscheckSanitizationTests(unittest.TestCase):
                 self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.json")))
                 self.assertFalse(os.path.exists(os.path.join(out, "crosscheck.md")))
         finally:
-            del crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
+            crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS = original_authorization
 
         self.assertEqual(calls, [])
 
