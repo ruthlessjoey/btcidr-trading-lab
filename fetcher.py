@@ -198,7 +198,10 @@ def read_bounded_body(response, max_bytes, timeout_seconds):
             raise ApiError("cannot enforce response body deadline") from None
         read_size = min(64 * 1024, max_bytes + 1 - total)
         try:
-            chunk = stream.read1(read_size)
+            # Use HTTPResponse.read1 rather than the raw buffered socket stream:
+            # HTTPResponse tracks Content-Length and closes exactly at the body
+            # boundary, even when the server keeps the connection alive.
+            chunk = http_response.read1(read_size)
         except (TimeoutError, socket.timeout) as exc:
             raise ResponseDeadlineError("response body deadline exceeded") from exc
         if time.monotonic() > deadline:
