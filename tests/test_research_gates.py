@@ -16,8 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import research.crosscheck as crosscheck
 from research.crosscheck import (
-    CrosscheckError, AUTHORIZED_CROSSCHECK_PROVIDERS,
-    CROSSCHECK_ARTIFACT_PRODUCER, CROSSCHECK_ARTIFACT_SCHEMA,
+    CrosscheckError, CROSSCHECK_ARTIFACT_PRODUCER, CROSSCHECK_ARTIFACT_SCHEMA,
     CONFIRMED_VERDICT, compare, is_confirmed_verdict, load_required_crosscheck,
     to_ts, validate_crosscheck_artifact,
 )
