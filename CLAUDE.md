@@ -26,7 +26,7 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
 - No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data exception is unauthenticated server-time/candles access scoped to `www.tokocrypto.site`. Do not use `www.tokocrypto.com` or private endpoints.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only approved public market-data exception is unauthenticated HTTPS GET candles from `https://www.tokocrypto.site/api/v3/klines` for `BTCUSDT`. No server-time route, symbol metadata, other host/path, `www.tokocrypto.com` API, or private endpoint is authorized.
 - `PAPER` is permitted only after its safeguards are separately approved. `LIVE` remains unavailable and must not be enabled.
 - An emergency stop is required before any paper execution. Partial closures must remain supported in paper accounting.
 - Strategy may propose a stop; risk validates it; portfolio owns the accepted stop.

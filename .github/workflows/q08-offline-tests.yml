@@ -1,13 +1,18 @@
-name: Q0.8 offline security regression tests (approved unprotected subset)
+name: Q0.8 offline security regression tests (strict unprotected subset)
 
 on:
   workflow_dispatch:
+    inputs:
+      review_head_sha:
+        description: "Exact branch commit SHA to validate"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: q08-offline-tests-${{ github.ref }}
+  group: q08-offline-security-tests
   cancel-in-progress: false
 
 jobs:
@@ -20,40 +25,58 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - name: Sparse checkout only approved unprotected test and source files
+      - name: Bind the requested review SHA to the selected branch commit
+        env:
+          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
+          ACTUAL_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVIEW_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::review_head_sha must be a full 40-character commit SHA."
+            exit 1
+          fi
+          if [[ "$REVIEW_HEAD_SHA" != "$ACTUAL_HEAD_SHA" ]]; then
+            echo "::error::review_head_sha does not match the selected branch commit."
+            exit 1
+          fi
+
+      - name: Sparse checkout only approved source and tests with static import closure
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /CLAUDE.md
+            /PROJECT_HANDOFF.MD
             /config.json
-            /research_config.json
             /fetcher.py
             /providers.py
             /probe.py
             /run.py
-            /research/__init__.py
-            /research/crosscheck.py
-            /research/history.py
-            /research/pipeline.py
+            /live_check.py
+            /tools/net_lab.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
-            /tests/test_history.py
             /tests/test_probe.py
-            /tests/test_pipeline.py
             /tests/test_sanitization.py
+            /tests/test_pipeline.py
+            /tests/test_q08_import_boundary.py
+            /.github/workflows/market-data-check.yml
+            /.github/workflows/q08-offline-tests.yml
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
-      - name: Run approved offline security regression modules
+      - name: Check exact unprotected import closure and workflow allowlist
+        run: python3 -m unittest discover -s tests -p 'test_q08_import_boundary.py' -v
+
+      - name: Run the five approved offline regression modules
         run: |
           python3 -m unittest discover -s tests -p 'test_fetcher.py' -v
           python3 -m unittest discover -s tests -p 'test_live_check.py' -v
-          python3 -m unittest discover -s tests -p 'test_history.py' -v
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
-          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
           python3 -m unittest discover -s tests -p 'test_sanitization.py' -v
+          python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
