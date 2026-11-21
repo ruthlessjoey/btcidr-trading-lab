@@ -101,6 +101,13 @@ class CrosscheckGateTests(unittest.TestCase):
                     CrosscheckError, "artifact is unreadable: OSError"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    def test_non_string_crosscheck_path_is_rejected_as_crosscheck_error(self):
+        for path in ([], {}, 123, object()):
+            with self.subTest(path_type=type(path).__name__):
+                with self.assertRaisesRegex(
+                        CrosscheckError, "path must be a non-empty string"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_symlinked_crosscheck_artifact_is_rejected_without_nofollow_flag(self):
         with tempfile.TemporaryDirectory() as d:
             target = self.write_evidence(d, self.payload())
