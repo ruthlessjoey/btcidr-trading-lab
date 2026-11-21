@@ -37,6 +37,7 @@ jobs:
             /tests/test_history.py
             /tests/test_probe.py
             /tests/test_pipeline.py
+            /tests/test_research_gates.py
 
       - name: Run the approved offline tests only
         run: |
@@ -45,6 +46,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_history.py' -v
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
+          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
 
       - name: Emit the fail-closed market-identity report; no network request is made
         run: python3 fetch_history.py
