@@ -1,7 +1,9 @@
-"""Static offline tests for the Step 1 fail-closed gate.
+"""Offline tests for the Step 1 fail-closed gate.
 
-These tests deliberately avoid importing protected validator.py or invoking network code.
-They parse source text with Python's AST; they never import the Step 1 entrypoint.
+The approved import closure includes only research.history, which uses the standard
+library. These tests combine AST-only source-boundary checks with an isolated temporary
+directory behavior test. They never import fetch_history.py or protected modules and
+never make network requests.
 """
 import ast
 import io
