@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from types import SimpleNamespace
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -99,6 +100,20 @@ class CrosscheckGateTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     CrosscheckError, "artifact is unreadable: OSError"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_symlinked_crosscheck_artifact_is_rejected_without_nofollow_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = self.write_evidence(d, self.payload())
+            path = os.path.join(d, "linked-crosscheck.json")
+            try:
+                os.symlink(target, path)
+            except (NotImplementedError, OSError):
+                self.skipTest("symlink creation is not available")
+            # Exercise the portable fallback even on Linux, where O_NOFOLLOW exists.
+            with mock.patch.object(crosscheck.os, "O_NOFOLLOW", 0, create=True):
+                with self.assertRaisesRegex(
+                        CrosscheckError, "artifact is unreadable: ValueError"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_oversized_crosscheck_artifact_is_rejected_before_json_parsing(self):
         with tempfile.TemporaryDirectory() as d:
