@@ -1527,3 +1527,10 @@ The prior 15.00/100 candidate-weighted maturity, 0/40 exact-main threshold statu
 6. Reconcile all 40 rows against the selected current-main baseline and attach exact source/test/review evidence. Candidate-only work does not become integrated credit.
 
 This addendum corrects the 2026-11-21 checkpoint with exact live repository and workflow evidence. It does not increase any maturity score or claim delivery acceptance.
+
+
+## Additional exact-head evidence and operational boundary — 2026-11-22
+
+- PR #76 holdout-publisher candidate head `1a966ddcfef686918bdb257b73874779776c80ba`, stacked on PR #34 and not integrated into main, has successful exact-head run [#44642158427](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44642158427). The retrieved job log confirms `Ran 22 tests` and `OK`; the sparse checkout contains only `.github/workflows/manual-offline-unit-tests.yml`, `research/holdout_publish.py`, and `tests/test_holdout_publish.py`. These publisher-unit results do not establish end-to-end holdout/backtest-pipeline acceptance.
+- PR #84 M6 risk-engine candidate remains open/draft at `7cbfbcce269aa6ccde28d2d6681dbc76680b5a47`, based on historical M6 rather than current main. GitHub run [#44686093112](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44686093112) is recorded as successful; the earlier row audit records 117 selected offline tests. This is candidate-only historical CI evidence. No protected risk source was inspected or tested in this emergency reconciliation, and the result is not an independent integration acceptance.
+- Current `main` remains unsuitable for operational use under the present access boundary: its legacy `config.json` still lists the Tokocrypto `.com/open_v1` source and other providers, while the root legacy `run.py` imports protected `report.py` and `validator.py`. The manual market-data workflow itself is intentionally blocked and exits before checkout/network access. Do not run the current-main entrypoints or use the unapproved provider configuration. PR #82 is the clean-main candidate that removes these paths and restricts the network boundary, but it remains unmerged.
