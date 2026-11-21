@@ -27,6 +27,21 @@ class CrosscheckError(RuntimeError):
     """Safe, unprotected error type for dataset-bound cross-check validation."""
 
 
+def _unique_json_object(pairs):
+    """Reject duplicate keys so evidence has one unambiguous interpretation."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value):
+    """Reject non-standard NaN/Infinity tokens in evidence JSON."""
+    raise ValueError("non-standard JSON numeric constant")
+
+
 def is_confirmed_verdict(value):
     """Accept only the exact verdict emitted by the two-source comparison rule."""
     return type(value) is str and value == CONFIRMED_VERDICT
@@ -60,8 +75,11 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         )
     try:
         with open(crosscheck_path, encoding="utf-8") as f:
-            evidence = json.load(f)
-    except (OSError, ValueError) as e:
+            evidence = json.load(
+                f, object_pairs_hook=_unique_json_object,
+                parse_constant=_reject_json_constant,
+            )
+    except (OSError, ValueError, RecursionError) as e:
         raise CrosscheckError(
             f"independent cross-check artifact is unreadable: {type(e).__name__}"
         ) from None
