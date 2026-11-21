@@ -90,6 +90,42 @@ class CrosscheckGateTests(unittest.TestCase):
                         CrosscheckError, "schema or producer"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    def test_duplicate_json_object_keys_are_rejected_at_any_depth(self):
+        valid = json.dumps(self.payload())
+        duplicate_cases = (
+            valid.replace(
+                '"schema": "twin-money-maker.crosscheck/v1"',
+                '"schema": "twin-money-maker.crosscheck/v1", '
+                '"schema": "twin-money-maker.crosscheck/v1"',
+                1,
+            ),
+            valid.replace(
+                '"date": "2020-03-12"',
+                '"date": "2020-03-12", "date": "2020-03-12"',
+                1,
+            ),
+        )
+        for raw in duplicate_cases:
+            with tempfile.TemporaryDirectory() as d:
+                path = os.path.join(d, "crosscheck.json")
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(raw)
+                with self.assertRaisesRegex(
+                        CrosscheckError, "artifact is unreadable: ValueError"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_non_standard_json_numeric_constants_are_rejected(self):
+        raw = json.dumps(self.payload()).replace(
+            '"dataset_sha256": "abc123"', '"dataset_sha256": NaN', 1
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "crosscheck.json")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(raw)
+            with self.assertRaisesRegex(
+                    CrosscheckError, "artifact is unreadable: ValueError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_every_provider_must_be_explicitly_authorized_and_distinct(self):
         payloads = (
             self.payload(providers=("coinbase", "kraken")),
