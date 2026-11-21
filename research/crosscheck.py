@@ -4,6 +4,8 @@ READ-ONLY. External cross-check acquisition is disabled pending separate owner a
 Only pure comparison/report helpers remain available; this module cannot fetch Coinbase
 or Bitstamp data or be enabled through mutable module state.
 """
+import json
+import os
 import statistics
 from datetime import datetime, timezone
 
@@ -15,6 +17,72 @@ TOLERANCE_PCT = 3.0
 # No independent cross-check provider is authorized under the current policy.
 # Keep the gate explicit and immutable; approval requires a reviewed source change.
 AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
+
+class CrosscheckError(RuntimeError):
+    """Safe, unprotected error type for dataset-bound cross-check validation."""
+
+
+def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
+    """Validate dataset-bound evidence without importing the protected backtest engine."""
+    flagged = cfg.get("flagged_dates", [])
+    if not flagged:
+        return None
+    if not authorized_providers:
+        raise CrosscheckError(
+            "no independent cross-check provider is currently authorized; flagged-date backtests are blocked"
+        )
+    if not crosscheck_path or not os.path.isfile(crosscheck_path):
+        raise CrosscheckError(
+            "independent cross-check evidence is required for flagged dates; no artifact was supplied"
+        )
+    try:
+        with open(crosscheck_path, encoding="utf-8") as f:
+            evidence = json.load(f)
+    except (OSError, ValueError) as e:
+        raise CrosscheckError(
+            f"independent cross-check artifact is unreadable: {type(e).__name__}"
+        ) from None
+    if not isinstance(evidence, dict):
+        raise CrosscheckError("independent cross-check artifact must be a JSON object")
+    if (evidence.get("dataset_version") != manifest.get("version_id") or
+            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+        raise CrosscheckError(
+            "cross-check evidence does not match the pinned dataset version and hash"
+        )
+    used = evidence.get("providers")
+    if (not isinstance(used, list) or not used or
+            any(not isinstance(p, str) for p in used) or
+            len(used) != len(set(used)) or
+            any(p not in authorized_providers for p in used)):
+        raise CrosscheckError(
+            "cross-check artifact does not identify exclusively authorized independent providers"
+        )
+    flagged_entries = evidence.get("flagged")
+    if not isinstance(flagged_entries, list):
+        raise CrosscheckError("cross-check artifact flagged entries must be a list")
+    entries = {}
+    for item in flagged_entries:
+        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+            raise CrosscheckError("cross-check artifact contains a malformed flagged entry")
+        if item["date"] in entries:
+            raise CrosscheckError("cross-check artifact contains duplicate flagged dates")
+        entries[item["date"]] = item
+    for date in flagged:
+        item = entries.get(date)
+        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
+            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+            raise CrosscheckError(
+                f"flagged date {date} lacks confirmed independent evidence ({verdict})"
+            )
+    return evidence
+
+
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Apply the current immutable provider policy to cross-check evidence."""
+    return validate_crosscheck_artifact(
+        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+    )
 
 
 
