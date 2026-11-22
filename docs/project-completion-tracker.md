@@ -1432,3 +1432,8 @@ Twin money maker.
 - This is a standalone tooling security fix. It does not change trading, provider, risk, or execution code; no protected paths were accessed.
 
 Twin money maker.
+
+
+- Follow-up to the PR #95 result above: exact-head CodeQL run [#45056420356](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056420356) completed successfully. Both Python and Actions analysis jobs passed on `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`. PR #95 now has 13/13 tests plus exact-head CodeQL success; remains open/draft/unmerged.
+
+Twin money maker.
