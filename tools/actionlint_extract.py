@@ -66,6 +66,8 @@ def extract_actionlint(
     """Copy one bounded regular tar member named actionlint; never extract paths."""
     archive = Path(archive_path)
     binary = Path(binary_path)
+    if type(max_expanded_bytes) is not int or not 0 < max_expanded_bytes <= MAX_EXPANDED_BYTES:
+        raise ValueError("expanded-byte limit is invalid")
     if type(max_binary_bytes) is not int or not 0 < max_binary_bytes <= MAX_BINARY_BYTES:
         raise ValueError("binary-size limit is invalid")
     if type(max_members) is not int or not 0 < max_members <= MAX_MEMBERS:

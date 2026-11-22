@@ -20,6 +20,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.github/workflows/
+            /tools/actionlint_extract.py
 
       - name: Install and run actionlint with bounded, verified release extraction
         shell: bash

@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from actionlint_extract import extract_actionlint
+from actionlint_extract import MAX_EXPANDED_BYTES, extract_actionlint
 
 
 class ActionlintExtractTests(unittest.TestCase):
@@ -70,6 +70,14 @@ class ActionlintExtractTests(unittest.TestCase):
         self.make_archive([("actionlint", "file", b"x" * 2048)])
         with self.assertRaisesRegex(ValueError, "expansion limit"):
             extract_actionlint(self.archive, self.binary, max_expanded_bytes=1024)
+
+    def test_expanded_limit_cannot_exceed_advertised_hard_cap(self):
+        self.make_archive([("actionlint", "file", b"small")])
+        for value in (MAX_EXPANDED_BYTES + 1, True, 1.5, 0, -1):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "expanded-byte limit is invalid"):
+                    extract_actionlint(self.archive, self.binary, max_expanded_bytes=value)
+        self.assertFalse(self.binary.exists())
 
     def test_rejects_oversized_binary_member(self):
         self.make_archive([("actionlint", "file", b"x" * 20)])
