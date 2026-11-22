@@ -551,7 +551,7 @@ def validate_checkpoint_source_metadata(run: dict, run_id: str,
     if (run.get("id") != int(run_id)
         or run.get("workflow_id") != EXPECTED_WORKFLOW_ID
         or run.get("path") != EXPECTED_WORKFLOW_PATH
-        or run.get("event") != "workflow_dispatch"
+        or run.get("event") not in ("workflow_dispatch", "push")
         or run.get("status") != "completed"
         or repository.get("full_name") != REPO
         or run.get("head_sha") != expected_head_sha
@@ -1013,11 +1013,17 @@ def synthetic():
     }
     validate_checkpoint_source_metadata(
         sample_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
+    # Both the automatic push-triggered review and a manual resume may provide
+    # a checkpoint, provided the source run matches this exact workflow and head.
+    push_run = {**sample_run, "event":"push"}
+    validate_checkpoint_source_metadata(
+        push_run, "123456", EXPECTED_REVIEW_BRANCH, expected_pr_head)
     for field, bad_value in (
         ("id", 123457),
         ("workflow_id", EXPECTED_WORKFLOW_ID + 1),
         ("path", ".github/workflows/other.yml"),
-        ("event", "push"),
+        ("event", "pull_request_target"),
+        ("event", "schedule"),
         ("status", "in_progress"),
         ("head_sha", "b" * 40),
         ("head_branch", "other-branch"),
