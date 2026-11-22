@@ -238,5 +238,80 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertIn("symbol metadata routes are not approved", fetcher_source)
 
 
+    def test_log_writer_never_replays_the_test_window(self):
+        # Static-only inspection: importing research.pipeline reaches the protected
+        # research.dataset / research.engine / validator.py dependency chain.
+        tree = ast.parse(
+            git_source_text("research/pipeline.py"),
+            filename="research/pipeline.py",
+        )
+        writer = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "write_logs"
+        )
+        self.assertNotIn("include_test", {arg.arg for arg in writer.args.args})
+
+        loops = [
+            node for node in ast.walk(writer)
+            if isinstance(node, ast.For)
+            and isinstance(node.iter, ast.Call)
+            and isinstance(node.iter.func, ast.Attribute)
+            and isinstance(node.iter.func.value, ast.Name)
+            and node.iter.func.value.id == "splits"
+            and node.iter.func.attr == "items"
+        ]
+        self.assertEqual(len(loops), 1)
+        loop = loops[0]
+        guard = loop.body[0]
+        self.assertIsInstance(guard, ast.If)
+        self.assertIsInstance(guard.test, ast.Compare)
+        self.assertIsInstance(guard.test.left, ast.Name)
+        self.assertEqual(guard.test.left.id, "seg")
+        self.assertEqual(len(guard.test.ops), 1)
+        self.assertIsInstance(guard.test.ops[0], ast.Eq)
+        self.assertEqual(len(guard.test.comparators), 1)
+        self.assertIsInstance(guard.test.comparators[0], ast.Constant)
+        self.assertEqual(guard.test.comparators[0].value, "test")
+        self.assertEqual(len(guard.body), 1)
+        self.assertIsInstance(guard.body[0], ast.Continue)
+        self.assertEqual(guard.orelse, [])
+
+        simulator_calls = [
+            node for node in ast.walk(loop)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "engine"
+            and node.func.attr in {"simulate", "buy_and_hold"}
+        ]
+        self.assertTrue(simulator_calls)
+        self.assertTrue(all(node.lineno > guard.lineno for node in simulator_calls))
+
+        run_backtest = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_backtest"
+        )
+        write_calls = [
+            node for node in ast.walk(run_backtest)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "write_logs"
+        ]
+        self.assertEqual(len(write_calls), 1)
+        self.assertEqual(len(write_calls[0].args), 5)
+        self.assertEqual(write_calls[0].keywords, [])
+
+        test_evaluations = [
+            node for node in ast.walk(run_backtest)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "selection"
+            and node.func.attr == "evaluate_test"
+        ]
+        self.assertEqual(len(test_evaluations), 1)
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -67,8 +67,8 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
     return out
 
 
-def write_logs(candles, n, splits, out_dir, rules, include_test):
-    """Trade, order and equity logs for the frozen choice under the BASE cost scenario."""
+def write_logs(candles, n, splits, out_dir, rules):
+    """Write TRAIN/VALIDATION logs only; TEST is owned exclusively by evaluate_test()."""
     costs = selection.SELECTION_COSTS
     sig = strategy.ma_trend(n)(candles)
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as ft, \
@@ -79,7 +79,7 @@ def write_logs(candles, n, splits, out_dir, rules, include_test):
         wo.writerow(["segment", "date", "side", "status", "ref_open", "fill", "qty", "fee", "reason"])
         we.writerow(["segment", "date", "strategy_equity", "buy_and_hold_equity"])
         for seg, (a, b) in splits.items():
-            if seg == "test" and not include_test:
+            if seg == "test":
                 continue
             run = engine.simulate(candles, sig, a, b, costs, rules)
             bh = engine.buy_and_hold(candles, a, b, costs, rules)
@@ -168,7 +168,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     n = sel["selected_n"]
     shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
     if n is not None:
-        write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
+        write_logs(candles, n, splits, out_dir, rules)
     sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
     result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
                                                      "end": utc_day(candles[b - 1].time),
