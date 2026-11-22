@@ -37,13 +37,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: 21716af3e3248bb64f84bf40b37b32621e1adfb
+          ref: security/q08-reviewer-diff-limit-2026-11-22
           path: runner
           persist-credentials: false
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /tools/q08_specialist_review.py
+
+      - name: Assert immutable reviewer commit identity
+        run: |
+          actual="$(git -C runner rev-parse HEAD)"
+          expected="21716af3e3248bb64f84bf40b37b32621e1adfb"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Immutable reviewer checkout SHA mismatch."
+            exit 1
+          fi
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -57,7 +66,7 @@ jobs:
           python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Respect the exact provider reset before resuming
-        run: sleep 245
+        run: sleep 125
 
       - name: Resume exact current PR #60 head (read-only)
         env:
