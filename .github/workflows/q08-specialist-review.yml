@@ -10,6 +10,7 @@ on:
       - "*.json"
       - "**/*.json"
       - ".github/workflows/q08-specialist-review.yml"
+      - ".github/workflows/q08-offline-tests.yml"
   workflow_dispatch:
     inputs:
       review_head_sha:
