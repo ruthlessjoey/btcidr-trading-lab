@@ -1,0 +1,45 @@
+name: Q0.8 immutable reviewer synthetic preflight
+
+on:
+  push:
+    branches:
+      - security/q08-reviewer-context-cap-2026-11-23
+    paths:
+      - "tools/q08_specialist_review.py"
+      - ".github/workflows/q08-runner-synthetic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: q08-reviewer-synthetic-preflight
+  cancel-in-progress: false
+
+jobs:
+  synthetic-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the immutable reviewer commit only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ruthlessjoey/btcidr-trading-lab
+          ref: cf9f319bc86155e7669f2cf0ced5d4df53cebffa
+          path: runner
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/q08_specialist_review.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Compile the pinned runner
+        run: python3 -m py_compile runner/tools/q08_specialist_review.py
+
+      - name: Run synthetic policy, checkpoint, and diff-context tests
+        run: python3 runner/tools/q08_specialist_review.py --mode synthetic
