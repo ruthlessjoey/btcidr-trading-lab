@@ -71,7 +71,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: cf9f319bc86155e7669f2cf0ced5d4df53cebffa
+          ref: ae6a5f427e861e30b4f40dc1b37a7fb7ac102ed8
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -105,7 +105,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python3 tools/q08_workflow_run_gate.py
+        run: python3 runner/tools/q08_workflow_run_gate.py
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
         if: ${{ github.event_name == 'workflow_run' || inputs.mode == 'review' }}
