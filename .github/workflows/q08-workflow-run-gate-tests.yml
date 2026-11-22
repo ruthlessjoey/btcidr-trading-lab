@@ -1,6 +1,14 @@
 name: Q0.8 trusted workflow-run gate tests
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/q08_workflow_run_gate.py"
+      - "tests/test_q08_workflow_run_gate.py"
+      - ".github/workflows/q08-specialist-review.yml"
+      - ".github/workflows/q08-workflow-run-gate-tests.yml"
   push:
     branches:
       - security/q08-trusted-main-dispatch-2026-11-22
