@@ -3035,3 +3035,13 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - GitHub's current documentation says `workflow_run` requires the workflow file on the default branch and can access secrets/write tokens even when the triggering workflow cannot: [official event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run). The new trigger will therefore only become active after merge.
 - Current PR #60 head remains `e8674db...`; exact-head offline run `45055081357` passed 103/103. Its topic-branch auto-resume job remains unapproved because it does not wait for provider reset, permits up to three additional runs beyond the four-attempt budget, and grants `actions: write` on an unprotected branch.
 - No change to project measurement: 40 requirements / 100 points; first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; overall UNRATED; profitability UNVERIFIED; PAPER NOT READY; LIVE DISABLED.
+
+
+## PR #97 exact-head gate-test recovery — 23 November 2026
+
+- PR #97 current head: `6ad01d7f546b0062196e9f47800f4e8431f3cbb8`, 13 commits / 4 changed paths.
+- Exact-head pull-request gate-test run [#45055580027](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055580027) passed **7/7** offline workflow-event tests on Python 3.11.18; pinned Actionlint checksum verification and lint of both Q0.8 workflow files passed.
+- Predecessor push run #45055549468 also passed 7/7 and Actionlint. Earlier zero-job failure #45055262845 was caused by invalid YAML quoting in the Actionlint command, corrected in commit `f75bf91...`.
+- Latest commit `6ad01d7...` adds a `pull_request` trigger to the secretless gate-test workflow so it validates PR updates. CodeQL Python and Actions were still in progress at last check.
+- These gate tests validate the event gate only. They do not authorize or execute the separate `workflow_run` trigger that starts the 19-role LLM review. That automatic secret-bearing behavior remains unapproved, lacks demonstrated same-head deduplication, and must not be merged/enabled until the owner chooses manual-only or explicitly approves automatic execution with safeguards.
+- PR #97 remains draft/open/unmerged; no 19-role review has run.
