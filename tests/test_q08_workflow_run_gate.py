@@ -216,10 +216,13 @@ class WorkflowRunGateTests(unittest.TestCase):
         self.assertEqual(reader.call_count, 3)
 
     def test_oversized_review_history_fails_closed(self):
-        reader = Mock(return_value={"id": 999})
+        reader = Mock(side_effect=[
+            {"id": 999},
+            {"total_count": 2001, "workflow_runs": []},
+        ])
         with self.assertRaisesRegex(GateError, "exceeds the bounded deduplication scan"):
             select_resume_run("a" * 40, "x" * 32, "900", reader)
-        reader.assert_called_once()
+        self.assertEqual(reader.call_count, 2)
 
     def test_incomplete_run_list_page_fails_closed(self):
         reader = Mock(side_effect=[
@@ -240,7 +243,7 @@ class WorkflowRunGateTests(unittest.TestCase):
             {"total_count": 1, "workflow_runs": [prior]},
             [],
         ])
-        with self.assertRaisesRegex(GateError, "artifact response is malformed"):
+        with self.assertRaisesRegex(GateError, "artifacts response is malformed"):
             select_resume_run(same_head, "x" * 32, "900", reader)
 
 
