@@ -214,7 +214,7 @@ class WorkflowRunGateTests(unittest.TestCase):
             workflow,
         )
         self.assertIn(
-            "github.event_name == 'push' && steps.validate-gate.outputs.resume_from_run_id",
+            "(github.event_name == 'workflow_run' || github.event_name == 'push') && steps.validate-gate.outputs.resume_from_run_id",
             workflow,
         )
         self.assertIn(
