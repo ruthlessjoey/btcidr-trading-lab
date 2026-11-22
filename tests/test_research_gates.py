@@ -21,6 +21,9 @@ from research.crosscheck import (
     CONFIRMED_VERDICT, build_markdown, compare, is_confirmed_verdict,
     load_required_crosscheck, to_ts, validate_crosscheck_artifact,
 )
+from research.backtest_report import (
+    build_markdown as build_backtest_markdown, market_source_label,
+)
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "a" * 64}
 CFG = {"flagged_dates": ["2020-03-12"]}
@@ -430,6 +433,52 @@ class CrosscheckMarkdownSanitizationTests(unittest.TestCase):
         self.assertIn("| Median | 1.250% |", rendered)
         self.assertIn("| 99th percentile | unavailable% |", rendered)
         self.assertIn("| Days over 1% / 2% / 5% | unavailable / 1 / 0 |", rendered)
+
+
+class BacktestReportMarketProvenanceTests(unittest.TestCase):
+    def test_market_label_comes_from_the_pinned_manifest_shape(self):
+        market = {
+            "provider": "tokocrypto",
+            "pair_label": "BTC/USDT",
+            "timeframe": "1d",
+            "market_type": "spot",
+        }
+        self.assertEqual(
+            market_source_label(market), "tokocrypto BTC/USDT 1d spot"
+        )
+
+    def test_market_label_rejects_missing_or_control_character_values(self):
+        self.assertEqual(
+            market_source_label(None),
+            "unknown (market identity unverified)",
+        )
+        self.assertEqual(
+            market_source_label({
+                "provider": "tokocrypto\n# injected",
+                "pair_label": "BTC/USDT",
+                "timeframe": "1d",
+                "market_type": "spot",
+            }),
+            "unknown (market identity unverified)",
+        )
+
+    def test_stopped_report_uses_manifest_label_and_never_hard_codes_binance(self):
+        report = build_backtest_markdown({
+            "run_id": "unit-test",
+            "status": "STOPPED",
+            "error": "market identity gate failed",
+            "dataset": {
+                "market": {
+                    "provider": "tokocrypto",
+                    "pair_label": "BTC/USDT",
+                    "timeframe": "1d",
+                    "market_type": "spot",
+                }
+            },
+        })
+        self.assertIn("tokocrypto BTC/USDT 1d spot", report)
+        self.assertIn("not independent proof of instrument identity", report)
+        self.assertNotIn("Binance BTC/USDT", report)
 
 
 class CrosscheckPipelineBoundaryTests(unittest.TestCase):
