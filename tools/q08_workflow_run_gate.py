@@ -62,6 +62,8 @@ def validate_event(
     fetch_json: Callable[[str, str], dict] = github_json,
 ) -> str:
     """Return the exact reviewed commit SHA only for the approved successful run."""
+    if type(token) is not str or len(token) < 20:
+        raise GateError("GitHub read token is unavailable")
     if type(event) is not dict:
         raise GateError("GitHub event payload must be an object")
     run = event.get("workflow_run")
@@ -91,7 +93,7 @@ def validate_event(
         + "/contents/" + WORKFLOW_PATH + "?ref=" + head_sha
     )
     workflow_blob = fetch_json(url, token)
-    if workflow_blob.get("sha") != OFFLINE_WORKFLOW_BLOB:
+    if type(workflow_blob) is not dict or workflow_blob.get("sha") != OFFLINE_WORKFLOW_BLOB:
         raise GateError("Candidate branch offline workflow is not the approved immutable blob")
     return head_sha
 
