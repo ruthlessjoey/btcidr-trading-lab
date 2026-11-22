@@ -1453,4 +1453,15 @@ Twin money maker.
 - No manual GitHub form dispatch, browser automation, wallet top-up, model API request, exchange/provider request, protected path access or real-money activity occurred in this session.
 - Overall project completion remains **UNRATED** because the proposed 40-item/100-weight inventory is not owner-approved. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
 
+
+## Q0.8 review failure and trusted-main correction — 23 November 2026
+
+- Exact Q0.8 specialist run [#45056820308](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056820308) targeted PR #60 head `e8674dbfe3efd2339ddb028484362f9466f7b058` on `security/q0-provider-sanitization-2026-11-18`. The reviewer validated the PR head/base and fetched the scoped snapshot, then failed before any model request: `Scoped review diff exceeded limit: chars=230101 limit=224000`. No HTTP 429 occurred, no role report was generated, no checkpoint file/artifact exists, and the automatic-resume job was skipped. This run provides **zero specialist-review progress**.
+- The PR #60 topic-branch workflow contains an unapproved automatic-resume proposal with `actions: write`; do not dispatch secret-bearing review mode from that branch. The safe route is the manual-only, read-only trusted-main workflow in PR #99. PR #99 remains draft/open/unmerged; current `main` remains protected at `731fc9fbb892dadccc64bf52da2f91ff069da124`. Do not dispatch the main workflow until PR #99 is approved and merged by the owner/admin.
+- Prepared bounded runner correction commit `2555e1715c46bd1babaafe9eb9ebe0e9b0c751e4` (source blob `7cdfb8e4b15f3950c080762d0b28ce6999430c08`). The only source change raises `MAX_DIFF` from 224,000 to 240,000 characters. The independent `MAX_REQUEST` limit remains 256,000 bytes; any oversized fully serialized model request still fails before transmission.
+- Updated PR #99 head to `a125ee52bf9b99184b17d9357f8a69143cc4de0e`; its single workflow file now pins the immutable runner above. It remains manual-dispatch-only, read-only, and contains no automatic-resume job. Its exact-head synthetic/Actionlint/CodeQL checks and review runtime remain **UNVERIFIED**. After owner/admin merge, run `mode=synthetic` first from protected `main`; only if it passes, run `mode=review` against a freshly re-fetched PR #60 head and leave the resume ID blank.
+- PR #60 offline verification remains **103/103** at exact head `e8674db...` in run #45055081357. This does not substitute for the failed specialist review. No Commander synthesis, independent acceptance, or final verification exists for this head.
+- No PR was merged, no workflow re-dispatch was performed, no API model request was sent in failed run #45056820308, and no provider/exchange call, protected-path access, dataset/backtest, PAPER/LIVE execution, or financial activity occurred.
+- Overall project completion remains **UNRATED**; profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+
 Twin money maker.
