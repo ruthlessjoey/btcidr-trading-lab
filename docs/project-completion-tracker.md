@@ -2344,3 +2344,12 @@ This section qualifies any earlier broad statement that all automation on PR #82
 - The separate sparse offline tests on PR #82 (#44979419555: 60/60; #44980418835: 62/62) remain valid for their declared test scopes only and are not conflated with the full-checkout CodeQL jobs.
 - No further commits, workflow changes, or deliberately initiated scans will be made by this assistant on PR #82, PR #93 or PR #95 in this session. These PRs remain draft/open/unmerged. Repository-level CodeQL configuration and authorization require owner/admin review before further main-target code PR pushes; available tools do not permit changing that setting here.
 - PR #60 is M6-based and was not part of these dynamic main-target CodeQL events. Its current exact-head offline run #44980188828 passed 80/80 on `0f79801e...`; current specialist run #44980188862 remains in progress after preflight, with no report/acceptance yet.
+
+## PR #82 expanded network-import guard — exact-head 62/62 — 2026-11-22
+
+- PR #82 latest head: `1e2be486c422e9727e80b94485583730fb01a970`, based on `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`, draft/open/unmerged.
+- The prior intermediate commit `b4ba95a...` expanded the static import guard's forbidden network module roots to include asyncio, ftplib, smtplib, telnetlib, xmlrpc, websocket and websockets and added seven import-form regressions. Its first exact-head import-boundary attempt failed only because two new expected-value fixtures used the package root whereas the helper returns the full module name (`xmlrpc.client`, `websockets.sync.client`). The follow-up `1e2be486...` corrected those two expectations; no guard logic was weakened.
+- Exact-head Actions run [#44980861404](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44980861404) passed **62/62** selected Python **3.11.18** tests: import-boundary 8, fetcher 30, live-check 4, disabled-probe 3, sanitization 13, pipeline-static 4. All six modules emitted `OK`.
+- This remains a clean-main security/transport containment candidate, not integration of M6 strategy/risk/portfolio code or end-to-end PAPER acceptance.
+- PR #60 remains at `0f79801e6fb9105358acdc3330112e6e5fd7e582`; its selected offline CI passed 80/80 on Python 3.11.18 in #44980188828. Exact-head Q0.8 run #44980188862 remains in its model-review step with no artifact or role verdict retrieved yet.
+- Project acceptance unchanged: overall UNRATED; 15.00/100 candidate-weighted maturity; 0/40 exact-main threshold; profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
