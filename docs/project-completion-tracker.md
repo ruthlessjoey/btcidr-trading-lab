@@ -1377,3 +1377,14 @@ Twin money maker.
 - No new provider access or test of protected imports was performed. Profitability remains **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**; whole-project completion **UNRATED**.
 
 Twin money maker.
+
+
+### Additional security-tool and holdout review reconciliation — 2026-11-23
+
+- PR [#95](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/95), head `1b398b5458d346310346aae65587a1b3dfee3edd`, remains open/draft. Its Actionlint archive helper avoids tar path extraction, streams through a decompressed-byte cap, limits member count and binary size, requires exactly one regular `actionlint` member, verifies the archive is a regular non-symlink file, and creates the destination with exclusive creation. Exact-head run [#45010735456](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45010735456) passed **10/10** adversarial tests; exact-head CodeQL run #45010736402 passed both Python and Actions analyses. The protected-path-safe lint workflow itself remains manual-only and has not been independently executed in this session.
+- PR [#97](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/97), head `3dba39b969db376211906ee5e7d35631a1af74b1`, changes only the default-branch Q0.8 specialist workflow to pin the immutable bounded-context reviewer `cf9f319bc86155e7669f2cf0ced5d4df53cebffa`. Its CodeQL run [#45054180623](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054180623) passed both Python and Actions analyses. It intentionally retains `workflow_dispatch`; it does not automate or remove the owner dispatch step.
+- PR [#96](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/96) overlaps the M5 hardening now in PR #98. Its exact-head test run #45010366577 passed, but the current PR #98 is a direct child of PR #60 and adds the stricter declared-reason-code boundary, required-history guard and full output schema regressions. Do not merge both M5 proposals independently or count their tests as separate implemented requirements.
+- PR #34 publisher source was statically re-read at exact head `d94c48b1078934a2e4a0dbf2f7351f0e70e13ed4`. The unprotected publisher performs bounded JSON reads, rejects non-standard/duplicate JSON, compares exact reservation identities and completed records, bounds directory enumeration, validates all completion records before cleanup, and stages/rechecks the exact reservation inode before removal. Its isolated 27/27 test pass remains publisher-only; the PR's pipeline/engine/test modules were not executed because import closure reaches protected `validator.py`. No end-to-end holdout TEST run or publication was performed.
+- No additional project completion credit is awarded for overlapping PRs, documentation-only changes or isolated infrastructure tests. Overall completion remains **UNRATED**; profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+
+Twin money maker.
