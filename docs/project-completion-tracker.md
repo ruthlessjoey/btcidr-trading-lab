@@ -1625,3 +1625,12 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - **Run #44964803902:** job `137031288240` checked out PR #92 exact SHA `fdcb882...` and failed only because the symlink test expected `OSError`, while the corrected `lstat` fallback intentionally rejects earlier as `ValueError`. Six suites passed: 55 tests. The research-gates suite had 20/21 pass. Follow-up commit `893e71933448cd56edd53a2c4311baa9d3f30f38` updates that expected exception; new exact-head CI remains pending.
 - PR #92 remains five unprotected files but still targets prior PR #60 base SHA `243f17d...`; its parent moved to `f9cc3bf...`. Branch synchronization is a pre-integration dependency.
 - No source code for protected paths was accessed/executed. No provider was activated, no exchange endpoint was called, no dataset/backtest was produced, and no paper/live trading occurred. No review acceptance or maturity credit is awarded by these runs.
+
+
+## Post-run corrective commits and current dispatch targets — 2026-11-22
+
+- PR #60 now has corrected reviewer workflow pin at head `f9cc3bfbd600b6edc9fc0cdd0765f0b446b41bf8`. It points to self-contained immutable runner `731fc9fbb892dadccc64bf52da2f91ff069da124` (source blob `92fc820128bba8cf8fa9e7d3de51838fe2672a1c`) with all 19 trusted role/skill guidance pairs embedded. Exact-head offline test and specialist review are still needed.
+- PR #92 now has follow-up head `893e71933448cd56edd53a2c4311baa9d3f30f38`, where the symlink regression assertion expects the sanitized `ValueError` contract actually emitted by `lstat` rejection. The 75/76 result on predecessor `fdcb882...` is not inherited; exact-head offline CI remains required.
+- Run #44964704552 produced no checkpoint artifact; the workflow log says no file existed at the upload path. No specialist role report exists from that run.
+- Current manual run targets: PR #60 branch `security/q0-provider-sanitization-2026-11-18`, SHA `f9cc3bfbd600b6edc9fc0cdd0765f0b446b41bf8`; choose reviewer mode `review` and leave resume blank. PR #92 branch `security/q08-crosscheck-strict-json-2026-11-22`, SHA `893e71933448cd56edd53a2c4311baa9d3f30f38`; use Q0.8 offline workflow.
+- No changes to project completion measurement: UNRATED overall; 15.00/100 candidate-weighted snapshot; 0/40 exact-main threshold. Profitability NOT PROVEN; PAPER NOT READY.
