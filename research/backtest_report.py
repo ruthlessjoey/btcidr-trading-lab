@@ -31,6 +31,29 @@ def short(name):
     return name.split(":")[0]
 
 
+def market_source_label(market):
+    """Return a bounded manifest label; it is descriptive, not identity proof."""
+    unknown = "unknown (market identity unverified)"
+    if type(market) is not dict:
+        return unknown
+    fields = (
+        market.get("provider"),
+        market.get("pair_label"),
+        market.get("timeframe"),
+        market.get("market_type"),
+    )
+    if any(
+        type(value) is not str
+        or not value
+        or len(value) > 64
+        or any(not (char.isascii() and (char.isalnum() or char in "._/-"))
+               for char in value)
+        for value in fields
+    ):
+        return unknown
+    return " ".join(fields)
+
+
 def metric_row(label, scenario, m):
     pf = "n/a" if m["profit_factor"] is None else f"{m['profit_factor']:.2f}"
     trades = f"{m['closed_trades']}" + (" (+1 open)" if m["open_position"] else "")
@@ -49,11 +72,15 @@ def seg_table(block):
 
 
 def build_markdown(r):
+    dataset = r.get("dataset")
+    market = dataset.get("market") if type(dataset) is dict else None
+    market_label = market_source_label(market)
     L = ["# BTC/USDT trend-filter backtest (research only)",
          f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
-         "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
-         "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
-         "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+         f"> **This is a historical simulation on a proxy dataset labelled `{market_label}`. "
+         "The manifest label is not independent proof of instrument identity or executable venue prices. "
+         "It does not demonstrate profitability and is not a signal.** Costs are unverified assumptions; "
+         "the period is one historical sample.", ""]
     if r["status"] != "OK":
         L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
               "Nothing was simulated and no results are shown."]
@@ -63,7 +90,8 @@ def build_markdown(r):
           f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
           f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
           f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
-          "- Re-verified at load: hash, market identity, order, no duplicates, no gaps, only completed candles."]
+          "- Re-verified at load: hash, manifest fields, order, no duplicates, no gaps, only completed candles.",
+          "- The manifest market label is descriptive provenance; independent instrument identity remains a separate gate."]
     # flagged candle
     L += ["", "## Flagged candle (2020-03-12, -39.5% in one day)", ""]
     c = r.get("crosscheck")
@@ -174,7 +202,8 @@ def build_markdown(r):
           "- Before trusting anything: more trades, other periods or assets, real fees, and paper trading with live prices.",
           "", "## Metric limitations", ""] + [f"- {m}" for m in METRIC_LIMITS]
     L += ["", "## Unresolved concerns", "",
-          "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
+          f"- Dataset market label: {market_label}. Independent market identity and executable venue prices remain unverified.",
+          "- Tokocrypto prices, spreads, fees and order rules are not verified for execution.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
           "- No independent cross-check was run: Coinbase and Bitstamp are excluded pending separate provider authorization. The flagged candle remains unverified."]
