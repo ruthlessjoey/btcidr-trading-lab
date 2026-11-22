@@ -3062,3 +3062,13 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - PR #99 manual-only workflow candidate remains draft/unmerged. Its workflow YAML was locally parsed but no exact-head synthetic run occurred.
 - GitHub connector has no `workflow_dispatch` action. The browser automation attempt to dispatch `mode=synthetic` did not start because its wallet balance was $0.00 and the error was non-retryable. No payment/top-up/retry was made.
 - No 19-role review or LLM call occurred. After PR #99 is approved/merged, an operator must use GitHub Actions UI on protected `main`: synthetic first, then review only if synthetic passes, with the freshly fetched PR #60 SHA.
+
+
+## PR #97 latest idempotency and resume eligibility evidence — 23 November 2026
+
+- PR #97 current head: `698510508178b150de1cbecc0c0e4d15569fd6ca`, 20 commits / 4 paths. Exact-head run #45056018988 passed **18/18** gate tests; pinned Actionlint and CodeQL Python/Actions passed.
+- Same-head running/successful review suppression is now implemented and tested. This resolves the earlier duplicate-running/successful-review concern.
+- Remaining policy defect: `select_resume_run` accepts same-head failed/cancelled/timed-out/action-required/startup-failure runs when a checkpoint artifact exists, without verifying that the failure was HTTP 429 and without parsing/waiting for provider reset. A later successful offline run can therefore resume a non-429 failure or retry before reset.
+- The `workflow_run` trigger still automatically starts LLM review after matching successful PR #60 offline runs; no explicit owner opt-in. Do not merge/enable PR #97 until the owner chooses manual-only or explicitly approves automatic execution with 429-only/reset/idempotency safeguards.
+- PR #99 remains the manual-only alternative. PR #60 auto-resume on the unprotected topic branch remains unapproved and must not be dispatched.
+- No Q0.8 19-role review was executed. Overall project status and scores remain unchanged.
