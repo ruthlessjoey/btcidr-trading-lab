@@ -297,5 +297,44 @@ class StrategyEngineTests(unittest.TestCase):
             evaluate_report(invalid_reason, LISTING, report(candles=[candle(NOW - DAY)] * 2))
 
 
+    def test_required_history_must_be_a_positive_plain_integer(self):
+        for value in (True, 0, -1, 1.5, "2", None):
+            with self.subTest(value=value):
+                strategy = FixtureStrategy()
+                strategy.required_history = lambda config, result=value: result
+                with self.assertRaises(C.StrategyError):
+                    evaluate_report(strategy, LISTING, report(candles=[candle(NOW - DAY)] * 2))
+                self.assertEqual(strategy.calls, 0)
+
+    def test_strategy_result_fields_are_strictly_validated(self):
+        valid = {
+            "decision": C.BUY,
+            "reason_codes": ["FIXTURE_SIGNAL"],
+            "reasons": ["synthetic fixture"],
+            "indicators": {"strength": 0.5},
+        }
+        invalid_results = (
+            {**valid, "reason_codes": None},
+            {**valid, "reason_codes": "FIXTURE_SIGNAL"},
+            {**valid, "reason_codes": ("FIXTURE_SIGNAL",)},
+            {**valid, "reason_codes": ["FIXTURE_SIGNAL", 1]},
+            {**valid, "reasons": None},
+            {**valid, "reasons": "synthetic fixture"},
+            {**valid, "reasons": ["synthetic fixture", 1]},
+            {**valid, "indicators": []},
+            {**valid, "indicators": {1: 0.5}},
+            {**valid, "indicators": {"": 0.5}},
+            {**valid, "indicators": {"strength": True}},
+            {**valid, "indicators": {"strength": "0.5"}},
+            {**valid, "indicators": {"strength": float("nan")}},
+            {**valid, "indicators": {"strength": float("inf")}},
+        )
+        for raw in invalid_results:
+            with self.subTest(raw=raw):
+                strategy = FixtureStrategy(result=raw)
+                with self.assertRaises(C.StrategyError):
+                    evaluate_report(strategy, LISTING, report(candles=[candle(NOW - DAY)] * 2))
+
+
 if __name__ == "__main__":
     unittest.main()
