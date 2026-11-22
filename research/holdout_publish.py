@@ -66,14 +66,24 @@ def _unique_object(pairs):
 
 def _read_object(path, description):
     _regular_file(path, description)
-    flags = os.O_RDONLY
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
+        path_metadata = os.lstat(path)
+        if not stat.S_ISREG(path_metadata.st_mode):
+            raise RuntimeError(f"{description} must be a regular file")
         descriptor = os.open(path, flags)
         with os.fdopen(descriptor, "rb") as stream:
-            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
                 raise RuntimeError(f"{description} must be a regular file")
+            if not os.path.samestat(path_metadata, metadata):
+                raise RuntimeError(f"{description} changed during open")
+            current_path_metadata = os.lstat(path)
+            if (not stat.S_ISREG(current_path_metadata.st_mode)
+                    or not os.path.samestat(current_path_metadata, metadata)):
+                raise RuntimeError(f"{description} path changed during open")
             raw = stream.read(MAX_JSON_BYTES + 1)
         if len(raw) > MAX_JSON_BYTES:
             raise RuntimeError(f"{description} exceeds the {MAX_JSON_BYTES}-byte JSON limit")
