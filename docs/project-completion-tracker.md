@@ -1505,3 +1505,47 @@ This section supersedes earlier Q0.8 automation/hash notes above where they name
 - No protected files were accessed or executed, no provider allowlist was expanded, no exchange or network market-data request was made, no real-money action occurred, and no PR was merged.
 
 Twin money maker.
+
+
+---
+
+## Authoritative bootstrap automation and current evidence — 23 November 2026
+
+This section supersedes older PR #97 / Q0.8 automatic-dispatch details above where commit IDs, helper blobs or test counts differ.
+
+### PR #97 unattended first review plus future event trigger
+
+- PR [#97](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/97) current head: `7c14e1bf5a780598f998638d709e8ee9fe1986a5`, base `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`. It remains open/draft/unmerged and has no submitted independent review.
+- Two trusted-default-branch events are wired:
+  1. **One-time bootstrap:** a push to `main` changing `.github/workflows/q08-specialist-review.yml` reads PR #60 through the API, verifies that it is open on the exact approved same-repository branch and base, confirms branch ref equals its current PR head, confirms the offline workflow blob, and requires a successful offline run for that exact SHA before starting the review.
+  2. **Future updates:** successful `workflow_run` events from the exact named Q0.8 offline workflow on the approved PR #60 branch start a review for that upstream run's exact SHA.
+- The bootstrap path validates the push payload's repository/ref/after SHA; PR #60 state/head/base/repository; branch ref identity; immutable offline workflow blob `4821963a7b752a1e5bbc52e1d97c93ea296ff7f4`; and a successful completed run from workflow ID `421573668` whose branch, repository and head SHA match the PR head. It uses the GitHub workflow-specific Actions endpoint and bounded, complete pagination.
+- The `workflow_run` path validates root workflow/repository identities, workflow ID/path/name, event type, conclusion, branch, repository, run ID and exact SHA; it also verifies the immutable workflow blob at that head.
+- Both paths call only immutable reviewer commit `812d9fd934c7fe1bc6308e38a32490a020c08b22`. PR #97 pins that commit; the helper blob `69a738c0798e177caa6b82344873ac3eb61db7b8` is identical in the PR branch and immutable reviewer checkout. The reviewer source remains immutable and the candidate PR source/YAML is never checked out by the secret-bearing review workflow.
+- Duplicate prevention keys review run name/concurrency to the reviewed SHA. Same-SHA running/successful runs block duplicates. A failed/cancelled same-SHA run resumes only from its own non-expired matching checkpoint artifact; absent checkpoints start cleanly. The gate selects the checkpoint before artifact restore and wires the selected ID into artifact name, artifact download run ID and reviewer environment. Malformed data, incomplete pagination, oversized run history and API errors fail closed.
+- Exact-head push gate run [#45059300704](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059300704): **27/27** Python 3.11 adversarial tests passed, pinned Actionlint archive checksum verified, and both trusted workflow files linted successfully.
+- Exact-head pull-request gate run [#45059305848](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059305848): **27/27** passed with the same Actionlint steps.
+- Exact-head CodeQL [#45059458124](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059458124): both Python and Actions analysis succeeded.
+- Immutable zero-context reviewer preflight [#45059447400](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059447400): Python 3.11 compilation and synthetic policy/checkpoint/diff regression passed on the pinned immutable reviewer checkout.
+- Current PR #60 head remains `e8674dbfe3efd2339ddb028484362f9466f7b058`; exact-head offline workflow run [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) passed **103/103** selected tests across seven suites. The one-time bootstrap is designed to verify this already-successful head on PR #97's integration push, so a new PR #60 commit or manual Actions dispatch is not required for the first review.
+
+### PR #60 bounded reviewer correction status
+
+- Review attempt [#45056820308](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056820308) stopped before the first specialist because the two-line-context diff was 230,101 characters, exceeding `MAX_DIFF=224,000`. It produced no model request, report or checkpoint.
+- The immutable reviewer now omits unchanged context lines but retains every added and removed line. Hard limits remain `MAX_DIFF=224,000` and `MAX_REQUEST=256,000`. Synthetic zero-context regression passed. Reconstructed sizing estimates current PR #60 diff around 220,851 characters; this is an estimate, not a live reviewer measurement.
+- No current-head 19-stage specialist review, Commander verdict, independent acceptance or final verification exists yet.
+
+### Remaining approval / integration boundary
+
+- The automatic no-manual-dispatch solution is implemented and passes its tests, but GitHub only delivers the trusted `workflow_run` and `push` events to workflow definitions already on the default branch. PR #97 must therefore be independently reviewed and integrated into protected `main` before the first automatic specialist review can happen.
+- No PR was merged during this session. PR #97 is still draft; the requested independent review has not been recorded. The user will not need to fill an Actions form after PR #97 is integrated.
+
+### Other exact evidence retained
+
+- PR #95 head `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`: standalone Actionlint archive tests [#45056419053](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056419053) passed **13/13** including FIFO nonblocking and symlink-parent checks; exact-head CodeQL [#45056420356](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056420356) passed both analyses. Open/draft/unmerged.
+- PR #98 head `3576c8041d27b0f54a572adc826c462d892ffd0c`: isolated pure M5 package/core tests [#45054403126](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054403126) passed **16/16**, excluding protected S1 adapter and validator import closure. Open/draft/unmerged.
+- PR #66 provider factory isolation passed **3/3** (run #45043119748), with exact-head CodeQL passed (run #45043120812). PR #34 isolated holdout publisher passed **27/27** (run #44975483232); this does not verify full pipeline/engine integration. PR #68 remains unexecuted because test import closure reaches protected validator code.
+
+Whole-project completion remains **UNRATED** because the proposed 40-item/100-weight scope is not owner-approved. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**. No protected files were accessed or executed, no provider authorization was expanded, no exchange request, real-money action or merge occurred.
+
+Twin money maker.
