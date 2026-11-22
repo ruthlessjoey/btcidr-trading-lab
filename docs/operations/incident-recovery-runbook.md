@@ -80,6 +80,21 @@ For each run, record:
 
 Do not sum overlapping suites from different workflows into a project-wide test count. Do not claim a run tests a commit unless the log confirms the exact checked-out SHA. A skipped, cancelled, timed-out, stale-head, syntax-only, synthetic-only or partially completed job is not a passing source review.
 
+### Independent scanners and repository-scope verification
+
+A workflow's sparse checkout constrains only that workflow job's checkout. Do not assume it also constrains a separate CodeQL, static-analysis, dependency-scanning, GitHub App, or third-party scanner that may obtain source independently.
+
+Before enabling or dispatching an independent scanner on a candidate PR:
+
+1. Identify the scanner workflow/action or external app, exact version/commit pin, event trigger, token permissions, source acquisition method, and exact commit SHA it analyzes.
+2. Establish from its documented/configured behavior and run evidence whether it reads a sparse working tree, a full repository checkout, or a remote Git tree/API. Treat an unknown source scope as **unverified**, not as safe.
+3. Check whether any protected/excluded path can be fetched or analyzed, including through a full checkout, archive download, Git API, CodeQL database creation, or a separate job. A sparse checkout in the offline-test job is not evidence about a different scanner job.
+4. If the scanner's source scope cannot be proven to exclude protected paths, keep that scan disabled and escalate to the repository owner/admin for a specific scope decision. Do not weaken protected-path controls or grant broader permissions to make it run.
+5. Preserve the scanner workflow SHA, action/tool pin, event, branch, analyzed commit, permissions, source-scope evidence, and result/artifact identifiers. Do not report scanner acceptance based only on a green unrelated offline test.
+
+This section is a stop/escalation rule; it does not authorize enabling scanners, modifying repository security settings, or running scans.
+
+
 ### Quota and retry handling
 
 - Retain the approved model/provider, credentials configuration, four bounded retries and 120-second maximum wait.
