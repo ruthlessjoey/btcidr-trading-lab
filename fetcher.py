@@ -96,8 +96,8 @@ class Source:
         return pair.replace("_", "")
 
     def time_url(self):
-        """Legacy candidate path only; fetch_server_time refuses it until verified."""
-        return self.base_url + "/api/v3/time"
+        """No server-time endpoint is approved; refuse before constructing a URL."""
+        raise DisallowedRequestError("server-time routes are not approved")
 
     def klines_url(self):
         return self.base_url + "/api/v3/klines"
