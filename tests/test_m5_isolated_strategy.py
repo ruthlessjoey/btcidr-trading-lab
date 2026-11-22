@@ -187,6 +187,15 @@ class M5IsolatedStrategyTests(unittest.TestCase):
             evaluate_report(self.strategy, self.listing, self.report, {"window": True})
         self.assertEqual(self.strategy.calls, 0)
 
+    def test_required_history_must_be_a_positive_plain_integer(self):
+        for value in (True, 0, -1, 1.5, "2", None):
+            with self.subTest(value=value):
+                strategy = RecordingStrategy()
+                strategy.required_history = lambda config, result=value: result
+                with self.assertRaises(C.StrategyError):
+                    evaluate_report(strategy, self.listing, self.report)
+                self.assertEqual(strategy.calls, 0)
+
     def test_strategy_result_must_match_contract(self):
         invalid_results = (
             {"decision": C.BUY},

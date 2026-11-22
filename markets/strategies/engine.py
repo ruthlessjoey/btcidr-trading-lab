@@ -92,6 +92,10 @@ def evaluate_report(strategy, listing, report, config=None):
 
     # 3. History, then the strategy itself.
     need = strategy.required_history(cfg)
+    if type(need) is not int or need <= 0:
+        raise C.StrategyError(
+            f"{strategy.strategy_id} required_history must return a positive integer"
+        )
     if len(candles) < need:
         return make(C.NO_DATA, ["INSUFFICIENT_HISTORY"],
                     [f"need {need} completed candles, have {len(candles)}"])
