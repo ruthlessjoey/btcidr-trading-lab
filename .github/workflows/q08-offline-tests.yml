@@ -1,5 +1,5 @@
 name: Q0.8 offline security regression tests (sparse unprotected scope)
-# Re-run the exact approved sparse offline gates after PR #60 parent synchronization.
+# Re-run the exact approved sparse offline gates after PR #60 reviewer-workflow synchronization.
 
 on:
   push:
