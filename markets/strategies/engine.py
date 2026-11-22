@@ -20,6 +20,8 @@ Decision mapping (the engine owns it; strategies cannot change it):
 No strategy evaluation happens on any path except COMPLETE with enough history. The provider error, if any, stays in
 provenance.provider_error, whatever the top-level decision.
 """
+import math
+
 from markets.strategies import contract as C
 from markets.strategies.decision import StrategyDecision, config_fingerprint
 
@@ -92,6 +94,10 @@ def evaluate_report(strategy, listing, report, config=None):
 
     # 3. History, then the strategy itself.
     need = strategy.required_history(cfg)
+    if type(need) is not int or need <= 0:
+        raise C.StrategyError(
+            f"{strategy.strategy_id} required_history must return a positive integer"
+        )
     if len(candles) < need:
         return make(C.NO_DATA, ["INSUFFICIENT_HISTORY"],
                     [f"need {need} completed candles, have {len(candles)}"])
@@ -104,4 +110,21 @@ def evaluate_report(strategy, listing, report, config=None):
     if raw["decision"] not in C.STRATEGY_DECISIONS:
         raise C.StrategyError(f"{strategy.strategy_id} returned {raw['decision']!r}; strategies may return only "
                               f"{', '.join(C.STRATEGY_DECISIONS)}")
+    if (not isinstance(raw["reason_codes"], list)
+            or any(not isinstance(code, str) for code in raw["reason_codes"])):
+        raise C.StrategyError(f"{strategy.strategy_id} reason_codes must be a list of strings")
+    if (not isinstance(raw["reasons"], list)
+            or any(not isinstance(reason, str) for reason in raw["reasons"])):
+        raise C.StrategyError(f"{strategy.strategy_id} reasons must be a list of strings")
+    if (not isinstance(raw["indicators"], dict)
+            or any(not isinstance(name, str) or not name for name in raw["indicators"])):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must be a mapping with non-empty string keys")
+    if any(
+        value is not None and (
+            type(value) not in (int, float)
+            or (type(value) is float and not math.isfinite(value))
+        )
+        for value in raw["indicators"].values()
+    ):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must contain only finite numbers or None")
     return make(raw["decision"], raw["reason_codes"], raw["reasons"], raw["indicators"], ref_open, ref_close)
