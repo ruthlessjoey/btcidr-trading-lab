@@ -139,7 +139,11 @@ class WorkflowRunGateTests(unittest.TestCase):
         self.assertTrue(
             reader.call_args_list[0].args[0].endswith("/actions/workflows/q08-specialist-review.yml")
         )
-        self.assertIn("/actions/runs?workflow_id=999", reader.call_args_list[1].args[0])
+        self.assertEqual(
+            reader.call_args_list[1].args[0],
+            "https://api.github.com/repos/" + REPOSITORY
+            + "/actions/workflows/999/runs?event=workflow_run&per_page=100&page=1",
+        )
 
     def test_same_head_running_review_blocks_duplicate(self):
         same_head = "a68b759b75adde426402eb39ef9c360f60e5bc27"
