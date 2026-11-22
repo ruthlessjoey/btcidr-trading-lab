@@ -200,8 +200,10 @@ class PipelineContainmentTests(unittest.TestCase):
 
         # This helper may read exact allowlisted blobs as text for ast.parse; it
         # must never evaluate, import, compile, or execute the returned source.
+        with open(__file__, encoding="utf-8") as source_file:
+            helper_tree = ast.parse(source_file.read())
         helper = next(
-            node for node in ast.parse(open(__file__, encoding="utf-8").read()).body
+            node for node in helper_tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "git_source_text"
         )
         forbidden_calls = {"exec", "eval", "compile", "__import__", "import_module", "run_module"}
