@@ -45,6 +45,7 @@ jobs:
             /tests/test_live_check.py
             /tests/test_history.py
             /tests/test_probe.py
+            /tests/test_research_gates.py
             /tests/test_pipeline.py
             /tests/test_sanitization.py
             /.github/workflows/market-data-check.yml
