@@ -177,7 +177,21 @@ At the recorded baseline: project scope contains 40 owner-approved requirements 
 - The current default `main` workflow still pins the older reviewer `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`. Do not treat it as the current bounded reviewer for the latest PR #60 diff.
 - Until PR #97 is separately approved and merged, **do not dispatch review mode from the unprotected PR #60 topic branch**: that branch's workflow definition receives `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`. A manual-only trigger does not make an unprotected workflow definition trusted.
 - After PR #97 is merged and the updated workflow is present on protected `main`, open Actions and select **Q0.8 immutable 19-role specialist review**. Select **`main`** in the branch dropdown so GitHub runs the trusted default-branch workflow; do not select the PR #60 topic branch.
-- Immediately before dispatch, re-fetch PR #60 and copy its exact current head SHA into `review_head_sha`. At this 23 November refresh the head is `a68b759b75adde426402eb39ef9c360f60e5bc27`; this is a snapshot, not a permanent value.
+- Immediately before dispatch, re-fetch PR #60 and copy its exact current head SHA into `review_head_sha`. At this 23 November refresh the head is `8f9f952a3d53f0723699922a621658dc81f40acf`; this is a snapshot, not a permanent value.
 - For that head, use a fresh review: leave `resume_from_run_id` blank because no checkpoint has been verified for SHA `a68b759b...`. Set `mode=review` and submit once. Never reuse a checkpoint from an earlier SHA.
 - If a 429 interrupts the run, preserve the artifact and run ID. Resume only after the reported reset window and only when repository, workflow, branch, base SHA, exact review SHA, reviewer, model and checkpoint schema all match. Keep the approved four retries and 120-second maximum wait; do not switch providers/models or increase limits.
 - PR #97's merge is an owner/admin decision and is not authorized by this runbook. This section does not authorize merging, changing secrets/permissions, or accessing protected paths.
+
+
+### 9.1 Automatic-resume workflow audit — 23 November 2026
+
+- PR #60 advanced to `8f9f952a3d53f0723699922a621658dc81f40acf`. Exact-head offline run [#45054914579](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054914579) passed **103/103** selected tests on Python 3.11.18. The Q0.8 review check remains skipped; no specialist review is claimed.
+- Commit `49f98101da78a0c25c004d8543432cf16c192b5b` added an `auto_resume` job with `actions: write` on the unprotected PR #60 topic workflow. Commit `8f9f952a3d53f0723699922a621658dc81f40acf` removed a suspected `GITHUB_OUTPUT` override; that specific output-path defect is no longer present.
+- The remaining automatic-resume implementation is not authorized and must not be dispatched:
+  1. Its HTTP 429 grep expression double-escapes the literal parentheses and failed a local reproduction against the actual `MODEL_REQUEST_FAILED ... reason=OpenRouter rate limit (HTTP 429)` log line.
+  2. It dispatches the next run immediately; it does not parse or wait for `Retry-After` / provider reset time.
+  3. It permits up to three extra workflow runs, each of which can repeat the review runner's four bounded model attempts. This multiplies the approved retry budget and conflicts with the user's instruction to wait for reset and resume manually.
+  4. The topic branch is unprotected and the auto-resume job grants `actions: write`; do not expose or use that workflow with secrets.
+- The prior user instruction remains controlling: preserve the $0 budget, wait until the provider's stated reset, then manually resume the same exact review SHA from an eligible identity-matching checkpoint. Do not repeatedly dispatch, increase the retry ceiling, or add paid fallback.
+- The current PR #60 head `8f9f952a...` has no verified same-head checkpoint. After PR #97 is merged, start a fresh trusted-main review with `resume_from_run_id` blank. If that run later stops at HTTP 429, wait for the actual reset and manually resume from its newest verified checkpoint run ID, keeping the SHA unchanged.
+- PR #98 remains based on the earlier PR #60 SHA `a68b759b...`; it is two commits behind current PR #60 and must be synchronized before integration. Its 16/16 test result remains evidence for its own exact head only.
