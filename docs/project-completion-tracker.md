@@ -1745,3 +1745,12 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - PR #82 clean-main transport candidate retains exact-head historical 59/59 Python 3.11.18 evidence and COMMENTED scoped review, not approval.
 - 40 requirements / 100 weight points; 24 candidate rows / 60 weight points; candidate-weighted maturity 15.00/100; 0/40 meet exact-main verification threshold. Overall project completion remains UNRATED. Profitability NOT PROVEN; historical proxy run about -11% / PF 0.36. PAPER NOT READY; LIVE DISABLED.
 - No protected source path was inspected or executed, no external provider request or dataset publication was made, no backtest/PAPER/LIVE execution or account/financial action occurred.
+
+
+## Latest PR #92 fail-closed transport regression and exact-head CI — 2026-11-22
+
+- PR #92 latest head: `07575c79d6ded36ee333a8e920449b97db5d54d3`; compare with current PR #60 target head `f6c520f725973d6c98534aec340fdabd77898383` is **36 commits ahead / 0 behind**. It remains a draft/open/unmerged stacked PR, not current-main integration.
+- Added a regression proving the permanently disabled cross-check acquisition entrypoint refuses before using injected opener or sleep callbacks or consulting the filesystem. A first expectation incorrectly required `RuntimeError`; the actual safe `ApiError` is not a `RuntimeError`. The test was corrected to assert the actual exception contract.
+- Exact-head push workflow [#44971902453](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44971902453) checked out `07575c79...` and passed **86/86** selected offline tests on Python **3.11.18**: fetcher 21, provider boundary 4, history 7, disabled probe 2, static pipeline 7, research gates 29, sanitization 16. Each suite logged `OK`.
+- Run [#44971839977](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44971839977) on parent head `19df42b...` failed only the new test's wrong exception superclass expectation; the exact-head fix and rerun passed. No source production gate was weakened. Provider acquisition remains disabled and test confirms no injected transport is called.
+- No independent PR review approval exists for PR #92. No merge or maturity/profitability credit is claimed.
