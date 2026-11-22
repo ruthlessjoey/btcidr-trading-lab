@@ -1766,3 +1766,19 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 ## Q0.8 recovery automation — third attempt status — 2026-11-22
 
 - After the provider's 240-second Retry-After period elapsed, recovery run [#44971874824](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44971874824) restored the saved checkpoint artifact #14733324197, checked out immutable runner `0eb085d...`, and passed Python 3.11 syntax validation. The full review step is currently in progress. It remains bound to PR #60 SHA `f6c520f...`; no candidate branch was moved.
+
+
+## PR #82 push-triggered exact-head verification — 2026-11-22
+
+- Added branch-scoped push automation to PR #82's existing least-privilege offline workflow while retaining manual dispatch and exact-SHA binding. It runs only on the approved PR #82 branch and source/config/docs/test or workflow changes; sparse checkout and test scope were not widened. Job remains `contents: read`, checkout credentials are not persisted.
+- Workflow automation commit and exact current head: `290436766951ee586c298a854528a8b7d4c5a14c`.
+- Push-triggered run [#44972046522](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972046522) checked out that exact SHA, verified the supplied SHA against `github.sha`, passed the static import-closure/allowlist check and passed **59/59** Python **3.11.18** tests: 6 import boundary, 30 fetcher, 4 provider/config, 3 disabled probe, 12 sanitization, 4 legacy entrypoint isolation. Every suite logged `OK`.
+- PR #82 remains open/draft/unmerged on main base `731fc9f...`. Its prior independent bounded review is COMMENTED, not APPROVED. No provider call, market identity verification, dataset, backtest, PAPER operation, or LIVE operation occurred.
+
+## Current repository delivery snapshot — 2026-11-22 09:35+08
+
+- `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no PR is merged.
+- PR #60 remains open/draft at `f6c520f725973d6c98534aec340fdabd77898383`, M6-based. Q0.8 review still has only 3/16 specialist reports; resume run #44971874824 is in progress after restoring the latest checkpoint, but no Commander, independent acceptance, final verification or complete role set is established.
+- PR #92 latest head `07575c79d6ded36ee333a8e920449b97db5d54d3` passed 86/86 selected Python 3.11.18 tests. It is open/draft, stacked on #60, compare 36 ahead / 0 behind, no independent review submissions.
+- PR #82 latest head `290436766951ee586c298a854528a8b7d4c5a14c` passed its exact-head push-triggered 59/59 selected Python 3.11.18 tests. It remains draft on main and has only a COMMENTED scoped review, not approval.
+- Completion remains UNRATED; candidate maturity 15.00/100; exact-main verified 0/40. Profitability NOT PROVEN; PAPER NOT READY; LIVE disabled.
