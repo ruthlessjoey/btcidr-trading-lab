@@ -207,6 +207,24 @@ class WorkflowRunGateTests(unittest.TestCase):
             "Q08_RESUME_FROM_RUN_ID: ${{ " + resume_expression + " || '' }}",
             workflow,
         )
+        self.assertEqual(workflow.count("\\n  workflow_run:\\n"), 1)
+        self.assertIn(
+            "  push:\\n    branches: [main]\\n    paths:\\n      - \".github/workflows/q08-specialist-review.yml\"",
+            workflow,
+        )
+        self.assertIn("GITHUB_EVENT_NAME: ${{ github.event_name }}", workflow)
+        self.assertIn(
+            "github.event_name == 'push' && steps.validate-gate.outputs.review_head_sha",
+            workflow,
+        )
+        self.assertIn(
+            "github.event_name == 'push' && steps.validate-gate.outputs.resume_from_run_id",
+            workflow,
+        )
+        self.assertIn(
+            "github.event_name == 'workflow_run' || github.event_name == 'push'",
+            workflow,
+        )
 
     def setUp(self):
         self.fetch_json = Mock(return_value={"sha": OFFLINE_WORKFLOW_BLOB})
