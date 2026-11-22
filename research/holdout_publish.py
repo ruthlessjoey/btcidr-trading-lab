@@ -5,6 +5,7 @@ records into its research-data checkout and before it removes pending markers.
 """
 import argparse
 import json
+import math
 import os
 import stat
 from pathlib import Path
@@ -34,6 +35,25 @@ def _reject_json_constant(value):
     raise ValueError("non-standard JSON constant")
 
 
+def _finite_json_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("non-finite JSON number")
+    return number
+
+
+def _same_json_value(left, right):
+    """Compare parsed JSON values without Python bool/int equality coercion."""
+    try:
+        return json.dumps(
+            left, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ) == json.dumps(
+            right, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _unique_object(pairs):
     value = {}
     for key, item in pairs:
@@ -58,7 +78,7 @@ def _read_object(path, description):
             raise RuntimeError(f"{description} exceeds the {MAX_JSON_BYTES}-byte JSON limit")
         value = json.loads(
             raw.decode("utf-8"), parse_constant=_reject_json_constant,
-            object_pairs_hook=_unique_object)
+            parse_float=_finite_json_float, object_pairs_hook=_unique_object)
     except RuntimeError:
         raise
     except (OSError, ValueError, RecursionError) as exc:
@@ -126,7 +146,7 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         if any(reservation_record.get(field) != completed_record.get(field)
                for field in IDENTITY_FIELDS):
             raise RuntimeError("completed record does not match its durable reservation")
-        if report_test != completed_record:
+        if not _same_json_value(report_test, completed_record):
             raise RuntimeError("report does not match completed TEST record")
         pending_to_remove.append(pending)
 
