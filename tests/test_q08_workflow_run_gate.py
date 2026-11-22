@@ -199,8 +199,8 @@ class WorkflowRunGateTests(unittest.TestCase):
             workflow,
         )
         resume_expression = (
-            "github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id "
-            "|| inputs.resume_from_run_id"
+            "(github.event_name == 'workflow_run' || github.event_name == 'push') "
+            "&& steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id"
         )
         self.assertEqual(workflow.count(resume_expression), 3)
         self.assertIn(
@@ -209,7 +209,7 @@ class WorkflowRunGateTests(unittest.TestCase):
         )
         self.assertEqual(workflow.count("\\n  workflow_run:\\n"), 1)
         self.assertIn(
-            "  push:\\n    branches: [main]\\n    paths:\\n      - \".github/workflows/q08-specialist-review.yml\"",
+            "  push:\\n    branches: [main]\\n    paths:\\n      - \\\".github/workflows/q08-specialist-review.yml\\\"",
             workflow,
         )
         self.assertIn("GITHUB_EVENT_NAME: ${{ github.event_name }}", workflow)
