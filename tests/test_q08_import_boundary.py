@@ -51,7 +51,22 @@ def _assert_no_dynamic_imports(tree, path):
         elif isinstance(node, ast.Call):
             func = node.func
             if ((isinstance(func, ast.Name) and func.id in dynamic_names)
-                or (isinstance(func, ast.Attribute) and func.attr == "import_module")):
+                attribute_call = (
+                isinstance(func, ast.Attribute)
+                and func.attr in {"import_module", "__import__", "eval", "exec"}
+            )
+            constant_getattr_call = (
+                isinstance(func, ast.Name)
+                and func.id == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value in {"import_module", "__import__", "eval", "exec"}
+            )
+            if (
+                (isinstance(func, ast.Name) and func.id in dynamic_names)
+                or attribute_call
+                or constant_getattr_call
+            ):
                 raise AssertionError(f"{path}: dynamic import/evaluation is not permitted")
 
 
@@ -182,6 +197,10 @@ class Q08ImportBoundaryTests(unittest.TestCase):
             "from importlib import import_module as load_module\nload_module('x')",
             "from builtins import __import__ as load_module\nload_module('x')",
             "from builtins import eval as run_code\nrun_code('1 + 1')",
+            "import builtins\nbuiltins.eval('1 + 1')",
+            "import builtins as runtime\nruntime.__import__('x')",
+            "import builtins\ngetattr(builtins, 'eval')('1 + 1')",
+            "import importlib as runtime\nruntime.import_module('x')",
         )
         for sample in samples:
             with self.subTest(sample=sample), self.assertRaisesRegex(
