@@ -224,8 +224,9 @@ class PipelineContainmentTests(unittest.TestCase):
                 with self.subTest(path=path, forbidden=forbidden):
                     self.assertNotIn(forbidden, sparse)
             if path == ".github/workflows/q08-offline-tests.yml":
-                self.assertNotIn("/tests/test_research_gates.py", sparse)
-                self.assertNotIn("test_research_gates.py", workflow)
+                # test_history.py statically verifies this module's unprotected import closure.
+                self.assertIn("/tests/test_research_gates.py", sparse)
+                self.assertIn("python3 -m unittest discover -s tests -p 'test_research_gates.py' -v", workflow)
 
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
         source = git_source_text("run.py")

@@ -20,7 +20,7 @@ from research.backtest_report import crosscheck_status_line
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "abc123"}
 CFG = {"flagged_dates": ["2020-03-12"]}
-TEST_APPROVED = frozenset({"coinbase"})
+TEST_APPROVED = frozenset({"coinbase", "bitstamp"})
 
 
 class CrosscheckGateTests(unittest.TestCase):
@@ -30,10 +30,32 @@ class CrosscheckGateTests(unittest.TestCase):
             json.dump(payload, f)
         return path
 
-    def payload(self, verdict="CONFIRMED", provider="coinbase"):
-        return {"dataset_version": "v-test", "dataset_sha256": "abc123",
-                "providers": [provider],
-                "flagged": [{"date": "2020-03-12", "verdict": verdict}]}
+    @staticmethod
+    def comparison():
+        return {
+            "open_diff_pct": 0.0,
+            "close_diff_pct": 0.0,
+            "high_diff_pct": 0.0,
+            "low_diff_pct": 0.0,
+            "binance_return_pct": 0.0,
+            "other_return_pct": 0.0,
+            "return_gap_pp": 0.0,
+            "agrees": True,
+        }
+
+    def payload(self, verdict="CONFIRMED (approximate: USD is not USDT)", provider=None):
+        providers = ["coinbase", "bitstamp"] if provider is None else ["coinbase", provider]
+        return {
+            "dataset_version": "v-test",
+            "dataset_sha256": "abc123",
+            "providers": providers,
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": verdict,
+                "coinbase": self.comparison(),
+                "bitstamp": self.comparison(),
+            }],
+        }
 
     def test_no_independent_provider_is_currently_authorized(self):
         self.assertEqual(AUTHORIZED_CROSSCHECK_PROVIDERS, frozenset())
@@ -56,7 +78,7 @@ class CrosscheckGateTests(unittest.TestCase):
 
     def test_provider_must_be_explicitly_authorized(self):
         with tempfile.TemporaryDirectory() as d:
-            path = self.write_evidence(d, self.payload(provider="bitstamp"))
+            path = self.write_evidence(d, self.payload(provider="kraken"))
             with self.assertRaisesRegex(CrosscheckError, "authorized independent providers"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 

@@ -63,7 +63,7 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         allowed = frozenset()
     if not REQUIRED_CROSSCHECK_PROVIDERS.issubset(allowed):
         raise CrosscheckError(
-            "two independent cross-check providers are required; flagged-date backtests are blocked"
+            "no independent cross-check provider set contains both required venues; two independent providers are required; flagged-date backtests are blocked"
         )
     if not crosscheck_path or not os.path.isfile(crosscheck_path):
         raise CrosscheckError(
@@ -109,7 +109,7 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
                 not _valid_confirmed_comparison(item.get("coinbase")) or
                 not _valid_confirmed_comparison(item.get("bitstamp"))):
             raise CrosscheckError(
-                f"flagged date {date} lacks complete, agreeing evidence from both independent providers"
+                f"flagged date {date} lacks confirmed, complete agreeing evidence from both independent providers"
             )
     return evidence
 
