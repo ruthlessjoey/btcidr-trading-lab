@@ -1349,3 +1349,16 @@ Twin money maker.
 - PR #98 remains draft/open/unmerged and has no independent review. No protected S1 module, normal strategy registry, provider, market data, risk, validator, or report module was checked out/imported/executed. The synthetic fixture tests establish M5 interface/gate behavior, not BTC trading profitability, strategy quality, M5 integration, or PAPER readiness.
 
 Twin money maker.
+
+
+### PR #60 reviewer-comment reconciliation — two-provider cross-check guard — 2026-11-23
+
+- The existing PR #60 review submission is state **COMMENTED**, not APPROVED. Its findings refer to a predecessor PR #60 head and do not constitute approval or acceptance of current PR #60.
+- The comment's cross-check concern (single-provider evidence could be accepted if the allowlist were later enabled) is already corrected in stacked draft PR #92 at exact head `c74c0fb8ef375ec634f96464b12d9555d0ac91f3`. Static inspection confirms:
+  - `validate_crosscheck_artifact()` requires an exact immutable `frozenset` of at least two non-empty authorized providers.
+  - The artifact must name at least two distinct approved providers; every flagged date must carry valid affirmative agreement from both.
+  - Only the exact `CONFIRMED_VERDICT` emitted by the two-source rule is accepted; prefix variants such as `CONFIRMED_UNTRUSTED` are rejected.
+  - `run_crosscheck()` continues to refuse unconditionally, and production authorization remains `AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()`; production loader passes a fresh empty set. No Coinbase, Bitstamp, or any other provider was enabled or contacted.
+- PR #92 exact-head offline run [#45042396379](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45042396379) passed **98/98** selected tests on Python 3.11.18, including the two-provider, exact-verdict, dataset-binding, and adversarial JSON checks. PR #92 remains draft/unreviewed and diverged from PR #60 ancestry; fix and tests are candidate-only, not integrated or independently accepted.
+
+Twin money maker.
