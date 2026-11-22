@@ -2062,3 +2062,13 @@ This addendum supersedes earlier head/run statements above where they differ.
 - Exact-head specialist review [#44973807749](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973807749) failed closed after the first role completed and the second role, `implementation-engineer`, hit OpenRouter HTTP 429. The runner applied waits of 15/30/60/120 seconds, then refused the provider's 240-second reset because it exceeds the 120-second policy cap.
 - Checkpoint artifact #14734094621, ZIP SHA-256 `25fe7fb95dcae4e59222238c1aab24d6993c1fe162144a5eaed3ae4377c7aba3`; contained JSON SHA-256 `9f37345f853bf03496806f6bd1ebba9ca505b3c256b8827fcbab0f15827e0227`. It is bound to repository `ruthlessjoey/btcidr-trading-lab`, M6 base `cd451972...`, exact current head `b9da90b...`, and model `inclusionai/ling-3.2-flash:free`. It contains **1/16 specialist reports** (`architecture-architect`, PASS WITH FINDINGS); Commander, independent acceptance, and verification are null.
 - No Q0.8 acceptance is established. A future resume must use this exact current-head checkpoint, same model, and the existing bounded retry policy after the free-provider quota reset. Do not reuse any predecessor-head checkpoint or launch duplicate concurrent resumes.
+
+
+## Q0.8 first-role report findings — 2026-11-22
+
+The current-head checkpoint artifact #14734094621 contains one specialist report, `architecture-architect`, with verdict **PASS WITH FINDINGS**. The report's medium findings are:
+
+- **F1:** `research/pipeline.py` still imports `research.engine`, whose known import chain reaches protected `validator.py`. Keep this path static-only; do not add it to sparse checkout or execute it without separate authorization.
+- **F2:** `tests/test_backtest_pipeline.py` imports and exercises that protected pipeline chain. Keep it excluded from approved offline test workflows.
+- Low findings F3/F4 concern clarifying that retained Coinbase/Bitstamp helpers are pure offline functions and that disabled `probe.py` / `tools/net_lab.py` return code 2 means permanently disabled pending authorization. F5 is informational; the live diagnostic path remains blocked.
+- These findings do not establish a present protected-path violation. They are migration constraints and require no protected-path access to preserve. The other 15 specialist roles, Commander, independent acceptance, and verification remain uncompleted.
