@@ -1,0 +1,84 @@
+name: Q0.8 trusted workflow-run gate tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/q08_workflow_run_gate.py"
+      - "tests/test_q08_workflow_run_gate.py"
+      - ".github/workflows/q08-specialist-review.yml"
+      - ".github/workflows/q08-workflow-run-gate-tests.yml"
+  push:
+    branches:
+      - security/q08-trusted-main-dispatch-2026-11-22
+    paths:
+      - "tools/q08_workflow_run_gate.py"
+      - "tests/test_q08_workflow_run_gate.py"
+      - ".github/workflows/q08-specialist-review.yml"
+      - ".github/workflows/q08-workflow-run-gate-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: q08-trusted-workflow-gate-tests
+  cancel-in-progress: false
+
+jobs:
+  gate-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout only the tested gate, tests and workflow definitions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/q08-specialist-review.yml
+            /.github/workflows/q08-workflow-run-gate-tests.yml
+            /tools/q08_workflow_run_gate.py
+            /tests/test_q08_workflow_run_gate.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+          check-latest: false
+
+      - name: Run offline adversarial workflow-event tests
+        run: python3 -W error::ResourceWarning -m unittest discover -s tests -p 'test_q08_workflow_run_gate.py' -v
+
+      - name: Install pinned Actionlint with bounded download and verified archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint_1.7.12_linux_amd64.tar.gz"
+          binary="$RUNNER_TEMP/actionlint"
+          max_archive_bytes=16777216
+          url="https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 90 \
+            --max-filesize "$max_archive_bytes" \
+            --retry 2 --retry-all-errors --retry-max-time 120 \
+            --output "$archive" "$url"
+
+          archive_bytes="$(stat -c '%s' "$archive")"
+          if [[ ! "$archive_bytes" =~ ^[0-9]+$ ]] || \
+             (( archive_bytes == 0 || archive_bytes > max_archive_bytes )); then
+            echo "::error::Actionlint archive size is invalid or exceeds the 16 MiB limit."
+            exit 1
+          fi
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          test -x "$binary"
+
+      - name: Lint the trusted Q0.8 workflows
+        run: |
+          "$RUNNER_TEMP/actionlint" .github/workflows/q08-specialist-review.yml .github/workflows/q08-workflow-run-gate-tests.yml

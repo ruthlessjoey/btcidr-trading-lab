@@ -1,6 +1,9 @@
 name: Q0.8 immutable 19-role specialist review
 
+run-name: Q0.8 specialist review ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'push' && github.sha) || inputs.review_head_sha }}
+
 on:
+  # Manual dispatch remains available for owner-directed recovery.
   workflow_dispatch:
     inputs:
       review_head_sha:
@@ -19,17 +22,44 @@ on:
           - synthetic
           - review
         default: synthetic
+  # Successful offline workflow runs on the approved PR60 branch automatically review that exact SHA.
+  workflow_run:
+    workflows:
+      - "Q0.8 offline security regression tests (sparse unprotected scope)"
+    types: [completed]
+    branches:
+      - security/q0-provider-sanitization-2026-11-18
+  # When this trusted workflow first reaches main, bootstrap review of the already-tested current PR60 head.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/q08-specialist-review.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: q08-specialist-review
+  group: q08-specialist-review-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'push' && github.sha) || inputs.review_head_sha }}
   cancel-in-progress: false
 
 jobs:
   review:
     name: Bounded read-only 19-role review
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'security/q0-provider-sanitization-2026-11-18' &&
+        github.event.workflow.id == 421573668 &&
+        github.event.repository.full_name == github.repository
+      ) ||
+      (
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'ruthlessjoey/btcidr-trading-lab'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -52,22 +82,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9
+          ref: 812d9fd934c7fe1bc6308e38a32490a020c08b22
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /tools/q08_specialist_review.py
+            /tools/q08_workflow_run_gate.py
 
-      - name: Restore checkpoint from an earlier run
-        if: ${{ inputs.mode == 'review' && inputs.resume_from_run_id != '' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: q08-review-checkpoint-${{ inputs.resume_from_run_id }}
-          path: ${{ runner.temp }}
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.resume_from_run_id }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -80,20 +102,40 @@ jobs:
       - name: Run synthetic policy smoke test
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
-      - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
-        if: ${{ inputs.mode == 'review' }}
+      - name: Validate trusted offline-test workflow completion before using its commit
+        id: validate-gate
+        if: ${{ github.event_name == 'workflow_run' || github.event_name == 'push' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: python3 runner/tools/q08_workflow_run_gate.py
+
+      - name: Restore checkpoint from an earlier run
+        if: ${{ ((github.event_name == 'workflow_run' || github.event_name == 'push') && steps.validate-gate.outputs.resume_from_run_id != '') || (github.event_name == 'workflow_dispatch' && inputs.mode == 'review' && inputs.resume_from_run_id != '') }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: q08-review-checkpoint-${{ (github.event_name == 'workflow_run' || github.event_name == 'push') && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
+          path: ${{ runner.temp }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ (github.event_name == 'workflow_run' || github.event_name == 'push') && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
+
+      - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
+        if: ${{ github.event_name == 'workflow_run' || github.event_name == 'push' || inputs.mode == 'review' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event_name == 'push' && steps.validate-gate.outputs.review_head_sha) || inputs.review_head_sha }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
-          Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id }}
+          Q08_RESUME_FROM_RUN_ID: ${{ (github.event_name == 'workflow_run' || github.event_name == 'push') && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id || '' }}
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
       - name: Persist resumable review checkpoint
-        if: ${{ always() && inputs.mode == 'review' }}
+        if: ${{ always() && (github.event_name == 'workflow_run' || github.event_name == 'push' || inputs.mode == 'review') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: q08-review-checkpoint-${{ github.run_id }}
