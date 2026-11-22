@@ -187,6 +187,31 @@ class HoldoutPublicationTests(unittest.TestCase):
                     self.publish()
                 self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_replacement_reservation_is_preserved_during_cleanup(self):
+        self.install_pair()
+        pending = self.root / (self.key + ".pending")
+        replacement = dict(self.reservation, run_attempt="99")
+        original_rename = os.rename
+        replaced = False
+
+        def replace_before_stage(source, destination):
+            nonlocal replaced
+            if not replaced and os.fspath(source) == os.fspath(pending):
+                replaced = True
+                pending.unlink()
+                self.write_json(pending, replacement)
+            return original_rename(source, destination)
+
+        with mock.patch("research.holdout_publish.os.rename", side_effect=replace_before_stage):
+            with self.assertRaisesRegex(
+                    RuntimeError, "durable reservation changed before cleanup"):
+                self.publish()
+
+        self.assertTrue(replaced)
+        self.assertTrue(pending.is_file())
+        self.assertEqual(json.loads(pending.read_text(encoding="utf-8")), replacement)
+        self.assertFalse(any(self.root.glob(".holdout-publish-*")))
+
     def test_report_boolean_does_not_match_integer_evaluation_number(self):
         self.install_pair()
         mismatched_report = dict(self.completed, evaluation_number=True)
