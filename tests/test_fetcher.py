@@ -1,10 +1,15 @@
-"""Offline tests for the approved public transport boundary; no sockets are used."""
+"""Offline transport tests with synthetic responses and local socketpairs; no external network calls."""
+import http.client
 import io
 import json
 import os
+import socket
 import sys
+import threading
+import time
 import unittest
 import urllib.error
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import fetcher  # noqa: E402
@@ -185,6 +190,145 @@ class ParseRegressionTests(unittest.TestCase):
     def test_server_time_shapes_remain_supported(self):
         self.assertEqual(fetcher.extract_server_time({"serverTime": 1_700_000_000_000}),
                          1_700_000_000)
+
+
+class BoundedResponseTests(unittest.TestCase):
+    def _response(self, body, headers):
+        client, server = socket.socketpair()
+        server.sendall(
+            b"HTTP/1.1 200 OK\r\n" + headers + b"\r\n" + body
+        )
+        response = http.client.HTTPResponse(client)
+        response.begin()
+        return client, server, response
+
+    def test_real_http_response_body_is_read_with_content_length(self):
+        client, server, response = self._response(
+            b"hello", b"Content-Length: 5\r\n"
+        )
+        try:
+            self.assertEqual(fetcher.read_bounded_body(response, 5, 1), b"hello")
+            self.assertTrue(response.isclosed())
+        finally:
+            client.close()
+            server.close()
+
+    def test_real_http_response_rejects_truncated_content_length(self):
+        client, server, response = self._response(
+            b"hey", b"Content-Length: 5\r\n"
+        )
+        server.close()
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "does not match Content-Length"):
+                fetcher.read_bounded_body(response, 5, 1)
+        finally:
+            client.close()
+
+    def test_real_http_response_slow_drip_obeys_absolute_body_deadline(self):
+        client, server, response = self._response(
+            b"a", b"Content-Length: 4\r\n"
+        )
+        stop = threading.Event()
+
+        def drip():
+            try:
+                for byte in (b"b", b"c", b"d"):
+                    if stop.wait(0.04):
+                        return
+                    server.sendall(byte)
+            except OSError:
+                return
+
+        sender = threading.Thread(target=drip, daemon=True)
+        try:
+            sender.start()
+            started = time.monotonic()
+            with self.assertRaises(fetcher.ResponseDeadlineError):
+                fetcher.read_bounded_body(response, 4, 0.10)
+            elapsed = time.monotonic() - started
+            self.assertGreaterEqual(elapsed, 0.08)
+            self.assertLess(elapsed, 0.30)
+        finally:
+            stop.set()
+            client.close()
+            server.close()
+
+    def test_transfer_encoding_is_rejected_before_body_read(self):
+        client, server, response = self._response(
+            b"1\r\nx\r\n0\r\n\r\n", b"Transfer-Encoding: chunked\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "transfer encoding"):
+                fetcher.read_bounded_body(response, 64, 1)
+            self.assertIsNotNone(response.fp)
+        finally:
+            client.close()
+            server.close()
+
+    def test_content_length_over_limit_is_rejected_before_body_read(self):
+        client, server, response = self._response(
+            b"123456", b"Content-Length: 6\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "exceeded"):
+                fetcher.read_bounded_body(response, 5, 1)
+            self.assertIsNotNone(response.fp)
+        finally:
+            client.close()
+            server.close()
+
+    def test_duplicate_content_length_is_rejected(self):
+        client, server, response = self._response(
+            b"x", b"Content-Length: 1\r\nContent-Length: 1\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "duplicated"):
+                fetcher.read_bounded_body(response, 5, 1)
+        finally:
+            client.close()
+            server.close()
+
+    def test_malformed_content_length_is_rejected(self):
+        client, server, response = self._response(
+            b"x", b"Content-Length: 1x\r\n"
+        )
+        try:
+            with self.assertRaisesRegex(fetcher.ApiError, "Content-Length is invalid"):
+                fetcher.read_bounded_body(response, 5, 1)
+        finally:
+            client.close()
+            server.close()
+
+    def test_non_finite_or_non_positive_body_deadline_is_rejected(self):
+        for timeout in (float("nan"), float("inf"), 0, -1, True):
+            with self.subTest(timeout=timeout):
+                with self.assertRaisesRegex(fetcher.ApiError, "deadline is invalid"):
+                    fetcher.read_bounded_body(None, 5, timeout)
+
+    def test_default_opener_disables_proxies_and_redirects(self):
+        client, server, response = self._response(
+            b"{}", b"Content-Length: 2\r\n"
+        )
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                self.timeout = timeout
+                return response
+
+        fake = FakeOpener()
+        try:
+            with patch("urllib.request.build_opener", return_value=fake) as build:
+                status, body = fetcher.default_opener(CANDLE_URL, 1)
+            self.assertEqual((status, body), (200, b"{}"))
+            handlers = build.call_args.args
+            proxy = next(h for h in handlers if isinstance(h, urllib.request.ProxyHandler))
+            redirect = next(h for h in handlers if isinstance(h, fetcher._NoRedirect))
+            self.assertEqual(proxy.proxies, {})
+            self.assertIsNotNone(redirect)
+        finally:
+            client.close()
+            server.close()
 
 
 if __name__ == "__main__":
