@@ -19,7 +19,7 @@ import research.crosscheck as crosscheck
 from research.crosscheck import (
     CrosscheckError, CROSSCHECK_ARTIFACT_PRODUCER, CROSSCHECK_ARTIFACT_SCHEMA,
     CONFIRMED_VERDICT, build_markdown, compare, is_confirmed_verdict,
-    load_required_crosscheck, to_ts, validate_crosscheck_artifact,
+    load_required_crosscheck, run_crosscheck, to_ts, validate_crosscheck_artifact,
 )
 from research.backtest_report import (
     build_markdown as build_backtest_markdown, market_source_label,
@@ -353,6 +353,26 @@ class CrosscheckGateTests(unittest.TestCase):
         }
         result = compare(binance, coinbase, disagreeing, ["2020-03-12"])
         self.assertEqual(result["flagged"][0]["verdict"], "NOT CONFIRMED")
+
+    def test_disabled_crosscheck_refuses_before_injected_transport_or_filesystem_use(self):
+        calls = []
+
+        def forbidden_opener(*args, **kwargs):
+            calls.append(("opener", args, kwargs))
+            raise AssertionError("cross-check opener must never be called")
+
+        def forbidden_sleep(*args, **kwargs):
+            calls.append(("sleep", args, kwargs))
+            raise AssertionError("cross-check sleep must never be called")
+
+        with self.assertRaisesRegex(RuntimeError, "independent cross-check providers are not authorized") as ctx:
+            run_crosscheck(
+                MANIFEST, (), ["2020-03-12"], object(),
+                opener=forbidden_opener, sleep=forbidden_sleep,
+                timeout="invalid", retries=-1,
+            )
+        self.assertEqual(type(ctx.exception).__name__, "ApiError")
+        self.assertEqual(calls, [])
 
     def test_no_flagged_dates_does_not_require_crosscheck(self):
         self.assertIsNone(load_required_crosscheck(
