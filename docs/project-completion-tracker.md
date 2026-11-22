@@ -2992,3 +2992,14 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - The historical first-pass candidate maturity remains **15.00/100**, with candidate implementation coverage **60/100** and **0/40** requirements meeting the exact-main implementation-plus-focused-test threshold.
 - The new PR #82, #84, #97, #98 and PR #60 results are unmerged candidate evidence. They strengthen individual rows but do not change the integrated score or denominator.
 - Whole-project completion remains **UNRATED** until the 40 rows are reconciled against the current selected baseline, integration, focused tests, independent review and owner acceptance. No percentage is inferred from candidate coverage.
+
+
+## Q0.8 automatic-resume audit and latest-head refresh — 23 November 2026
+
+- PR #60 has advanced to `8f9f952a3d53f0723699922a621658dc81f40acf`; it is 140 commits ahead / 0 behind M6 baseline `cd451972...`, 26 changed paths, and 151 ahead / 92 behind current `main 731fc9f...`. It remains draft/open/unmerged.
+- Exact-head offline run [#45054914579](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054914579) passed **103/103** selected Python 3.11.18 tests. The Q0.8 review check remains skipped; no specialist verdict is claimed.
+- New commits `49f9810...` and `8f9f952...` add an automatic HTTP-429 resume job. The follow-up removed a suspected `GITHUB_OUTPUT` override, but the remaining job is not authorized and must not be dispatched: its 429 regex is double-escaped (local reproduction does not match the actual log), it does not wait for provider reset, it can trigger up to three extra runs on top of the four-attempt runner policy, and it grants `actions: write` on the unprotected topic workflow. This conflicts with the owner's prior explicit manual-resume/$0 constraints.
+- PR #98 remains at `3576c804...`, based on PR #60 predecessor `a68b759...`; it is now two commits behind the current PR #60 branch. Its 16/16 exact-head run remains candidate evidence for its own head only; synchronize before integration.
+- PR #97 trusted-main workflow remains draft/unmerged at `3dba39b...`, pinned to reviewer `cf9f319...`; no dispatch/runtime run. PR #94 runbook is updated to head `e391449...` and explicitly blocks use of the auto-resume job.
+- The suspected `GITHUB_OUTPUT` override was removed by `8f9f952a...`; it is not a current finding. Current blockers are the regex, missing reset wait, multiplied retry budget, and unprotected-branch `actions: write`.
+- No score change: 40 requirements / 100 points, first-pass candidate maturity 15.00/100, candidate coverage 60/100, 0/40 exact-main threshold, overall UNRATED. Historical strategy evidence remains approximately -11% return / PF 0.36; no new backtest. Profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
