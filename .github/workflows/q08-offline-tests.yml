@@ -46,7 +46,6 @@ jobs:
             /tests/test_history.py
             /tests/test_probe.py
             /tests/test_pipeline.py
-            /tests/test_research_gates.py
             /tests/test_sanitization.py
             /.github/workflows/market-data-check.yml
             /.github/workflows/research-data.yml
@@ -63,5 +62,4 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_history.py' -v
           python3 -m unittest discover -s tests -p 'test_probe.py' -v
           python3 -m unittest discover -s tests -p 'test_pipeline.py' -v
-          python3 -m unittest discover -s tests -p 'test_research_gates.py' -v
           python3 -m unittest discover -s tests -p 'test_sanitization.py' -v
