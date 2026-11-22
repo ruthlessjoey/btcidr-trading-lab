@@ -77,6 +77,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /tools/q08_specialist_review.py
+            /tools/q08_workflow_run_gate.py
 
       - name: Restore checkpoint from an earlier run
         if: ${{ inputs.mode == 'review' && inputs.resume_from_run_id != '' }}
@@ -103,72 +104,8 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_REPOSITORY: ${{ github.repository }}
-          EXPECTED_WORKFLOW_ID: "421573668"
-          EXPECTED_BRANCH: "security/q0-provider-sanitization-2026-11-18"
-          EXPECTED_WORKFLOW_NAME: "Q0.8 offline security regression tests (sparse unprotected scope)"
-          EXPECTED_WORKFLOW_BLOB: "4821963a7b752a1e5bbc52e1d97c93ea296ff7f4"
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          import re
-          import urllib.error
-          import urllib.request
-
-          try:
-              with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as stream:
-                  event = json.load(stream)
-              run = event["workflow_run"]
-              workflow = event["workflow"]
-              repository = event["repository"]
-              expected_repo = "ruthlessjoey/btcidr-trading-lab"
-              if os.environ["REVIEW_REPOSITORY"] != expected_repo:
-                  raise ValueError("unexpected repository")
-              checks = (
-                  workflow.get("id") == int(os.environ["EXPECTED_WORKFLOW_ID"]),
-                  workflow.get("path") == ".github/workflows/q08-offline-tests.yml",
-                  run.get("name") == os.environ["EXPECTED_WORKFLOW_NAME"],
-                  run.get("event") == "push",
-                  run.get("conclusion") == "success",
-                  run.get("head_branch") == os.environ["EXPECTED_BRANCH"],
-                  (run.get("head_repository") or {}).get("full_name") == expected_repo,
-                  repository.get("full_name") == expected_repo,
-                  isinstance(run.get("head_sha"), str)
-                      and re.fullmatch(r"[0-9a-f]{40}", run["head_sha"]),
-                  type(run.get("id")) is int and run["id"] > 0,
-              )
-              if not all(checks):
-                  raise ValueError("upstream workflow run identity or conclusion mismatch")
-              sha = run["head_sha"]
-              url = (
-                  "https://api.github.com/repos/" + expected_repo
-                  + "/contents/.github/workflows/q08-offline-tests.yml?ref=" + sha
-              )
-              request = urllib.request.Request(
-                  url,
-                  headers={
-                      "Accept": "application/vnd.github+json",
-                      "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
-                      "X-GitHub-Api-Version": "2022-11-28",
-                      "User-Agent": "q08-trusted-workflow-run-gate",
-                  },
-                  method="GET",
-              )
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  body = response.read(65537)
-              if len(body) > 65536:
-                  raise ValueError("offline workflow metadata response exceeded limit")
-              content = json.loads(body.decode("utf-8"))
-              if content.get("sha") != os.environ["EXPECTED_WORKFLOW_BLOB"]:
-                  raise ValueError("PR branch offline workflow is not the approved immutable blob")
-              print("Trusted workflow_run event validated for exact head " + sha)
-          except (KeyError, TypeError, ValueError, OSError, urllib.error.URLError,
-                  json.JSONDecodeError) as exc:
-              print("::error::Trusted Q0.8 workflow_run validation failed: " + type(exc).__name__)
-              raise SystemExit(1)
-          PY
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 tools/q08_workflow_run_gate.py
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
         if: ${{ github.event_name == 'workflow_run' || inputs.mode == 'review' }}
