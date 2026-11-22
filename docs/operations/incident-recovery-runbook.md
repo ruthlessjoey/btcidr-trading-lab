@@ -200,7 +200,7 @@ At the recorded baseline: project scope contains 40 owner-approved requirements 
 
 **This section supersedes the assumption in §9.1 that PR #97 remains manual-dispatch-only.**
 
-- PR #97 has advanced to `6ad01d7f546b0062196e9f47800f4e8431f3cbb8` (13 commits / 4 paths) and now includes a `workflow_run` trigger. After PR #97 is merged to protected `main`, every matching successful PR #60 offline workflow completion can automatically start the 19-role LLM review using the trusted-main workflow and its LLM secrets.
+- PR #97 has advanced to `698510508178b150de1cbecc0c0e4d15569fd6ca` (20 commits / 4 paths) and includes a `workflow_run` trigger. After PR #97 is merged to protected `main`, every matching successful PR #60 offline workflow completion can automatically start the 19-role LLM review using the trusted-main workflow and its LLM secrets.
 - Positive controls: the gate helper checks repository, branch, workflow identity and immutable offline-workflow blob; the trusted reviewer remains pinned; the candidate is fetched through the API and is not checked out or executed; the review job is read-only.
 - **This automatic LLM-trigger behavior is not authorized by the owner. Do not merge or enable the current PR #97 head until the owner explicitly chooses manual-only or automatic review.** The new trigger has no demonstrated same-head idempotency/deduplication gate; concurrency serializes runs but does not prevent duplicate reviews from repeated successful offline runs or reruns. It can consume the configured LLM quota automatically.
 - The initial gate-test run [#45055262845](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055262845) failed with zero jobs because the Actionlint command had invalid YAML quoting; this was corrected in commit `f75bf91...`. Exact-head pull-request run [#45055580027](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055580027) on PR #97 head `6ad01d7...` passed **7/7** offline gate tests and Actionlint; predecessor push run #45055549468 also passed. CodeQL Python and Actions both completed successfully on exact PR #97 head `6ad01d7...` (run #45055575060).
@@ -226,3 +226,10 @@ At the recorded baseline: project scope contains 40 owner-approved requirements 
 - Therefore PR #99 has **local YAML-parse evidence only**; no exact-head synthetic Actions run has occurred. Do not claim synthetic or full review success.
 - After owner/admin approval and merge of PR #99, an operator must use GitHub Actions UI on protected `main`: first run `mode=synthetic` with the freshly fetched PR #60 SHA and blank resume ID; only after it passes, manually dispatch `mode=review` with that same SHA and blank resume ID. If a later review stops on 429, wait for the provider reset and manually resume from the newest eligible same-SHA checkpoint.
 - No paid fallback, wallet top-up, or automatic trigger is authorized by this procedure.
+
+
+### 9.2.1 Latest automatic-gate test and resume-policy review — 23 November 2026
+
+- PR #97 exact head `698510508178b150de1cbecc0c0e4d15569fd6ca`: run [#45056018988](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056018988) passed **18/18** gate tests, pinned Actionlint passed, and CodeQL Python/Actions passed.
+- Same-head running/successful review suppression is implemented. However, `select_resume_run` accepts a same-head failed/cancelled/timed-out/action-required/startup-failure run if a checkpoint artifact exists; it does not inspect the prior failure reason or parse provider reset metadata. Therefore it can resume a non-429 failure and can retry before reset.
+- The `workflow_run` trigger still automatically invokes the LLM review after matching successful offline runs. It remains unapproved and must not be merged/activated without explicit owner approval. PR #99 remains the manual-only alternative.
