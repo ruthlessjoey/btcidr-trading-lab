@@ -4,6 +4,7 @@ This module imports only fetcher, providers, and research.crosscheck. It does no
 import live_check, validator, report, dataset, or any protected module.
 """
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -186,6 +187,93 @@ class ProviderSanitizationTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError) as ctx:
             legacy_coinbase.candles("1h", 1, 3600, FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]))
         self.assertNotIn(MARKER, str(ctx.exception))
+
+
+class CrosscheckEvidenceValidationTests(unittest.TestCase):
+    @staticmethod
+    def _comparison():
+        return {
+            "open_diff_pct": 0.0,
+            "close_diff_pct": 0.0,
+            "high_diff_pct": 0.0,
+            "low_diff_pct": 0.0,
+            "binance_return_pct": 0.0,
+            "other_return_pct": 0.0,
+            "return_gap_pp": 0.0,
+            "agrees": True,
+        }
+
+    def _payload(self, providers=None, verdict=None, bitstamp=True):
+        return {
+            "dataset_version": "synthetic-v1",
+            "dataset_sha256": "a" * 64,
+            "providers": ["coinbase", "bitstamp"] if providers is None else providers,
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": crosscheck.CONFIRMED_VERDICT if verdict is None else verdict,
+                "coinbase": self._comparison(),
+                **({"bitstamp": self._comparison()} if bitstamp else {}),
+            }],
+        }
+
+    def _validate(self, payload):
+        cfg = {"flagged_dates": ["2020-03-12"]}
+        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
+        with tempfile.TemporaryDirectory() as out:
+            path = os.path.join(out, "crosscheck.json")
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(payload, stream)
+            return crosscheck.validate_crosscheck_artifact(
+                cfg, manifest, path, frozenset({"coinbase", "bitstamp"})
+            )
+
+    def test_two_provider_artifact_with_complete_agreement_is_accepted(self):
+        result = self._validate(self._payload())
+        self.assertEqual(result["providers"], ["coinbase", "bitstamp"])
+
+    def test_single_provider_artifact_is_rejected(self):
+        with self.assertRaisesRegex(crosscheck.CrosscheckError, "both distinct"):
+            self._validate(self._payload(providers=["coinbase"]))
+
+    def test_missing_bitstamp_evidence_is_rejected(self):
+        with self.assertRaisesRegex(crosscheck.CrosscheckError, "both independent providers"):
+            self._validate(self._payload(bitstamp=False))
+
+    def test_confirmed_prefix_with_untrusted_suffix_is_rejected(self):
+        with self.assertRaisesRegex(crosscheck.CrosscheckError, "both independent providers"):
+            self._validate(self._payload(verdict="CONFIRMED_UNTRUSTED"))
+
+    def test_two_provider_authorization_is_required(self):
+        cfg = {"flagged_dates": ["2020-03-12"]}
+        manifest = {"version_id": "synthetic-v1", "csv_sha256": "a" * 64}
+        with tempfile.TemporaryDirectory() as out:
+            path = os.path.join(out, "crosscheck.json")
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(self._payload(), stream)
+            with self.assertRaisesRegex(crosscheck.CrosscheckError, "two independent"):
+                crosscheck.validate_crosscheck_artifact(
+                    cfg, manifest, path, frozenset({"coinbase"})
+                )
+
+    def test_comparison_is_unavailable_when_bitstamp_evidence_is_missing(self):
+        previous = fetcher.Candle(1_583_884_800, 100.0, 101.0, 99.0, 100.0, 1.0)
+        current = fetcher.Candle(1_583_971_200, 100.0, 101.0, 99.0, 100.0, 1.0)
+        independent = {previous.time: previous, current.time: current}
+        result = crosscheck.compare(
+            [previous, current], independent, {}, ["2020-03-12"]
+        )
+        self.assertEqual(result["flagged"][0]["verdict"], "UNAVAILABLE")
+
+    def test_comparison_confirms_only_when_both_independent_sources_agree(self):
+        previous = fetcher.Candle(1_583_884_800, 100.0, 101.0, 99.0, 100.0, 1.0)
+        current = fetcher.Candle(1_583_971_200, 100.0, 101.0, 99.0, 100.0, 1.0)
+        independent = {previous.time: previous, current.time: current}
+        result = crosscheck.compare(
+            [previous, current], independent, independent, ["2020-03-12"]
+        )
+        self.assertEqual(
+            result["flagged"][0]["verdict"], crosscheck.CONFIRMED_VERDICT
+        )
 
 
 class CrosscheckSanitizationTests(unittest.TestCase):

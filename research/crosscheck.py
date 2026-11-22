@@ -5,6 +5,7 @@ Only pure comparison/report helpers remain available; this module cannot fetch C
 or Bitstamp data or be enabled through mutable module state.
 """
 import json
+import math
 import os
 import statistics
 from datetime import datetime, timezone
@@ -13,6 +14,34 @@ from fetcher import ApiError
 
 DAY = 86400
 TOLERANCE_PCT = 3.0
+REQUIRED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
+CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
+
+
+def _valid_confirmed_comparison(value):
+    """Require a complete, finite, agreeing result from one independent venue."""
+    if type(value) is not dict or value.get("agrees") is not True:
+        return False
+    numeric_fields = (
+        "open_diff_pct", "close_diff_pct", "high_diff_pct", "low_diff_pct",
+        "binance_return_pct", "other_return_pct", "return_gap_pp",
+    )
+    numbers = {}
+    for field in numeric_fields:
+        number = value.get(field)
+        if type(number) not in (int, float):
+            return False
+        try:
+            if not math.isfinite(number):
+                return False
+        except (OverflowError, TypeError, ValueError):
+            return False
+        numbers[field] = number
+    return (
+        abs(numbers["open_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["return_gap_pp"]) <= TOLERANCE_PCT
+    )
 
 # No independent cross-check provider is authorized under the current policy.
 # Keep the gate explicit and immutable; approval requires a reviewed source change.
@@ -28,9 +57,13 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
     flagged = cfg.get("flagged_dates", [])
     if not flagged:
         return None
-    if not authorized_providers:
+    try:
+        allowed = frozenset(authorized_providers)
+    except (TypeError, ValueError):
+        allowed = frozenset()
+    if not REQUIRED_CROSSCHECK_PROVIDERS.issubset(allowed):
         raise CrosscheckError(
-            "no independent cross-check provider is currently authorized; flagged-date backtests are blocked"
+            "two independent cross-check providers are required; flagged-date backtests are blocked"
         )
     if not crosscheck_path or not os.path.isfile(crosscheck_path):
         raise CrosscheckError(
@@ -51,12 +84,13 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
             "cross-check evidence does not match the pinned dataset version and hash"
         )
     used = evidence.get("providers")
-    if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) for p in used) or
+    if (type(used) is not list or len(used) < 2 or
+            any(type(p) is not str for p in used) or
             len(used) != len(set(used)) or
-            any(p not in authorized_providers for p in used)):
+            not REQUIRED_CROSSCHECK_PROVIDERS.issubset(used) or
+            any(p not in allowed for p in used)):
         raise CrosscheckError(
-            "cross-check artifact does not identify exclusively authorized independent providers"
+            "cross-check artifact must identify both distinct authorized independent providers"
         )
     flagged_entries = evidence.get("flagged")
     if not isinstance(flagged_entries, list):
@@ -70,10 +104,12 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         entries[item["date"]] = item
     for date in flagged:
         item = entries.get(date)
-        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
-            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+        if (not item or type(item.get("verdict")) is not str or
+                item["verdict"] != CONFIRMED_VERDICT or
+                not _valid_confirmed_comparison(item.get("coinbase")) or
+                not _valid_confirmed_comparison(item.get("bitstamp"))):
             raise CrosscheckError(
-                f"flagged date {date} lacks confirmed independent evidence ({verdict})"
+                f"flagged date {date} lacks complete, agreeing evidence from both independent providers"
             )
     return evidence
 
@@ -155,10 +191,10 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
                     entry["table"].append({"date": day(tt), "source": name, "open": c.open, "high": c.high,
                                            "low": c.low, "close": c.close})
         cb, bs = entry["coinbase"], entry["bitstamp"]
-        if cb is None:
+        if cb is None or bs is None:
             entry["verdict"] = "UNAVAILABLE"
-        elif cb["agrees"] and (bs is None or bs["agrees"]):
-            entry["verdict"] = "CONFIRMED (approximate: USD is not USDT)"
+        elif cb["agrees"] is True and bs["agrees"] is True:
+            entry["verdict"] = CONFIRMED_VERDICT
         else:
             entry["verdict"] = "NOT CONFIRMED"
         res["flagged"].append(entry)
