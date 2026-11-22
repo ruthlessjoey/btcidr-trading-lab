@@ -173,7 +173,7 @@ class PipelineContainmentTests(unittest.TestCase):
             self.assertNotIn("/research/pipeline.py", sparse)
             self.assertIn("/research/backtest_report.py", sparse)
 
-    def test_static_source_helper_rejects_unapproved_paths_before_git_access(self):
+    def test_static_source_helper_rejects_unapproved_paths(self):
         with self.assertRaises(ValueError):
             git_source_text("validator.py")
 
@@ -183,6 +183,34 @@ class PipelineContainmentTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not approved"):
                 git_source_text("validator.py")
         run.assert_not_called()
+
+    def test_static_source_allowlist_is_exact_and_never_executes_source(self):
+        expected = frozenset({
+            "research/pipeline.py",
+            "run.py",
+            ".github/workflows/research-data.yml",
+            ".github/workflows/research-backtest.yml",
+            ".github/workflows/q08-offline-tests.yml",
+        })
+        self.assertEqual(_STATIC_ONLY_SOURCES, expected)
+
+        forbidden_roots = {"P1", "signal", "markets", "validator.py", "report.py"}
+        for path in _STATIC_ONLY_SOURCES:
+            self.assertNotIn(path.split("/", 1)[0], forbidden_roots, path)
+
+        # This helper may read exact allowlisted blobs as text for ast.parse; it
+        # must never evaluate, import, compile, or execute the returned source.
+        helper = next(
+            node for node in ast.parse(open(__file__, encoding="utf-8").read()).body
+            if isinstance(node, ast.FunctionDef) and node.name == "git_source_text"
+        )
+        forbidden_calls = {"exec", "eval", "compile", "__import__", "import_module", "run_module"}
+        for node in ast.walk(helper):
+            if isinstance(node, ast.Call):
+                name = node.func.id if isinstance(node.func, ast.Name) else (
+                    node.func.attr if isinstance(node.func, ast.Attribute) else ""
+                )
+                self.assertNotIn(name, forbidden_calls, name)
 
     def test_static_source_helper_rejects_head_mismatch_before_git_show(self):
         expected = "0" * 40

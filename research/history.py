@@ -40,6 +40,7 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
             "pair_label": f"{base_asset}/{quote_asset}" if base_asset and quote_asset else None,
             "timeframe": cfg.get("timeframe"), "market_type": "spot",
         },
+        "market_identity_evidence": "none",
         "checks": [{"name": "market_identity", "status": "FAIL", "detail": reason}],
         "pages": [],
         "gate": "FAIL",
@@ -62,6 +63,7 @@ def run_step1(cfg, out_dir="out", opener=None, sleep=None, local_now=None, previ
         "**GATE: FAIL**\n\n"
         f"{reason}\n\n"
         "- Network requests: 0\n"
+        "- Market-identity evidence: none\n"
         "- Dataset written: no\n"
         "- Backtest allowed: no\n"
     )

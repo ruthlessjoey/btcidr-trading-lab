@@ -132,6 +132,11 @@ class HistoryContainmentTests(unittest.TestCase):
                 report = json.load(f)
             self.assertEqual(report["gate"], "FAIL")
             self.assertEqual(report["network_requests"], 0)
+            self.assertEqual(report["market_identity_evidence"], "none")
+            with open(os.path.join(out, "dataset_report.md"), encoding="utf-8") as f:
+                markdown_report = f.read()
+            self.assertIn("- Market-identity evidence: none", markdown_report)
+
             self.assertIsNone(report["dataset"])
             self.assertFalse(report["backtest_allowed"])
             self.assertIn("Market identity is unverified", report["stop_reason"])
