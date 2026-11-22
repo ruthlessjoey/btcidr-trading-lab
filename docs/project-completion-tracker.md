@@ -1313,3 +1313,10 @@ Twin money maker.
 - No protected files or import closures were executed for this follow-up. All PRs above remain candidates; exact-main integration and independent acceptance are still outstanding.
 
 Twin money maker.
+
+
+### PR #66 exact-head CodeQL follow-up — 2026-11-23
+
+- CodeQL run [#45043120812](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45043120812) completed successfully on PR #66's current head `ddd396494fc3bbc4529e7586fbe60a151772c8ca`. Both the Python and Actions analysis jobs succeeded. This supersedes the preceding note that only the older CodeQL run was available; it remains static-analysis evidence, separate from the **3/3** isolated provider-factory unit-test result in run #45043119748.
+
+Twin money maker.
