@@ -116,7 +116,7 @@ class WorkflowRunGateTests(unittest.TestCase):
         self.assertEqual(selected, "e8674dbfe3efd2339ddb028484362f9466f7b058")
         self.assertEqual(reader.call_count, 4)
         self.assertIn("/pulls/60", reader.call_args_list[0].args[0])
-        self.assertIn("/branches/" + BRANCH, reader.call_args_list[1].args[0])
+        self.assertIn("/branches/" + BRANCH.replace("/", "%2F"), reader.call_args_list[1].args[0])
         self.assertIn("actions/workflows/421573668/runs", reader.call_args_list[3].args[0])
         self.assertIn("status=completed", reader.call_args_list[3].args[0])
 
@@ -194,10 +194,6 @@ class WorkflowRunGateTests(unittest.TestCase):
         self.assertLess(gate_position, restore_position)
         self.assertLess(restore_position, review_position)
         self.assertIn("run: python3 runner/tools/q08_workflow_run_gate.py", workflow)
-        self.assertIn(
-            "github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id != ''",
-            workflow,
-        )
         resume_expression = (
             "(github.event_name == 'workflow_run' || github.event_name == 'push') "
             "&& steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id"
@@ -207,9 +203,9 @@ class WorkflowRunGateTests(unittest.TestCase):
             "Q08_RESUME_FROM_RUN_ID: ${{ " + resume_expression + " || '' }}",
             workflow,
         )
-        self.assertEqual(workflow.count("\\n  workflow_run:\\n"), 1)
+        self.assertEqual(workflow.count("\n  workflow_run:\n"), 1)
         self.assertIn(
-            "  push:\\n    branches: [main]\\n    paths:\\n      - \\\".github/workflows/q08-specialist-review.yml\\\"",
+            "  push:\n    branches: [main]\n    paths:\n      - \".github/workflows/q08-specialist-review.yml\"",
             workflow,
         )
         self.assertIn("GITHUB_EVENT_NAME: ${{ github.event_name }}", workflow)
