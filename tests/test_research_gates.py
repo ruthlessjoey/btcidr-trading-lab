@@ -23,6 +23,7 @@ from research.crosscheck import (
 )
 from research.backtest_report import (
     build_markdown as build_backtest_markdown, market_source_label,
+    _crosscheck_markdown_lines,
 )
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "a" * 64}
@@ -525,6 +526,47 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
             source = f.read()
         self.assertIn("vs {market_label}", source)
         self.assertNotIn("vs Binance", source)
+
+    class HostileReportNumber:
+        def __format__(self, spec):
+            raise AssertionError("untrusted cross-check number formatter executed")
+
+        def __float__(self):
+            raise AssertionError("untrusted cross-check number conversion executed")
+
+    def test_crosscheck_report_sanitizes_all_untrusted_text_and_numeric_fields(self):
+        evil = self.HostileReportNumber()
+        lines = _crosscheck_markdown_lines({
+            "rule": "approved rule\\n# injected rule",
+            "flagged": [{
+                "date": "2020-03-12\\n# injected date",
+                "verdict": "CONFIRMED\\n# injected verdict",
+                "coinbase": {
+                    "other_return_pct": evil,
+                    "binance_return_pct": 1.25,
+                    "close_diff_pct": 0.5,
+                    "low_diff_pct": float("inf"),
+                },
+                "bitstamp": None,
+            }],
+            "summary": {
+                "median_abs_close_diff_pct": 1.25,
+                "p99_abs_close_diff_pct": evil,
+                "max_abs_close_diff_pct": float("nan"),
+            },
+            "coinbase_error": "provider refused\\n# injected error",
+        }, "tokocrypto BTC/USDT 1d spot")
+        rendered = "\\n".join(lines)
+        self.assertIn("approved rule injected rule", rendered)
+        self.assertIn("2020-03-12 injected date", rendered)
+        self.assertIn("CONFIRMED injected verdict", rendered)
+        self.assertIn("day return unavailable%", rendered)
+        self.assertIn("close diff +0.50%", rendered)
+        self.assertIn("low diff unavailable%", rendered)
+        self.assertIn("99th percentile unavailable%", rendered)
+        self.assertIn("max unavailable%", rendered)
+        self.assertIn("provider refused injected error", rendered)
+        self.assertNotIn("# injected", rendered)
 
     def test_report_sanitizes_stopped_run_and_manifest_metadata(self):
         report = build_backtest_markdown({
