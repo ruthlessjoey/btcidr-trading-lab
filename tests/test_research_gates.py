@@ -18,8 +18,8 @@ sys.path.insert(0, ROOT)
 import research.crosscheck as crosscheck
 from research.crosscheck import (
     CrosscheckError, CROSSCHECK_ARTIFACT_PRODUCER, CROSSCHECK_ARTIFACT_SCHEMA,
-    CONFIRMED_VERDICT, compare, is_confirmed_verdict, load_required_crosscheck,
-    to_ts, validate_crosscheck_artifact,
+    CONFIRMED_VERDICT, build_markdown, compare, is_confirmed_verdict,
+    load_required_crosscheck, to_ts, validate_crosscheck_artifact,
 )
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "a" * 64}
@@ -355,6 +355,81 @@ class CrosscheckGateTests(unittest.TestCase):
         self.assertIsNone(load_required_crosscheck(
             {"flagged_dates": []}, MANIFEST, None
         ))
+
+
+class CrosscheckMarkdownSanitizationTests(unittest.TestCase):
+    class HostileNumber:
+        def __format__(self, spec):
+            raise AssertionError("caller-controlled __format__ executed")
+
+        def __str__(self):
+            raise AssertionError("caller-controlled __str__ executed")
+
+    def test_report_builder_never_formats_custom_objects_as_numbers(self):
+        evil = self.HostileNumber()
+        report = {
+            "dataset_version": "v-test",
+            "dataset_sha256": "a" * 64,
+            "rule": "approved rule\n# injected heading",
+            "coinbase_error": None,
+            "bitstamp_error": None,
+            "common_days": evil,
+            "summary": {
+                "median_abs_close_diff_pct": evil,
+                "p95_abs_close_diff_pct": evil,
+                "p99_abs_close_diff_pct": evil,
+                "max_abs_close_diff_pct": evil,
+                "days_over_1pct": evil,
+                "days_over_2pct": 0,
+                "days_over_5pct": 0,
+            },
+            "worst_days": [{"date": "2020-03-12", "abs_close_diff_pct": evil}],
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": "UNAVAILABLE\n# injected verdict",
+                "table": [{
+                    "date": "2020-03-12", "source": evil,
+                    "open": evil, "high": evil, "low": evil, "close": evil,
+                }],
+                "coinbase": {
+                    "open_diff_pct": evil, "close_diff_pct": evil,
+                    "high_diff_pct": evil, "low_diff_pct": evil,
+                    "binance_return_pct": evil, "other_return_pct": evil,
+                    "return_gap_pp": evil, "agrees": evil,
+                },
+                "bitstamp": None,
+            }],
+        }
+        rendered = build_markdown(report)
+        self.assertIn("unavailable", rendered)
+        self.assertIn("approved rule # injected heading", rendered)
+        self.assertNotIn("\n# injected heading", rendered)
+        self.assertNotIn("\n# injected verdict", rendered)
+
+    def test_report_builder_formats_finite_builtin_numbers_and_rejects_non_finite_values(self):
+        report = {
+            "dataset_version": "v-test",
+            "dataset_sha256": "a" * 64,
+            "rule": "test",
+            "coinbase_error": None,
+            "bitstamp_error": None,
+            "common_days": 2,
+            "summary": {
+                "median_abs_close_diff_pct": 1.25,
+                "p95_abs_close_diff_pct": 2.5,
+                "p99_abs_close_diff_pct": float("inf"),
+                "max_abs_close_diff_pct": 3,
+                "days_over_1pct": True,
+                "days_over_2pct": 1,
+                "days_over_5pct": 0,
+            },
+            "worst_days": [{"date": "2020-03-12", "abs_close_diff_pct": 1.25}],
+            "flagged": [],
+        }
+        rendered = build_markdown(report)
+        self.assertIn("| Median | 1.250% |", rendered)
+        self.assertIn("| 99th percentile | unavailable% |", rendered)
+        self.assertIn("| Days over 1% / 2% / 5% | unavailable / 1 / 0 |", rendered)
 
 
 class CrosscheckPipelineBoundaryTests(unittest.TestCase):
