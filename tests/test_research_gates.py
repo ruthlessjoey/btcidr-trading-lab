@@ -537,10 +537,10 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
     def test_crosscheck_report_sanitizes_all_untrusted_text_and_numeric_fields(self):
         evil = self.HostileReportNumber()
         lines = _crosscheck_markdown_lines({
-            "rule": "approved rule\\n# injected rule",
+            "rule": "approved rule\n# injected rule",
             "flagged": [{
-                "date": "2020-03-12\\n# injected date",
-                "verdict": "CONFIRMED\\n# injected verdict",
+                "date": "2020-03-12\n# injected date",
+                "verdict": "CONFIRMED\n# injected verdict",
                 "coinbase": {
                     "other_return_pct": evil,
                     "binance_return_pct": 1.25,
@@ -554,9 +554,9 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
                 "p99_abs_close_diff_pct": evil,
                 "max_abs_close_diff_pct": float("nan"),
             },
-            "coinbase_error": "provider refused\\n# injected error",
+            "coinbase_error": "provider refused\n# injected error",
         }, "tokocrypto BTC/USDT 1d spot")
-        rendered = "\\n".join(lines)
+        rendered = "\n".join(lines)
         self.assertIn("approved rule injected rule", rendered)
         self.assertIn("2020-03-12 injected date", rendered)
         self.assertIn("CONFIRMED injected verdict", rendered)
