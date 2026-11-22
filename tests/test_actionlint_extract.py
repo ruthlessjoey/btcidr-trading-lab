@@ -105,5 +105,36 @@ class ActionlintExtractTests(unittest.TestCase):
             extract_actionlint(self.archive, self.binary)
 
 
+    def test_rejects_fifo_archive_without_blocking(self):
+        fifo = self.root / "release.pipe"
+        os.mkfifo(fifo)
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            extract_actionlint(fifo, self.binary)
+        self.assertFalse(self.binary.exists())
+
+    def test_rejects_symlinked_parent_of_archive(self):
+        real_dir = self.root / "real-archive-dir"
+        real_dir.mkdir()
+        self.make_archive([("actionlint", "file", b"x")])
+        nested = real_dir / "release.tar.gz"
+        self.archive.rename(nested)
+        alias = self.root / "archive-dir-alias"
+        alias.symlink_to(real_dir, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "symlinked path component"):
+            extract_actionlint(alias / nested.name, self.binary)
+        self.assertFalse(self.binary.exists())
+
+    def test_rejects_symlinked_parent_of_binary_destination(self):
+        self.make_archive([("actionlint", "file", b"x")])
+        real_dir = self.root / "real-binary-dir"
+        real_dir.mkdir()
+        alias = self.root / "binary-dir-alias"
+        alias.symlink_to(real_dir, target_is_directory=True)
+        destination = alias / "actionlint"
+        with self.assertRaisesRegex(ValueError, "symlinked path component"):
+            extract_actionlint(self.archive, destination)
+        self.assertFalse((real_dir / "actionlint").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
