@@ -1362,3 +1362,18 @@ Twin money maker.
 - PR #92 exact-head offline run [#45042396379](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45042396379) passed **98/98** selected tests on Python 3.11.18, including the two-provider, exact-verdict, dataset-binding, and adversarial JSON checks. PR #92 remains draft/unreviewed and diverged from PR #60 ancestry; fix and tests are candidate-only, not integrated or independently accepted.
 
 Twin money maker.
+
+
+---
+
+### M5 strict-result hardening and workflow-dispatch attempt — 2026-11-23
+
+- Concurrent M5 hardening commit `0bdfa1ca48e010fd4326ffc084cf1b75af54b078` extends the reason-code boundary fix. `required_history()` must return a positive plain integer. Strategy outputs must contain a list of string reason codes declared by the strategy, a list of string reasons, and an indicator dictionary with non-empty string names and finite numeric-or-null values. Invalid payloads fail closed with `StrategyError`.
+- Follow-up regression commit advanced the M5 branch to `647349ff5b2486921a9c9be3fa5a51b540faa9b4`. Exact-head run [#45053884315](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45053884315) passed **15/15** isolated tests. The suite includes pure contract/config, decision serialization, required-history validation, strategy output schema, fail-closed data gating, and two import-boundary tests. Python 3.11; ResourceWarnings are configured as errors. No protected S1 adapter, registry, provider, network, risk, validator, or report module was checked out/imported/executed.
+- Draft PR [#98](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/98) now points at `647349ff5b2486921a9c9be3fa5a51b540faa9b4`, stacked directly on PR #60 head `a68b759b75adde426402eb39ef9c360f60e5bc27` (6 commits ahead / 0 behind; exactly three changed paths). Its description records the latest implementation and evidence. PR #98 has no independent review and remains open/draft/unmerged.
+- Tracker PR #65 exact head `d75dacf16f34b73d04b99bcdf8f68f88057e20e3` passed CodeQL run [#45053413311](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45053413311); both Python and Actions analysis jobs succeeded.
+- Q0.8 dispatch automation was attempted using the existing saved GitHub browser session and exact current PR #60 branch/head. The browser automation service refused to start the run because its usage wallet balance was $0.00 (minimum top-up $10); no browser run was started, no workflow was dispatched, and no payment or purchase was made. Do not retry this browser automation unless the user funds the service. The GitHub connector itself has no workflow-dispatch action; it exposes only reads and rerun operations for existing workflow jobs. The existing Q0.8 workflow remains manual-dispatch-only.
+- No Q0.8 review acceptance is claimed for current PR #60 head `a68b759b75adde426402eb39ef9c360f60e5bc27`. Its exact-head offline suite remains 103/103 (run #45052517363); immutable reviewer synthetic preflight passed (run #45052478122). Full 19-stage review, Commander, independent acceptance and final verification remain pending.
+- No new provider access or test of protected imports was performed. Profitability remains **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**; whole-project completion **UNRATED**.
+
+Twin money maker.
