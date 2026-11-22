@@ -221,6 +221,14 @@ class WorkflowRunGateTests(unittest.TestCase):
             select_resume_run("a" * 40, "x" * 32, "900", reader)
         reader.assert_called_once()
 
+    def test_incomplete_run_list_page_fails_closed(self):
+        reader = Mock(side_effect=[
+            {"id": 999},
+            {"total_count": 101, "workflow_runs": [{"id": 1000}]},
+        ])
+        with self.assertRaisesRegex(GateError, "page is incomplete"):
+            select_resume_run("a68b759b75adde426402eb39ef9c360f60e5bc27", "x" * 32, "900", reader)
+
     def test_malformed_artifact_response_fails_closed(self):
         same_head = "a68b759b75adde426402eb39ef9c360f60e5bc27"
         prior = {
