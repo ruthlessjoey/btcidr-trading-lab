@@ -57,7 +57,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
-          Q08_RESUME_FROM_RUN_ID: "44970126651"
+          Q08_RESUME_FROM_RUN_ID: "44972690441"
           Q08_REVIEW_BRANCH: security/q0-provider-sanitization-2026-11-18
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
