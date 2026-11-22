@@ -1,4 +1,4 @@
-name: Q0.8 one-line-context immutable reviewer preflight
+name: Q0.8 zero-context immutable reviewer preflight
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: e76faed3520ea3dce0b06dfb5bc64ca5ad3554aa
+          ref: 812d9fd934c7fe1bc6308e38a32490a020c08b22
           path: runner
           persist-credentials: false
           fetch-depth: 1
@@ -43,5 +43,5 @@ jobs:
       - name: Compile immutable reviewer
         run: python3 -m py_compile runner/tools/q08_specialist_review.py
 
-      - name: Run synthetic policy, checkpoint and one-line-diff regression
+      - name: Run synthetic policy, checkpoint and zero-context-diff regression
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
