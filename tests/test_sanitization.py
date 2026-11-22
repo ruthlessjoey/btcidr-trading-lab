@@ -170,8 +170,8 @@ class ProviderSanitizationTests(unittest.TestCase):
             def get(self, url):
                 return self.response
 
-        # Bypass the deliberately blocked public constructor only to retain
-        # offline regression coverage for legacy parser error sanitization.
+        # TEST-ONLY BYPASS: parser-error fixtures use uninitialized objects.
+        # Normal constructor refusal is asserted by test_legacy_venue_adapters_cannot_be_constructed.
         legacy_coinbase = object.__new__(providers.Coinbase)
         legacy_kraken = object.__new__(providers.Kraken)
 
