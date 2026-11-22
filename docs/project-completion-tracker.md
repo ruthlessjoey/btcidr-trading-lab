@@ -2429,3 +2429,11 @@ This addendum supersedes every earlier PR #60, PR #82, and Q0.8 head/run snapsho
 - The helper also accepts caller-supplied `max_expanded_bytes` values above `MAX_EXPANDED_BYTES`; the value is passed to `LimitedReader` without the upper-bound validation used for the binary-size and member-count overrides. Enforce an exact positive integer no greater than 64 MiB and add over-limit / boolean regression cases.
 - Findings were recorded as a top-level PR #95 comment (comment ID `7074421118`). GitHub rejected a formal REQUEST_CHANGES review because the connected identity is the PR author; the findings therefore remain a comment, not a review verdict.
 - No source commit, workflow dispatch, or further scan was made. The isolated 9/9 test result remains valid for its declared scope; actual Actionlint/zizmor execution remains **UNVERIFIED**. Because existing dynamic CodeQL runs on PR #95 performed full-tree checkout, do not push a fix or deliberately trigger another scan until owner/admin reviews that repository-level scope.
+
+
+## Follow-up K5 document review — PR #94 — 2026-11-22
+
+- Re-fetched PR #94 at head `c2dd479bd176e372c732bc5d25a77abf76d6b915`, based on selected `main` `731fc9fbb892dadccc64bf52da2f91ff069da124`. Its only changed path is `docs/operations/incident-recovery-runbook.md` (143 lines).
+- Static consistency review found that the draft correctly distinguishes the selected mainline and historical M6 baselines; preserves spot/long-only, provider, protected-path, read-only CI, no-merge and PAPER/LIVE boundaries; specifies evidence provenance and checkpoint identity; limits quota recovery to the approved retry ceiling; and requires exact-head tests, independent review, incident closure evidence and tracker updates.
+- No substantive contradiction with the current operating boundary was found in this static pass. This is not an operational exercise, incident simulation, external independent acceptance, or proof that each recovery procedure works in GitHub.
+- PR #94 remains draft/open/unmerged. K5 remains **0.00 / UNVERIFIED** until operational exercise and independent acceptance. No test, workflow dispatch, protected-path access, code write or trading/data operation occurred during this review.
