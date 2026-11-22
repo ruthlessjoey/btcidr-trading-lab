@@ -2938,3 +2938,15 @@ This addendum records the latest read-only verification performed during the eme
 - Approved inventory remains 40 requirements / 100 points; historical candidate-weighted maturity 15.00/100; 0/40 meet exact-main threshold; overall project completion UNRATED. No new score credit is awarded.
 - Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED. Historical proxy evidence remains negative and is not validated Tokocrypto spot/cost-sensitive out-of-sample performance.
 - No market-data requests, account actions, real trades, dataset publication, backtest, TEST evaluation, PAPER/LIVE execution, PR merge, protected-path access or security-control weakening occurred in this continuation.
+## Emergency continuation — PR #60 cross-check artifact hardening and latest exact-head status — 2026-11-22 18:10+08
+
+### Current PR #60 head and offline verification
+- PR #60 is at 3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127 on security/q0-provider-sanitization-2026-11-18; draft/open/unmerged, M6-based. Main remains 731fc9fbb892dadccc64bf52da2f91ff069da124.
+- Commit 3d7a651 changes research/crosscheck.py and tests/test_research_gates.py. It hardens evidence ingestion with duplicate-key rejection at all JSON object depths, rejection of NaN/Infinity, an exact 1 MiB bound, no-follow/nonblocking open where supported, regular-file checks, path/open identity checks, and bounded UTF-8 parsing. No additional provider is authorized; AUTHORIZED_CROSSCHECK_PROVIDERS remains empty.
+- Exact-head offline run #45010806695 passed 103/103 on Python 3.11.18: 33 fetcher + 4 provider-boundary + 7 history/import-boundary + 2 disabled-probe + 15 static-pipeline + 18 research-gate + 24 sanitization/cross-check tests. All seven suites completed successfully.
+- Full PR #60 comparison: 137 ahead / 0 behind M6; 148 ahead / 92 behind current main, merge base 733abeb931eddcb442220f9b73b092833282e671. No direct merge to main.
+
+### Q0.8 — new review must be manually dispatched at current SHA
+- Current branch workflow blob: cb8bff2fdbdd7a2c7130a79364c8fb57efd44e57. It is workflow_dispatch only, has no push trigger, and pins immutable reviewer fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1. This ensures topic-branch pushes do not automatically release the model-review secret.
+- The last checkpoint is bound to stale SHA 7a20e86... and is invalid for 3d7a651... . No current-head review has run since the last source changes. Do not reuse any checkpoint artifact from 7a20e86 or earlier.
+- Fresh manual inputs: select workflow Q0.8 immutable 19-role specialist review; branch security/q0-provider-sanitization-2026-11-18; review_head_sha=3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127; leave resume_from_run_id blank; mode=review. Re-fetch the branch SHA immediately before dispatch. The connected GitHub tools do not expose workflow_dispatch; do not pay/top up browser automation to bypass this.
