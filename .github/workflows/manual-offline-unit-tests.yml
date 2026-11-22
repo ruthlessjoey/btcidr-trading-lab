@@ -1,6 +1,13 @@
 name: Manual Offline Holdout Publisher Tests (protected-path-safe)
 
 on:
+  push:
+    branches:
+      - security/implement-durable-holdout-reservations
+    paths:
+      - "research/holdout_publish.py"
+      - "tests/test_holdout_publish.py"
+      - ".github/workflows/manual-offline-unit-tests.yml"
   workflow_dispatch:
 
 permissions:
