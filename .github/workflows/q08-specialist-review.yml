@@ -1,5 +1,7 @@
 name: Q0.8 immutable 19-role specialist review
 
+run-name: Q0.8 specialist review ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.review_head_sha }}
+
 on:
   # Manual dispatch remains available for owner-directed recovery.
   workflow_dispatch:
@@ -34,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: q08-specialist-review
+  group: q08-specialist-review-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.review_head_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -101,10 +103,12 @@ jobs:
         run: python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Validate trusted offline-test workflow completion before using its commit
+        id: validate-gate
         if: ${{ github.event_name == 'workflow_run' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: python3 runner/tools/q08_workflow_run_gate.py
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
@@ -116,7 +120,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
-          Q08_RESUME_FROM_RUN_ID: ${{ inputs.resume_from_run_id || '' }}
+          Q08_RESUME_FROM_RUN_ID: ${{ github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id || '' }}
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
       - name: Persist resumable review checkpoint
