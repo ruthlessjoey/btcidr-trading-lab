@@ -1549,3 +1549,13 @@ This section supersedes older PR #97 / Q0.8 automatic-dispatch details above whe
 Whole-project completion remains **UNRATED** because the proposed 40-item/100-weight scope is not owner-approved. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**. No protected files were accessed or executed, no provider authorization was expanded, no exchange request, real-money action or merge occurred.
 
 Twin money maker.
+
+
+### PR #97 review-readiness status — 23 November 2026
+
+- PR #97 is now **open and ready for independent review**, not draft; it remains unmerged. This allows an independent reviewer to submit a normal review. No reviewer approval has been recorded yet.
+- After the ready-for-review transition, exact-head PR checks [#45059736940](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059736940) passed **27/27** gate tests, verified the pinned Actionlint archive checksum, and linted both trusted Q0.8 workflow files.
+- Exact-head CodeQL run [#45059458124](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45059458124) passed both Python and Actions analyses on PR #97 head `7c14e1bf5a780598f998638d709e8ee9fe1986a5`.
+- Protected `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no merge or trusted-main activation occurred. The one-time push bootstrap and future workflow_run automation will become active only after PR #97 receives independent review and is integrated into `main`. No manual workflow dispatch is needed after that integration.
+
+Twin money maker.
