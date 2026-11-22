@@ -1862,3 +1862,32 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - Candidate evidence above remains on unmerged, stacked PRs. It does not satisfy the approved exact-main 0.50 threshold. The first-pass measurement remains **15.00/100 candidate-weighted maturity**, **0/40** exact-main threshold, and overall project completion **UNRATED**.
 - Profitability remains **NOT PROVEN** (historical proxy result approximately −11% return / 0.36 profit factor); PAPER remains **NOT READY**; LIVE remains **DISABLED**.
 - No protected path was accessed or executed; no provider or exchange API request, dataset publication, full backtest, PAPER/LIVE operation, order, payment, funding, withdrawal, or account action occurred.
+
+
+
+## Current-head automated verification — fresh Q0.8 review started — 2026-11-22
+
+- Current PR #60 head is d4edb4bc634e794b1957399471532ad7671576ba on the historical M6 base. Exact-head push workflow run #44972690427 checked out this SHA and passed 65/65 selected Python 3.11.18 tests (21 fetcher, 4 provider boundary, 7 history, 2 disabled probe, 7 static pipeline, 10 research gates, 14 sanitization). All seven suites emitted OK.
+- Fresh automatic specialist review #44972690441 started against the same exact SHA. It uses the immutable self-contained runner 731fc9fbb892dadccc64bf52da2f91ff069da124; syntax and synthetic policy preflight passed. No checkpoint from the stale f6c520f... review was restored; this is a new run. At the last check, the model-based 19-role step was in progress and no role-completion artifact had yet been uploaded.
+- The earlier 3/16 checkpoint runs are historical and do not satisfy review acceptance for the current d4edb4b... head. Do not declare Q0.8 accepted until all 16 specialist reports, Commander, independent acceptance and final verification complete.
+
+
+
+## Latest parent-synchronized exact-head verification — 2026-11-22
+
+- PR #92 current head: e808c3dc45e6813b8b4ffcebd5c196de8217be6d; base remains PR #60. Current compare against PR #60 is **49 ahead / 0 behind**, with an effective eight-file differential. The PR remains draft/open/unmerged; GitHub reports clean mergeability metadata, but no independent acceptance or merge is implied.
+- Parent sync used two normal two-parent commits: 4c105efa20f171fb27252e66b1d9225fe7509a51 inherited PR #60 workflow commit 6e6d8b...; 36e43300bc55db496dc4c9de38e4ef48c3f4bdb4 inherited PR #60 reviewer workflow path-filter commit d4edb4b.... No force push, reset or PR merge occurred. A final workflow-comment commit e808c3d... triggered exact-head verification.
+- Exact-head push run [#44972824721](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972824721) checked out e808c3d... and passed **90/90** selected Python 3.11.18 tests across seven suites: 21 fetcher, 4 provider boundary, 7 history/import boundary, 2 disabled probe, 7 static pipeline, 33 research gates, 16 sanitization. Every suite emitted OK.
+- Latest changes include strict evidence-schema/date validation, two-provider metric consistency, fail-closed acquisition refusal before any injected transport, manifest-derived backtest market labels, removal of hard-coded Binance comparison wording, and markdown/newline sanitization in report provenance/errors.
+- The workflow suite remains selected offline coverage only. It does not exercise protected risk/accounting/reporting modules, production provider access, full engine integration, dataset publishing, end-to-end backtesting, or PAPER operations. PR #92 remains candidate-only.
+
+## Current evidence status after final synchronization — 2026-11-22
+
+- main is unchanged at 731fc9fbb892dadccc64bf52da2f91ff069da124. No PR is merged.
+- PR #60 is current at d4edb4bc634e794b1957399471532ad7671576ba; exact-head offline CI #44972690427 passed 65/65. Fresh full reviewer #44972690441 is running on that same SHA; it is not accepted yet.
+- PR #92 is current at e808c3dc45e6813b8b4ffcebd5c196de8217be6d; exact-head offline CI #44972824721 passed 90/90; compare to current PR #60 is 49 ahead / 0 behind. It remains a draft child candidate.
+- PR #82 remains current at 290436766951ee586c298a854528a8b7d4c5a14c; exact-head offline CI #44972046522 passed 59/59. Its source-level COMMENTED review is attached to predecessor 883bc7c...; the one-commit difference is workflow-only, so independent approval remains absent.
+- PR #79 is a draft tracker update at its current branch tip; latest tracker reconciliation includes the Q0.8 3/16 quota checkpoint, PR #92 90/90 exact-head result, and PR #82 59/59 exact-head result.
+- 40 requirements / 100 weighted points; 24 candidate rows / 60 weight points at 0.25 = 15.00/100 candidate-weighted maturity; 16 rows at 0.00; 0/40 meet the exact-main 0.50 threshold. Overall completion remains UNRATED.
+- Profitability NOT PROVEN; historical proxy evidence approx -11% return and 0.36 profit factor. Realistic fees/slippage and verified instrument identity remain missing. PAPER NOT READY. LIVE DISABLED.
+- No protected files/path, market provider, dataset publisher, backtest engine, PAPER/live process, private account or financial action was accessed/executed.
