@@ -130,12 +130,12 @@ class StrategyImportBoundaryTests(unittest.TestCase):
 
     def test_normal_package_import_does_not_load_protected_s1_or_signal(self):
         script = (
-            "import sys\\n"
-            "from markets.strategies.engine import evaluate_report\\n"
-            "assert callable(evaluate_report)\\n"
-            "assert 'markets.strategies.registry' in sys.modules\\n"
-            "assert 'markets.strategies.btc_s1' not in sys.modules\\n"
-            "assert 'signal.btc_signal' not in sys.modules\\n"
+            "import sys\n"
+            "from markets.strategies.engine import evaluate_report\n"
+            "assert callable(evaluate_report)\n"
+            "assert 'markets.strategies.registry' in sys.modules\n"
+            "assert 'markets.strategies.btc_s1' not in sys.modules\n"
+            "assert 'signal.btc_signal' not in sys.modules\n"
         )
         env = os.environ.copy()
         env["PYTHONPATH"] = ROOT
