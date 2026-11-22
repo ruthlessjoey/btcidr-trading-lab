@@ -528,12 +528,12 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
 
     def test_report_sanitizes_stopped_run_and_manifest_metadata(self):
         report = build_backtest_markdown({
-            "run_id": "run-42\\n# injected run heading",
+            "run_id": "run-42\n# injected run heading",
             "status": "STOPPED",
-            "error": "market identity gate failed\\n# injected error heading",
+            "error": "market identity gate failed\n# injected error heading",
             "dataset": {
                 "market": {
-                    "provider": "tokocrypto\\n# injected provider",
+                    "provider": "tokocrypto\n# injected provider",
                     "pair_label": "BTC/USDT",
                     "timeframe": "1d",
                     "market_type": "spot",
@@ -543,7 +543,7 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
         self.assertIn("Run run-42 injected run heading", report)
         self.assertIn("market identity gate failed injected error heading", report)
         self.assertIn("unknown (market identity unverified)", report)
-        self.assertNotIn("\\n# injected", report)
+        self.assertNotIn("\n# injected", report)
         self.assertNotIn("# injected", report)
 
         path = os.path.join(ROOT, "research", "backtest_report.py")
