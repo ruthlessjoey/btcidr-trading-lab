@@ -1388,3 +1388,19 @@ Twin money maker.
 - No additional project completion credit is awarded for overlapping PRs, documentation-only changes or isolated infrastructure tests. Overall completion remains **UNRATED**; profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
 
 Twin money maker.
+
+
+---
+
+### Q0.8 bounded automatic resume and latest exact-head evidence — 2026-11-23
+
+- PR #60 latest head is `e8674dbfe3efd2339ddb028484362f9466f7b058`, open/draft/unmerged, based on M6 `cd451972e3a641ad6fa78e64abf3968655a4b82a`. It is 141 commits ahead / 0 behind M6 and remains heavily diverged from current `main`; do not merge directly.
+- Added a bounded auto-resume controller to the existing manual-only Q0.8 workflow. It starts only after a failed review step emits the exact OpenRouter HTTP 429 failure marker. It then verifies the live PR #60 branch, open/unmerged PR state, base SHA and exact review head; validates a schema-1 checkpoint bound to repository/base/head/model and an allowlisted role set; rejects malformed/duplicate-key/non-standard JSON, invalid verdict reports and detected secret patterns; and permits no more than three automatic resumes. The dispatch reuses the same workflow/branch/head, supplies the source run ID as the checkpoint reference, and checks GitHub's returned run ID/URL. The review runner itself independently verifies exact source-run workflow/branch/head identity and checkpoint schema before restoring.
+- Workflow/controller source is at PR #60 head `e8674dbfe3efd2339ddb028484362f9466f7b058`; current workflow blob `af85115179d0e1fb17cb5fecec5bae64de1d62cf`. The controller job alone has `actions: write`; the review job remains contents/pull-requests/actions read-only. First dispatch remains manual-only; subsequent quota-triggered resumes are intended to be automatic, capped at three.
+- Exact-head offline Q0.8 run [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) checked out `e8674db...` and passed **103/103** selected Python 3.11.18 tests across seven suites; all suites ended `OK`, with no traceback, error, or ResourceWarning.
+- The auto-resume controller has **not yet been exercised end-to-end** by a real current-head HTTP 429/model checkpoint cycle. The successful offline workflow proves exact-head selected regression coverage and that Actions parsed/executed the workflow, not that controller dispatch/restore worked in the quota-failure path. No Q0.8 specialist dispatch or acceptance report has yet been completed for `e8674db...`.
+- GitHub's workflow-dispatch REST endpoint supports `return_run_details: true` to return a run ID/URL, and `GITHUB_TOKEN` can trigger the `workflow_dispatch` event when the controller job has the necessary Actions permission. The controller uses this repo-scoped token; it does not expose credentials to the model or broaden the read-only reviewer permissions.
+- Draft PR [#98](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/98) latest head `3576c8041d27b0f54a572adc826c462d892ffd0c` passed its isolated M5 package/core workflow [#45054403126](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054403126): **16/16** Python 3.11 tests, with ResourceWarnings treated as errors. This includes strict strategy result schema, declared reason codes, positive plain-integer history, data gating, and package/import-boundary checks. It remains draft/unreviewed; its base has drifted from PR #60 by three commits and requires ancestry reconciliation before integration.
+- No auto-resume model run was dispatched, no model-provider request was made by this controller change, no protected paths were accessed or executed, and no provider allowlist was expanded. Profitability remains **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**; overall project completion **UNRATED**.
+
+Twin money maker.
