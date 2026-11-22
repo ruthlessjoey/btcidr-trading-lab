@@ -51,12 +51,35 @@ def is_confirmed_verdict(value):
     return type(value) is str and value == CONFIRMED_VERDICT
 
 
+def _valid_comparison_evidence(source):
+    """Require the exact finite metrics emitted by judge() and recompute its rule."""
+    required = {
+        "open_diff_pct", "close_diff_pct", "high_diff_pct", "low_diff_pct",
+        "binance_return_pct", "other_return_pct", "return_gap_pp", "agrees",
+    }
+    if type(source) is not dict or set(source) != required:
+        return False
+    numeric_fields = required - {"agrees"}
+    for field in numeric_fields:
+        value = source[field]
+        if type(value) not in (int, float) or not math.isfinite(value):
+            return False
+    expected = (
+        abs(source["open_diff_pct"]) <= TOLERANCE_PCT
+        and abs(source["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(source["return_gap_pp"]) <= TOLERANCE_PCT
+    )
+    return type(source["agrees"]) is bool and source["agrees"] is expected
+
+
 def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
     """Validate versioned, dataset-bound evidence from at least two approved sources.
 
     This pure helper accepts an explicit immutable provider set for isolated
     fixtures. Production entrypoints below always pass a fresh empty frozenset.
     """
+    if type(cfg) is not dict or type(manifest) is not dict:
+        raise CrosscheckError("cross-check configuration and dataset manifest must be objects")
     flagged = cfg.get("flagged_dates", [])
     if type(flagged) is not list:
         raise CrosscheckError("cross-check flagged_dates must be a list")
@@ -65,6 +88,12 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
     if (any(type(date) is not str or not date for date in flagged)
             or len(flagged) != len(set(flagged))):
         raise CrosscheckError("cross-check flagged_dates must contain unique non-empty strings")
+    for date in flagged:
+        try:
+            if datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d") != date:
+                raise ValueError("date is not canonical")
+        except ValueError:
+            raise CrosscheckError("cross-check flagged_dates must use YYYY-MM-DD dates") from None
     if (type(authorized_providers) is not frozenset
             or len(authorized_providers) < 2
             or any(type(provider) is not str or not provider
@@ -118,8 +147,14 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         raise CrosscheckError(
             "cross-check artifact schema or producer identity is unsupported"
         )
-    if (evidence.get("dataset_version") != manifest.get("version_id")
-            or evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+    manifest_version = manifest.get("version_id")
+    manifest_sha256 = manifest.get("csv_sha256")
+    if (type(manifest_version) is not str or not manifest_version
+            or type(manifest_sha256) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}", manifest_sha256)):
+        raise CrosscheckError("pinned dataset manifest identity is invalid")
+    if (evidence.get("dataset_version") != manifest_version
+            or evidence.get("dataset_sha256") != manifest_sha256):
         raise CrosscheckError(
             "cross-check evidence does not match the pinned dataset version and hash"
         )
@@ -149,7 +184,11 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         item = entries[date]
         for provider in used:
             source = item.get(provider)
-            if type(source) is not dict or source.get("agrees") is not True:
+            if not _valid_comparison_evidence(source):
+                raise CrosscheckError(
+                    f"flagged date {date} has invalid comparison evidence from provider {provider}"
+                )
+            if source["agrees"] is not True:
                 raise CrosscheckError(
                     f"flagged date {date} lacks affirmative agreement from provider {provider}"
                 )
