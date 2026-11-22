@@ -11,6 +11,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 from typing import Callable
 
 REPOSITORY = "ruthlessjoey/btcidr-trading-lab"
@@ -20,6 +21,9 @@ WORKFLOW_PATH = ".github/workflows/q08-offline-tests.yml"
 SPECIALIST_WORKFLOW_PATH = "q08-specialist-review.yml"
 OFFLINE_WORKFLOW_BLOB = "4821963a7b752a1e5bbc52e1d97c93ea296ff7f4"
 BRANCH = "security/q0-provider-sanitization-2026-11-18"
+PR_NUMBER = 60
+PR_BASE = "feature/m6-risk-engine"
+MAIN_REF = "refs/heads/main"
 MAX_RESPONSE_BYTES = 524_288
 MAX_RUN_PAGES = 20
 RUNS_PER_PAGE = 100
@@ -161,6 +165,119 @@ def select_resume_run(
     return ""
 
 
+
+def validate_bootstrap_event(
+    event: dict,
+    token: str,
+    fetch_json: Callable[[str, str], dict] = github_json,
+) -> str:
+    """Select the current PR #60 head only after its exact offline suite succeeded."""
+    if type(token) is not str or len(token) < 20:
+        raise GateError("GitHub read token is unavailable")
+    if type(event) is not dict:
+        raise GateError("GitHub push event payload must be an object")
+    repository = event.get("repository")
+    if (
+        type(repository) is not dict
+        or repository.get("full_name") != REPOSITORY
+        or event.get("ref") != MAIN_REF
+        or not isinstance(event.get("after"), str)
+        or not SHA_RE.fullmatch(event["after"])
+    ):
+        raise GateError("Bootstrap event is not a valid push to the trusted main branch")
+
+    pr = fetch_json(
+        "https://api.github.com/repos/" + REPOSITORY + "/pulls/" + str(PR_NUMBER),
+        token,
+    )
+    if type(pr) is not dict:
+        raise GateError("PR #60 metadata response is malformed")
+    pr_head = pr.get("head")
+    pr_base = pr.get("base")
+    if type(pr_head) is not dict or type(pr_base) is not dict:
+        raise GateError("PR #60 head/base metadata is missing")
+    if (
+        pr.get("number") != PR_NUMBER
+        or pr.get("state") != "open"
+        or pr_head.get("ref") != BRANCH
+        or (pr_head.get("repo") or {}).get("full_name") != REPOSITORY
+        or pr_base.get("ref") != PR_BASE
+        or (pr_base.get("repo") or {}).get("full_name") != REPOSITORY
+        or not isinstance(pr_head.get("sha"), str)
+        or not SHA_RE.fullmatch(pr_head["sha"])
+    ):
+        raise GateError("PR #60 is not the expected open same-repository branch/target")
+
+    head_sha = pr_head["sha"]
+    branch_url = (
+        "https://api.github.com/repos/" + REPOSITORY
+        + "/branches/" + quote(BRANCH, safe="")
+    )
+    branch_record = fetch_json(branch_url, token)
+    branch_commit = branch_record.get("commit") if type(branch_record) is dict else None
+    if type(branch_commit) is not dict or branch_commit.get("sha") != head_sha:
+        raise GateError("PR #60 head and authorized branch ref do not match")
+
+    workflow_url = (
+        "https://api.github.com/repos/" + REPOSITORY
+        + "/contents/" + WORKFLOW_PATH + "?ref=" + head_sha
+    )
+    workflow_blob = fetch_json(workflow_url, token)
+    if type(workflow_blob) is not dict or workflow_blob.get("sha") != OFFLINE_WORKFLOW_BLOB:
+        raise GateError("PR #60 offline workflow is not the approved immutable blob")
+
+    found = False
+    total_count = None
+    for page in range(1, MAX_RUN_PAGES + 1):
+        runs_url = (
+            "https://api.github.com/repos/" + REPOSITORY
+            + "/actions/workflows/" + str(WORKFLOW_ID) + "/runs"
+            + "?event=push&branch=" + quote(BRANCH, safe="")
+            + "&status=completed&per_page=" + str(RUNS_PER_PAGE)
+            + "&page=" + str(page)
+        )
+        payload = fetch_json(runs_url, token)
+        if type(payload) is not dict:
+            raise GateError("Q0.8 offline workflow run list has an invalid shape")
+        count = payload.get("total_count")
+        page_runs = payload.get("workflow_runs")
+        if type(count) is not int or count < 0 or type(page_runs) is not list:
+            raise GateError("Q0.8 offline workflow run list metadata is invalid")
+        if total_count is None:
+            total_count = count
+            if total_count > MAX_RUN_PAGES * RUNS_PER_PAGE:
+                raise GateError("Q0.8 offline workflow history exceeds the fixed scan limit")
+        elif count != total_count:
+            raise GateError("Q0.8 offline workflow run list changed during pagination")
+        expected_size = min(RUNS_PER_PAGE, max(0, total_count - ((page - 1) * RUNS_PER_PAGE)))
+        if len(page_runs) != expected_size:
+            raise GateError("Q0.8 offline workflow run list page is incomplete")
+        for run in page_runs:
+            if type(run) is not dict:
+                raise GateError("Q0.8 offline workflow run entry is malformed")
+            if (
+                run.get("workflow_id") == WORKFLOW_ID
+                and run.get("name") == WORKFLOW_NAME
+                and run.get("event") == "push"
+                and run.get("status") == "completed"
+                and run.get("conclusion") == "success"
+                and run.get("head_branch") == BRANCH
+                and run.get("head_sha") == head_sha
+                and (run.get("head_repository") or {}).get("full_name") == REPOSITORY
+                and (run.get("repository") or {}).get("full_name") == REPOSITORY
+                and type(run.get("id")) is int
+                and run.get("id") > 0
+            ):
+                found = True
+                break
+        if found or page * RUNS_PER_PAGE >= total_count:
+            break
+    if not found:
+        raise GateError("Current PR #60 head has no successful exact-head Q0.8 offline run")
+    return head_sha
+
+
+
 def validate_event(
     event: dict,
     token: str,
@@ -211,7 +328,13 @@ def main() -> int:
         if os.environ.get("GITHUB_REPOSITORY") != REPOSITORY:
             raise GateError("Trusted review workflow ran in an unexpected repository")
         token = os.environ.get("GITHUB_TOKEN", "")
-        head_sha = validate_event(event, token)
+        event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+        if event_name == "workflow_run":
+            head_sha = validate_event(event, token)
+        elif event_name == "push":
+            head_sha = validate_bootstrap_event(event, token)
+        else:
+            raise GateError("Unsupported event for automatic Q0.8 review")
         resume_from_run_id = select_resume_run(
             head_sha, token, os.environ.get("GITHUB_RUN_ID", "")
         )
@@ -219,7 +342,8 @@ def main() -> int:
         if not output_path:
             raise GateError("GitHub output path is unavailable")
         with open(output_path, "a", encoding="utf-8") as output:
-            output.write("resume_from_run_id=" + resume_from_run_id + "\\n")
+            output.write("review_head_sha=" + head_sha + "\n")
+            output.write("resume_from_run_id=" + resume_from_run_id + "\n")
     except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, GateError) as exc:
         message = str(exc) if isinstance(exc, GateError) else "event payload could not be read"
         print("::error::Q0.8 upstream workflow validation failed: " + message)
