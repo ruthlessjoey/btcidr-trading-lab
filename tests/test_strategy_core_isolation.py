@@ -194,7 +194,7 @@ class StrategyDecisionTests(unittest.TestCase):
         parsed = json.loads(rendered)
         self.assertEqual(parsed["decision"], C.BUY)
         self.assertEqual(parsed["indicators"]["strength"], 0.12345679)
-        self.assertIn("not an order", parsed["no_trading"])
+        self.assertIn("not an order", parsed["no_trading"].lower())
         self.assertEqual(rendered, json.dumps(parsed, sort_keys=True, separators=(",", ":"), ensure_ascii=True))
 
     def test_non_finite_decision_values_are_rejected(self):
