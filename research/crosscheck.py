@@ -5,7 +5,9 @@ Only pure comparison/report helpers remain available; this module cannot fetch C
 or Bitstamp data or be enabled through mutable module state.
 """
 import json
+import math
 import os
+import re
 import statistics
 import stat
 from datetime import datetime, timezone
@@ -255,43 +257,129 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=None,
     raise ApiError("independent cross-check providers are not authorized")
 
 
+def _safe_report_text(value, limit=160):
+    """Render only ordinary strings; remove line breaks and control characters."""
+    if type(value) is not str:
+        return "unavailable"
+    cleaned = " ".join(value.split())
+    return cleaned[:limit] if cleaned else "unavailable"
+
+
+def _safe_report_number(value, spec=".2f"):
+    """Format only finite built-in numeric primitives, never caller-defined objects."""
+    if type(value) not in (int, float):
+        return "unavailable"
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return "unavailable"
+    if not math.isfinite(number):
+        return "unavailable"
+    return format(number, spec)
+
+
+def _safe_report_count(value):
+    """Render non-negative built-in integer counts only."""
+    return str(value) if type(value) is int and value >= 0 else "unavailable"
+
+
+def _safe_report_bool(value):
+    return "true" if value is True else "false" if value is False else "unavailable"
+
+
 def build_markdown(r):
-    L = ["# Cross-check of flagged candles", "",
-         f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The source candles "
-         "were **not changed**.", "",
-         "External acquisition status: **DISABLED**. No external source was contacted; "
-         "Coinbase and Bitstamp data were not acquired. Comparison helpers are retained for offline fixtures only. "
-         "Any provider acquisition requires separate owner authorization.",
-         f"Pre-stated rule: {r['rule']}.", ""]
-    if r["coinbase_error"]:
-        L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")
-    if r["bitstamp_error"]:
-        L.append(f"- Bitstamp could not be fetched: {r['bitstamp_error']}")
-    s = r["summary"]
-    if s:
-        L += ["", f"## Whole-history comparison with Coinbase ({r['common_days']} common days)", "",
-              "| Close difference |  |", "|---|---|",
-              f"| Median | {s['median_abs_close_diff_pct']:.3f}% |", f"| 95th percentile | {s['p95_abs_close_diff_pct']:.3f}% |",
-              f"| 99th percentile | {s['p99_abs_close_diff_pct']:.3f}% |", f"| Maximum | {s['max_abs_close_diff_pct']:.3f}% |",
-              f"| Days over 1% / 2% / 5% | {s['days_over_1pct']} / {s['days_over_2pct']} / {s['days_over_5pct']} |", "",
-              "Largest disagreements: " + ", ".join(f"{w['date']} ({w['abs_close_diff_pct']}%)" for w in r["worst_days"])]
-    for e in r["flagged"]:
-        L += ["", f"## Flagged day {e['date']}: **{e['verdict']}**", "",
-              "| Date | Source | Open | High | Low | Close |", "|---|---|---|---|---|---|"]
-        L += [f"| {t['date']} | {t['source']} | {t['open']:,.2f} | {t['high']:,.2f} | {t['low']:,.2f} | {t['close']:,.2f} |"
-              for t in e["table"]]
+    """Render offline comparison summaries without formatting caller-defined values."""
+    version = _safe_report_text(r.get("dataset_version"))
+    digest = r.get("dataset_sha256")
+    digest_prefix = digest[:16] if type(digest) is str and re.fullmatch(
+        r"[0-9a-f]{64}", digest
+    ) else "unavailable"
+    lines = [
+        "# Cross-check of flagged candles",
+        "",
+        f"Dataset `{version}` (sha256 `{digest_prefix}...`). The source candles were **not changed**.",
+        "",
+        "External acquisition status: **DISABLED**. No external source was contacted; "
+        "Coinbase and Bitstamp data were not acquired. Comparison helpers are retained for offline fixtures only. "
+        "Any provider acquisition requires separate owner authorization.",
+        f"Pre-stated rule: {_safe_report_text(r.get('rule'))}.",
+        "",
+    ]
+    for name in ("coinbase", "bitstamp"):
+        error = r.get(name + "_error")
+        if error is not None:
+            lines.append(
+                f"- {name.title()} could not be fetched: {_safe_report_text(error)}"
+            )
+
+    summary = r.get("summary")
+    if summary:
+        lines.extend([
+            "",
+            f"## Whole-history comparison with Coinbase ({_safe_report_count(r.get('common_days'))} common days)",
+            "",
+            "| Close difference |  |",
+            "|---|---|",
+            f"| Median | {_safe_report_number(summary.get('median_abs_close_diff_pct'), '.3f')}% |",
+            f"| 95th percentile | {_safe_report_number(summary.get('p95_abs_close_diff_pct'), '.3f')}% |",
+            f"| 99th percentile | {_safe_report_number(summary.get('p99_abs_close_diff_pct'), '.3f')}% |",
+            f"| Maximum | {_safe_report_number(summary.get('max_abs_close_diff_pct'), '.3f')}% |",
+            "| Days over 1% / 2% / 5% | "
+            + " / ".join(_safe_report_count(summary.get(key)) for key in (
+                "days_over_1pct", "days_over_2pct", "days_over_5pct"
+            ))
+            + " |",
+            "",
+            "Largest disagreements: " + ", ".join(
+                f"{_safe_report_text(item.get('date'))} "
+                f"({_safe_report_number(item.get('abs_close_diff_pct'), '.3f')}%)"
+                for item in r.get("worst_days", [])
+            ),
+        ])
+
+    for entry in r.get("flagged", []):
+        lines.extend([
+            "",
+            f"## Flagged day {_safe_report_text(entry.get('date'))}: "
+            f"**{_safe_report_text(entry.get('verdict'))}**",
+            "",
+            "| Date | Source | Open | High | Low | Close |",
+            "|---|---|---|---|---|---|",
+        ])
+        for candle in entry.get("table", []):
+            lines.append(
+                f"| {_safe_report_text(candle.get('date'))} "
+                f"| {_safe_report_text(candle.get('source'))} "
+                f"| {_safe_report_number(candle.get('open'), ',.2f')} "
+                f"| {_safe_report_number(candle.get('high'), ',.2f')} "
+                f"| {_safe_report_number(candle.get('low'), ',.2f')} "
+                f"| {_safe_report_number(candle.get('close'), ',.2f')} |"
+            )
         for name in ("coinbase", "bitstamp"):
-            j = e[name]
-            if j:
-                L.append(f"- vs {name}: open {j['open_diff_pct']:+.2f}%, close {j['close_diff_pct']:+.2f}%, "
-                         f"high {j['high_diff_pct']:+.2f}%, low {j['low_diff_pct']:+.2f}%; day return "
-                         f"{j['binance_return_pct']:+.2f}% (source) vs {j['other_return_pct']:+.2f}% ({name}); "
-                         f"gap {j['return_gap_pp']:+.2f} pp; rule met: {j['agrees']}")
+            comparison = entry.get(name)
+            if comparison:
+                lines.append(
+                    f"- vs {name}: open {_safe_report_number(comparison.get('open_diff_pct'), '+.2f')}%, "
+                    f"close {_safe_report_number(comparison.get('close_diff_pct'), '+.2f')}%, "
+                    f"high {_safe_report_number(comparison.get('high_diff_pct'), '+.2f')}%, "
+                    f"low {_safe_report_number(comparison.get('low_diff_pct'), '+.2f')}%; "
+                    f"day return {_safe_report_number(comparison.get('binance_return_pct'), '+.2f')}% "
+                    f"(source) vs {_safe_report_number(comparison.get('other_return_pct'), '+.2f')}% ({name}); "
+                    f"gap {_safe_report_number(comparison.get('return_gap_pp'), '+.2f')} pp; "
+                    f"rule met: {_safe_report_bool(comparison.get('agrees'))}"
+                )
             else:
-                L.append(f"- vs {name}: not available")
-        L.append("- High and low are shown but not used by the rule: they depend on when each venue "
-                 "traded the extreme, and this strategy uses only closes and next-day opens.")
-    L += ["", "## Limits", "",
-          "- Two other venues agreeing supports that the move happened; it does not prove every price is exact.",
-          "- USD and USDT prices can differ, especially in a crash."]
-    return "\n".join(L) + "\n"
+                lines.append(f"- vs {name}: not available")
+        lines.append(
+            "- High and low are shown but not used by the rule: they depend on when each venue "
+            "traded the extreme, and this strategy uses only closes and next-day opens."
+        )
+
+    lines.extend([
+        "",
+        "## Limits",
+        "",
+        "- Two other venues agreeing supports that the move happened; it does not prove every price is exact.",
+        "- USD and USDT prices can differ, especially in a crash.",
+    ])
+    return "\n".join(lines) + "\n"
