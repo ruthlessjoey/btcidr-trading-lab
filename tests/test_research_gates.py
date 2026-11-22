@@ -463,7 +463,7 @@ class CrosscheckMarkdownSanitizationTests(unittest.TestCase):
         }
         rendered = build_markdown(report)
         self.assertIn("unavailable", rendered)
-        self.assertIn("approved rule # injected heading", rendered)
+        self.assertIn("approved rule injected heading", rendered)
         self.assertNotIn("\n# injected heading", rendered)
         self.assertNotIn("\n# injected verdict", rendered)
 
