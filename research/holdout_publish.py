@@ -4,6 +4,7 @@ This module is called by the research-backtest workflow after it copies complete
 records into its research-data checkout and before it removes pending markers.
 """
 import argparse
+import hashlib
 import itertools
 import json
 import math
@@ -99,7 +100,7 @@ def _read_object(path, description, return_identity=False):
     if not isinstance(value, dict):
         raise RuntimeError(f"{description} must contain a JSON object")
     if return_identity:
-        return value, (metadata.st_dev, metadata.st_ino, metadata.st_ctime_ns)
+        return value, (metadata.st_dev, metadata.st_ino, hashlib.sha256(raw).hexdigest())
     return value
 
 
@@ -109,9 +110,13 @@ def _remove_exact_reservation(path, expected_identity):
     staged = quarantine / path.name
     try:
         os.rename(path, staged)
-        metadata = os.lstat(staged)
-        actual_identity = (metadata.st_dev, metadata.st_ino, metadata.st_ctime_ns)
-        if not stat.S_ISREG(metadata.st_mode) or actual_identity != expected_identity:
+        try:
+            _, actual_identity = _read_object(
+                staged, "staged durable reservation", return_identity=True
+            )
+        except RuntimeError:
+            actual_identity = None
+        if actual_identity != expected_identity:
             # The path was replaced after validation. Restore the replacement when
             # possible; never delete it merely because it occupied the old path.
             try:
