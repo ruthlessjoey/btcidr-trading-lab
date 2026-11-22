@@ -8,6 +8,7 @@ Only the three pure strategy-core modules are imported.
 import ast
 import json
 import os
+import subprocess
 import sys
 import types
 import unittest
@@ -126,6 +127,27 @@ class StrategyImportBoundaryTests(unittest.TestCase):
                                 for item in forbidden),
                             msg=f"{path} imports forbidden module {module!r}",
                         )
+
+    def test_normal_package_import_does_not_load_protected_s1_or_signal(self):
+        script = (
+            "import sys\\n"
+            "from markets.strategies.engine import evaluate_report\\n"
+            "assert callable(evaluate_report)\\n"
+            "assert 'markets.strategies.registry' in sys.modules\\n"
+            "assert 'markets.strategies.btc_s1' not in sys.modules\\n"
+            "assert 'signal.btc_signal' not in sys.modules\\n"
+        )
+        env = os.environ.copy()
+        env["PYTHONPATH"] = ROOT
+        completed = subprocess.run(
+            [sys.executable, "-B", "-c", script],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_harness_did_not_load_registry_or_protected_s1_adapter(self):
         self.assertNotIn("markets.strategies.registry", sys.modules)
