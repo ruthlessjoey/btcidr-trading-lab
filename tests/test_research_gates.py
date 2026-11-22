@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from research.crosscheck import (
     CrosscheckError, AUTHORIZED_CROSSCHECK_PROVIDERS,
-    load_required_crosscheck, validate_crosscheck_artifact,
+    load_required_crosscheck, validate_crosscheck_artifact, build_markdown,
 )
 from research.backtest_report import crosscheck_status_line
 
@@ -127,6 +127,29 @@ class CrosscheckGateTests(unittest.TestCase):
 
 
 class BacktestReportCrosscheckBoundaryTests(unittest.TestCase):
+    def test_crosscheck_markdown_matches_high_low_agreement_rule(self):
+        comparison = CrosscheckGateTests.comparison()
+        report = {
+            "dataset_version": "v-test",
+            "dataset_sha256": "abc123",
+            "rule": "all OHLC differences and daily return gap must be within 3%",
+            "coinbase_error": None,
+            "bitstamp_error": None,
+            "summary": None,
+            "common_days": 1,
+            "worst_days": [],
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": "CONFIRMED (approximate: USD is not USDT)",
+                "table": [],
+                "coinbase": comparison,
+                "bitstamp": comparison,
+            }],
+        }
+        rendered = build_markdown(report).lower()
+        self.assertIn("high and low price differences are included", rendered)
+        self.assertNotIn("high and low are shown but not used by the rule", rendered)
+
     def test_missing_crosscheck_is_reported_as_unverified(self):
         rendered = crosscheck_status_line(None)
         self.assertIn("No independent cross-check was run", rendered)

@@ -251,8 +251,9 @@ def build_markdown(r):
                          f"gap {j['return_gap_pp']:+.2f} pp; rule met: {j['agrees']}")
             else:
                 L.append(f"- vs {name}: not available")
-        L.append("- High and low are shown but not used by the rule: they depend on when each venue "
-                 "traded the extreme, and this strategy uses only closes and next-day opens.")
+        L.append("- High and low price differences are included in the agreement threshold, alongside open, " +
+                 "close and daily return-gap differences. They help detect mismatched candle extremes; " +
+                 "they do not establish exact execution prices.")
     L += ["", "## Limits", "",
           "- Two other venues agreeing supports that the move happened; it does not prove every price is exact.",
           "- USD and USDT prices can differ, especially in a crash."]
