@@ -1,5 +1,7 @@
 """research/backtest_report.py - Markdown for the Step 2 backtest, readable on a phone."""
 
+import re
+
 METRIC_LIMITS = [
     "**Total return** - one number for one start and end date; moving either by a few weeks can change "
     "it a lot. Open positions are valued at the last close without exit costs, for the strategy and "
@@ -29,6 +31,29 @@ def plain(x):
 
 def short(name):
     return name.split(":")[0]
+
+
+def _safe_report_text(value, limit=160):
+    """Collapse and bound untrusted report text; strip Markdown/control syntax."""
+    if type(value) is not str:
+        return "unavailable"
+    cleaned = " ".join(value.split())
+    allowed = []
+    for char in cleaned:
+        if char.isascii() and (char.isalnum() or char in " .,:;_()/+-"):
+            allowed.append(char)
+    result = "".join(allowed).strip()
+    return result[:limit] if result else "unavailable"
+
+
+def _safe_report_hash(value):
+    """Render only a lowercase SHA-256 digest."""
+    return value if type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) else "unavailable"
+
+
+def _safe_report_count(value):
+    """Render non-negative built-in integer counts only."""
+    return str(value) if type(value) is int and value >= 0 else "unavailable"
 
 
 def market_source_label(market):
@@ -75,21 +100,23 @@ def build_markdown(r):
     dataset = r.get("dataset")
     market = dataset.get("market") if type(dataset) is dict else None
     market_label = market_source_label(market)
+    run_id = _safe_report_text(r.get("run_id"))
     L = ["# BTC/USDT trend-filter backtest (research only)",
-         f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
+         f"Run {run_id} · **READ-ONLY** · no keys, no orders, no live trading", "",
          f"> **This is a historical simulation on a proxy dataset labelled `{market_label}`. "
          "The manifest label is not independent proof of instrument identity or executable venue prices. "
          "It does not demonstrate profitability and is not a signal.** Costs are unverified assumptions; "
          "the period is one historical sample.", ""]
     if r["status"] != "OK":
-        L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
+        L += ["## STOPPED", "", f"The backtest did not run: {_safe_report_text(r.get('error'))}", "",
               "Nothing was simulated and no results are shown."]
         return "\n".join(L) + "\n"
     d = r["dataset"]
     L += ["## Data (preserved version, pinned)", "",
-          f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
-          f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
-          f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
+          f"- {_safe_report_text(d.get('version_id'))} · sha256 {_safe_report_hash(d.get('sha256'))}",
+          f"- {market_label} · {_safe_report_count(d.get('rows'))} candles · "
+          f"{_safe_report_text(d.get('first_open_utc'))[:10]} to "
+          f"{_safe_report_text(d.get('last_open_utc'))[:10]} (UTC open times)",
           "- Re-verified at load: hash, manifest fields, order, no duplicates, no gaps, only completed candles.",
           "- The manifest market label is descriptive provenance; independent instrument identity remains a separate gate."]
     # flagged candle
