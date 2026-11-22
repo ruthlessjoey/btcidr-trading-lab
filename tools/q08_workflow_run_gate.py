@@ -233,7 +233,7 @@ def validate_bootstrap_event(
             "https://api.github.com/repos/" + REPOSITORY
             + "/actions/workflows/" + str(WORKFLOW_ID) + "/runs"
             + "?event=push&branch=" + quote(BRANCH, safe="")
-            + "&status=success&per_page=" + str(RUNS_PER_PAGE)
+            + "&status=completed&per_page=" + str(RUNS_PER_PAGE)
             + "&page=" + str(page)
         )
         payload = fetch_json(runs_url, token)
