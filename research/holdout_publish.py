@@ -4,6 +4,7 @@ This module is called by the research-backtest workflow after it copies complete
 records into its research-data checkout and before it removes pending markers.
 """
 import argparse
+import itertools
 import json
 import math
 import os
@@ -101,9 +102,12 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
     if output.is_symlink() or not output.is_dir():
         raise RuntimeError("run output test registry must be a real directory")
 
-    completed_files = sorted(output.glob("*.json"))
-    if len(completed_files) > MAX_COMPLETED_FILES:
+    candidate_files = list(itertools.islice(
+        output.glob("*.json"), MAX_COMPLETED_FILES + 1
+    ))
+    if len(candidate_files) > MAX_COMPLETED_FILES:
         raise RuntimeError(f"run output contains more than {MAX_COMPLETED_FILES} completed records")
+    completed_files = sorted(candidate_files)
     if not completed_files:
         return 0
 
