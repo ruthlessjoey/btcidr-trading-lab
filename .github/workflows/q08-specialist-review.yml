@@ -1,6 +1,7 @@
 name: Q0.8 immutable 19-role specialist review
 
 on:
+  # Manual-only trusted-default-branch workflow. The candidate ref is read through the pinned API reviewer; no candidate YAML or source is executed.
   workflow_dispatch:
     inputs:
       review_head_sha:
@@ -52,7 +53,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ruthlessjoey/btcidr-trading-lab
-          ref: ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9
+          ref: fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1
           path: runner
           persist-credentials: false
           sparse-checkout-cone-mode: false
