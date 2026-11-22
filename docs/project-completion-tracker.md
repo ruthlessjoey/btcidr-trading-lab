@@ -3003,3 +3003,13 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - PR #97 trusted-main workflow remains draft/unmerged at `3dba39b...`, pinned to reviewer `cf9f319...`; no dispatch/runtime run. PR #94 runbook is updated to head `e391449...` and explicitly blocks use of the auto-resume job.
 - The suspected `GITHUB_OUTPUT` override was removed by `8f9f952a...`; it is not a current finding. Current blockers are the regex, missing reset wait, multiplied retry budget, and unprotected-branch `actions: write`.
 - No score change: 40 requirements / 100 points, first-pass candidate maturity 15.00/100, candidate coverage 60/100, 0/40 exact-main threshold, overall UNRATED. Historical strategy evidence remains approximately -11% return / PF 0.36; no new backtest. Profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
+
+
+## Q0.8 auto-resume follow-up correction — 23 November 2026
+
+- PR #60 advanced to `e8674dbfe3efd2339ddb028484362f9466f7b058`. Exact-head offline run [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) passed **103/103** selected Python 3.11.18 tests; the review check remains skipped.
+- Commit `e8674db...` corrected the HTTP 429 grep expression, secret-screening expressions and dispatch input type, and added pull-request read permission. The earlier `GITHUB_OUTPUT` override was removed by `8f9f952...`. Those earlier defects are no longer current.
+- Remaining blockers on the auto-resume job: no parsing/wait for provider `Retry-After` or reset time; up to three additional workflow runs can multiply the four-attempt model retry budget; `actions: write` remains on the unprotected PR #60 topic-branch workflow. This conflicts with the owner's explicit $0 budget, manual same-SHA resume, wait-for-reset, and no-repeated-dispatch constraints. Do not dispatch this job.
+- PR #97 trusted-main workflow remains draft/unmerged at `3dba39b...`, pinning reviewer `cf9f319...`; no review dispatch. PR #94 runbook is now at `138cdfcd...` and records the latest corrections and remaining blockers.
+- PR #98 remains based on PR #60 predecessor `a68b759...`; it is two commits behind current PR #60. Its 16/16 result is valid only for its own exact head and is not integrated evidence.
+- No change to measurement: 40 requirements / 100 points; first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; whole project UNRATED. Historical strategy evidence remains negative; profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
