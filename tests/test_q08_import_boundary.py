@@ -167,9 +167,9 @@ class Q08ImportBoundaryTests(unittest.TestCase):
             ("from ftplib import FTP", "ftplib"),
             ("from smtplib import SMTP", "smtplib"),
             ("from telnetlib import Telnet", "telnetlib"),
-            ("from xmlrpc.client import ServerProxy", "xmlrpc"),
+            ("from xmlrpc.client import ServerProxy", "xmlrpc.client"),
             ("from websocket import create_connection", "websocket"),
-            ("from websockets.sync.client import connect", "websockets"),
+            ("from websockets.sync.client import connect", "websockets.sync.client"),
         )
         for statement, expected in blocked:
             with self.subTest(statement=statement):
