@@ -37,7 +37,10 @@ class HoldoutFailureReportingTests(unittest.TestCase):
                 ),
             ):
                 code = pipeline.run_backtest(
-                    {"evaluate_test": True}, root, out, prev_results_root=root, run_id="synthetic-run"
+                    {"evaluate_test": True}, root, out, prev_results_root=root, run_id="123456",
+                    require_committed_reservation=True, run_attempt="1",
+                    workflow_ref="tests/test_holdout_reporting.py",
+                    repository="ruthlessjoey/btcidr-trading-lab"
                 )
 
             self.assertEqual(code, 1)
