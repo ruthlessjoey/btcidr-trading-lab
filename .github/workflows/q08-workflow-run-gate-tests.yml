@@ -72,4 +72,5 @@ jobs:
           test -x "$binary"
 
       - name: Lint the trusted Q0.8 workflows
-        run: "$RUNNER_TEMP/actionlint" .github/workflows/q08-specialist-review.yml .github/workflows/q08-workflow-run-gate-tests.yml
+        run: |
+          "$RUNNER_TEMP/actionlint" .github/workflows/q08-specialist-review.yml .github/workflows/q08-workflow-run-gate-tests.yml
