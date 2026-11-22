@@ -10,7 +10,12 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-_STATIC_ONLY_SOURCES = frozenset({"research/pipeline.py", "run.py"})
+_STATIC_ONLY_SOURCES = frozenset({
+    "research/pipeline.py",
+    "run.py",
+    ".github/workflows/research-data.yml",
+    ".github/workflows/research-backtest.yml",
+})
 
 
 def git_source_text(path):
@@ -137,13 +142,16 @@ class PipelineContainmentTests(unittest.TestCase):
 
     def test_research_workflows_do_not_checkout_protected_engine_sources(self):
         for name in ("research-data.yml", "research-backtest.yml"):
-            path = os.path.join(ROOT, ".github", "workflows", name)
-            with open(path, encoding="utf-8") as f:
-                workflow = f.read()
+            path = ".github/workflows/" + name
+            workflow = git_source_text(path)
             sparse = workflow.split("sparse-checkout: |", 1)[1].split("\n\n", 1)[0]
             self.assertNotIn("/run.py", sparse)
             self.assertNotIn("/research/pipeline.py", sparse)
             self.assertIn("/research/backtest_report.py", sparse)
+
+    def test_static_source_helper_rejects_unapproved_paths_before_git_access(self):
+        with self.assertRaises(ValueError):
+            git_source_text("validator.py")
 
 
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
