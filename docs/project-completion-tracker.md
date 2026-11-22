@@ -2374,3 +2374,49 @@ This section qualifies any earlier broad statement that all automation on PR #82
 - The 9 cases cover valid extraction, duplicate actionlint members, symlink member, member-count cap, decompressed-byte cap, oversized binary, missing actionlint member, preexisting destination preservation, and symlink archive refusal.
 - This run verifies the helper only. **The actual manual Actionlint/zizmor scanner workflow has not yet been dispatched**, so semantic workflow linting and zizmor findings are unverified. PR #95 remains draft/open/unmerged and earns no mainline maturity credit.
 - Project status unchanged: overall completion UNRATED; candidate maturity 15.00/100; 0/40 at exact-main threshold; profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
+
+## Emergency delivery live-state reconciliation — 2026-11-22 12:44+08
+
+This addendum supersedes every earlier PR #60, PR #82, and Q0.8 head/run snapshot above where they differ. It does not alter the approved requirements, scoring weights, security boundaries, or merge/approval policy.
+
+### Repository and measurement baseline
+
+- Live GitHub refresh confirms default branch `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no pull request was merged during this execution.
+- The 40-requirement / 100-point inventory remains owner-approved. Candidate maturity remains **15.00/100** (24 rows at 0.25 across 60 weight points); **0/40** meet the exact-main 0.50 evidence threshold. Overall project completion remains **UNRATED**, not 15% complete.
+- Current quantitative evidence remains a historical proxy only: approximately **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, and **0.36 profit factor**. Instrument identity, quote-asset equivalence, and venue-realistic fees/spread/slippage are not verified; no new backtest was run. Profitability remains **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+
+### PR #60 — current Q0 candidate and specialist review
+
+- Current head: `321de7a2d8d95a1a0c46ba7d3f370f24c64e001c`, branch `security/q0-provider-sanitization-2026-11-18`, based on M6 `cd451972e3a641ad6fa78e64abf3968655a4b82a`. It is open/draft/unmerged, with 26 changed paths.
+- Comparison to M6: **121 ahead / 0 behind**. Comparison to selected `main`: **132 ahead / 92 behind**, merge base `733abeb931eddcb442220f9b73b092833282e671`. This branch is not a direct mainline integration candidate; do not merge it directly to `main`.
+- The two commits after predecessor `0f79801e6fb9105358acdc3330112e6e5fd7e582` modify only `tests/test_fetcher.py` and `tests/test_pipeline.py`, adding response-boundary and accurate sparse-checkout-manifest assertions.
+- Current exact-head offline workflow [#44981358687](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44981358687) completed successfully on Python **3.11.18** with **85/85 selected tests** (suite counts 33, 4, 7, 2, 12, 12, 15). This is scoped offline evidence only, not complete M6 integration or protected-engine evidence.
+- Current exact-head Q0.8 specialist workflow [#44981358684](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44981358684) completed with failure after immutable reviewer checkout, Python 3.11 syntax compilation, synthetic policy smoke, PR-head validation, and diff snapshot all passed. The first `architecture-architect` model request hit OpenRouter HTTP 429; bounded retries requested 15/30/60/120 seconds and the provider then requested 240 seconds, exceeding the unchanged 120-second retry ceiling. No role report was completed.
+- Uploaded checkpoint artifact ID `14737683912`, name `q08-review-checkpoint-44981358684`, was downloaded and inspected. Its checkpoint JSON is schema v1 and matches repository, M6 base, exact head `321de7a...`, and approved model `inclusionai/ling-3.2-flash:free`; it contains **0/16 reports**, no Commander, no independent acceptance, and no verification. This current-head checkpoint may be used for a fresh same-head resume; the older checkpoint from run `44980188862` is bound to predecessor `0f79801...` and MUST NOT be reused.
+- Manual continuation required: on GitHub Actions select workflow **Q0.8 immutable 19-role specialist review**, branch `security/q0-provider-sanitization-2026-11-18`, set `review_head_sha=321de7a2d8d95a1a0c46ba7d3f370f24c64e001c`, `resume_from_run_id=44981358684`, `mode=review`. Preserve the same model/provider and retry ceiling. No final Q0.8 acceptance exists yet.
+
+### PR #82 — clean-main containment candidate
+
+- Current head: `045a4dc5d4490aa7da5ae9e573f4373ed79b4e2e`, base `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`; open/draft/unmerged. Compare: **41 ahead / 0 behind**, 17 changed paths.
+- Exact-head sparse offline workflow [#44981166074](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44981166074) passed **62/62** selected Python **3.11.18** tests (8 import-boundary, 30 fetcher, 4 provider/configuration, 3 disabled-probe, 13 sanitization, 4 static-pipeline).
+- Its latest two-commit delta only changes `tests/test_q08_import_boundary.py`, including correction of the static dynamic-import guard condition.
+- Only COMMENTED reviews exist on predecessor heads; no current-head independent approval is recorded. This is a clean-main transport/legacy-entrypoint containment candidate only; it does not integrate M6 strategy/risk/portfolio, FIFO ledger, or PAPER lifecycle.
+
+### CodeQL full-checkout exception
+
+- Existing dynamic CodeQL runs on PRs #82, #93 and #95 disabled sparse checkout and fetched full pull-request trees. Treat these as **potential protected-path boundary exposure**; their success does not earn K1/K2 acceptance. No protected source content was opened or execution established from the logs.
+- Do not push further commits or deliberately trigger scans on PRs #82, #93 or #95 until owner/admin reviews repository-level CodeQL scope. Existing Actions logs and tracker warnings remain the evidence.
+
+### Other independently tested candidates
+
+- PR #95 head `8b3f97ecb935bdca8a2041cacbb6ba9bef4b1ba8`: exact-head isolated Actionlint extractor tests [#44981040971](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44981040971) passed **9/9** Python 3.11.18 adversarial cases. Actual manual Actionlint/zizmor scan remains undispatched/unverified.
+- PR #92 remains an M6-stacked strict-cross-check JSON candidate; its recorded exact-head selected suite passed 96/96 on its then-current SHA. Cross-check provider authorization remains empty and production acquisition remains blocked; its old SHA and test result are not current PR #60 head evidence.
+- PR #34 is an isolated durable holdout publisher component with recorded 27/27 tests on its then-current head; its publisher is not wired into an end-to-end TEST reservation/evaluation/publish lifecycle. It is not PAPER acceptance.
+- PR #68 test modules remain excluded because their import closures reach protected modules.
+- Historical PR #60 / PR #64 / PR #65 / PR #73 snapshots are superseded by current live PR metadata above; PR #64 is merged to `main`, while PR #65 and #73 are stale tracker drafts. PR #79 is the current approved-scope tracker branch.
+
+### Operations during this refresh
+
+- Read-only GitHub metadata, diffs, workflow/job logs, and one uploaded checkpoint artifact were inspected. The only repository write from this delivery reconciliation is this documentation addendum on the existing PR #79 tracker branch.
+- No protected path was read/imported/executed; no market-data/provider request, dataset publication, backtest, TEST evaluation, account action, trade, merge, workflow-dispatch write, or security-control change occurred.
+- Current exact blockers remain: manual same-SHA Q0.8 resume; owner/admin review of dynamic CodeQL full-checkout scope; exact integration/acceptance of M6 strategy/risk/portfolio/ledger and paper lifecycle; verified instrument identity and realistic cost model; full 40-row evidence audit and independent acceptance.
