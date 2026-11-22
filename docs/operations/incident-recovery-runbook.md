@@ -95,6 +95,18 @@ Before enabling or dispatching an independent scanner on a candidate PR:
 This section is a stop/escalation rule; it does not authorize enabling scanners, modifying repository security settings, or running scans.
 
 
+### Manual Q0.8 specialist-review dispatch (GitHub web / iPhone)
+
+The default branch contains `.github/workflows/q08-specialist-review.yml` with `workflow_dispatch` and the three inputs `review_head_sha`, `resume_from_run_id`, and `mode`. GitHub requires the manually triggered workflow to exist on the default branch; the Actions page then allows the operator to select the topic branch for the run.
+
+1. Open the repository in GitHub, tap **Actions**, and select **Q0.8 immutable 19-role specialist review**.
+2. Tap **Run workflow** and select `security/q0-provider-sanitization-2026-11-18` in the branch dropdown.
+3. Re-fetch PR #60 immediately before dispatch. Copy its exact current head SHA into `review_head_sha`; do not copy an older tracker/handoff SHA.
+4. For a resume, verify the source run has an uploaded checkpoint and inspect its artifact identity: repository, workflow, approved branch, base SHA, exact same review-head SHA, model and schema. Enter that source run's numeric ID in `resume_from_run_id`. Leave it blank only for a fresh review with no checkpoint.
+5. Set `mode=review`, confirm the latest 429 reset window has elapsed, and tap **Run workflow** once. Do not create duplicate parallel reviews.
+
+If PR #60 advances after verification, stop: refresh the SHA and use only a checkpoint bound to the new exact head. Never resume an earlier-head checkpoint against a newer commit. A partial report set remains inconclusive; acceptance requires all specialists, Commander synthesis, independent acceptance and final verification. This procedure does not authorize changes to the model/provider, retry ceiling, secrets, permissions, protected paths or any trading workflow.
+
 ### Quota and retry handling
 
 - Retain the approved model/provider, credentials configuration, four bounded retries and 120-second maximum wait.
