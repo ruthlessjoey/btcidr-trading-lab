@@ -2849,3 +2849,24 @@ This addendum records the latest read-only verification performed during the eme
 - Selected `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`. PR #60 full-tree comparison remains 144 ahead / 92 behind main and 133 ahead / 0 behind M6; it is not a direct mainline integration candidate.
 - Approved inventory remains **40 requirements / 100 points**. Candidate-weighted historical maturity remains **15.00/100**; **0/40** exact-main requirements meet the 0.50 threshold; overall completion **UNRATED**.
 - Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**. No market-data/provider request, dataset publication, backtest, TEST evaluation, credentials/account/financial activity, order, PAPER/LIVE execution, protected path access/import/execution, PR merge or security-settings change occurred.
+
+## Emergency continuation — M5 malformed-result fail-closed correction — 2026-11-22 17:55+08
+
+### M5 generic engine hardening on isolated branch
+- The synthetic M5 branch `security/m5-isolated-strategy-contract-tests-2026-11-22` advanced from `467121177313943f726bdd8464625f211eb60b9c` to `8d6f628c2de3372276fd542af47205750e17510f`.
+- Exact one-commit change, parent `4671211...`, touches only `markets/strategies/engine.py` (+9 lines) and `tests/test_m5_isolated_strategy.py` (+7 lines). It adds pre-construction validation that `reason_codes` and `reasons` are lists of strings and `indicators` is a mapping with string keys. Malformed outputs now fail with explicit `StrategyError` rather than leaking incidental Python type exceptions from tuple conversion, iteration or mapping access. Existing allowlist validation and numeric serialization still enforce declared reason codes and finite/serializable indicator values.
+- Expanded the single strategy-result regression with malformed `None`, string rather than list, mixed non-string reason, non-mapping indicators, non-string mapping key and NaN indicator cases. No protected code or strategy adapter is involved.
+- Exact-head workflow [#45009737374](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45009737374) completed **success** on Python **3.11.18**, with the single unittest suite reporting **12/12 passed** and `OK`. All workflow jobs/steps succeeded; checkout remains sparse to the generic M5 modules and synthetic test file, read-only with credentials disabled.
+- This validates only generic M5 engine result validation and the synthetic contract. It does not exercise the real S1 adapter, protected `signal/` implementation, provider/data pipeline, market identity, strategy performance, risk/portfolio integration or PAPER readiness. It is a candidate branch on M6, not integrated mainline work. No score increment is awarded.
+
+### Current Q0.8 review and PR #60 status
+- PR #60 remains at exact head `7a20e86ca35ef614e2be997058fedb692e28eb5c`, open/draft/unmerged, base `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`. Main remains `731fc9fbb892dadccc64bf52da2f91ff069da124`.
+- Exact-head offline security workflow #45009212243 passed **98/98** tests on Python 3.11.18; suite counts 33 + 4 + 7 + 2 + 15 + 13 + 24. Static inspection confirms PR #60 high/low agreement behavior and report wording align; no external providers have been authorized/contacted.
+- Exact-head specialist review #45009212249 still reports **IN PROGRESS** at 17:55 WITA (model-review step active). No report artifact is available. Do not run a duplicate or try to restore any predecessor checkpoint; await terminal state and the artifact from this exact source run. The immutable runner is pinned at `fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1`; same-head push/manual resume support is in place.
+- PR #60 full-tree comparison is **144 ahead / 92 behind** main, merge base `733abeb931eddcb442220f9b73b092833282e671`; it remains a divergent M6-based candidate and cannot be directly merged into main.
+
+### Overall status remains unchanged
+- Approved inventory: **40 requirements / 100 weights**. Historical candidate maturity: **15.00/100**, **0/40** at exact-main threshold; whole-project completion **UNRATED**. No new maturity credit assigned.
+- Historical proxy performance remains approx **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, **0.36 profit factor**. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+- No provider request, dataset publication, backtest, TEST evaluation, account/financial action, order, PAPER/LIVE execution, PR merge, protected-path access/import/execution or security-settings change occurred in the M5 hardening work.
+
