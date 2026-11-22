@@ -565,7 +565,8 @@ def validate_checkpoint_source(token: str) -> None:
     current_run_id = os.environ.get("GITHUB_RUN_ID", "")
     if current_run_id and current_run_id == run_id:
         raise RuntimeError("A review run cannot resume its own checkpoint")
-    current_branch = os.environ.get("GITHUB_REF_NAME", "")
+    current_branch = os.environ.get(
+        "Q08_REVIEW_BRANCH", os.environ.get("GITHUB_REF_NAME", ""))
     source_run = github_json("/repos/" + REPO + "/actions/runs/" + run_id, token)
     validate_checkpoint_source_metadata(source_run, run_id, current_branch, HEAD_SHA)
     print("STAGE checkpoint_source_run_verified run_id=" + run_id, flush=True)
