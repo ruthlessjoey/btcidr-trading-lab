@@ -1782,3 +1782,11 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - PR #92 latest head `07575c79d6ded36ee333a8e920449b97db5d54d3` passed 86/86 selected Python 3.11.18 tests. It is open/draft, stacked on #60, compare 36 ahead / 0 behind, no independent review submissions.
 - PR #82 latest head `290436766951ee586c298a854528a8b7d4c5a14c` passed its exact-head push-triggered 59/59 selected Python 3.11.18 tests. It remains draft on main and has only a COMMENTED scoped review, not approval.
 - Completion remains UNRATED; candidate maturity 15.00/100; exact-main verified 0/40. Profitability NOT PROVEN; PAPER NOT READY; LIVE disabled.
+
+
+## PR #92 flagged-day provenance correction — 2026-11-22
+
+- Latest PR #92 head: `6ec730b1d8accf6d13f10d04d708ef7fa1e53db7`; current comparison against PR #60 head `f6c520f725973d6c98534aec340fdabd77898383` remains ahead with no behind commits (recheck exact ahead count on any future ancestry change). Draft/open/unmerged.
+- The historical backtest report's flagged-day comparison text now uses the manifest-derived `market_label` instead of the prior hard-coded phrase `vs Binance`. A source regression asserts the dynamic label is present and hardcoded Binance comparison wording is absent.
+- Exact-head run [#44972088481](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972088481) checked out `6ec730b...` and passed **87/87** selected tests on Python **3.11.18**: fetcher 21, provider boundary 4, history 7, disabled probe 2, static pipeline 7, research gates 30, sanitization 16. All seven suite logs emitted `OK`.
+- This removes a reporting-label inconsistency only. It does not verify the Tokocrypto market identity, make an exchange provider eligible, validate venue costs, establish profitability, or enable a backtest/PAPER operation.
