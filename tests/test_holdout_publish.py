@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from research.holdout_publish import publish_completed_reservations
@@ -216,6 +217,21 @@ class HoldoutPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "more than 1000 completed records"):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_completed_file_enumeration_stops_at_limit_plus_one(self):
+        yielded = 0
+
+        def many_json_files(path, pattern):
+            nonlocal yielded
+            for index in range(10000):
+                yielded += 1
+                yield path / f"record-{index}.json"
+
+        with mock.patch.object(Path, "glob", new=many_json_files):
+            with self.assertRaisesRegex(RuntimeError, "more than 1000 completed records"):
+                self.publish()
+
+        self.assertEqual(yielded, 1001)
 
     def test_symlinked_report_parent_refuses_cleanup(self):
         self.install_pair()
