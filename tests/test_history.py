@@ -1,9 +1,9 @@
 """Offline tests for the Step 1 fail-closed gate.
 
-The approved import closure includes only research.history, which uses the standard
-library. These tests combine AST-only source-boundary checks with an isolated temporary
-directory behavior test. They never import fetch_history.py or protected modules and
-never make network requests.
+The Step 1 behavior test imports research.history only after an AST-only check proves
+its current source uses standard-library imports only. These tests never import
+fetch_history.py or protected modules and never make network requests.
+
 """
 import ast
 import io
@@ -13,7 +13,6 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 
-from research import history
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -71,7 +70,7 @@ class HistoryContainmentTests(unittest.TestCase):
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": {"research.history"},
+            "tests/test_history.py": set(),
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_research_gates.py": {"research.crosscheck", "research.backtest_report"},
@@ -119,6 +118,13 @@ class HistoryContainmentTests(unittest.TestCase):
             calls.append((url, timeout))
             raise AssertionError("Step 1 must not make a network request")
 
+        # Prove the exact import closure before importing the module under test.
+        self.assertEqual(
+            source_import_edges("research/history.py"),
+            {"json", "os", "time", "datetime"},
+        )
+        from research import history
+
         with tempfile.TemporaryDirectory() as out:
             with redirect_stdout(io.StringIO()):
                 status = history.run_step1(
@@ -165,10 +171,9 @@ class HistoryContainmentTests(unittest.TestCase):
 
     def test_step1_entrypoint_has_an_exact_unprotected_import_closure(self):
         self.assertEqual(
-            source_imports("fetch_history.py"),
+            source_import_edges("fetch_history.py"),
             {"argparse", "json", "sys", "research.history"},
         )
-        source_imports("fetch_history.py")  # also rejects dynamic imports
 
     def test_only_exact_tokocrypto_scope_is_accepted_as_configuration(self):
         with open(os.path.join(ROOT, "research", "history.py"), encoding="utf-8") as f:

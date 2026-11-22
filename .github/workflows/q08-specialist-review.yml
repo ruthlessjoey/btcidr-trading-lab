@@ -1,9 +1,7 @@
 name: Q0.8 immutable 19-role specialist review
 
 on:
-  push:
-    branches:
-      - security/q0-provider-sanitization-2026-11-18
+  # Secret-bearing reviews are never launched automatically by topic-branch pushes.
     paths:
       - "*.py"
       - "**/*.py"
