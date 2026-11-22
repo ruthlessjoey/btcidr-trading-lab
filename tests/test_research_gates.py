@@ -45,7 +45,7 @@ class CrosscheckGateTests(unittest.TestCase):
             "close_diff_pct": difference,
             "high_diff_pct": 1.0,
             "low_diff_pct": 1.0,
-            "binance_return_pct": 2.0,
+            "binance_return_pct": 5.0 if not agrees_by_metrics else 2.0,
             "other_return_pct": 1.0,
             "return_gap_pp": 1.0 if agrees_by_metrics else 4.0,
             "agrees": agrees,
@@ -244,7 +244,7 @@ class CrosscheckGateTests(unittest.TestCase):
         del payload["flagged"][0]["bitstamp"]
         with tempfile.TemporaryDirectory() as d:
             path = self.write_evidence(d, payload)
-            with self.assertRaisesRegex(CrosscheckError, "invalid comparison evidence"):
+            with self.assertRaisesRegex(CrosscheckError, "malformed flagged entry"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_comparison_metrics_must_be_finite_and_match_the_agreement_rule(self):
