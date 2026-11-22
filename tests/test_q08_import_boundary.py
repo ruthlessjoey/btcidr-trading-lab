@@ -22,16 +22,42 @@ FORBIDDEN_IMPORT_ROOTS = {
 }
 
 
-def _source_imports(path):
+def _source_text(path):
     if path == "run.py":
         result = subprocess.run(
             ["git", "show", "HEAD:run.py"], cwd=ROOT, check=True,
             capture_output=True, text=True, encoding="utf-8",
         )
-        source = result.stdout
-    else:
-        source = (ROOT / path).read_text(encoding="utf-8")
+        return result.stdout
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _assert_no_dynamic_imports(tree, path):
+    dynamic_names = {"__import__", "eval", "exec"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module == "importlib":
+                dynamic_names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name == "import_module"
+                )
+            elif node.module == "builtins":
+                dynamic_names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name in {"__import__", "eval", "exec"}
+                )
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if ((isinstance(func, ast.Name) and func.id in dynamic_names)
+                or (isinstance(func, ast.Attribute) and func.attr == "import_module")):
+                raise AssertionError(f"{path}: dynamic import/evaluation is not permitted")
+
+
+def _source_imports_from_text(source, path="<source>"):
     tree = ast.parse(source, filename=path)
+    _assert_no_dynamic_imports(tree, path)
     edges = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -41,12 +67,33 @@ def _source_imports(path):
                 raise AssertionError(f"{path}: relative import is not permitted")
             if node.module:
                 edges.add(node.module)
-        elif isinstance(node, ast.Call):
-            func = node.func
-            if ((isinstance(func, ast.Name) and func.id in {"__import__", "eval", "exec"})
-                or (isinstance(func, ast.Attribute) and func.attr == "import_module")):
-                raise AssertionError(f"{path}: dynamic import/evaluation is not permitted")
     return edges
+
+
+def _source_imports(path):
+    return _source_imports_from_text(_source_text(path), path)
+
+
+def _network_client_imports(source):
+    tree = ast.parse(source)
+    network_roots = {"requests", "httpx", "aiohttp", "socket", "urllib3"}
+    network_exact = {"urllib.request", "http.client"}
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(
+                alias.name for alias in node.names
+                if alias.name.split(".", 1)[0] in network_roots or alias.name in network_exact
+            )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module.split(".", 1)[0] in network_roots or module in network_exact:
+                found.add(module)
+            for alias in node.names:
+                imported = f"{module}.{alias.name}" if module else alias.name
+                if imported.split(".", 1)[0] in network_roots or imported in network_exact:
+                    found.add(imported)
+    return found
 
 
 def _local_edges(path):
@@ -96,18 +143,39 @@ class Q08ImportBoundaryTests(unittest.TestCase):
                 }, allowed)
 
     def test_fetcher_is_the_only_selected_module_with_an_http_client(self):
-        network_client_roots = {
-            "requests", "httpx", "aiohttp", "socket", "urllib3", "httpx",
-        }
-        forbidden_exact = {"urllib.request", "http.client"}
         for path in ("providers.py", "probe.py", "run.py", "live_check.py", "tools/net_lab.py"):
             with self.subTest(path=path):
-                imports = _source_imports(path)
-                self.assertFalse(any(
-                    edge.split(".", 1)[0] in network_client_roots
-                    or edge in forbidden_exact
-                    for edge in imports
-                ), f"{path} must not own a network client; use fetcher.py only")
+                self.assertEqual(
+                    _network_client_imports(_source_text(path)),
+                    set(),
+                    f"{path} must not own a network client; use fetcher.py only",
+                )
+
+    def test_network_import_guard_recognizes_from_import_forms(self):
+        blocked = (
+            ("from urllib import request", "urllib.request"),
+            ("from urllib.request import urlopen", "urllib.request"),
+            ("from http import client", "http.client"),
+            ("from http.client import HTTPConnection", "http.client"),
+            ("from socket import socket", "socket"),
+            ("from requests import get", "requests"),
+        )
+        for statement, expected in blocked:
+            with self.subTest(statement=statement):
+                self.assertIn(expected, _network_client_imports(statement))
+        self.assertEqual(_network_client_imports("from urllib import parse"), set())
+        self.assertEqual(_network_client_imports("from http import cookies"), set())
+
+    def test_dynamic_import_guard_recognizes_aliased_importlib_and_builtins(self):
+        samples = (
+            "from importlib import import_module as load_module\\nload_module('x')",
+            "from builtins import __import__ as load_module\\nload_module('x')",
+            "from builtins import eval as run_code\\nrun_code('1 + 1')",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample), self.assertRaisesRegex(
+                    AssertionError, "dynamic import/evaluation"):
+                _source_imports_from_text(sample)
 
     def test_disabled_subprocess_script_has_no_network_or_protected_imports(self):
         path = "tools/net_lab.py"
