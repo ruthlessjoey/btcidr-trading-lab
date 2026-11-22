@@ -3013,3 +3013,14 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - PR #97 trusted-main workflow remains draft/unmerged at `3dba39b...`, pinning reviewer `cf9f319...`; no review dispatch. PR #94 runbook is now at `138cdfcd...` and records the latest corrections and remaining blockers.
 - PR #98 remains based on PR #60 predecessor `a68b759...`; it is two commits behind current PR #60. Its 16/16 result is valid only for its own exact head and is not integrated evidence.
 - No change to measurement: 40 requirements / 100 points; first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; whole project UNRATED. Historical strategy evidence remains negative; profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
+
+
+## PR #97 trusted-main workflow authorization gate — 23 November 2026
+
+- PR #97 latest head is `62352cca01fbff8a1fc6924620b2a3a7d0600c62` (10 commits / 4 paths). It is no longer manual-only: it adds a `workflow_run` trigger that can automatically start the 19-role LLM review after matching successful PR #60 offline runs.
+- The gate helper has positive controls: it validates repository, branch, workflow identity and immutable offline-workflow blob; candidate source is read through the API and is not checked out or executed; the review job remains read-only.
+- The automatic trigger has not been authorized by the owner. It can consume LLM quota automatically after matching runs and lacks demonstrated same-head idempotency/deduplication. Concurrency serializes but does not deduplicate. Do not merge or enable PR #97 until the owner chooses manual-only (remove `workflow_run`) or explicitly authorizes automatic review with deduplication, opt-in and retry/reset safeguards.
+- Gate-test run [#45055262845](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055262845) failed with zero job records; no gate tests executed. CodeQL Actions passed; CodeQL Python was in progress at last check.
+- GitHub's official documentation states that `workflow_run` only triggers when the workflow file exists on the default branch and that the resulting workflow can access secrets/write tokens even if the triggering workflow cannot: [GitHub workflow_run event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+- PR #60 current head remains `e8674db...`; exact-head offline suite #45055081357 passed 103/103. The unapproved topic-branch auto-resume job remains blocked by no reset-time wait, up to three extra runs beyond the four-attempt budget, and `actions: write` on the unprotected branch. Do not dispatch it.
+- Project measurement remains unchanged: 40 requirements / 100 points; first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; whole project UNRATED; profitability UNVERIFIED; PAPER NOT READY; LIVE DISABLED.
