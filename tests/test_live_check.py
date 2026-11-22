@@ -50,5 +50,37 @@ class ProviderAuthorizationTests(unittest.TestCase):
         self.assertEqual(cfg["min_verified"], 1)
 
 
+    def test_legacy_adapters_and_custom_sources_cannot_bypass_central_allowlist(self):
+        attempted = []
+
+        def opener(url, timeout):
+            attempted.append(url)
+            raise AssertionError("unapproved provider URL reached the opener")
+
+        class GuardedHttp:
+            def get(self, url):
+                return fetcher.http_get_json(url, 5, 1, opener, lambda seconds: None)
+
+        http = GuardedHttp()
+        for adapter_type in (providers.Kraken, providers.Coinbase):
+            with self.subTest(adapter=adapter_type.__name__):
+                with self.assertRaises(fetcher.DisallowedRequestError):
+                    adapter_type()
+                adapter = object.__new__(adapter_type)
+                with self.assertRaises(fetcher.DisallowedRequestError):
+                    adapter.server_time(http)
+                with self.assertRaises(fetcher.DisallowedRequestError):
+                    adapter.candles("1h", 0, 3_600, http)
+
+        custom = providers.BinanceStyle(
+            "unapproved", "BTC/USDT", "USDT", "BTCUSDT",
+            "https://api.kraken.com", "synthetic test only",
+        )
+        with self.assertRaises(fetcher.DisallowedRequestError):
+            custom.candles("1h", 0, 3_600, http)
+
+        self.assertEqual(attempted, [])
+
+
 if __name__ == "__main__":
     unittest.main()
