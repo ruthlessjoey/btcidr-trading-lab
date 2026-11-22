@@ -2917,3 +2917,24 @@ This addendum records the latest read-only verification performed during the eme
 - Historical proxy metrics remain approximately **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, **0.36 profit factor**; no new backtest was run and identity-bound Tokocrypto market data/venue costs remain unverified. **Profitability NOT PROVEN.**
 - **PAPER NOT READY; LIVE DISABLED.**
 - No Tokocrypto or other external provider request, dataset publication, full backtest, TEST evaluation, account/financial action, order, PAPER/LIVE execution, PR merge, protected-path read/import/execute or security-setting change occurred during this continuation.
+## Emergency continuation — current PR #60 evidence hardening and all active candidate tests — 2026-11-22 18:09+08
+
+### PR #60 current exact-head security update
+- PR #60 branch/head is now 3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127, open/draft/unmerged, base feature/m6-risk-engine at cd451972e3a641ad6fa78e64abf3968655a4b82a. Main remains 731fc9fbb892dadccc64bf52da2f91ff069da124.
+- New commit 3d7a651 adds bounded, unambiguous cross-check evidence reads in research/crosscheck.py and adversarial tests in tests/test_research_gates.py. It rejects duplicate JSON keys at nested levels, non-standard NaN/Infinity tokens, non-string paths, symlink/special-file artifacts, path replacement around open, and evidence over 1 MiB. Reads use O_NOFOLLOW/O_NONBLOCK where available, fstat/lstat identity checks, a bounded read, UTF-8 and explicit JSON hooks. It does not authorize or contact any additional provider; the immutable authorized-provider set remains empty.
+- Exact-head sparse offline run #45010806695 passed **103/103** selected tests on Python **3.11.18** across seven suites: 33 fetcher + 4 provider boundary + 7 history/import boundary + 2 disabled probes + 15 static pipeline + 18 research gates + 24 sanitization/cross-check. Every suite ended OK.
+- The Q0.8 reviewer workflow at this head remains manual-only (workflow_dispatch; no push trigger), with immutable runner pin fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1. The prior 3/16 checkpoint is stale. Start a fresh manual review on branch security/q0-provider-sanitization-2026-11-18, set review_head_sha=3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127, leave resume_from_run_id blank, and set mode=review. Do not reuse artifact #14748869627 or run #45009212249.
+- PR #60 comparisons: M6 baseline 137 ahead / 0 behind; selected main 148 ahead / 92 behind, merge base 733abeb931eddcb442220f9b73b092833282e671. Not a direct-to-main merge candidate.
+
+### PR #95 isolated Actionlint extraction candidate
+- PR #95 remains draft/open/unmerged at head 1b398b5458d346310346aae65587a1b3dfee3edd, base main. Its exact-head offline test run #45010735456 passed 10/10 Python 3.11.18 tests.
+- The helper enforces a true positive integer expanded-stream limit no greater than the advertised 64 MiB ceiling, including when an override is supplied. Regression rejects over-cap, bool, float, zero and negative values. The separate manual workflow now sparse-checks out the helper it invokes. The full Actionlint/zizmor audit remains unrun because independent scanner source acquisition may include protected paths; owner/admin scope decision remains required.
+
+### PR #96 generic M5 candidate
+- PR #96 remains draft/open/unmerged at head e2a9f34991e9a1c563af7da47491560aea996892, base feature/m6-risk-engine at frozen M6 baseline. It is 4 ahead / 0 behind M6 and has three changed paths: generic M5 engine, synthetic test, isolated test workflow.
+- Exact-head run #45010366577 passed 13/13 on Python 3.11.18. It uses sparse checkout, read-only contents permission and persist-credentials=false; tests assert btc_s1 and signal.btc_signal are not imported. This is generic M5 verification only, not protected S1, market identity, profitability, risk/portfolio bridge or PAPER acceptance.
+
+### Completion and safety
+- Approved inventory remains 40 requirements / 100 points; historical candidate-weighted maturity 15.00/100; 0/40 meet exact-main threshold; overall project completion UNRATED. No new score credit is awarded.
+- Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED. Historical proxy evidence remains negative and is not validated Tokocrypto spot/cost-sensitive out-of-sample performance.
+- No market-data requests, account actions, real trades, dataset publication, backtest, TEST evaluation, PAPER/LIVE execution, PR merge, protected-path access or security-control weakening occurred in this continuation.
