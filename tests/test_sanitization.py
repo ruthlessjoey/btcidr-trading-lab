@@ -174,6 +174,34 @@ class ProviderSanitizationTests(unittest.TestCase):
 
 
 class CrosscheckSanitizationTests(unittest.TestCase):
+    def test_disabled_crosscheck_report_does_not_claim_external_data_was_acquired(self):
+        report = {
+            "dataset_version": "synthetic-v1", "dataset_sha256": "a" * 64,
+            "rule": "offline fixture only", "coinbase_error": None,
+            "bitstamp_error": None, "summary": None, "common_days": 0,
+            "worst_days": [], "flagged": [],
+        }
+        markdown = crosscheck.build_markdown(report)
+        self.assertIn("External acquisition status: **DISABLED**", markdown)
+        self.assertIn("No external source was contacted", markdown)
+        self.assertIn("Coinbase and Bitstamp data were not acquired", markdown)
+        self.assertNotIn("Sources: **Coinbase", markdown)
+
+    def test_crosscheck_verdict_parser_accepts_only_the_exact_two_source_confirmation(self):
+        self.assertTrue(crosscheck.is_confirmed_verdict(crosscheck.CONFIRMED_VERDICT))
+        for value in (
+            "CONFIRMED",
+            "CONFIRMED_UNTRUSTED",
+            "CONFIRMED-malformed",
+            "CONFIRMED but not actually confirmed",
+            "NOT CONFIRMED",
+            "UNAVAILABLE",
+            None,
+            {"verdict": crosscheck.CONFIRMED_VERDICT},
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(crosscheck.is_confirmed_verdict(value))
+
     def test_crosscheck_cannot_be_enabled_by_mutating_legacy_authorization_state(self):
         calls = []
 
