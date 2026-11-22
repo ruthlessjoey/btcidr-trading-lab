@@ -199,18 +199,17 @@ Documentation-only work, historical test results on older commits, draft PRs, sy
 
 ## 80% target and next gates
 
-**Whole-project completion percentage: UNRATED — requirement decomposition and weights are not yet authoritative.** This is not a zero-percent claim. The master vision is now recovered, but the handoff is not a complete acceptance matrix and protected components cannot be independently scored under the current access boundary.
+**Whole-project completion percentage: UNRATED — the 40-row / 100-point scope and weights are owner-approved, but exact-baseline row evidence and independent acceptance are not complete.** This is not a zero-percent claim. The first-pass candidate maturity is **15.00/100** (24 rows at 0.25 across 60 weight points), not a project completion percentage; **0/40** requirements meet the exact-main 0.50 evidence threshold.
 
 Before publishing a numeric percentage:
 
-1. Decompose `PROJECT_HANDOFF.MD` vision into versioned, testable requirements and identify any current ADR conflicts.
-2. Establish one authoritative integration baseline and map every stacked PR to it.
-3. Confirm which Workstream B components can be scored using independent evidence without opening protected implementation.
-4. Propose explicit weights for every requirement; obtain owner acceptance before using them for the 80% score.
-5. Score only implementation and verification evidence on exact commits.
+1. Reconcile all 40 requirements against the selected integration baseline `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`, recording exact implementation, test, security-review and operational evidence for each row.
+2. Distinguish merged-main evidence from draft PRs, M6-stacked candidates and disconnected branches; do not combine separate candidate test passes into an integrated-system claim.
+3. Keep protected requirements explicitly unverified/excluded where their implementation or test import closure cannot be accessed under the current boundary.
+4. Complete exact-head independent review and integration checks for the Q0.8 security candidate, while preserving the immutable scope, provider authorization and retry limits.
+5. Verify market identity, data provenance, cost assumptions, chronological strategy results, portfolio/ledger integration, emergency stop and PAPER lifecycle before assigning maturity to downstream trading requirements.
 
-The next engineering priorities are: redispatch the inspect the Commander, independent-acceptance, and verification sections in Actions run `44285252753` job summary before determining whether PR #60 has an acceptable review outcome using workflow branch `security/workflow-protected-path-isolation-2026-11-18` (workflow head `92ab726dc17e6bdcf66caec67e25956776d6a7e7`); independently review remaining changed paths and reconcile the Q0 security branch with the M6 baseline; then proceed through dataset identity, research integrity, strategy/backtest, and risk/portfolio interfaces without crossing protected boundaries.
-
+The highest-value remaining work is exact-baseline reconciliation, resolving the Q0.8 reviewer capacity/acceptance blocker, safe integration of the M6-based candidate without direct merging across its branch divergence, and closing market-identity and PAPER-readiness gates. The old manual-dispatch instructions and run IDs in earlier dated sections are historical snapshots; use the latest dated reconciliation addendum for current workflow inputs and results.
 
 ## 2026-11-18 Q0.8 reviewer scope correction
 
@@ -2478,3 +2477,13 @@ This addendum supersedes every earlier PR #60, PR #82, and Q0.8 head/run snapsho
 - Reviewer run [#44987369526](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987369526) targets the immediately preceding head `fe833c1...` using the new bounded-context runner; at latest check it was still in progress. A separate exact-current-head run [#44987510739](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987510739) for `879c401...` was queued behind it by the workflow's non-cancelling concurrency group. Neither has produced a completed specialist/Commander/acceptance result yet. The earlier run [#44987233932](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987233932) stopped at the 208,000-character limit before creating a checkpoint and must not be resumed.
 - No new market data was requested; no dataset, backtest, holdout evaluation, TEST trade, account action, PR merge, live/PAPER execution or CodeQL scan was performed. No protected paths or modules were read/imported/executed. The current exact-head offline suite runs only the seven documented sparse tests; the research-gate test is included only after the static import-closure test verifies it depends on unprotected `research.crosscheck` and `research.backtest_report`.
 - Completion scoring is unchanged: approved scope 40 requirements / 100 weights; candidate maturity **15.00/100**; **0/40** exact-main acceptance; overall completion **UNRATED**. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+
+
+## Emergency delivery continuation — latest verified PR #60 head — 2026-11-22
+
+- **Current source candidate:** PR #60 head `879c4015fdc79c4c3be1ec1ae0a1f9b5cd895fd0`, draft/open/unmerged, base `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`, exactly 26 changed paths. Compare: **127 ahead / 0 behind** M6. Direct compare to selected `main` `731fc9fbb892dadccc64bf52da2f91ff069da124`: **138 ahead / 92 behind**, merge base `733abeb931eddcb442220f9b73b092833282e671`. It is not a direct mainline integration candidate.
+- **Exact-head test result:** offline run [#44987510714](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987510714) passed **94/94** selected tests on Python **3.11.18** across seven suites: fetcher 33, provider boundary 4, history/import boundary 7, disabled probe 2, static pipeline 12, research gates 12, sanitization 24. All seven emitted `OK`. This is sparse/offline candidate coverage only; protected M6 engine, portfolio and PAPER code were not exercised.
+- **Cross-check high/low agreement finding resolved on this candidate:** commit `879c401...` adds 3% high/low thresholds to both `judge()` and artifact validation, plus two regressions proving high/low divergence cannot produce a `CONFIRMED` result. The original comment (ID `7074485612`) was updated to record resolution. Production cross-check authorization remains `frozenset()`; acquisition remains disabled. No provider request occurred.
+- **Current specialist review state:** run [#44987510739](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987510739) is pending/queued at the last refresh. The preceding PR #60 specialist run [#44987369526](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44987369526) is still reported in progress on predecessor `fe833c...`; its successor is serialized by the Q0.8 concurrency group. The immutable reviewer source currently inspected at commit `1f600c201362f2930b4b92cc7a294bb2e48aa1eb` still sets `MAX_DIFF = 208,000`. No current-head specialist reports, Commander synthesis, independent acceptance or final verification have been retrieved. Do not treat a prior-head run as review coverage for `879c401...`.
+- **Current acceptance:** 40 owner-approved requirements / 100 points; candidate maturity **15.00/100** (not a completion percentage); **0/40** at exact-main 0.50 threshold; overall completion **UNRATED**. Historical proxy remains approximately **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, **0.36 profit factor**; profitability **NOT PROVEN**. PAPER **NOT READY**; LIVE **DISABLED**.
+- No PR merge, provider request, dataset publication, backtest, TEST evaluation, account action, financial transaction, protected-path access or PAPER/LIVE activity occurred during this continuation.
