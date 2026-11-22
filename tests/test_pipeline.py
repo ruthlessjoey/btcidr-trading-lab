@@ -35,19 +35,36 @@ class PipelineContainmentTests(unittest.TestCase):
         pipeline_path = os.path.join(ROOT, "research", "pipeline.py")
         with open(pipeline_path, encoding="utf-8") as f:
             pipeline_tree = ast.parse(f.read(), filename=pipeline_path)
-        wiring = [
+        # Production wiring must not expose a mutable module-level alias.
+        pipeline_aliases = [
             node for node in pipeline_tree.body
             if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Name)
                     and target.id == "AUTHORIZED_CROSSCHECK_PROVIDERS"
                     for target in node.targets)
         ]
-        self.assertEqual(len(wiring), 1)
-        wired_value = wiring[0].value
-        self.assertIsInstance(wired_value, ast.Attribute)
-        self.assertEqual(wired_value.attr, "AUTHORIZED_CROSSCHECK_PROVIDERS")
-        self.assertIsInstance(wired_value.value, ast.Name)
-        self.assertEqual(wired_value.value.id, "crosscheck")
+        self.assertEqual(pipeline_aliases, [])
+
+        # The production loader must pass a fresh, empty immutable allowlist.
+        loader = next(
+            node for node in pipeline_tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "load_required_crosscheck"
+        )
+        loader_calls = [
+            node for node in ast.walk(loader)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "validate_crosscheck_artifact"
+        ]
+        self.assertEqual(len(loader_calls), 1)
+        self.assertGreaterEqual(len(loader_calls[0].args), 4)
+        empty_allowlist = loader_calls[0].args[3]
+        self.assertIsInstance(empty_allowlist, ast.Call)
+        self.assertIsInstance(empty_allowlist.func, ast.Name)
+        self.assertEqual(empty_allowlist.func.id, "frozenset")
+        self.assertEqual(empty_allowlist.args, [])
+        self.assertEqual(empty_allowlist.keywords, [])
 
         # The owner-authorization gate must run before split creation. Inspect
         # syntax only; do not import or execute the pipeline.

@@ -7,6 +7,7 @@ or Bitstamp data or be enabled through mutable module state.
 import json
 import os
 import statistics
+import stat
 from datetime import datetime, timezone
 
 from fetcher import ApiError
@@ -15,73 +16,152 @@ DAY = 86400
 TOLERANCE_PCT = 3.0
 
 # No independent cross-check provider is authorized under the current policy.
-# Keep the gate explicit and immutable; approval requires a reviewed source change.
+# Production entrypoints pass a fresh empty frozenset; this named constant is
+# informational and is not consulted to authorize production backtests.
 AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+MAX_CROSSCHECK_ARTIFACT_BYTES = 1_048_576
+CROSSCHECK_ARTIFACT_SCHEMA = "twin-money-maker.crosscheck/v1"
+CROSSCHECK_ARTIFACT_PRODUCER = "research.crosscheck"
+CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
 
 
 class CrosscheckError(RuntimeError):
     """Safe, unprotected error type for dataset-bound cross-check validation."""
 
 
+def _unique_json_object(pairs):
+    """Reject duplicate keys so evidence has one unambiguous interpretation."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value):
+    """Reject non-standard NaN/Infinity tokens in evidence JSON."""
+    raise ValueError("non-standard JSON numeric constant")
+
+
+def is_confirmed_verdict(value):
+    """Accept only the exact verdict emitted by the two-source comparison rule."""
+    return type(value) is str and value == CONFIRMED_VERDICT
+
+
 def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
-    """Validate dataset-bound evidence without importing the protected backtest engine."""
+    """Validate versioned, dataset-bound evidence from at least two approved sources.
+
+    This pure helper accepts an explicit immutable provider set for isolated
+    fixtures. Production entrypoints below always pass a fresh empty frozenset.
+    """
     flagged = cfg.get("flagged_dates", [])
+    if type(flagged) is not list:
+        raise CrosscheckError("cross-check flagged_dates must be a list")
     if not flagged:
         return None
-    if not authorized_providers:
+    if (any(type(date) is not str or not date for date in flagged)
+            or len(flagged) != len(set(flagged))):
+        raise CrosscheckError("cross-check flagged_dates must contain unique non-empty strings")
+    if (type(authorized_providers) is not frozenset
+            or len(authorized_providers) < 2
+            or any(type(provider) is not str or not provider
+                   for provider in authorized_providers)):
         raise CrosscheckError(
-            "no independent cross-check provider is currently authorized; flagged-date backtests are blocked"
+            "no independent cross-check provider set is accepted; "
+            "at least two distinct authorized providers are required"
         )
-    if not crosscheck_path or not os.path.isfile(crosscheck_path):
-        raise CrosscheckError(
-            "independent cross-check evidence is required for flagged dates; no artifact was supplied"
-        )
+    if type(crosscheck_path) is not str or not crosscheck_path:
+        raise CrosscheckError("independent cross-check artifact path must be a non-empty string")
     try:
-        with open(crosscheck_path, encoding="utf-8") as f:
-            evidence = json.load(f)
-    except (OSError, ValueError) as e:
+        if not os.path.lexists(crosscheck_path):
+            raise CrosscheckError(
+                "independent cross-check evidence is required for flagged dates; no artifact was supplied"
+            )
+        # lstat rejects symlinks even on platforms without O_NOFOLLOW. The
+        # path/descriptor comparisons catch replacement during the open.
+        path_metadata = os.lstat(crosscheck_path)
+        if not stat.S_ISREG(path_metadata.st_mode):
+            raise ValueError("cross-check artifact is not a regular file")
+        flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_NONBLOCK", 0))
+        descriptor = os.open(crosscheck_path, flags)
+        with os.fdopen(descriptor, "rb") as f:
+            metadata = os.fstat(f.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("cross-check artifact is not a regular file")
+            if not os.path.samestat(path_metadata, metadata):
+                raise ValueError("cross-check artifact changed during open")
+            current_path_metadata = os.lstat(crosscheck_path)
+            if (not stat.S_ISREG(current_path_metadata.st_mode)
+                    or not os.path.samestat(current_path_metadata, metadata)):
+                raise ValueError("cross-check artifact path changed during open")
+            if metadata.st_size > MAX_CROSSCHECK_ARTIFACT_BYTES:
+                raise ValueError("cross-check artifact exceeds the size limit")
+            raw = f.read(MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
+        if len(raw) > MAX_CROSSCHECK_ARTIFACT_BYTES:
+            raise ValueError("cross-check artifact exceeds the size limit")
+        evidence = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (OSError, ValueError, RecursionError) as e:
         raise CrosscheckError(
             f"independent cross-check artifact is unreadable: {type(e).__name__}"
         ) from None
-    if not isinstance(evidence, dict):
+    if type(evidence) is not dict:
         raise CrosscheckError("independent cross-check artifact must be a JSON object")
-    if (evidence.get("dataset_version") != manifest.get("version_id") or
-            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+    if (evidence.get("schema") != CROSSCHECK_ARTIFACT_SCHEMA
+            or evidence.get("producer") != CROSSCHECK_ARTIFACT_PRODUCER):
+        raise CrosscheckError(
+            "cross-check artifact schema or producer identity is unsupported"
+        )
+    if (evidence.get("dataset_version") != manifest.get("version_id")
+            or evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
         raise CrosscheckError(
             "cross-check evidence does not match the pinned dataset version and hash"
         )
     used = evidence.get("providers")
-    if (not isinstance(used, list) or not used or
-            any(not isinstance(p, str) for p in used) or
-            len(used) != len(set(used)) or
-            any(p not in authorized_providers for p in used)):
+    if (type(used) is not list or len(used) < 2
+            or any(type(provider) is not str or not provider for provider in used)
+            or len(used) != len(set(used))
+            or any(provider not in authorized_providers for provider in used)):
         raise CrosscheckError(
-            "cross-check artifact does not identify exclusively authorized independent providers"
+            "cross-check artifact must identify at least two distinct authorized independent providers"
         )
     flagged_entries = evidence.get("flagged")
-    if not isinstance(flagged_entries, list):
+    if type(flagged_entries) is not list:
         raise CrosscheckError("cross-check artifact flagged entries must be a list")
     entries = {}
     for item in flagged_entries:
-        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+        if type(item) is not dict or type(item.get("date")) is not str or not item["date"]:
             raise CrosscheckError("cross-check artifact contains a malformed flagged entry")
         if item["date"] in entries:
             raise CrosscheckError("cross-check artifact contains duplicate flagged dates")
         entries[item["date"]] = item
+    if set(entries) != set(flagged):
+        raise CrosscheckError(
+            "cross-check artifact flagged dates do not exactly match the requested dates"
+        )
     for date in flagged:
-        item = entries.get(date)
-        if not item or not str(item.get("verdict", "")).startswith("CONFIRMED"):
-            verdict = item.get("verdict", "MISSING") if item else "MISSING"
+        item = entries[date]
+        for provider in used:
+            source = item.get(provider)
+            if type(source) is not dict or source.get("agrees") is not True:
+                raise CrosscheckError(
+                    f"flagged date {date} lacks affirmative agreement from provider {provider}"
+                )
+        if not is_confirmed_verdict(item.get("verdict")):
+            verdict = item.get("verdict", "MISSING")
             raise CrosscheckError(
-                f"flagged date {date} lacks confirmed independent evidence ({verdict})"
+                f"flagged date {date} lacks the exact confirmed verdict ({verdict})"
             )
     return evidence
 
-
 def load_required_crosscheck(cfg, manifest, crosscheck_path):
-    """Apply the current immutable provider policy to cross-check evidence."""
+    """Keep production flagged-date backtests fail-closed pending separate approval."""
     return validate_crosscheck_artifact(
-        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+        cfg, manifest, crosscheck_path, frozenset()
     )
 
 
@@ -155,10 +235,10 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
                     entry["table"].append({"date": day(tt), "source": name, "open": c.open, "high": c.high,
                                            "low": c.low, "close": c.close})
         cb, bs = entry["coinbase"], entry["bitstamp"]
-        if cb is None:
+        if cb is None or bs is None:
             entry["verdict"] = "UNAVAILABLE"
-        elif cb["agrees"] and (bs is None or bs["agrees"]):
-            entry["verdict"] = "CONFIRMED (approximate: USD is not USDT)"
+        elif cb.get("agrees") is True and bs.get("agrees") is True:
+            entry["verdict"] = CONFIRMED_VERDICT
         else:
             entry["verdict"] = "NOT CONFIRMED"
         res["flagged"].append(entry)
@@ -179,8 +259,9 @@ def build_markdown(r):
     L = ["# Cross-check of flagged candles", "",
          f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The source candles "
          "were **not changed**.", "",
-         "Sources: **Coinbase BTC/USD** daily candles (USD is not USDT) and "
-         "**Bitstamp BTC/USD** around flagged days. Cross-check providers remain disabled pending authorization.",
+         "External acquisition status: **DISABLED**. No external source was contacted; "
+         "Coinbase and Bitstamp data were not acquired. Comparison helpers are retained for offline fixtures only. "
+         "Any provider acquisition requires separate owner authorization.",
          f"Pre-stated rule: {r['rule']}.", ""]
     if r["coinbase_error"]:
         L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")
