@@ -305,6 +305,31 @@ class BoundedResponseTests(unittest.TestCase):
                 with self.assertRaisesRegex(fetcher.ApiError, "deadline is invalid"):
                     fetcher.read_bounded_body(None, 5, timeout)
 
+    def test_response_without_read1_fails_closed(self):
+        with self.assertRaisesRegex(
+                fetcher.ApiError, "does not support bounded single-read operation"):
+            fetcher.read_bounded_body(object(), 5, 1)
+
+    def test_response_without_socket_handle_fails_closed_before_read(self):
+        class Stream:
+            def __init__(self):
+                self.raw = object()
+                self.read_calls = 0
+
+            def read1(self, size):
+                self.read_calls += 1
+                raise AssertionError("must not read without an enforceable deadline")
+
+        class Response:
+            def __init__(self):
+                self.fp = Stream()
+                self.headers = {}
+
+        response = Response()
+        with self.assertRaisesRegex(fetcher.ApiError, "cannot enforce response body deadline"):
+            fetcher.read_bounded_body(response, 5, 1)
+        self.assertEqual(response.fp.read_calls, 0)
+
     def test_default_opener_disables_proxies_and_redirects(self):
         client, server, response = self._response(
             b"{}", b"Content-Length: 2\r\n"

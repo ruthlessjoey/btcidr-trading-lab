@@ -5,8 +5,10 @@ Do not import run.py here: it imports the protected validator.py module.
 import ast
 import json
 import os
+import re
 import subprocess
 import unittest
+from unittest.mock import patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -15,15 +17,37 @@ _STATIC_ONLY_SOURCES = frozenset({
     "run.py",
     ".github/workflows/research-data.yml",
     ".github/workflows/research-backtest.yml",
+    ".github/workflows/q08-offline-tests.yml",
 })
 
 
+def _verified_git_head_sha():
+    """Bind static Git-blob reads to the exact commit GitHub Actions checked out."""
+    expected = os.environ.get("GITHUB_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", expected):
+        raise RuntimeError("GITHUB_SHA is unavailable or invalid")
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    actual = result.stdout.strip()
+    if actual != expected:
+        raise RuntimeError("checked-out HEAD does not match GITHUB_SHA")
+    return expected
+
+
 def git_source_text(path):
-    """Read an allowlisted source blob for AST/text checks without checking it out or importing it."""
+    """Read only an allowlisted blob from the exact GitHub Actions commit."""
     if path not in _STATIC_ONLY_SOURCES:
         raise ValueError("source path is not approved for static inspection")
+    verified_sha = _verified_git_head_sha()
     result = subprocess.run(
-        ["git", "show", "HEAD:" + path],
+        ["git", "show", verified_sha + ":" + path],
+        cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
@@ -153,6 +177,52 @@ class PipelineContainmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             git_source_text("validator.py")
 
+
+    def test_static_source_helper_rejects_unapproved_paths_before_git_access(self):
+        with patch.object(subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "not approved"):
+                git_source_text("validator.py")
+        run.assert_not_called()
+
+    def test_static_source_helper_rejects_head_mismatch_before_git_show(self):
+        expected = "0" * 40
+        actual = "1" * 40
+        with patch.dict(os.environ, {"GITHUB_SHA": expected}), patch.object(
+                subprocess, "run", return_value=type("Result", (), {"stdout": actual + "\\n"})()
+        ) as run:
+            with self.assertRaisesRegex(RuntimeError, "does not match GITHUB_SHA"):
+                git_source_text("run.py")
+        run.assert_called_once_with(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+            capture_output=True, text=True, encoding="utf-8",
+        )
+
+    def test_protected_pipeline_dependency_is_recorded_without_importing_it(self):
+        tree = ast.parse(
+            git_source_text("research/pipeline.py"), filename="research/pipeline.py"
+        )
+        imports_engine = any(
+            isinstance(node, ast.ImportFrom)
+            and node.module == "research"
+            and any(alias.name == "engine" for alias in node.names)
+            for node in ast.walk(tree)
+        )
+        self.assertTrue(imports_engine, "protected research.engine dependency must remain explicit")
+
+    def test_all_three_offline_workflows_exclude_protected_engine_entrypoints(self):
+        for path in (
+            ".github/workflows/q08-offline-tests.yml",
+            ".github/workflows/research-data.yml",
+            ".github/workflows/research-backtest.yml",
+        ):
+            workflow = git_source_text(path)
+            sparse = workflow.split("sparse-checkout: |", 1)[1].split("\\n\\n", 1)[0]
+            for forbidden in (
+                "/run.py", "/research/pipeline.py", "/validator.py", "/report.py",
+                "/P1/", "/signal/data/", "/markets/risk/",
+            ):
+                with self.subTest(path=path, forbidden=forbidden):
+                    self.assertNotIn(forbidden, sparse)
 
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
         source = git_source_text("run.py")
