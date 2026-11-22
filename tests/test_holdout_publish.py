@@ -163,6 +163,30 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_identity_fields_reject_type_coercion_and_malformed_hash(self):
+        cases = ("boolean_integer_collision", "non_string_run_id", "malformed_frozen_hash")
+        for case in cases:
+            with self.subTest(case=case):
+                self.install_pair()
+                bad_reservation = dict(self.reservation)
+                bad_completed = dict(self.completed)
+                if case == "boolean_integer_collision":
+                    bad_reservation["run_attempt"] = True
+                    bad_completed["run_attempt"] = 1
+                elif case == "non_string_run_id":
+                    bad_reservation["run_id"] = 123456
+                    bad_completed["run_id"] = 123456
+                else:
+                    bad_reservation["frozen_hash"] = "not-a-sha256"
+                    bad_completed["frozen_hash"] = "not-a-sha256"
+                self.write_json(self.root / (self.key + ".pending"), bad_reservation)
+                self.write_json(self.output / (self.key + ".json"), bad_completed)
+                self.write_json(self.root / (self.key + ".json"), bad_completed)
+                self.write_json(self.report, {"status": "OK", "test": bad_completed})
+                with self.assertRaisesRegex(RuntimeError, "identity fields are invalid"):
+                    self.publish()
+                self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_report_boolean_does_not_match_integer_evaluation_number(self):
         self.install_pair()
         mismatched_report = dict(self.completed, evaluation_number=True)
