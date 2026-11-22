@@ -46,10 +46,14 @@ jobs:
             /tools/q08_specialist_review.py
 
       - name: Assert immutable reviewer commit identity
+        env:
+          EXPECTED_REVIEWER_SHA: 21716af3e3248bb64f84fbe40b37b32621e1adfb
         run: |
-          actual="$(git -C runner rev-parse HEAD)"
-          expected="21716af3e3248bb64f84bf40b37b32621e1adfb"
-          if [[ "$actual" != "$expected" ]]; then
+          set -euo pipefail
+          actual="$(git -C "$GITHUB_WORKSPACE/runner" rev-parse --verify HEAD)"
+          printf 'Immutable reviewer actual SHA: %s\n' "$actual"
+          printf 'Immutable reviewer expected SHA: %s\n' "$EXPECTED_REVIEWER_SHA"
+          if [[ "$actual" != "$EXPECTED_REVIEWER_SHA" ]]; then
             echo "::error::Immutable reviewer checkout SHA mismatch."
             exit 1
           fi
