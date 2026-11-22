@@ -104,4 +104,16 @@ def evaluate_report(strategy, listing, report, config=None):
     if raw["decision"] not in C.STRATEGY_DECISIONS:
         raise C.StrategyError(f"{strategy.strategy_id} returned {raw['decision']!r}; strategies may return only "
                               f"{', '.join(C.STRATEGY_DECISIONS)}")
-    return make(raw["decision"], raw["reason_codes"], raw["reasons"], raw["indicators"], ref_open, ref_close)
+    strategy_reason_codes = raw["reason_codes"]
+    if not isinstance(strategy_reason_codes, (list, tuple)):
+        raise C.StrategyError(f"{strategy.strategy_id} returned reason_codes outside the contract")
+    undeclared = [
+        code for code in strategy_reason_codes
+        if not isinstance(code, str) or code not in strategy.reason_codes
+    ]
+    if undeclared:
+        raise C.StrategyError(
+            f"{strategy.strategy_id} returned undeclared strategy reason code(s) {undeclared}"
+        )
+    return make(raw["decision"], strategy_reason_codes, raw["reasons"],
+                raw["indicators"], ref_open, ref_close)
