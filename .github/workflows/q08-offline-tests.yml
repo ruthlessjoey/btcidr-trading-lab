@@ -1,6 +1,17 @@
 name: Q0.8 offline security regression tests (strict unprotected subset)
 
 on:
+  push:
+    branches:
+      - security/main-candles-only-and-legacy-entrypoint-isolation-2026-11-20
+    paths:
+      - "*.py"
+      - "**/*.py"
+      - "*.json"
+      - "**/*.json"
+      - "*.md"
+      - "**/*.md"
+      - ".github/workflows/q08-offline-tests.yml"
   workflow_dispatch:
     inputs:
       review_head_sha:
@@ -27,7 +38,7 @@ jobs:
     steps:
       - name: Bind the requested review SHA to the selected branch commit
         env:
-          REVIEW_HEAD_SHA: ${{ inputs.review_head_sha }}
+          REVIEW_HEAD_SHA: ${{ github.event_name == 'push' && github.sha || inputs.review_head_sha }}
           ACTUAL_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
