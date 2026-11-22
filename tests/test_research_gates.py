@@ -493,6 +493,36 @@ class CrosscheckMarkdownSanitizationTests(unittest.TestCase):
         self.assertIn("| Days over 1% / 2% / 5% | unavailable / 1 / 0 |", rendered)
 
 
+    def test_crosscheck_report_removes_markdown_html_and_table_injection(self):
+        rendered = build_markdown({
+            "dataset_version": "v-test",
+            "dataset_sha256": "a" * 64,
+            "rule": "approved **rule** [click](https://evil.test) | <img src=x>",
+            "coinbase_error": "failed [open](https://evil.test)",
+            "bitstamp_error": None,
+            "common_days": 0,
+            "summary": None,
+            "worst_days": [],
+            "flagged": [{
+                "date": "2020-03-12 | injected",
+                "verdict": "UNAVAILABLE **bold** <script>alert(1)</script>",
+                "table": [{
+                    "date": "2020-03-12", "source": "coinbase | <img>",
+                    "open": 1, "high": 1, "low": 1, "close": 1,
+                }],
+                "coinbase": None,
+                "bitstamp": None,
+            }],
+        })
+        self.assertNotIn("**rule**", rendered)
+        self.assertNotIn("[click]", rendered)
+        self.assertNotIn("](https://evil.test)", rendered)
+        self.assertNotIn("<img", rendered)
+        self.assertNotIn("<script", rendered)
+        self.assertNotIn(" | injected", rendered)
+        self.assertNotIn("coinbase |", rendered)
+
+
 class BacktestReportMarketProvenanceTests(unittest.TestCase):
     def test_market_label_comes_from_the_pinned_manifest_shape(self):
         market = {
