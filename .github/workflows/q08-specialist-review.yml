@@ -190,7 +190,6 @@ jobs:
           AUTO_RESUME_COUNT: ${{ inputs.auto_resume_count }}
           CURRENT_BRANCH: ${{ github.ref_name }}
           CURRENT_REPOSITORY: ${{ github.repository }}
-          GITHUB_OUTPUT: ${{ github.output }}
         run: |
           python3 - <<'PY'
           import json
