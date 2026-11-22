@@ -40,6 +40,14 @@ class UrlPolicyTests(unittest.TestCase):
             fetcher.http_get_json(UNVERIFIED_TIME_URL, 5, 1, op, NO_SLEEP)
         self.assertEqual(op.calls, [])
 
+    def test_source_server_time_url_constructor_refuses_unapproved_route(self):
+        source = fetcher.Source(
+            "tokocrypto", "binance_style", "https://www.tokocrypto.site"
+        )
+        with self.assertRaisesRegex(
+                fetcher.DisallowedRequestError, "server-time routes are not approved"):
+            source.time_url()
+
     def test_only_btcusdt_candle_route_is_allowed(self):
         self.assertEqual(fetcher.validate_public_url(CANDLE_URL), CANDLE_URL)
 
