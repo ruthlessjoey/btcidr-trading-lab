@@ -2012,3 +2012,10 @@ This addendum supersedes earlier head/run statements above where they differ.
 - **PR #60** remains at `b9da90b91e49970e8c662771fa6c589f151eda25`. Its exact-head offline suite [#44973807793](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973807793) passed **66/66** tests on Python **3.11.18**. Review run [#44973807749](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973807749) is pending behind global workflow concurrency. Older review run #44973785314 on predecessor `304c044...` is still in progress and currently holds the concurrency group. Its result cannot approve the newer head.
 - **PR #92** remains at `e5ec01ca53ceba41d2c146a4a01bcac5683e3164`; exact-head run #44973714835 passed **92/92** tests on Python **3.11.18**.
 - **PR #79** tracker addendum updated; this is still an unmerged candidate record.
+
+
+## Emergency delivery evidence refresh — 2026-11-22 10:04+08
+
+- **PR #92** latest head `7b91479550159e011b5e1617cb9c6fa88f566c37`; exact-head offline run [#44973974176](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973974176) passed **93/93** selected tests on Python **3.11.18** (suite counts 22, 4, 8, 2, 7, 34, 16). It remains an unmerged candidate.
+- **PR #34** latest head `54c8dd41148a042c6d9a52b0553eb239d98d62b1`; exact-head isolated publisher run #44973932005 passed **24/24** on Python **3.11.18**. This includes the branch-record bool/int strict comparison regression. A newer code change after the earlier 23/23 pass is therefore covered by the 24/24 run.
+- **PR #60** latest head `b9da90b91e49970e8c662771fa6c589f151eda25`; exact-head offline run #44973807793 passed **66/66** on Python **3.11.18**. Its review run #44973807749 is queued behind the global Q0.8 concurrency lock, held by older review run #44973785314 on predecessor `304c044...`; the older review cannot approve the latest head.
