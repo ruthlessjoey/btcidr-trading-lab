@@ -545,17 +545,30 @@ def validate_checkpoint_source_metadata(run: dict, run_id: str,
     repository = run.get("repository") if isinstance(run, dict) else None
     if not isinstance(repository, dict):
         raise RuntimeError("Checkpoint source run metadata is incomplete")
-    if (run.get("id") != int(run_id)
-        or run.get("workflow_id") != EXPECTED_WORKFLOW_ID
-        or run.get("path") != EXPECTED_WORKFLOW_PATH
-        or run.get("event") not in ("workflow_dispatch", "push")
-        or run.get("status") != "completed"
-        or run.get("conclusion") != "failure"
-        or repository.get("full_name") != REPO
-        or run.get("head_sha") != expected_head_sha
-        or run.get("head_branch") != current_branch):
+    mismatches = []
+    if run.get("id") != int(run_id):
+        mismatches.append("run_id")
+    if run.get("workflow_id") != EXPECTED_WORKFLOW_ID:
+        mismatches.append("workflow_id")
+    if run.get("path") != EXPECTED_WORKFLOW_PATH:
+        mismatches.append("workflow_path")
+    if run.get("event") not in ("workflow_dispatch", "push"):
+        mismatches.append("event")
+    if run.get("status") != "completed":
+        mismatches.append("status")
+    if run.get("conclusion") != "failure":
+        mismatches.append("conclusion")
+    if repository.get("full_name") != REPO:
+        mismatches.append("repository")
+    if run.get("head_sha") != expected_head_sha:
+        mismatches.append("head_sha")
+    if run.get("head_branch") != current_branch:
+        mismatches.append("head_branch")
+    if current_branch != EXPECTED_REVIEW_BRANCH:
+        mismatches.append("approved_review_branch")
+    if mismatches:
         raise RuntimeError(
-            "Checkpoint source run does not match this repository, workflow, branch, and exact review head")
+            "Checkpoint source metadata mismatch fields: " + ",".join(mismatches))
 
 
 def validate_checkpoint_source(token: str) -> None:
