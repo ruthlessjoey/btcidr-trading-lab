@@ -1,5 +1,7 @@
 """research/backtest_report.py - Markdown for the Step 2 backtest, readable on a phone."""
 
+import re
+
 METRIC_LIMITS = [
     "**Total return** - one number for one start and end date; moving either by a few weeks can change "
     "it a lot. Open positions are valued at the last close without exit costs, for the strategy and "
@@ -31,6 +33,52 @@ def short(name):
     return name.split(":")[0]
 
 
+def _safe_report_text(value, limit=160):
+    """Collapse and bound untrusted report text; strip Markdown/control syntax."""
+    if type(value) is not str:
+        return "unavailable"
+    cleaned = " ".join(value.split())
+    allowed = []
+    for char in cleaned:
+        if char.isascii() and (char.isalnum() or char in " .,:;_()/+-"):
+            allowed.append(char)
+    result = " ".join("".join(allowed).split())
+    return result[:limit] if result else "unavailable"
+
+
+def _safe_report_hash(value):
+    """Render only a lowercase SHA-256 digest."""
+    return value if type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) else "unavailable"
+
+
+def _safe_report_count(value):
+    """Render non-negative built-in integer counts only."""
+    return str(value) if type(value) is int and value >= 0 else "unavailable"
+
+
+def market_source_label(market):
+    """Return a bounded manifest label; it is descriptive, not identity proof."""
+    unknown = "unknown (market identity unverified)"
+    if type(market) is not dict:
+        return unknown
+    fields = (
+        market.get("provider"),
+        market.get("pair_label"),
+        market.get("timeframe"),
+        market.get("market_type"),
+    )
+    if any(
+        type(value) is not str
+        or not value
+        or len(value) > 64
+        or any(not (char.isascii() and (char.isalnum() or char in "._/-"))
+               for char in value)
+        for value in fields
+    ):
+        return unknown
+    return " ".join(fields)
+
+
 def metric_row(label, scenario, m):
     pf = "n/a" if m["profit_factor"] is None else f"{m['profit_factor']:.2f}"
     trades = f"{m['closed_trades']}" + (" (+1 open)" if m["open_position"] else "")
@@ -49,21 +97,28 @@ def seg_table(block):
 
 
 def build_markdown(r):
+    dataset = r.get("dataset")
+    market = dataset.get("market") if type(dataset) is dict else None
+    market_label = market_source_label(market)
+    run_id = _safe_report_text(r.get("run_id"))
     L = ["# BTC/USDT trend-filter backtest (research only)",
-         f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
-         "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
-         "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
-         "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+         f"Run {run_id} · **READ-ONLY** · no keys, no orders, no live trading", "",
+         f"> **This is a historical simulation on a proxy dataset labelled `{market_label}`. "
+         "The manifest label is not independent proof of instrument identity or executable venue prices. "
+         "It does not demonstrate profitability and is not a signal.** Costs are unverified assumptions; "
+         "the period is one historical sample.", ""]
     if r["status"] != "OK":
-        L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
+        L += ["## STOPPED", "", f"The backtest did not run: {_safe_report_text(r.get('error'))}", "",
               "Nothing was simulated and no results are shown."]
         return "\n".join(L) + "\n"
     d = r["dataset"]
     L += ["## Data (preserved version, pinned)", "",
-          f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
-          f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
-          f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
-          "- Re-verified at load: hash, market identity, order, no duplicates, no gaps, only completed candles."]
+          f"- {_safe_report_text(d.get('version_id'))} · sha256 {_safe_report_hash(d.get('sha256'))}",
+          f"- {market_label} · {_safe_report_count(d.get('rows'))} candles · "
+          f"{_safe_report_text(d.get('first_open_utc'))[:10]} to "
+          f"{_safe_report_text(d.get('last_open_utc'))[:10]} (UTC open times)",
+          "- Re-verified at load: hash, manifest fields, order, no duplicates, no gaps, only completed candles.",
+          "- The manifest market label is descriptive provenance; independent instrument identity remains a separate gate."]
     # flagged candle
     L += ["", "## Flagged candle (2020-03-12, -39.5% in one day)", ""]
     c = r.get("crosscheck")
@@ -73,7 +128,7 @@ def build_markdown(r):
             for name in ("coinbase", "bitstamp"):
                 j = e[name]
                 if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs Binance "
+                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs {market_label} "
                              f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
                              f"low diff {j['low_diff_pct']:+.2f}%")
         if c.get("summary"):
@@ -174,7 +229,8 @@ def build_markdown(r):
           "- Before trusting anything: more trades, other periods or assets, real fees, and paper trading with live prices.",
           "", "## Metric limitations", ""] + [f"- {m}" for m in METRIC_LIMITS]
     L += ["", "## Unresolved concerns", "",
-          "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
+          f"- Dataset market label: {market_label}. Independent market identity and executable venue prices remain unverified.",
+          "- Tokocrypto prices, spreads, fees and order rules are not verified for execution.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
           "- No independent cross-check was run: Coinbase and Bitstamp are excluded pending separate provider authorization. The flagged candle remains unverified."]

@@ -74,7 +74,7 @@ class HistoryContainmentTests(unittest.TestCase):
             "tests/test_history.py": {"research.history"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
-            "tests/test_research_gates.py": {"research.crosscheck"},
+            "tests/test_research_gates.py": {"research.crosscheck", "research.backtest_report"},
             "tests/test_sanitization.py": {"fetcher", "providers", "research.crosscheck"},
             "fetch_history.py": {"research.history"},
             "fetcher.py": set(),
