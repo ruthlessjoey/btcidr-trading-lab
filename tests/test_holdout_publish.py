@@ -215,6 +215,25 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertEqual(json.loads(backup.read_text(encoding="utf-8")), self.reservation)
         self.assertFalse(any(self.root.glob(".holdout-publish-*")))
 
+    def test_unreadable_staged_reservation_is_restored(self):
+        self.install_pair()
+        pending = self.root / (self.key + ".pending")
+        original_read = _read_object
+
+        def fail_staged_read(path, description, return_identity=False):
+            if Path(path).parent.name.startswith(".holdout-publish-"):
+                raise RuntimeError("synthetic staged read failure")
+            return original_read(path, description, return_identity)
+
+        with mock.patch(
+                "research.holdout_publish._read_object", side_effect=fail_staged_read):
+            with self.assertRaisesRegex(RuntimeError, "synthetic staged read failure"):
+                self.publish()
+
+        self.assertTrue(pending.is_file())
+        self.assertEqual(json.loads(pending.read_text(encoding="utf-8")), self.reservation)
+        self.assertFalse(any(self.root.glob(".holdout-publish-*")))
+
     def test_report_boolean_does_not_match_integer_evaluation_number(self):
         self.install_pair()
         mismatched_report = dict(self.completed, evaluation_number=True)
