@@ -38,10 +38,21 @@ class LimitedReader:
         return data
 
 
+def _reject_symlink_components(path: Path, description: str) -> None:
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    for component in (absolute, *absolute.parents):
+        if component.is_symlink():
+            raise ValueError(f"{description} must not traverse a symlinked path component")
+
+
 def _open_regular_archive(path: Path):
-    if path.is_symlink():
-        raise ValueError("archive must not be a symlink")
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    _reject_symlink_components(path, "archive")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    descriptor = os.open(path, flags)
     raw = os.fdopen(descriptor, "rb")
     try:
         metadata = os.fstat(raw.fileno())
@@ -72,6 +83,8 @@ def extract_actionlint(
         raise ValueError("binary-size limit is invalid")
     if type(max_members) is not int or not 0 < max_members <= MAX_MEMBERS:
         raise ValueError("archive-member limit is invalid")
+    _reject_symlink_components(archive, "archive")
+    _reject_symlink_components(binary.parent, "binary destination")
     if binary.name != "actionlint" or binary.parent.is_symlink() or not binary.parent.is_dir():
         raise ValueError("binary destination must be a fixed file in a real directory")
     if binary.exists() or binary.is_symlink():
