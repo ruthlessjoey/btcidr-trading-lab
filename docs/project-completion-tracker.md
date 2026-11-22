@@ -1815,3 +1815,29 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 
 - PR #82 current head is 290436766951ee586c298a854528a8b7d4c5a14c on main base 731fc9fbb892dadccc64bf52da2f91ff069da124. Push-triggered run #44972046522 checked out the exact current SHA and passed 59/59 Python 3.11.18 offline tests (6 import boundary, 30 fetcher, 4 provider/configuration, 3 disabled probe, 12 sanitization, 4 legacy-entrypoint isolation).
 - The scoped COMMENTED review is on predecessor SHA 883bc7c3c500102405dad884dd0995ee4e0e887d. Comparison from that reviewed SHA to the current PR #82 head is exactly one commit and one changed file: .github/workflows/q08-offline-tests.yml, adding a scoped push trigger. No source/test implementation changed after the COMMENTED review. Review is still COMMENTED, not APPROVED; PR remains draft/open/unmerged.
+
+
+## Emergency delivery execution — 2026-11-22 09:42+08
+
+**Live integration baseline:** `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`. No candidate PR was merged. The owner-approved whole-project inventory remains 40 requirements / 100 weighted points.
+
+### Exact-head candidate changes and CI
+
+- PR #60 remains open/draft/unmerged on the M6 line. Current head: `d4edb4bc634e794b1957399471532ad7671576ba`.
+  - Commit `6e6d8b768c4ce89ebb546705420a387a85c3c59b` added `.github/workflows/q08-specialist-review.yml` to the offline suite path filter. The exact-head push run [#44972548746](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972548746) passed **65/65** tests on Python **3.11.18** (21 fetcher, 4 provider boundary, 7 history, 2 disabled probe, 7 pipeline, 10 research gates, 14 sanitization).
+  - Commit `d4edb4bc634e794b1957399471532ad7671576ba` added `.github/workflows/q08-offline-tests.yml` to the specialist review path filter so edits to the offline test workflow trigger a fresh exact-head review. The exact-head offline push run [#44972690427](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690427) passed **65/65** tests on Python **3.11.18** with the same seven suite counts. Permissions, immutable reviewer source, sparse checkout and retry ceilings were not broadened.
+  - Exact-head 19-role review run [#44972690441](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690441) is running against `d4edb4b...` at this snapshot. It is not yet an accepted review. The previous attempt on `f6c520f...` stopped at 3/16 reports due OpenRouter HTTP 429; do not treat that old checkpoint as current-head acceptance.
+
+- PR #92 remains open/draft/unmerged and stacked on PR #60. Current head: `52c9570a93e233cd6c64aefb8876847791226fa1`. The current parent comparison is diverged (45 commits ahead / 2 behind); this is not synchronized or integrated.
+  - Commit `a2e8f3132ca0d5ce553264ef5216a382631fed00` corrected the strict-evidence test fixture so the false-agreement example's reported return gap matches its underlying return values, and aligned the missing-provider assertion with structural validation.
+  - Commit `39a3cfb35ed15243be4b307248d5dee8459afa47` collapsed whitespace after unsafe Markdown/control characters are removed by the report sanitizer, preserving its allowlist and output bound.
+  - The latest exact-head offline run [#44972699507](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972699507) passed **90/90** tests on Python **3.11.18**: 21 fetcher, 4 provider boundary, 7 history, 2 disabled probe, 7 pipeline, 33 research gates, and 16 sanitization. This head includes a comment-only workflow annotation above the already-tested implementation; the exact SHA was checked by the workflow.
+
+### Evidence and status that do not change
+
+- The PR #60/#92 results above are bounded candidate-branch tests, not current-main verification, production integration, protected-engine testing, or independent whole-project acceptance. The PRs remain draft/open; no merge or project maturity credit is awarded.
+- The approved 40-row first-pass evidence audit remains **15.00/100 candidate-weighted maturity** (24 rows covering 60 weight points at 0.25; 16 rows at 0.00) and **0/40** rows at the 0.50 exact-main threshold. This is not a 15% completion claim. Overall project completion remains **UNRATED** pending row-by-row exact-baseline reconciliation and independent acceptance.
+- Profitability remains **NOT PROVEN**. Historical proxy evidence is approximately **−11% return / 0.36 profit factor**; instrument identity, realistic venue fees/slippage and accepted chronological out-of-sample results are absent.
+- PAPER remains **NOT READY**; LIVE remains **DISABLED**.
+- Production cross-check provider authorization remains empty and fail-closed; no Coinbase/Bitstamp or other provider was enabled or contacted. Tokocrypto access was not used in this session.
+- No protected paths were accessed or executed. No dataset was published, no backtest was run, no PAPER/LIVE operation, order, credential/account action, payment, funding or withdrawal occurred.
