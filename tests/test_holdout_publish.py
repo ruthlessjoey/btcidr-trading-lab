@@ -191,6 +191,7 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.install_pair()
         pending = self.root / (self.key + ".pending")
         replacement = dict(self.reservation, run_attempt="99")
+        backup = self.root / "replaced-pending.json"
         original_rename = os.rename
         replaced = False
 
@@ -198,7 +199,7 @@ class HoldoutPublicationTests(unittest.TestCase):
             nonlocal replaced
             if not replaced and os.fspath(source) == os.fspath(pending):
                 replaced = True
-                pending.unlink()
+                os.replace(pending, backup)
                 self.write_json(pending, replacement)
             return original_rename(source, destination)
 
@@ -210,6 +211,8 @@ class HoldoutPublicationTests(unittest.TestCase):
         self.assertTrue(replaced)
         self.assertTrue(pending.is_file())
         self.assertEqual(json.loads(pending.read_text(encoding="utf-8")), replacement)
+        self.assertTrue(backup.is_file())
+        self.assertEqual(json.loads(backup.read_text(encoding="utf-8")), self.reservation)
         self.assertFalse(any(self.root.glob(".holdout-publish-*")))
 
     def test_report_boolean_does_not_match_integer_evaluation_number(self):
