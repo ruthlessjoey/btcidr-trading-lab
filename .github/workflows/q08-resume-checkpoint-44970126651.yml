@@ -1,4 +1,4 @@
-name: Q0.8 recover saved checkpoint 44970126651
+name: Q0.8 resume latest checkpoint after quota stop 44971089583
 
 on:
   push:
@@ -20,14 +20,14 @@ jobs:
       pull-requests: read
       actions: read
     steps:
-      - name: Restore exact failed-run checkpoint
+      - name: Restore latest checkpoint from quota-interrupted resume
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: q08-review-checkpoint-44970126651
+          name: q08-review-checkpoint-44971089583
           path: ${{ runner.temp }}
           github-token: ${{ github.token }}
           repository: ruthlessjoey/btcidr-trading-lab
-          run-id: 44970126651
+          run-id: 44971089583
 
       - name: Checkout immutable push-resume reviewer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
