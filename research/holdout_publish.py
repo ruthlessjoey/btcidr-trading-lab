@@ -132,6 +132,13 @@ def _remove_exact_reservation(path, expected_identity):
         staged.unlink()
         quarantine.rmdir()
     except RuntimeError:
+        try:
+            if os.path.lexists(staged) and not os.path.lexists(path):
+                os.rename(staged, path)
+            if quarantine.is_dir() and not any(quarantine.iterdir()):
+                quarantine.rmdir()
+        except OSError:
+            pass
         raise
     except OSError as exc:
         try:
