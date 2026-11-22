@@ -89,8 +89,8 @@ def select_resume_run(
     for page in range(1, MAX_RUN_PAGES + 1):
         url = (
             "https://api.github.com/repos/" + REPOSITORY
-            + "/actions/runs?workflow_id=" + str(workflow_id)
-            + "&event=workflow_run&per_page=" + str(RUNS_PER_PAGE)
+            + "/actions/workflows/" + str(workflow_id) + "/runs"
+            + "?event=workflow_run&per_page=" + str(RUNS_PER_PAGE)
             + "&page=" + str(page)
         )
         payload = fetch_json(url, token)
