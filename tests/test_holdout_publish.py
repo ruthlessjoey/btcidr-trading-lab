@@ -171,6 +171,14 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_branch_record_boolean_does_not_match_integer_evaluation_number(self):
+        self.install_pair()
+        mismatched_branch_record = dict(self.completed, evaluation_number=True)
+        self.write_json(self.root / (self.key + ".json"), mismatched_branch_record)
+        with self.assertRaisesRegex(RuntimeError, "branch completed record differs from this run's result"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_overflowing_json_float_refuses_cleanup(self):
         self.install_pair()
         raw = json.dumps({"status": "OK", "test": self.completed}, sort_keys=True)
