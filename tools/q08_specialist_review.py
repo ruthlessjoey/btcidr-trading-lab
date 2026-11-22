@@ -96,6 +96,17 @@ MAX_DIFF = 224_000  # Current PR #60 diff is 210,091 chars; hard request/total c
 MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
 MAX_OUTPUT = 24_000
+REPORT_OUTPUT_CONTRACT = """Return a concise, evidence-dense specialist report.
+The first non-empty line must contain exactly one explicit verdict: PASS, PASS WITH FINDINGS,
+BLOCKED, or INCONCLUSIVE.
+Keep the complete report within 8,000 characters; target 4,000–6,000 characters where feasible.
+Do not restate the task, repository scope, or generic positive observations. For each distinct
+material finding, give severity, exact path and symbol/line or quoted source fact, impact,
+actionable remediation, and one concrete acceptance/regression check.
+Do not omit a material issue to meet the length target. Group findings only when they share
+the same root cause. Mark conditional assumptions and unverified behavior explicitly.
+Do not infer protected source contents, runtime results, test results, or operational success.
+""";
 
 SECRET_PATTERNS = (
     re.compile(r"\bsk-or-v1-[A-Za-z0-9]{20,}\b"),
@@ -756,7 +767,7 @@ def require_complete_finish_reason(finish_reason) -> None:
 def ask_model(system: str, payload: dict, key: str, endpoint: str, model: str, label: str) -> str:
     body = json.dumps({
         "model":model, "temperature":0.1, "max_tokens":5000, "reasoning":{"effort":"none"},
-        "messages":[{"role":"system","content":system},
+        "messages":[{"role":"system","content":system + "\n\n" + REPORT_OUTPUT_CONTRACT},
                     {"role":"user","content":json.dumps(payload, ensure_ascii=False)}],
     }).encode("utf-8")
     enforce_request_limit(body)
@@ -925,6 +936,9 @@ def write_summary(text: str):
         print(text)
 
 def synthetic():
+    assert "first non-empty line" in REPORT_OUTPUT_CONTRACT
+    assert "8,000 characters" in REPORT_OUTPUT_CONTRACT
+    assert "Do not omit a material issue" in REPORT_OUTPUT_CONTRACT
     assert len(REVIEW_PATHS) == 27 and len(EXPECTED_STATUS) == 26 and len(SPECIALISTS) == 16
     assert len(SPECIALISTS) + 3 == 19
     assert EXPECTED_CHANGED.issubset(set(REVIEW_PATHS))
