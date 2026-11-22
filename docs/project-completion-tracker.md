@@ -1437,3 +1437,20 @@ Twin money maker.
 - Follow-up to the PR #95 result above: exact-head CodeQL run [#45056420356](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056420356) completed successfully. Both Python and Actions analysis jobs passed on `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`. PR #95 now has 13/13 tests plus exact-head CodeQL success; remains open/draft/unmerged.
 
 Twin money maker.
+
+
+---
+
+### Final Q0.8 automation correction and exact-head evidence — 2026-11-23
+
+- PR #97 current head is `4dfff3092a139193fd2f5b503924882ac79c8b94`, open/draft/unmerged against `main`. The trusted workflow's run-history lookup now calls the GitHub Actions workflow endpoint using the supported filename `q08-specialist-review.yml`, rather than passing the full `.github/workflows/...` path. An exact URL regression test protects this.
+- The helper is synchronized into immutable reviewer commit `41fcbb834274ab2f76adde762d6aa80d13107981`, blob `d468706ec5a2814dc7d887f49f6bfa6cf84216cb`; the PR #97 branch uses the identical blob. The immutable reviewer source remains pinned and unmodified at blob `ac4cd045f8ff525744705f9fbedee5ea57104838`.
+- Exact-head PR #97 push-run [#45056707058](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056707058) passed **18/18** adversarial Python 3.11 tests, Actionlint archive checksum validation, and lint of both trusted Q0.8 workflow files. Exact-head pull-request run [#45056711669](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056711669) also passed. Exact-head CodeQL run [#45056707494](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056707494) passed both Python and Actions analyses.
+- PR #95 current head `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`: exact-head Actionlint archive suite [#45056419053](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056419053) passed **13/13** on Python 3.11.18, including nonblocking FIFO rejection and symlinked archive/destination parent tests. Exact-head CodeQL [#45056420356](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056420356) passed both Python and Actions analysis.
+- PR #60 current head remains `e8674dbfe3efd2339ddb028484362f9466f7b058`; exact-head Q0.8 offline suite [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) passed **103/103** selected tests across seven suites. Its existing branch-local auto-resume controller remains separate and still requires a first manual dispatch; PR #97 adds the trusted-default-branch automatic first-review path.
+- PR #98 latest head `3576c8041d27b0f54a572adc826c462d892ffd0c`; exact-head pure strategy package/core suite [#45054403126](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054403126) passed **16/16**; no protected S1 adapter or validator chain was imported/executed.
+- No full 19-role specialist review, Commander verdict, independent acceptance or final verification has yet been produced for PR #60's current head. PR #97's trusted workflow_run listener will become active only after PR #97 is reviewed and merged into `main`; this session did not merge it or initiate a model review.
+- No manual GitHub form dispatch, browser automation, wallet top-up, model API request, exchange/provider request, protected path access or real-money activity occurred in this session.
+- Overall project completion remains **UNRATED** because the proposed 40-item/100-weight inventory is not owner-approved. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+
+Twin money maker.
