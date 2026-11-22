@@ -98,7 +98,7 @@ class CrosscheckGateTests(unittest.TestCase):
             path = os.path.join(d, "linked-crosscheck.json")
             os.symlink(target, path)
             with self.assertRaisesRegex(
-                    CrosscheckError, "artifact is unreadable: OSError"):
+                    CrosscheckError, "artifact is unreadable: ValueError"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_non_string_crosscheck_path_is_rejected_as_crosscheck_error(self):
