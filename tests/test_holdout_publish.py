@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
-from research.holdout_publish import publish_completed_reservations
+from research.holdout_publish import _read_object, publish_completed_reservations
 
 
 class HoldoutPublicationTests(unittest.TestCase):
@@ -46,6 +46,40 @@ class HoldoutPublicationTests(unittest.TestCase):
 
     def publish(self):
         return publish_completed_reservations(self.root, self.output, self.report)
+
+    def test_read_object_opens_in_nonblocking_mode(self):
+        self.install_pair()
+        original_open = os.open
+        observed_flags = []
+
+        def record_flags(path, flags, *args, **kwargs):
+            if os.fspath(path) == os.fspath(self.report):
+                observed_flags.append(flags)
+            return original_open(path, flags, *args, **kwargs)
+
+        with mock.patch("research.holdout_publish.os.open", side_effect=record_flags):
+            _read_object(self.report, "backtest report")
+
+        self.assertEqual(len(observed_flags), 1)
+        self.assertTrue(observed_flags[0] & getattr(os, "O_NONBLOCK", 0))
+
+    def test_read_object_rejects_path_replaced_between_check_and_open(self):
+        self.report.write_text('{"status":"OK"}', encoding="utf-8")
+        original_open = os.open
+        moved = self.report.with_name("original-report.json")
+
+        def replace_then_open(path, flags, *args, **kwargs):
+            if os.fspath(path) == os.fspath(self.report):
+                os.replace(self.report, moved)
+                self.report.write_text('{"status":"REPLACED"}', encoding="utf-8")
+            return original_open(path, flags, *args, **kwargs)
+
+        with mock.patch("research.holdout_publish.os.open", side_effect=replace_then_open):
+            with self.assertRaisesRegex(RuntimeError, "changed during open"):
+                _read_object(self.report, "backtest report")
+
+        self.assertTrue(moved.is_file())
+        self.assertEqual(json.loads(self.report.read_text(encoding="utf-8"))["status"], "REPLACED")
 
     def test_failed_run_with_only_pending_marker_keeps_it_without_completion_report(self):
         pending = self.root / (self.key + ".pending")
