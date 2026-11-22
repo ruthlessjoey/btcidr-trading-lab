@@ -325,11 +325,16 @@ def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=None,
 
 
 def _safe_report_text(value, limit=160):
-    """Render only ordinary strings; remove line breaks and control characters."""
+    """Render bounded plain text; remove Markdown, HTML, pipes, and control syntax."""
     if type(value) is not str:
         return "unavailable"
     cleaned = " ".join(value.split())
-    return cleaned[:limit] if cleaned else "unavailable"
+    allowed = []
+    for char in cleaned:
+        if char.isascii() and (char.isalnum() or char in " .,:;_()/+-"):
+            allowed.append(char)
+    result = " ".join("".join(allowed).split())
+    return result[:limit] if result else "unavailable"
 
 
 def _safe_report_number(value, spec=".2f"):
