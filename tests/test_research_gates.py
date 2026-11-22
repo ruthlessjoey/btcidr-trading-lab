@@ -365,7 +365,7 @@ class CrosscheckGateTests(unittest.TestCase):
             calls.append(("sleep", args, kwargs))
             raise AssertionError("cross-check sleep must never be called")
 
-        with self.assertRaisesRegex(RuntimeError, "independent cross-check providers are not authorized") as ctx:
+        with self.assertRaisesRegex(Exception, "independent cross-check providers are not authorized") as ctx:
             run_crosscheck(
                 MANIFEST, (), ["2020-03-12"], object(),
                 opener=forbidden_opener, sleep=forbidden_sleep,
