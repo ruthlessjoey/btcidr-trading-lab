@@ -1,26 +1,174 @@
-"""research/crosscheck.py - compare the preserved Binance daily candles with independent sources.
+"""research/crosscheck.py - compare preserved daily candles with independent sources.
 
-READ-ONLY. Coinbase BTC/USD (docs read) is compared over the whole history. Bitstamp BTC/USD
-(docs NOT read this session, so treated as unverified) is compared only around flagged days.
-USD is not USDT, so small differences are normal; this checks that a flagged day really happened.
-The Binance candles are never changed.
+READ-ONLY. External cross-check acquisition is disabled pending separate owner approval.
+Only pure comparison/report helpers remain available; this module cannot fetch Coinbase
+or Bitstamp data or be enabled through mutable module state.
 """
 import json
+import math
 import os
 import statistics
-import time
-import urllib.parse
+import stat
 from datetime import datetime, timezone
 
-import fetcher
-import providers
-from fetcher import ApiError, Candle
+from fetcher import ApiError
 
 DAY = 86400
-COINBASE = "https://api.exchange.coinbase.com"
-BITSTAMP = "https://www.bitstamp.net"
-# Pre-stated rule for a flagged day (written before looking at the answer):
-TOLERANCE_PCT = 3.0       # open and close within 3%, and the day's return within 3 percentage points
+TOLERANCE_PCT = 3.0
+REQUIRED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
+CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
+MAX_CROSSCHECK_ARTIFACT_BYTES = 1_048_576
+
+
+def _unique_json_object(pairs):
+    """Reject duplicate JSON keys so evidence has one unambiguous interpretation."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value):
+    """Reject non-standard NaN/Infinity tokens in evidence JSON."""
+    raise ValueError("non-standard JSON numeric constant")
+
+
+
+
+def _valid_confirmed_comparison(value):
+    """Require a complete, finite, agreeing result from one independent venue."""
+    if type(value) is not dict or value.get("agrees") is not True:
+        return False
+    numeric_fields = (
+        "open_diff_pct", "close_diff_pct", "high_diff_pct", "low_diff_pct",
+        "binance_return_pct", "other_return_pct", "return_gap_pp",
+    )
+    numbers = {}
+    for field in numeric_fields:
+        number = value.get(field)
+        if type(number) not in (int, float):
+            return False
+        try:
+            if not math.isfinite(number):
+                return False
+        except (OverflowError, TypeError, ValueError):
+            return False
+        numbers[field] = number
+    return (
+        abs(numbers["open_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["high_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["low_diff_pct"]) <= TOLERANCE_PCT
+        and abs(numbers["return_gap_pp"]) <= TOLERANCE_PCT
+    )
+
+# No independent cross-check provider is authorized under the current policy.
+# Keep the gate explicit and immutable; approval requires a reviewed source change.
+AUTHORIZED_CROSSCHECK_PROVIDERS = frozenset()
+
+
+class CrosscheckError(RuntimeError):
+    """Safe, unprotected error type for dataset-bound cross-check validation."""
+
+
+def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
+    """Validate dataset-bound evidence without importing the protected backtest engine."""
+    flagged = cfg.get("flagged_dates", [])
+    if not flagged:
+        return None
+    try:
+        allowed = frozenset(authorized_providers)
+    except (TypeError, ValueError):
+        allowed = frozenset()
+    if not REQUIRED_CROSSCHECK_PROVIDERS.issubset(allowed):
+        raise CrosscheckError(
+            "no independent cross-check provider set contains both required venues; two independent providers are required; flagged-date backtests are blocked"
+        )
+    if type(crosscheck_path) is not str or not crosscheck_path:
+        raise CrosscheckError("independent cross-check artifact path must be a non-empty string")
+    try:
+        if not os.path.lexists(crosscheck_path):
+            raise CrosscheckError(
+                "independent cross-check evidence is required for flagged dates; no artifact was supplied"
+            )
+        # Reject symlinks, special files and pathname replacement around open.
+        path_metadata = os.lstat(crosscheck_path)
+        if not stat.S_ISREG(path_metadata.st_mode):
+            raise ValueError("cross-check artifact is not a regular file")
+        flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_NONBLOCK", 0))
+        descriptor = os.open(crosscheck_path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("cross-check artifact is not a regular file")
+            if not os.path.samestat(path_metadata, metadata):
+                raise ValueError("cross-check artifact changed during open")
+            current_path_metadata = os.lstat(crosscheck_path)
+            if (not stat.S_ISREG(current_path_metadata.st_mode)
+                    or not os.path.samestat(current_path_metadata, metadata)):
+                raise ValueError("cross-check artifact path changed during open")
+            if metadata.st_size > MAX_CROSSCHECK_ARTIFACT_BYTES:
+                raise ValueError("cross-check artifact exceeds the size limit")
+            raw = stream.read(MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
+        if len(raw) > MAX_CROSSCHECK_ARTIFACT_BYTES:
+            raise ValueError("cross-check artifact exceeds the size limit")
+        evidence = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except CrosscheckError:
+        raise
+    except (OSError, ValueError, RecursionError) as e:
+        raise CrosscheckError(
+            f"independent cross-check artifact is unreadable: {type(e).__name__}"
+        ) from None
+    if not isinstance(evidence, dict):
+        raise CrosscheckError("independent cross-check artifact must be a JSON object")
+    if (evidence.get("dataset_version") != manifest.get("version_id") or
+            evidence.get("dataset_sha256") != manifest.get("csv_sha256")):
+        raise CrosscheckError(
+            "cross-check evidence does not match the pinned dataset version and hash"
+        )
+    used = evidence.get("providers")
+    if (type(used) is not list or len(used) < 2 or
+            any(type(p) is not str for p in used) or
+            len(used) != len(set(used)) or
+            not REQUIRED_CROSSCHECK_PROVIDERS.issubset(used) or
+            any(p not in allowed for p in used)):
+        raise CrosscheckError(
+            "cross-check artifact must identify both distinct authorized independent providers"
+        )
+    flagged_entries = evidence.get("flagged")
+    if not isinstance(flagged_entries, list):
+        raise CrosscheckError("cross-check artifact flagged entries must be a list")
+    entries = {}
+    for item in flagged_entries:
+        if not isinstance(item, dict) or not isinstance(item.get("date"), str):
+            raise CrosscheckError("cross-check artifact contains a malformed flagged entry")
+        if item["date"] in entries:
+            raise CrosscheckError("cross-check artifact contains duplicate flagged dates")
+        entries[item["date"]] = item
+    for date in flagged:
+        item = entries.get(date)
+        if (not item or type(item.get("verdict")) is not str or
+                item["verdict"] != CONFIRMED_VERDICT or
+                not _valid_confirmed_comparison(item.get("coinbase")) or
+                not _valid_confirmed_comparison(item.get("bitstamp"))):
+            raise CrosscheckError(
+                f"flagged date {date} lacks confirmed, complete agreeing evidence from both independent providers"
+            )
+    return evidence
+
+
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Apply the current immutable provider policy to cross-check evidence."""
+    return validate_crosscheck_artifact(
+        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+    )
+
 
 
 def day(ts):
@@ -31,38 +179,9 @@ def to_ts(text):
     return int(datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
 
 
-def fetch_coinbase_daily(http, first_ts, last_ts):
-    out, cur = {}, first_ts
-    while cur <= last_ts:
-        end = min(cur + 299 * DAY, last_ts + DAY)
-        q = urllib.parse.urlencode({"granularity": DAY,
-                                    "start": datetime.fromtimestamp(cur, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                    "end": datetime.fromtimestamp(end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
-        rows = http.get(f"{COINBASE}/products/BTC-USD/candles?{q}")
-        if not isinstance(rows, list):
-            raise ApiError(f"Coinbase did not return a list: {str(rows)[:200]}")
-        for r in rows:
-            try:      # [time, low, high, open, close, volume]
-                out[int(r[0])] = Candle(int(r[0]), float(r[3]), float(r[2]), float(r[1]), float(r[4]), float(r[5]))
-            except (TypeError, ValueError, IndexError):
-                raise ApiError(f"unexpected Coinbase candle: {str(r)[:200]}")
-        cur = end
-    return out
-
-
-def fetch_bitstamp_window(http, first_ts, days):
-    q = urllib.parse.urlencode({"step": DAY, "limit": days, "start": first_ts})
-    obj = http.get(f"{BITSTAMP}/api/v2/ohlc/btcusd/?{q}")
-    try:
-        rows = obj["data"]["ohlc"]
-        return {int(r["timestamp"]): Candle(int(r["timestamp"]), float(r["open"]), float(r["high"]),
-                                            float(r["low"]), float(r["close"]), float(r["volume"]))
-                for r in rows}
-    except (KeyError, TypeError, ValueError):
-        raise ApiError(f"unexpected Bitstamp answer: {str(obj)[:200]}")
-
-
 def pct(a, b):
+    if b == 0:
+        raise ValueError("comparison reference price must be non-zero")
     return (a / b - 1) * 100
 
 
@@ -71,22 +190,35 @@ def judge(binance, other, t):
     if t not in other or t - DAY not in other or t - DAY not in binance:
         return None
     b, o = binance[t], other[t]
-    ret_b = pct(b.close, binance[t - DAY].close)
-    ret_o = pct(o.close, other[t - DAY].close)
-    d = {"open_diff_pct": pct(b.open, o.open), "close_diff_pct": pct(b.close, o.close),
-         "high_diff_pct": pct(b.high, o.high), "low_diff_pct": pct(b.low, o.low),
-         "binance_return_pct": ret_b, "other_return_pct": ret_o,
-         "return_gap_pp": ret_b - ret_o}
-    d["agrees"] = (abs(d["open_diff_pct"]) <= TOLERANCE_PCT and abs(d["close_diff_pct"]) <= TOLERANCE_PCT
-                   and abs(d["return_gap_pp"]) <= TOLERANCE_PCT)
+    try:
+        ret_b = pct(b.close, binance[t - DAY].close)
+        ret_o = pct(o.close, other[t - DAY].close)
+        d = {"open_diff_pct": pct(b.open, o.open), "close_diff_pct": pct(b.close, o.close),
+             "high_diff_pct": pct(b.high, o.high), "low_diff_pct": pct(b.low, o.low),
+             "binance_return_pct": ret_b, "other_return_pct": ret_o,
+             "return_gap_pp": ret_b - ret_o}
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    d["agrees"] = (
+        abs(d["open_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["high_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["low_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["return_gap_pp"]) <= TOLERANCE_PCT
+    )
     return d
 
 
 def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
-    """Pure comparison. `candles` is the preserved Binance list."""
+    """Pure comparison. `candles` is the preserved source list."""
     bn = {c.time: c for c in candles}
     common = sorted(set(bn) & set(coinbase))
-    diffs = [(abs(pct(bn[t].close, coinbase[t].close)), t) for t in common]
+    diffs = []
+    for t in common:
+        try:
+            diffs.append((abs(pct(bn[t].close, coinbase[t].close)), t))
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
     abs_d = [d for d, _ in diffs]
     res = {"common_days": len(common), "binance_days": len(bn),
            "coinbase_days": len(coinbase), "summary": None, "worst_days": [], "flagged": []}
@@ -113,52 +245,32 @@ def compare(candles, coinbase, bitstamp, flagged_dates, window_days=2):
                     entry["table"].append({"date": day(tt), "source": name, "open": c.open, "high": c.high,
                                            "low": c.low, "close": c.close})
         cb, bs = entry["coinbase"], entry["bitstamp"]
-        if cb is None:
+        if cb is None or bs is None:
             entry["verdict"] = "UNAVAILABLE"
-        elif cb["agrees"] and (bs is None or bs["agrees"]):
-            entry["verdict"] = "CONFIRMED (approximate: USD is not USDT)"
+        elif cb["agrees"] is True and bs["agrees"] is True:
+            entry["verdict"] = CONFIRMED_VERDICT
         else:
             entry["verdict"] = "NOT CONFIRMED"
         res["flagged"].append(entry)
     return res
 
 
-def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=fetcher.default_opener,
-                   sleep=time.sleep, timeout=20, retries=3):
-    os.makedirs(out_dir, exist_ok=True)
-    http = providers.Http(timeout, retries, opener, sleep)
-    result = {"dataset_version": manifest["version_id"], "dataset_sha256": manifest["csv_sha256"],
-              "rule": f"open and close within {TOLERANCE_PCT}%, and the day's return within "
-                      f"{TOLERANCE_PCT} percentage points, on Coinbase BTC/USD (and Bitstamp if available)",
-              "coinbase_error": None, "bitstamp_error": None, "http_log": []}
-    coinbase, bitstamp = {}, {}
-    try:
-        coinbase = fetch_coinbase_daily(http, candles[0].time, candles[-1].time)
-    except ApiError as e:
-        result["coinbase_error"] = str(e)
-    if flagged_dates:
-        try:
-            first = to_ts(min(flagged_dates)) - 3 * DAY
-            bitstamp = fetch_bitstamp_window(http, first, 8 + (to_ts(max(flagged_dates)) - to_ts(min(flagged_dates))) // DAY)
-        except ApiError as e:
-            result["bitstamp_error"] = str(e)
-    result.update(compare(candles, coinbase, bitstamp, flagged_dates))
-    result["http_log"] = http.log[:6] + ([("...", f"{len(http.log)} requests in total")] if len(http.log) > 6 else [])
-    with open(os.path.join(out_dir, "crosscheck.json"), "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
-    text = build_markdown(result)
-    with open(os.path.join(out_dir, "crosscheck.md"), "w", encoding="utf-8") as f:
-        f.write(text)
-    print(text)
-    return result
+def run_crosscheck(manifest, candles, flagged_dates, out_dir, opener=None,
+                   sleep=None, timeout=20, retries=3):
+    """Fail closed until independent cross-check sources receive separate approval.
+
+    No provider authorization can be enabled by mutating a module global or by
+    injecting a transport. Re-enabling this feature requires a reviewed source change.
+    """
+    raise ApiError("independent cross-check providers are not authorized")
 
 
 def build_markdown(r):
     L = ["# Cross-check of flagged candles", "",
-         f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The Binance candles "
+         f"Dataset `{r['dataset_version']}` (sha256 `{r['dataset_sha256'][:16]}...`). The source candles "
          "were **not changed**.", "",
-         "Sources: **Coinbase BTC/USD** daily candles (official docs read; USD is not USDT) and "
-         "**Bitstamp BTC/USD** around flagged days (official docs NOT read this session, so unverified).",
+         "Sources: **Coinbase BTC/USD** daily candles (USD is not USDT) and "
+         "**Bitstamp BTC/USD** around flagged days. Cross-check providers remain disabled pending authorization.",
          f"Pre-stated rule: {r['rule']}.", ""]
     if r["coinbase_error"]:
         L.append(f"- Coinbase could not be fetched: {r['coinbase_error']}")
@@ -182,12 +294,13 @@ def build_markdown(r):
             if j:
                 L.append(f"- vs {name}: open {j['open_diff_pct']:+.2f}%, close {j['close_diff_pct']:+.2f}%, "
                          f"high {j['high_diff_pct']:+.2f}%, low {j['low_diff_pct']:+.2f}%; day return "
-                         f"{j['binance_return_pct']:+.2f}% (Binance) vs {j['other_return_pct']:+.2f}% ({name}); "
+                         f"{j['binance_return_pct']:+.2f}% (source) vs {j['other_return_pct']:+.2f}% ({name}); "
                          f"gap {j['return_gap_pp']:+.2f} pp; rule met: {j['agrees']}")
             else:
                 L.append(f"- vs {name}: not available")
-        L.append("- High and low are shown but not used by the rule: they depend on when each venue "
-                 "traded the extreme, and this strategy uses only closes and next-day opens.")
+        L.append("- High and low price differences are included in the agreement threshold, alongside open, " +
+                 "close and daily return-gap differences. They help detect mismatched candle extremes; " +
+                 "they do not establish exact execution prices.")
     L += ["", "## Limits", "",
           "- Two other venues agreeing supports that the move happened; it does not prove every price is exact.",
           "- USD and USDT prices can differ, especially in a crash."]

@@ -8,13 +8,16 @@ import json
 import os
 from datetime import datetime, timezone
 
-from research import dataset, engine, selection, splits as splits_mod, strategy
+from research import crosscheck, dataset, engine, selection, splits as splits_mod, strategy
 from research.backtest_report import build_markdown
 from research.engine import EngineError, Rules
 
 SEGMENTS = (("train", "TRAIN (in-sample; used to screen candidates)"),
             ("validation", "VALIDATION (used to pick among eligible candidates)"),
             ("test", "TEST (final; evaluated once)"))
+
+# Share the exact provider authorization gate with the cross-check runner.
+AUTHORIZED_CROSSCHECK_PROVIDERS = crosscheck.AUTHORIZED_CROSSCHECK_PROVIDERS
 
 
 def utc_day(ts):
@@ -64,8 +67,8 @@ def evaluate_frozen(candles, n, splits, rules, include_test=False):
     return out
 
 
-def write_logs(candles, n, splits, out_dir, rules, include_test):
-    """Trade, order and equity logs for the frozen choice under the BASE cost scenario."""
+def write_logs(candles, n, splits, out_dir, rules):
+    """Write TRAIN/VALIDATION logs only; TEST is owned exclusively by evaluate_test()."""
     costs = selection.SELECTION_COSTS
     sig = strategy.ma_trend(n)(candles)
     with open(os.path.join(out_dir, "trades.csv"), "w", newline="", encoding="utf-8") as ft, \
@@ -76,7 +79,7 @@ def write_logs(candles, n, splits, out_dir, rules, include_test):
         wo.writerow(["segment", "date", "side", "status", "ref_open", "fill", "qty", "fee", "reason"])
         we.writerow(["segment", "date", "strategy_equity", "buy_and_hold_equity"])
         for seg, (a, b) in splits.items():
-            if seg == "test" and not include_test:
+            if seg == "test":
                 continue
             run = engine.simulate(candles, sig, a, b, costs, rules)
             bh = engine.buy_and_hold(candles, a, b, costs, rules)
@@ -111,6 +114,23 @@ def sensitivity(candles, splits, flagged_dates, rules, original_selection):
             "test_signals_identical_for_original_choice": same_test_signals}
 
 
+def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_providers):
+    """Preserve the engine-facing error contract around the safe validator."""
+    try:
+        return crosscheck.validate_crosscheck_artifact(
+            cfg, manifest, crosscheck_path, authorized_providers
+        )
+    except crosscheck.CrosscheckError as exc:
+        raise EngineError(str(exc)) from None
+
+
+def load_required_crosscheck(cfg, manifest, crosscheck_path):
+    """Apply the current owner-approved provider set to the cross-check artifact."""
+    return validate_crosscheck_artifact(
+        cfg, manifest, crosscheck_path, AUTHORIZED_CROSSCHECK_PROVIDERS
+    )
+
+
 def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, crosscheck_path=None,
                  allow_reeval=False, run_id="local", code_rev=None):
     rules = Rules()
@@ -118,6 +138,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     result = {"status": "FAILED", "error": None, "run_id": run_id}
     try:
         manifest, candles = load_pinned(cfg, datasets_root)
+        cross = load_required_crosscheck(cfg, manifest, crosscheck_path)
         splits = splits_mod.make_splits(len(candles), warmup=cfg.get("warmup", 200))
         for n in selection.CANDIDATES:                      # look-ahead guard on the real series
             strategy.assert_causal(strategy.ma_trend(n), candles)
@@ -147,11 +168,7 @@ def run_backtest(cfg, datasets_root, out_dir="out", prev_results_root=None, cros
     n = sel["selected_n"]
     shown = evaluate_frozen(candles, n, splits, rules) if n is not None else None
     if n is not None:
-        write_logs(candles, n, splits, out_dir, rules, test["status"] in ("evaluated", "already_evaluated"))
-    cross = None
-    if crosscheck_path and os.path.exists(crosscheck_path):
-        with open(crosscheck_path, encoding="utf-8") as f:
-            cross = json.load(f)
+        write_logs(candles, n, splits, out_dir, rules)
     sens = sensitivity(candles, splits, cfg.get("flagged_dates", []), rules, sel) if cfg.get("flagged_dates") else None
     result.update(status="OK", dataset=ds, splits={k: {"start": utc_day(candles[a].time),
                                                      "end": utc_day(candles[b - 1].time),
