@@ -1925,3 +1925,14 @@ Static inspection of the unprotected `research/holdout_publish.py` and its dedic
 - Historical proxy strategy evidence remains approximately **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, and **0.36 profit factor**. Costs/fees and the proxy instrument identity are unverified; no new backtest was run. Profitability remains **NOT PROVEN**.
 - PAPER remains **NOT READY**; LIVE remains **DISABLED**.
 - No protected path was accessed or executed; no market API request, full backtest, dataset publication, TEST evaluation, PAPER/LIVE run, credential/account activity, order, payment, funding, or withdrawal occurred.
+
+
+## Same-day delivery final refresh — 2026-11-22 09:56+08
+
+- Selected main baseline remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no merge or mainline integration occurred.
+- PR #92 current head `a115728d02cc374132f765a1752bb5e0d6efd714`, a child of PR #60 at **55 ahead / 0 behind**. Exact-head run [#44973297492](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973297492) passed **91/91** Python 3.11.18 tests (21, 4, 7, 2, 7, 34, 16 across seven selected suites).
+- PR #34 current head `e2b34c3586f7d4fe6319dca33d1517ffeb3a5dd9`, stacked on a non-main branch. Exact-head run [#44973394546](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973394546) passed **20/20** dedicated `test_holdout_publish.py` tests on Python 3.11.18, including boolean-versus-integer and overflowing-float regressions.
+- PR #60 current head `d4edb4bc634e794b1957399471532ad7671576ba`; exact-head offline run [#44972690427](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690427) passed 65/65. Q0.8 specialist run [#44972690441](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690441) failed on provider HTTP 429 at the third role. Its verified checkpoint artifact is #14733888650, ZIP SHA-256 `82b6009e0b45be64ebf08e1f3d104af52fd2379a47dece597ba390232183fbb0`; payload has 2/16 specialist reports, no Commander, no acceptance and no verification. Q0.8 remains inconclusive.
+- PR #82 remains open/draft at `290436766951ee586c298a854528a8b7d4c5a14c`, on `main`. Exact-head run #44972046522 passed 59/59. The previously submitted independent review is COMMENTED on predecessor `883bc7c...`; exact compare shows the current head differs only by one workflow file adding the scoped push trigger. This is not APPROVED.
+- The 40-row audit and rubric remain unchanged: 15.00/100 candidate-weighted maturity, 0/40 exact-main verification threshold, overall completion UNRATED. Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
+- PR #34 static source review records the possible pending-file check/unlink TOCTOU race as an unconfirmed threat-model question, not a demonstrated exploit. No protected import path or engine integration was tested.
