@@ -1265,3 +1265,38 @@ These relationships are based on the current changed-file lists. They do not aut
 - Current PR #78 head `770fd64368d93b81344e6bd4b239714332cb2e34`; compare against frozen PR #60 head `d5d5db6cc5d3f11bf579eed45c873b630ed560a4` confirms 8 commits ahead, 0 behind, exactly six unprotected files. The six approved offline modules now contain 58 test methods. Static re-fetch confirmed the new helper, derived report fields, and unchanged standard-library-only history import closure.
 - Python 3.11 exact-head Actions execution remains pending. No local or CI test pass is claimed. PR #78 remains open/draft and stacked on PR #60; no merge.
 
+
+
+---
+
+### Live repository and evidence reconciliation — 2026-11-23
+
+This dated addendum supersedes older Q0.8 and PR-head snapshots above. All references below were refreshed against GitHub before recording.
+
+#### Repository and stacked candidate state
+
+- Default branch `main` is `731fc9fbb892dadccc64bf52da2f91ff069da124`.
+- PR [#60](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/60) remains **open / draft / unmerged**. Its live head is `3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127`, based on M6 `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`. It is 137 commits ahead / 0 behind M6. Compared with current `main`, it is diverged (148 ahead / 92 behind; merge base `733abeb931eddcb442220f9b73b092833282e671`). This is not a clean direct-main integration candidate; do not merge or retarget without a separately reviewed integration plan.
+- PR [#92](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/92) remains **open / draft / unmerged**, with no submitted PR review. Its current head is `c74c0fb8ef375ec634f96464b12d9555d0ac91f3`; its recorded base SHA is stale and its effective comparison against live PR #60 is diverged (67 ahead / 26 behind; merge base `b9da90b91e49970e8c662771fa6c589f151eda25`). It must not be merged independently of its parent stack.
+- PR [#64](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/64) is now **closed / merged**, with merge commit `731fc9fbb892dadccc64bf52da2f91ff069da124` (the current `main` head). The default-branch specialist workflow now exposes exact-head, resume-run, and synthetic/review mode inputs and pins immutable reviewer `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`. The PR #60 branch workflow still pins its immutable self-contained reviewer `fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1`; both runner sources were statically checked for millisecond/seconds reset parsing, strict exact-head checkpoint identity, atomic checkpoint saving, and the 16 specialist + 3 synthesis/acceptance/verification stages. These source checks are not a completed specialist review.
+
+#### Exact-head offline verification
+
+- PR #60 head `3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127`: Actions run [#45010806695](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45010806695) checked out this exact SHA and passed **103/103** selected offline tests under Python 3.11 (33 fetcher, 4 provider-boundary, 7 history/import-boundary, 2 disabled-probe, 15 static-pipeline, 18 research-gate, 24 sanitization). All seven suites completed without traceback, error, failure, or ResourceWarning in the retrieved job log. This is selected sparse offline coverage, not full integration or project acceptance.
+- A current-head specialist review for PR #60 has **not** been completed. The associated Workstream A run [#45010808935](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45010808935) was skipped and is not the Q0.8 review. The Q0.8 workflow is manual-only. No current-head specialist reports, Commander verdict, independent acceptance, or final verification artifact were retrieved.
+- PR #92 head `c74c0fb8ef375ec634f96464b12d9555d0ac91f3`: Actions run [#45042396379](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45042396379) checked out this exact SHA and passed **98/98** selected offline tests under Python 3.11 (22 fetcher, 4 provider-boundary, 8 history/import-boundary, 4 disabled-probe, 7 static-pipeline, 37 research-gate/report, 16 sanitization). All seven suites completed without traceback, error, failure, or ResourceWarning in the retrieved job log. This remains candidate-only coverage; there is no independent PR review or mainline integration.
+
+#### PR #92 high/low agreement and report consistency
+
+- Static review of `research/crosscheck.py` confirmed that both verdict creation (`judge`) and independent evidence validation require open, close, high, low, and daily-return-gap metrics to remain within the configured 3.0% tolerance. Adversarial tests already rejected high/low divergence and evidence values inconsistent with the rule. The formula was not changed in this follow-up because it was already consistent at the inspected head.
+- Found and corrected a contradictory report explanation that said high/low values were not used by the rule. Commit `aae1a9db30092d5ea71a44e4d576e86d3c3a40b9` updates the explanation; commit `c74c0fb8ef375ec634f96464b12d9555d0ac91f3` adds a regression requiring the rendered report to describe both high/low thresholds and the daily-return-gap threshold.
+- The production cross-check provider authorization remains an empty immutable set. No Coinbase, Bitstamp, or other provider was enabled or contacted. No dataset publication, backtest, PAPER execution, or LIVE activity occurred.
+
+#### Remaining blockers and project status
+
+- Q0.8 full specialist review remains **NOT ACCEPTED / UNVERIFIED** until the exact current PR #60 SHA is reviewed through all 16 specialist roles, Commander synthesis, independent acceptance, and final verification with matching checkpoint/artifact evidence. The user must manually dispatch the Q0.8 workflow on branch `security/q0-provider-sanitization-2026-11-18` with `review_head_sha=3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127`, `mode=review`, and a blank `resume_from_run_id` for the first run. Do not resume a checkpoint tied to any predecessor SHA.
+- PR #60 remains unsuitable for direct mainline merge because of its 92-commit divergence from `main` and protected-path files in the overall comparison. PR #92 is also diverged from its parent and requires ancestry reconciliation before any integration.
+- Historical strategy proxy figures remain provisional and do not prove profitability. **Profitability: NOT PROVEN. PAPER: NOT READY. LIVE: DISABLED.**
+- Overall project completion remains **UNRATED**. Candidate-only selected offline test passes do not count as integrated project-wide acceptance. Protected scope remains uninspected and untested.
+
+Twin money maker.
