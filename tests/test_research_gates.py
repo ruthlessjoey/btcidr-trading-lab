@@ -275,6 +275,43 @@ class CrosscheckGateTests(unittest.TestCase):
                     CrosscheckError, "invalid comparison evidence"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+    def test_return_gap_must_match_the_two_reported_daily_returns(self):
+        for field, value in (
+            ("binance_return_pct", 5.0),
+            ("other_return_pct", -4.0),
+            ("return_gap_pp", 9.0),
+        ):
+            payload = self.payload()
+            payload["flagged"][0]["coinbase"][field] = value
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, payload)
+                with self.subTest(field=field), self.assertRaisesRegex(
+                        CrosscheckError, "invalid comparison evidence"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+        payload = self.payload()
+        payload["flagged"][0]["coinbase"]["binance_return_pct"] = 2.0000000001
+        with tempfile.TemporaryDirectory() as d:
+            path = self.write_evidence(d, payload)
+            self.assertEqual(
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED),
+                payload,
+            )
+
+    def test_versioned_artifact_rejects_unrecognized_fields(self):
+        for mutation in ("top-level", "flagged-entry"):
+            payload = self.payload()
+            if mutation == "top-level":
+                payload["unrecognized"] = "ignored?"
+            else:
+                payload["flagged"][0]["unrecognized"] = "ignored?"
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, payload)
+                with self.subTest(mutation=mutation), self.assertRaisesRegex(
+                        CrosscheckError,
+                        "unsupported fields" if mutation == "top-level" else "malformed flagged entry"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
     def test_invalid_pinned_dataset_manifest_identity_is_rejected(self):
         for manifest in (
             {"version_id": None, "csv_sha256": "a" * 64},
