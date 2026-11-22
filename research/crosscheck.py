@@ -8,6 +8,7 @@ import json
 import math
 import os
 import statistics
+import stat
 from datetime import datetime, timezone
 
 from fetcher import ApiError
@@ -16,6 +17,24 @@ DAY = 86400
 TOLERANCE_PCT = 3.0
 REQUIRED_CROSSCHECK_PROVIDERS = frozenset({"coinbase", "bitstamp"})
 CONFIRMED_VERDICT = "CONFIRMED (approximate: USD is not USDT)"
+MAX_CROSSCHECK_ARTIFACT_BYTES = 1_048_576
+
+
+def _unique_json_object(pairs):
+    """Reject duplicate JSON keys so evidence has one unambiguous interpretation."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value):
+    """Reject non-standard NaN/Infinity tokens in evidence JSON."""
+    raise ValueError("non-standard JSON numeric constant")
+
+
 
 
 def _valid_confirmed_comparison(value):
@@ -67,14 +86,42 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         raise CrosscheckError(
             "no independent cross-check provider set contains both required venues; two independent providers are required; flagged-date backtests are blocked"
         )
-    if not crosscheck_path or not os.path.isfile(crosscheck_path):
-        raise CrosscheckError(
-            "independent cross-check evidence is required for flagged dates; no artifact was supplied"
-        )
+    if type(crosscheck_path) is not str or not crosscheck_path:
+        raise CrosscheckError("independent cross-check artifact path must be a non-empty string")
     try:
-        with open(crosscheck_path, encoding="utf-8") as f:
-            evidence = json.load(f)
-    except (OSError, ValueError) as e:
+        if not os.path.lexists(crosscheck_path):
+            raise CrosscheckError(
+                "independent cross-check evidence is required for flagged dates; no artifact was supplied"
+            )
+        # Reject symlinks, special files and pathname replacement around open.
+        path_metadata = os.lstat(crosscheck_path)
+        if not stat.S_ISREG(path_metadata.st_mode):
+            raise ValueError("cross-check artifact is not a regular file")
+        flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_NONBLOCK", 0))
+        descriptor = os.open(crosscheck_path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("cross-check artifact is not a regular file")
+            if not os.path.samestat(path_metadata, metadata):
+                raise ValueError("cross-check artifact changed during open")
+            current_path_metadata = os.lstat(crosscheck_path)
+            if (not stat.S_ISREG(current_path_metadata.st_mode)
+                    or not os.path.samestat(current_path_metadata, metadata)):
+                raise ValueError("cross-check artifact path changed during open")
+            if metadata.st_size > MAX_CROSSCHECK_ARTIFACT_BYTES:
+                raise ValueError("cross-check artifact exceeds the size limit")
+            raw = stream.read(MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
+        if len(raw) > MAX_CROSSCHECK_ARTIFACT_BYTES:
+            raise ValueError("cross-check artifact exceeds the size limit")
+        evidence = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except CrosscheckError:
+        raise
+    except (OSError, ValueError, RecursionError) as e:
         raise CrosscheckError(
             f"independent cross-check artifact is unreadable: {type(e).__name__}"
         ) from None

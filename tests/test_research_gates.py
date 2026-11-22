@@ -9,9 +9,11 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import research.crosscheck as crosscheck
 from research.crosscheck import (
     CrosscheckError, AUTHORIZED_CROSSCHECK_PROVIDERS,
     load_required_crosscheck, validate_crosscheck_artifact, build_markdown,
@@ -67,6 +69,59 @@ class CrosscheckGateTests(unittest.TestCase):
             with self.assertRaisesRegex(CrosscheckError, "no artifact"):
                 validate_crosscheck_artifact(CFG, MANIFEST, os.path.join(d, "missing.json"),
                                              TEST_APPROVED)
+
+    def write_raw_evidence(self, directory, raw):
+        path = os.path.join(directory, "crosscheck.json")
+        with open(path, "wb") as f:
+            f.write(raw)
+        return path
+
+    def test_duplicate_json_keys_are_rejected_at_every_object_depth(self):
+        raw = (
+            b'{"dataset_version":"v-test","dataset_sha256":"abc123",'
+            b'"providers":["coinbase","bitstamp"],"flagged":[{'
+            b'"date":"2020-03-12","verdict":"CONFIRMED (approximate: USD is not USDT)",'
+            b'"coinbase":{"open_diff_pct":0,"open_diff_pct":0},"bitstamp":{}}]}'
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_raw_evidence(directory, raw)
+            with self.assertRaisesRegex(CrosscheckError, "unreadable: ValueError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_non_standard_json_numeric_constants_are_rejected(self):
+        for token in (b"NaN", b"Infinity", b"-Infinity"):
+            with self.subTest(token=token), tempfile.TemporaryDirectory() as directory:
+                raw = (
+                    b'{"dataset_version":"v-test","dataset_sha256":"abc123",'
+                    b'"providers":["coinbase","bitstamp"],"flagged":[{'
+                    b'"date":"2020-03-12","verdict":"CONFIRMED (approximate: USD is not USDT)",'
+                    b'"coinbase":{"open_diff_pct":' + token + b'},"bitstamp":{}}]}'
+                )
+                path = self.write_raw_evidence(directory, raw)
+                with self.assertRaisesRegex(CrosscheckError, "unreadable: ValueError"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_oversized_crosscheck_artifact_is_rejected_before_parsing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_raw_evidence(
+                directory, b" " * (crosscheck.MAX_CROSSCHECK_ARTIFACT_BYTES + 1)
+            )
+            with self.assertRaisesRegex(CrosscheckError, "unreadable: ValueError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_symlinked_crosscheck_artifact_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = os.path.join(directory, "target.json")
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(self.payload(), f)
+            link = os.path.join(directory, "crosscheck.json")
+            os.symlink(target, link)
+            with self.assertRaisesRegex(CrosscheckError, "unreadable: ValueError"):
+                validate_crosscheck_artifact(CFG, MANIFEST, link, TEST_APPROVED)
+
+    def test_non_string_crosscheck_path_is_rejected(self):
+        with self.assertRaisesRegex(CrosscheckError, "non-empty string"):
+            validate_crosscheck_artifact(CFG, MANIFEST, Path("crosscheck.json"), TEST_APPROVED)
 
     def test_dataset_version_and_hash_must_match(self):
         with tempfile.TemporaryDirectory() as d:
