@@ -216,7 +216,7 @@ class PipelineContainmentTests(unittest.TestCase):
             ".github/workflows/research-backtest.yml",
         ):
             workflow = git_source_text(path)
-            sparse = workflow.split("sparse-checkout: |", 1)[1].split("\\n\\n", 1)[0]
+            sparse = workflow.split("sparse-checkout: |", 1)[1].split("\n\n", 1)[0]
             for forbidden in (
                 "/run.py", "/research/pipeline.py", "/validator.py", "/report.py",
                 "/P1/", "/signal/data/", "/markets/risk/",
