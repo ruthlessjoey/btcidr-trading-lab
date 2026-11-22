@@ -217,3 +217,12 @@ At the recorded baseline: project scope contains 40 owner-approved requirements 
 - The current PR #60 raw patch is 232,545 characters over 26 paths. Protected `main` currently pins the older 192,000-character reviewer; PR #99 updates to the 224,000-character bounded reviewer with two context lines and a separate 256,000-byte request cap.
 - The PR #99 workflow YAML was locally parsed successfully. No exact PR #99 Actions/Actionlint run has occurred; PR #97's related exact-head gate/actionlint and CodeQL results do not replace PR #99 verification.
 - After owner/admin approval and merge of PR #99, select branch `main`, enter the freshly fetched PR #60 head `e8674dbfe3efd2339ddb028484362f9466f7b058` (refresh immediately before dispatch), leave `resume_from_run_id` blank for a fresh review, and choose `mode=review`. No workflow dispatch has been performed in this session.
+
+
+### 9.4 Workflow-dispatch tooling limitation — 23 November 2026
+
+- The GitHub connector exposes workflow-run inspection and rerun actions but no `workflow_dispatch` action.
+- A browser attempt to dispatch PR #99's `mode=synthetic` workflow from its manual-only branch did not start: the available browser-automation wallet balance was `$0.00` and the error was non-retryable. No top-up, payment, or retry was made.
+- Therefore PR #99 has **local YAML-parse evidence only**; no exact-head synthetic Actions run has occurred. Do not claim synthetic or full review success.
+- After owner/admin approval and merge of PR #99, an operator must use GitHub Actions UI on protected `main`: first run `mode=synthetic` with the freshly fetched PR #60 SHA and blank resume ID; only after it passes, manually dispatch `mode=review` with that same SHA and blank resume ID. If a later review stops on 429, wait for the provider reset and manually resume from the newest eligible same-SHA checkpoint.
+- No paid fallback, wallet top-up, or automatic trigger is authorized by this procedure.
