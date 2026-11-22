@@ -69,6 +69,20 @@ def _valid_comparison_evidence(source):
                 return False
         except (OverflowError, ValueError):
             return False
+    try:
+        calculated_gap = (
+            float(source["binance_return_pct"])
+            - float(source["other_return_pct"])
+        )
+        if not math.isclose(
+            float(source["return_gap_pp"]),
+            calculated_gap,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            return False
+    except (OverflowError, ValueError):
+        return False
     expected = (
         abs(source["open_diff_pct"]) <= TOLERANCE_PCT
         and abs(source["close_diff_pct"]) <= TOLERANCE_PCT
@@ -147,6 +161,11 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
         ) from None
     if type(evidence) is not dict:
         raise CrosscheckError("independent cross-check artifact must be a JSON object")
+    expected_evidence_keys = {
+        "schema", "producer", "dataset_version", "dataset_sha256", "providers", "flagged",
+    }
+    if set(evidence) != expected_evidence_keys:
+        raise CrosscheckError("cross-check artifact contains unsupported fields")
     if (evidence.get("schema") != CROSSCHECK_ARTIFACT_SCHEMA
             or evidence.get("producer") != CROSSCHECK_ARTIFACT_PRODUCER):
         raise CrosscheckError(
@@ -175,8 +194,12 @@ def validate_crosscheck_artifact(cfg, manifest, crosscheck_path, authorized_prov
     if type(flagged_entries) is not list:
         raise CrosscheckError("cross-check artifact flagged entries must be a list")
     entries = {}
+    expected_entry_keys = {"date", "verdict", *used}
     for item in flagged_entries:
-        if type(item) is not dict or type(item.get("date")) is not str or not item["date"]:
+        if (type(item) is not dict
+                or set(item) != expected_entry_keys
+                or type(item.get("date")) is not str
+                or not item["date"]):
             raise CrosscheckError("cross-check artifact contains a malformed flagged entry")
         if item["date"] in entries:
             raise CrosscheckError("cross-check artifact contains duplicate flagged dates")
