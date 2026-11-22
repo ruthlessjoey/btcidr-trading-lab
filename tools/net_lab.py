@@ -1,4 +1,8 @@
-"""Disabled broad network scanner. No network access is performed by this module."""
+"""Permanently disabled broad network scanner.
+
+Exit code 2 means the scanner is blocked by policy, not that it should be retried.
+This module performs no network access.
+"""
 import sys
 
 
