@@ -2079,3 +2079,9 @@ The current-head checkpoint artifact #14734094621 contains one specialist report
 - PR #60 exact head `b9da90b...` compares to M6 baseline `cd451972...` as **111 ahead / 0 behind**, with 26 changed paths.
 - PR #60 compared directly with default `main` `731fc9f...` is **122 ahead / 92 behind**, with 89 differing paths. It is based on the M6 feature branch, not a clean direct-main candidate; do not merge it directly to main or treat its branch-wide ancestry as accepted integration.
 - PR #92 is a child candidate **60 ahead / 0 behind** PR #60 current head, with eight changed paths. Its tests remain exact-head candidate evidence only.
+
+
+## Q0.8 checkpoint-resume attempt — 2026-11-22 10:10+08
+
+- Recovery workflow [#44974696738](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44974696738) restored exact-head checkpoint artifact #14734094621 from source run #44973807749. It checked out immutable reviewer commit `9ae2e8f24dfe59e16397022a359840d4a11c2300`, passed Python 3.11 syntax compilation and synthetic checkpoint-policy tests, and waited 110 seconds for the provider's previously reported 240-second reset window.
+- The exact PR #60 review is now running from the restored checkpoint against head `b9da90b91e49970e8c662771fa6c589f151eda25`. No resumed specialist count or acceptance is claimed yet. If quota blocks again, preserve the new checkpoint artifact and do not increase the 120-second retry cap or change model/provider.
