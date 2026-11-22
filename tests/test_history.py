@@ -70,7 +70,7 @@ class HistoryContainmentTests(unittest.TestCase):
         expected_local_edges = {
             "tests/test_fetcher.py": {"fetcher"},
             "tests/test_live_check.py": {"providers", "fetcher"},
-            "tests/test_history.py": set(),
+            "tests/test_history.py": {"research.history"},
             "tests/test_probe.py": {"probe"},
             "tests/test_pipeline.py": set(),
             "tests/test_research_gates.py": {"research.crosscheck", "research.backtest_report"},
@@ -82,6 +82,8 @@ class HistoryContainmentTests(unittest.TestCase):
             "research/history.py": set(),
             "research/crosscheck.py": {"fetcher"},
         }
+        # The module has no module-scope research imports; this guarded local import
+        # is still visible to the AST walker and is checked before it executes.
         forbidden_roots = {
             "P1", "signal", "markets", "validator", "report", "__relative_import__",
         }
