@@ -2448,3 +2448,11 @@ This addendum supersedes every earlier PR #60, PR #82, and Q0.8 head/run snapsho
 - Increasing the reviewer limit or replacing its immutable pin would change the reviewer/security boundary. The default-branch CodeQL full-checkout scope exception remains unresolved; no such limit/pin change or further PR #93/#95 code push was made.
 - PR #60 remains non-integrated because of its M6/main divergence. Overall completion remains **UNRATED**; candidate maturity remains **15.00/100** (not a completion percentage), **0/40** meet the exact-main evidence threshold; profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
 - During this follow-up, no commit was made by this assistant to PR #60; concurrent branch commits were re-fetched and verified. No protected path/module was read, imported, or executed; no market-data request, dataset publication, TEST/backtest, account operation, order, merge, or PAPER/LIVE activity occurred.
+
+
+## Follow-up cross-check verdict completeness review — PR #60 — 2026-11-22
+
+- Re-fetched `research/crosscheck.py` at PR #60 head `a5bdf11d753e540c23c6bb12c58f99cb73b92c63` (blob `52369ad97253832999d6c1a10a41b1b62c1b7041`). Both comparison generation (`judge()`) and artifact validation (`_valid_confirmed_comparison()`) require finite high/low difference fields but use only open, close and return-gap differences for the 3% `agrees` threshold.
+- Consequently a comparison marked `agrees=True` with open/close/return-gap within tolerance but very large high/low divergence can be accepted as `CONFIRMED`. This may be intentional if high/low are informational, but that policy is not explicit in the code/schema and should be resolved before any independent providers are authorized.
+- Recorded finding in PR #60 comment ID `7074485612`. Recommended choices are to enforce the same tolerance on high/low and add regressions, or document that they are informational and make the confirmation semantics explicit.
+- This is a **dormant acceptance risk only**: production `AUTHORIZED_CROSSCHECK_PROVIDERS` remains `frozenset()`, and `run_crosscheck()` refuses external acquisition. No provider or network access was performed; no authorization was widened. No source change or test was made for this finding.
