@@ -48,9 +48,11 @@ def select(candles, splits, candidates=CANDIDATES, costs=SELECTION_COSTS, rules=
         raise engine.EngineError("training split must start after the longest candidate lookback")
     rows = []
     for n in periods:
-        sig = strategy.ma_trend(n)(candles)
-        tr = engine.metrics(engine.simulate(candles, sig, *splits["train"], costs, rules))
-        va = engine.metrics(engine.simulate(candles, sig, *splits["validation"], costs, rules))
+        # Signals are generated only through VALIDATION; TEST remains untouched until reservation.
+        selection_candles = candles[:splits["validation"][1]]
+        sig = strategy.ma_trend(n)(selection_candles)
+        tr = engine.metrics(engine.simulate(selection_candles, sig, *splits["train"], costs, rules))
+        va = engine.metrics(engine.simulate(selection_candles, sig, *splits["validation"], costs, rules))
         rows.append({"n": n, "train": tr, "validation": va,
                      "eligible": tr["total_return"] > 0,
                      "score": va["total_return"] / max(va["max_drawdown"], DD_FLOOR)})
@@ -246,12 +248,83 @@ def _publish_record(directory, final_path, record):
             pass
 
 
+
+def _reservation_context(run_id, run_attempt, workflow_ref, repository):
+    values = {
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "workflow_ref": workflow_ref,
+        "repository": repository,
+    }
+    if (not isinstance(run_id, str) or not run_id.isascii() or not run_id.isdigit() or len(run_id) > 20
+            or not isinstance(run_attempt, str) or not run_attempt.isascii()
+            or not run_attempt.isdigit() or len(run_attempt) > 7
+            or int(run_attempt) < 1 or int(run_attempt) > 1000000
+            or not isinstance(workflow_ref, str) or not workflow_ref or len(workflow_ref) > 512
+            or not isinstance(repository, str) or len(repository) > 256
+            or repository.count("/") != 1):
+        raise engine.EngineError("invalid GitHub reservation context")
+    return values
+
+
+def prepare_test_reservation(frozen, registry_dir, run_id, run_attempt, workflow_ref, repository):
+    """Write a local intent only. This function never computes TEST signals or metrics."""
+    verify_frozen(frozen)
+    if frozen.get("selected_n") is None:
+        return None
+    context = _reservation_context(run_id, run_attempt, workflow_ref, repository)
+    if not registry_dir:
+        raise engine.EngineError("reservation preparation requires an output registry")
+    os.makedirs(registry_dir, exist_ok=True)
+    key = test_key(frozen)
+    completed = os.path.join(registry_dir, key + ".json")
+    pending = os.path.join(registry_dir, key + ".pending")
+    if os.path.lexists(completed) or os.path.lexists(pending):
+        raise engine.EngineError("completed or pending holdout record already exists; refusing reservation")
+    record = {"status": "reserved", "key": key, "frozen_hash": frozen["frozen_hash"], **context}
+    fd = None
+    try:
+        fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            fd = None
+            json.dump(record, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        raise engine.EngineError("holdout reservation already exists")
+    finally:
+        if fd is not None:
+            os.close(fd)
+    return record
+
+
+def verify_committed_test_reservation(frozen, registry_dir, run_id, run_attempt,
+                                      workflow_ref, repository):
+    """Require the exact persistent reservation copied from the research-data branch."""
+    context = _reservation_context(run_id, run_attempt, workflow_ref, repository)
+    key = test_key(frozen)
+    path = os.path.join(registry_dir, key + ".pending")
+    if not os.path.lexists(path) or os.path.islink(path) or not os.path.isfile(path):
+        raise engine.EngineError("committed holdout reservation is missing or not a regular file")
+    try:
+        with open(path, encoding="utf-8") as stream:
+            record = json.load(stream)
+    except (OSError, ValueError) as exc:
+        raise engine.EngineError(f"committed holdout reservation is unreadable: {type(exc).__name__}")
+    expected = {"status": "reserved", "key": key, "frozen_hash": frozen["frozen_hash"], **context}
+    if record != expected:
+        raise engine.EngineError("committed holdout reservation does not match this frozen choice and workflow attempt")
+    return record
+
+
 def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=None,
-                  allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules()):
+                  allow_reeval=False, run_id=None, cost_grid=COST_GRID, rules=Rules(),
+                  committed_reservation=None, allow_local_reservation=False):
     """Evaluate a frozen holdout once, using an exclusive persistent reservation.
 
     A hard process termination leaves the reservation in place and blocks retries until
-    an operator verifies whether a result was published. This deliberately fails closed.
+    an operator verifies whether a result was published. Production callers must provide
+    committed_reservation. allow_local_reservation is reserved for isolated offline unit tests.
     """
     verify_frozen(frozen)
     _verify_frozen_inputs(candles, frozen, splits)
@@ -266,6 +339,43 @@ def evaluate_test(candles, frozen, splits, registry_dir=None, out_registry_dir=N
         raise engine.EngineError("a persistent registry directory is required for holdout evaluation")
     os.makedirs(store_dir, exist_ok=True)
     os.makedirs(reservation_dir, exist_ok=True)
+
+    if committed_reservation is not None:
+        if allow_reeval:
+            raise engine.EngineError("committed-reservation re-evaluation requires a separate reservation identity and is not enabled")
+        if not registry_dir:
+            raise engine.EngineError("committed reservation verification requires the persistent registry")
+        verify_committed_test_reservation(
+            frozen, registry_dir,
+            committed_reservation.get("run_id"),
+            committed_reservation.get("run_attempt"),
+            committed_reservation.get("workflow_ref"),
+            committed_reservation.get("repository"))
+        prior = find_prior_test(registry_dir, frozen, out_registry_dir)
+        if prior and not allow_reeval:
+            raise engine.EngineError("completed holdout record exists alongside a pending reservation; manual recovery required")
+        # The durable marker is owned by the research-data branch publisher. The evaluator
+        # must neither create nor delete it; it only writes the completed result to out/.
+        key = test_key(frozen)
+        sig = strategy.ma_trend(frozen["selected_n"])(candles)
+        a, b = splits["test"]
+        results = {}
+        for costs in cost_grid:
+            results[costs.name] = {
+                "strategy": engine.metrics(engine.simulate(candles, sig, a, b, costs, rules)),
+                "buy_and_hold": engine.metrics(engine.buy_and_hold(candles, a, b, costs, rules)),
+                "cash": engine.metrics(engine.cash_only(candles, a, b, costs, rules))}
+        record = {"status": "evaluated", "key": key, "run_id": committed_reservation["run_id"],
+                  "run_attempt": committed_reservation["run_attempt"],
+                  "workflow_ref": committed_reservation["workflow_ref"],
+                  "repository": committed_reservation["repository"],
+                  "evaluation_number": 1, "re_evaluation": False,
+                  "frozen_hash": frozen["frozen_hash"], "results": results}
+        _publish_record(store_dir, os.path.join(store_dir, key + ".json"), record)
+        return record
+
+    if not allow_local_reservation:
+        raise engine.EngineError("TEST evaluation requires an exact committed reservation")
 
     # Fast path permits recovery of a completed publication if the process stopped
     # after publishing the record but before removing its reservation.

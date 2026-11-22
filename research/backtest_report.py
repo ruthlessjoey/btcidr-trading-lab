@@ -54,6 +54,37 @@ def build_markdown(r):
          "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
          "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
          "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+    if r["status"] == "RESERVATION_PREPARED":
+        reservation = r.get("reservation") or {}
+        L += ["## Reservation prepared", "",
+              "TRAIN + VALIDATION selection and the frozen dataset identity were prepared. "
+              "The TEST window was **not evaluated** in this phase.", ""]
+        if reservation.get("status") == "reserved":
+            L.append(f"- Reservation key: `{reservation.get('key')}`")
+            L.append(f"- Frozen hash: `{reservation.get('frozen_hash')}`")
+            L.append(f"- GitHub run: `{reservation.get('run_id')}`, attempt `{reservation.get('run_attempt')}`")
+            L.append("- The workflow must commit this exact reservation to `research-data` before TEST can run.")
+        else:
+            L.append(f"- No TEST reservation was required: {reservation.get('reason', 'no eligible candidate was selected')}.")
+        return "\n".join(L) + "\n"
+    if r["status"] == "POST_PROCESSING_FAILED":
+        test = r.get("test") or {}
+        L += ["## Post-selection processing failed", "",
+              f"TEST status: **{test.get('status', 'unknown')}**. No new TEST evaluation is claimed by this report.", "",
+              f"- Error: `{r.get('error', 'unknown error')}`",
+              "- Inspect the frozen selection and run output before retrying the workflow."]
+        return "\n".join(L) + "\n"
+    if r["status"] == "POST_EVALUATION_FAILED":
+        test = r.get("test") or {}
+        L += ["## TEST evaluation completed; post-evaluation processing failed", "",
+              f"The TEST result was written with status **{test.get('status', 'unknown')}**. "
+              "The report or supporting logs could not be fully generated.", "",
+              f"- Reservation key: `{test.get('key', 'unavailable')}`",
+              f"- Frozen hash: `{test.get('frozen_hash', 'unavailable')}`",
+              f"- Error: `{r.get('error', 'unknown error')}`", "",
+              "**Do not rerun this TEST evaluation.** Preserve the durable registry and inspect "
+              "the existing result before any recovery action."]
+        return "\n".join(L) + "\n"
     if r["status"] != "OK":
         L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
               "Nothing was simulated and no results are shown."]
@@ -91,9 +122,7 @@ def build_markdown(r):
         L += ["", f"Sensitivity: the same selection with the candle **removed** ({', '.join(sv['removed'])}); "
               "the original candle is kept in the data.",
               f"- Selected period with the candle: **{r['selection']['selected_n']}**; without it: "
-              f"**{sel2['selected_n']}** ({'CHANGED' if sv['selected_n_changed'] else 'unchanged'}).",
-              f"- Test-window signals for the chosen period identical with and without the candle: "
-              f"**{sv['test_signals_identical_for_original_choice']}**."]
+              f"**{sel2['selected_n']}** ({'CHANGED' if sv['selected_n_changed'] else 'unchanged'})."]
         L += ["", "| MA | Train return (with / without) | Validation return (with / without) |", "|---|---|---|"]
         for a, b in zip(r["selection"]["rows"], sel2["rows"]):
             L.append(f"| {a['n']} | {pct(a['train']['total_return'])} / {pct(b['train']['total_return'])} | "
@@ -178,6 +207,6 @@ def build_markdown(r):
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
           "- One cross-check of the flagged day uses USD venues, not USDT."]
-    L += ["", "Logs for the frozen choice under base costs: `trades.csv`, `orders.csv`, `equity.csv`; "
-          "the frozen record is `frozen_choice.json`."]
+    L += ["", "TRAIN + VALIDATION logs for the frozen choice under base costs: `trades.csv`, `orders.csv`, `equity.csv`; "
+          "TEST is not resimulated for log generation. The frozen record is `frozen_choice.json`."]
     return "\n".join(L) + "\n"
