@@ -1,4 +1,7 @@
 """Offline adversarial tests for the trusted Q0.8 workflow_run gate."""
+import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
@@ -12,8 +15,10 @@ from tools.q08_workflow_run_gate import (
     WORKFLOW_PATH,
     GateError,
     select_resume_run,
+    validate_bootstrap_event,
     validate_event,
 )
+import tools.q08_workflow_run_gate as gate
 
 
 def valid_event():
@@ -33,6 +38,151 @@ def valid_event():
 
 
 class WorkflowRunGateTests(unittest.TestCase):
+    def valid_bootstrap_event(self):
+        return {
+            "repository": {"full_name": REPOSITORY},
+            "ref": "refs/heads/main",
+            "after": "f" * 40,
+        }
+
+    def valid_pr60(self):
+        return {
+            "number": 60,
+            "state": "open",
+            "head": {
+                "ref": BRANCH,
+                "sha": "e8674dbfe3efd2339ddb028484362f9466f7b058",
+                "repo": {"full_name": REPOSITORY},
+            },
+            "base": {
+                "ref": "feature/m6-risk-engine",
+                "repo": {"full_name": REPOSITORY},
+            },
+        }
+
+    def valid_offline_run(self):
+        return {
+            "id": 45055081357,
+            "workflow_id": WORKFLOW_ID,
+            "name": WORKFLOW_NAME,
+            "event": "push",
+            "status": "completed",
+            "conclusion": "success",
+            "head_branch": BRANCH,
+            "head_sha": "e8674dbfe3efd2339ddb028484362f9466f7b058",
+            "head_repository": {"full_name": REPOSITORY},
+            "repository": {"full_name": REPOSITORY},
+        }
+
+    def bootstrap_reader(self, *, pr=None, branch_sha=None, workflow_sha=None, runs=None):
+        run_payload = runs if runs is not None else {
+            "total_count": 1,
+            "workflow_runs": [self.valid_offline_run()],
+        }
+        return Mock(side_effect=[
+            self.valid_pr60() if pr is None else pr,
+            {"commit": {"sha": self.valid_pr60()["head"]["sha"] if branch_sha is None else branch_sha}},
+            {"sha": OFFLINE_WORKFLOW_BLOB if workflow_sha is None else workflow_sha},
+            run_payload,
+        ])
+
+    def test_main_push_bootstrap_selects_exact_successful_pr60_head(self):
+        event = self.valid_bootstrap_event()
+        with tempfile.TemporaryDirectory() as temp:
+            event_path = Path(temp) / "event.json"
+            output_path = Path(temp) / "output.txt"
+            event_path.write_text(json.dumps(event), encoding="utf-8")
+            env = {
+                "GITHUB_EVENT_PATH": str(event_path),
+                "GITHUB_REPOSITORY": REPOSITORY,
+                "GITHUB_EVENT_NAME": "push",
+                "GITHUB_TOKEN": "x" * 32,
+                "GITHUB_RUN_ID": "900",
+                "GITHUB_OUTPUT": str(output_path),
+            }
+            with patch.dict(os.environ, env, clear=False), \
+                    patch.object(gate, "validate_bootstrap_event", return_value="e8674dbfe3efd2339ddb028484362f9466f7b058"), \
+                    patch.object(gate, "select_resume_run", return_value="700"):
+                self.assertEqual(gate.main(), 0)
+            self.assertEqual(
+                output_path.read_text(encoding="utf-8"),
+                "review_head_sha=e8674dbfe3efd2339ddb028484362f9466f7b058\n"
+                "resume_from_run_id=700\n",
+            )
+
+    def test_bootstrap_accepts_only_open_exact_pr60_head_with_successful_offline_run(self):
+        reader = self.bootstrap_reader()
+        selected = validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+        self.assertEqual(selected, "e8674dbfe3efd2339ddb028484362f9466f7b058")
+        self.assertEqual(reader.call_count, 4)
+        self.assertIn("/pulls/60", reader.call_args_list[0].args[0])
+        self.assertIn("/branches/" + BRANCH, reader.call_args_list[1].args[0])
+        self.assertIn("actions/workflows/421573668/runs", reader.call_args_list[3].args[0])
+        self.assertIn("status=completed", reader.call_args_list[3].args[0])
+
+    def test_bootstrap_rejects_non_main_or_wrong_repository_event_before_api(self):
+        cases = []
+        event = self.valid_bootstrap_event()
+        event["ref"] = "refs/heads/attacker"
+        cases.append(event)
+        event = self.valid_bootstrap_event()
+        event["repository"] = {"full_name": "attacker/fork"}
+        cases.append(event)
+        event = self.valid_bootstrap_event()
+        event["after"] = "not-a-sha"
+        cases.append(event)
+        for candidate in cases:
+            reader = Mock()
+            with self.subTest(event=candidate), self.assertRaises(GateError):
+                validate_bootstrap_event(candidate, "x" * 32, reader)
+            reader.assert_not_called()
+
+    def test_bootstrap_rejects_closed_fork_wrong_branch_or_wrong_base_pr(self):
+        mutations = (
+            lambda pr: pr.update(state="closed"),
+            lambda pr: pr["head"].update(ref="attacker-branch"),
+            lambda pr: pr["head"].update(repo={"full_name": "attacker/fork"}),
+            lambda pr: pr["base"].update(ref="main"),
+            lambda pr: pr["base"].update(repo={"full_name": "attacker/fork"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate):
+                pr = self.valid_pr60()
+                mutate(pr)
+                reader = Mock(return_value=pr)
+                with self.assertRaises(GateError):
+                    validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+                self.assertEqual(reader.call_count, 1)
+
+    def test_bootstrap_rejects_pr_head_branch_ref_mismatch(self):
+        reader = self.bootstrap_reader(branch_sha="0" * 40)
+        with self.assertRaisesRegex(GateError, "branch ref do not match"):
+            validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+        self.assertEqual(reader.call_count, 2)
+
+    def test_bootstrap_rejects_unapproved_offline_workflow_blob(self):
+        reader = self.bootstrap_reader(workflow_sha="0" * 40)
+        with self.assertRaisesRegex(GateError, "immutable blob"):
+            validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+        self.assertEqual(reader.call_count, 3)
+
+    def test_bootstrap_requires_successful_run_for_exact_current_sha(self):
+        invalid_runs = (
+            dict(self.valid_offline_run(), conclusion="failure"),
+            dict(self.valid_offline_run(), head_sha="b" * 40),
+            dict(self.valid_offline_run(), workflow_id=WORKFLOW_ID + 1),
+            dict(self.valid_offline_run(), head_repository={"full_name": "attacker/fork"}),
+        )
+        for run in invalid_runs:
+            reader = self.bootstrap_reader(runs={"total_count": 1, "workflow_runs": [run]})
+            with self.subTest(run=run), self.assertRaisesRegex(GateError, "no successful exact-head"):
+                validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+
+    def test_bootstrap_fails_closed_on_incomplete_offline_run_page(self):
+        reader = self.bootstrap_reader(runs={"total_count": 101, "workflow_runs": [self.valid_offline_run()]})
+        with self.assertRaisesRegex(GateError, "page is incomplete"):
+            validate_bootstrap_event(self.valid_bootstrap_event(), "x" * 32, reader)
+
     def test_trusted_workflow_restores_gate_selected_same_head_checkpoint(self):
         workflow = (
             Path(__file__).resolve().parents[1]
