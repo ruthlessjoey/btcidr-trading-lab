@@ -1634,3 +1634,9 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - Run #44964704552 produced no checkpoint artifact; the workflow log says no file existed at the upload path. No specialist role report exists from that run.
 - Current manual run targets: PR #60 branch `security/q0-provider-sanitization-2026-11-18`, SHA `f9cc3bfbd600b6edc9fc0cdd0765f0b446b41bf8`; choose reviewer mode `review` and leave resume blank. PR #92 branch `security/q08-crosscheck-strict-json-2026-11-22`, SHA `893e71933448cd56edd53a2c4311baa9d3f30f38`; use Q0.8 offline workflow.
 - No changes to project completion measurement: UNRATED overall; 15.00/100 candidate-weighted snapshot; 0/40 exact-main threshold. Profitability NOT PROVEN; PAPER NOT READY.
+
+
+## PR #92 parent drift refresh — 2026-11-22 (supersedes prior drift counts)
+
+- Live comparison of PR #92 head `893e71933448cd56edd53a2c4311baa9d3f30f38` against its target branch `security/q0-provider-sanitization-2026-11-18` now reports **20 commits ahead and 2 commits behind**. The target branch advanced with both the reviewer runner-pin correction and subsequent PR #60 documentation/metadata updates. PR #92 remains open/draft with its intended five unprotected research/test paths, but needs target synchronization before integration.
+- No rebase, force push, merge, or branch-ref movement was performed. PR #92 exact-head offline tests remain pending.
