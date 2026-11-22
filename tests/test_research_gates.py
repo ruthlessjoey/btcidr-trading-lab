@@ -22,7 +22,7 @@ from research.crosscheck import (
     to_ts, validate_crosscheck_artifact,
 )
 
-MANIFEST = {"version_id": "v-test", "csv_sha256": "abc123"}
+MANIFEST = {"version_id": "v-test", "csv_sha256": "a" * 64}
 CFG = {"flagged_dates": ["2020-03-12"]}
 TEST_APPROVED = frozenset({"coinbase", "bitstamp"})
 
@@ -34,17 +34,31 @@ class CrosscheckGateTests(unittest.TestCase):
             json.dump(payload, f)
         return path
 
+    def comparison_source(self, agrees=True):
+        agrees_by_metrics = agrees is True
+        difference = 1.0 if agrees_by_metrics else 4.0
+        return {
+            "open_diff_pct": difference,
+            "close_diff_pct": difference,
+            "high_diff_pct": 1.0,
+            "low_diff_pct": 1.0,
+            "binance_return_pct": 2.0,
+            "other_return_pct": 1.0,
+            "return_gap_pp": 1.0 if agrees_by_metrics else 4.0,
+            "agrees": agrees,
+        }
+
     def payload(self, verdict=CONFIRMED_VERDICT, providers=("coinbase", "bitstamp"),
                 agreements=None):
         agreements = agreements or {}
         entry = {"date": "2020-03-12", "verdict": verdict}
         for provider in providers:
-            entry[provider] = {"agrees": agreements.get(provider, True)}
+            entry[provider] = self.comparison_source(agreements.get(provider, True))
         return {
             "schema": CROSSCHECK_ARTIFACT_SCHEMA,
             "producer": CROSSCHECK_ARTIFACT_PRODUCER,
             "dataset_version": "v-test",
-            "dataset_sha256": "abc123",
+            "dataset_sha256": "a" * 64,
             "providers": list(providers),
             "flagged": [entry],
         }
@@ -71,7 +85,7 @@ class CrosscheckGateTests(unittest.TestCase):
 
     def test_dataset_version_and_hash_must_match(self):
         for field, value in (("dataset_version", "wrong-version"),
-                             ("dataset_sha256", "wrong-hash")):
+                             ("dataset_sha256", "b" * 64)):
             with tempfile.TemporaryDirectory() as d:
                 payload = self.payload()
                 payload[field] = value
@@ -157,7 +171,7 @@ class CrosscheckGateTests(unittest.TestCase):
 
     def test_non_standard_json_numeric_constants_are_rejected(self):
         raw = json.dumps(self.payload()).replace(
-            '"dataset_sha256": "abc123"', '"dataset_sha256": NaN', 1
+            '"dataset_version": "v-test"', '"dataset_version": NaN', 1
         )
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "crosscheck.json")
@@ -206,8 +220,6 @@ class CrosscheckGateTests(unittest.TestCase):
         for agreements in (
             {"coinbase": False, "bitstamp": True},
             {"coinbase": True, "bitstamp": False},
-            {"coinbase": True, "bitstamp": None},
-            {"coinbase": True, "bitstamp": 1},
         ):
             with tempfile.TemporaryDirectory() as d:
                 path = self.write_evidence(d, self.payload(agreements=agreements))
@@ -215,12 +227,49 @@ class CrosscheckGateTests(unittest.TestCase):
                         CrosscheckError, "lacks affirmative agreement"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
+        for agreements in (
+            {"coinbase": None, "bitstamp": True},
+            {"coinbase": 1, "bitstamp": True},
+        ):
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, self.payload(agreements=agreements))
+                with self.subTest(agreements=agreements), self.assertRaisesRegex(
+                        CrosscheckError, "invalid comparison evidence"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
         payload = self.payload()
         del payload["flagged"][0]["bitstamp"]
         with tempfile.TemporaryDirectory() as d:
             path = self.write_evidence(d, payload)
-            with self.assertRaisesRegex(CrosscheckError, "lacks affirmative agreement"):
+            with self.assertRaisesRegex(CrosscheckError, "invalid comparison evidence"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_comparison_metrics_must_be_finite_and_match_the_agreement_rule(self):
+        mutations = (
+            ("close_diff_pct", 4.0),
+            ("return_gap_pp", 4.0),
+            ("high_diff_pct", float("inf")),
+            ("open_diff_pct", True),
+        )
+        for field, value in mutations:
+            payload = self.payload()
+            payload["flagged"][0]["coinbase"][field] = value
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, payload)
+                with self.subTest(field=field), self.assertRaisesRegex(
+                        CrosscheckError, "invalid comparison evidence"):
+                    validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_invalid_pinned_dataset_manifest_identity_is_rejected(self):
+        for manifest in (
+            {"version_id": None, "csv_sha256": "a" * 64},
+            {"version_id": "v-test", "csv_sha256": "not-a-sha256"},
+        ):
+            with tempfile.TemporaryDirectory() as d:
+                path = self.write_evidence(d, self.payload())
+                with self.subTest(manifest=manifest), self.assertRaisesRegex(
+                        CrosscheckError, "manifest identity is invalid"):
+                    validate_crosscheck_artifact(CFG, manifest, path, TEST_APPROVED)
 
     def test_only_exact_confirmed_verdict_is_accepted(self):
         self.assertTrue(is_confirmed_verdict(CONFIRMED_VERDICT))
