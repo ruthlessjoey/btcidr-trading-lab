@@ -1,6 +1,14 @@
 name: Q0.8 offline security regression tests (sparse unprotected scope)
 
 on:
+  push:
+    branches:
+      - security/q0-provider-sanitization-2026-11-18
+      - security/q08-crosscheck-strict-json-2026-11-22
+    paths:
+      - "**/*.py"
+      - "**/*.json"
+      - ".github/workflows/q08-offline-tests.yml"
   workflow_dispatch:
 
 permissions:
