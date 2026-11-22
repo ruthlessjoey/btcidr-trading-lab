@@ -521,11 +521,21 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
         )
 
     def test_flagged_comparison_uses_the_manifest_market_label(self):
-        path = os.path.join(ROOT, "research", "backtest_report.py")
-        with open(path, encoding="utf-8") as f:
-            source = f.read()
-        self.assertIn("vs {market_label}", source)
-        self.assertNotIn("vs Binance", source)
+        lines = _crosscheck_markdown_lines({
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": "CONFIRMED",
+                "coinbase": {
+                    "other_return_pct": -1.0,
+                    "binance_return_pct": 1.25,
+                    "close_diff_pct": 0.5,
+                    "low_diff_pct": 0.25,
+                },
+            }],
+        }, "tokocrypto BTC/USDT 1d spot")
+        rendered = "\\n".join(lines)
+        self.assertIn("vs tokocrypto BTC/USDT 1d spot", rendered)
+        self.assertNotIn("vs Binance", rendered)
 
     class HostileReportNumber:
         def __format__(self, spec):
