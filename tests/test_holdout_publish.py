@@ -227,7 +227,7 @@ class HoldoutPublicationTests(unittest.TestCase):
 
         with mock.patch(
                 "research.holdout_publish._read_object", side_effect=fail_staged_read):
-            with self.assertRaisesRegex(RuntimeError, "synthetic staged read failure"):
+            with self.assertRaisesRegex(RuntimeError, "durable reservation changed before cleanup"):
                 self.publish()
 
         self.assertTrue(pending.is_file())
