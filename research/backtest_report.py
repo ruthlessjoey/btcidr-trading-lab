@@ -1,5 +1,6 @@
 """research/backtest_report.py - Markdown for the Step 2 backtest, readable on a phone."""
 
+import math
 import re
 
 METRIC_LIMITS = [
@@ -21,16 +22,36 @@ METRIC_LIMITS = [
 ]
 
 
+def _safe_report_number(value):
+    """Return only finite built-in numeric values; never format caller objects."""
+    if type(value) not in (int, float):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _safe_report_percent_points(value, signed=True):
+    number = _safe_report_number(value)
+    if number is None:
+        return "unavailable"
+    return f"{number:+.2f}%" if signed else f"{number:.2f}%"
+
+
 def pct(x):
-    return "n/a" if x is None else f"{x * 100:+.1f}%"
+    number = _safe_report_number(x)
+    return "n/a" if number is None else f"{number * 100:+.1f}%"
 
 
 def plain(x):
-    return "n/a" if x is None else f"{x * 100:.1f}%"
+    number = _safe_report_number(x)
+    return "n/a" if number is None else f"{number * 100:.1f}%"
 
 
 def short(name):
-    return name.split(":")[0]
+    return _safe_report_text(name, 64).split(":")[0]
 
 
 def _safe_report_text(value, limit=160):
@@ -80,19 +101,29 @@ def market_source_label(market):
 
 
 def metric_row(label, scenario, m):
-    pf = "n/a" if m["profit_factor"] is None else f"{m['profit_factor']:.2f}"
-    trades = f"{m['closed_trades']}" + (" (+1 open)" if m["open_position"] else "")
-    return (f"| {scenario} | {label} | {pct(m['total_return'])} | {plain(m['max_drawdown'])} | {trades} | "
-            f"{plain(m['win_rate'])} | {pf} | {plain(m['exposure'])} |")
+    profit_factor = _safe_report_number(m.get("profit_factor"))
+    pf = "n/a" if profit_factor is None else f"{profit_factor:.2f}"
+    closed_trades = _safe_report_count(m.get("closed_trades"))
+    trades = closed_trades + (" (+1 open)" if m.get("open_position") is True else "")
+    return (f"| {_safe_report_text(scenario, 48)} | {_safe_report_text(label, 48)} | "
+            f"{pct(m.get('total_return'))} | {plain(m.get('max_drawdown'))} | {trades} | "
+            f"{plain(m.get('win_rate'))} | {pf} | {plain(m.get('exposure'))} |")
 
 
 def seg_table(block):
     L = ["| Costs | Row | Return | Max drawdown | Closed trades | Win rate | Profit factor | Exposure |",
          "|---|---|---|---|---|---|---|---|"]
+    if type(block) is not dict:
+        return L
     for scen, parts in block.items():
-        L.append(metric_row("Strategy", short(scen), parts["strategy"]))
-        L.append(metric_row("Buy and hold", short(scen), parts["buy_and_hold"]))
-        L.append(metric_row("Cash", short(scen), parts["cash"]))
+        if type(parts) is not dict:
+            continue
+        for name, key in (("Strategy", "strategy"),
+                          ("Buy and hold", "buy_and_hold"),
+                          ("Cash", "cash")):
+            metrics = parts.get(key)
+            if type(metrics) is dict:
+                L.append(metric_row(name, short(scen), metrics))
     return L
 
 
@@ -122,22 +153,41 @@ def build_markdown(r):
     # flagged candle
     L += ["", "## Flagged candle (2020-03-12, -39.5% in one day)", ""]
     c = r.get("crosscheck")
-    if c:
-        for e in c["flagged"]:
-            L.append(f"- **{e['date']}: {e['verdict']}** (rule: {c['rule']}).")
-            for name in ("coinbase", "bitstamp"):
-                j = e[name]
-                if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs {market_label} "
-                             f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
-                             f"low diff {j['low_diff_pct']:+.2f}%")
-        if c.get("summary"):
-            s = c["summary"]
-            L.append(f"- Whole history vs Coinbase: median close difference {s['median_abs_close_diff_pct']:.2f}%, "
-                     f"99th percentile {s['p99_abs_close_diff_pct']:.2f}%, max {s['max_abs_close_diff_pct']:.2f}%.")
-        for k in ("coinbase_error", "bitstamp_error"):
-            if c.get(k):
-                L.append(f"- {k.split('_')[0]} could not be fetched: {c[k]}")
+    if type(c) is dict:
+        flagged = c.get("flagged")
+        if type(flagged) is list:
+            safe_rule = _safe_report_text(c.get("rule"))
+            for entry in flagged:
+                if type(entry) is not dict:
+                    continue
+                date = _safe_report_text(entry.get("date"), 32)
+                verdict = _safe_report_text(entry.get("verdict"), 48)
+                L.append(f"- **{date}: {verdict}** (rule: {safe_rule}).")
+                for name in ("coinbase", "bitstamp"):
+                    source = entry.get(name)
+                    if type(source) is dict:
+                        L.append(
+                            f"  - {name}: day return "
+                            f"{_safe_report_percent_points(source.get('other_return_pct'))} vs "
+                            f"{market_label} {_safe_report_percent_points(source.get('binance_return_pct'))}, "
+                            f"close diff {_safe_report_percent_points(source.get('close_diff_pct'))}, "
+                            f"low diff {_safe_report_percent_points(source.get('low_diff_pct'))}"
+                        )
+        summary = c.get("summary")
+        if type(summary) is dict:
+            L.append(
+                "- Whole history vs Coinbase: median close difference "
+                f"{_safe_report_percent_points(summary.get('median_abs_close_diff_pct'), signed=False)}, "
+                "99th percentile "
+                f"{_safe_report_percent_points(summary.get('p99_abs_close_diff_pct'), signed=False)}, "
+                "max "
+                f"{_safe_report_percent_points(summary.get('max_abs_close_diff_pct'), signed=False)}."
+            )
+        for key in ("coinbase_error", "bitstamp_error"):
+            error = c.get(key)
+            if type(error) is str and error:
+                label = key.split("_", 1)[0]
+                L.append(f"- {label} could not be fetched: {_safe_report_text(error)}")
     else:
         L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     sv = r.get("sensitivity")
