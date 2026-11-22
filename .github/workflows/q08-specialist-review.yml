@@ -46,9 +46,8 @@ jobs:
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_branch == 'security/q0-provider-sanitization-2026-11-18' &&
-        github.event.workflow_run.workflow_id == 421573668 &&
-        github.event.workflow_run.head_repository.full_name == github.repository &&
-        github.event.workflow_run.repository.full_name == github.repository
+        github.event.workflow.id == 421573668 &&
+        github.event.repository.full_name == github.repository
       )
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -122,17 +121,20 @@ jobs:
               with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as stream:
                   event = json.load(stream)
               run = event["workflow_run"]
+              workflow = event["workflow"]
+              repository = event["repository"]
               expected_repo = "ruthlessjoey/btcidr-trading-lab"
               if os.environ["REVIEW_REPOSITORY"] != expected_repo:
                   raise ValueError("unexpected repository")
               checks = (
-                  run.get("workflow_id") == int(os.environ["EXPECTED_WORKFLOW_ID"]),
+                  workflow.get("id") == int(os.environ["EXPECTED_WORKFLOW_ID"]),
+                  workflow.get("path") == ".github/workflows/q08-offline-tests.yml",
                   run.get("name") == os.environ["EXPECTED_WORKFLOW_NAME"],
                   run.get("event") == "push",
                   run.get("conclusion") == "success",
                   run.get("head_branch") == os.environ["EXPECTED_BRANCH"],
                   (run.get("head_repository") or {}).get("full_name") == expected_repo,
-                  (run.get("repository") or {}).get("full_name") == expected_repo,
+                  repository.get("full_name") == expected_repo,
                   isinstance(run.get("head_sha"), str)
                       and re.fullmatch(r"[0-9a-f]{40}", run["head_sha"]),
                   type(run.get("id")) is int and run["id"] > 0,
