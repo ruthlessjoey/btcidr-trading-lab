@@ -35,9 +35,12 @@ jobs:
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
+            /markets/__init__.py
+            /markets/strategies/__init__.py
             /markets/strategies/contract.py
             /markets/strategies/decision.py
             /markets/strategies/engine.py
+            /markets/strategies/registry.py
             /tests/test_strategy_core_isolation.py
 
       - name: Set up Python 3.11
@@ -47,9 +50,12 @@ jobs:
 
       - name: Compile the isolated strategy modules and tests
         run: |
+          python3 -m py_compile markets/__init__.py
+          python3 -m py_compile markets/strategies/__init__.py
           python3 -m py_compile markets/strategies/contract.py
           python3 -m py_compile markets/strategies/decision.py
           python3 -m py_compile markets/strategies/engine.py
+          python3 -m py_compile markets/strategies/registry.py
           python3 -m py_compile tests/test_strategy_core_isolation.py
 
       - name: Run pure M5 strategy contract and engine tests
