@@ -1335,3 +1335,17 @@ Twin money maker.
 - No specialist-review acceptance exists for `a68b759b...` yet. The only outstanding Q0.8 action is a new manual dispatch of the pinned PR #60 workflow on branch `security/q0-provider-sanitization-2026-11-18`, with `review_head_sha=a68b759b75adde426402eb39ef9c360f60e5bc27`, `mode=review`, and blank `resume_from_run_id`. Do not resume run #45046260173's zero-report checkpoint. Verify the new run's actual request size, all specialist reports, Commander, independent acceptance, final verification, and checkpoint artifact before claiming Q0.8 accepted.
 
 Twin money maker.
+
+
+---
+
+### M5 isolated strategy-core defect correction — 2026-11-23
+
+- Static import-closure inspection showed the broad legacy `markets/strategies/test_strategies.py` is not safe to run under current exclusions: it imports provider/data-pipeline modules and `markets.strategies.btc_s1`, which loads the protected S1 `signal` implementation. That broad suite was not executed.
+- Created isolated draft child PR [#98](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/98), head `f0ae6b2074217492884314a12f9941cb262eb383`, based exactly on PR #60 head `a68b759b75adde426402eb39ef9c360f60e5bc27` (4 commits ahead / 0 behind; three changed paths only).
+- Reproduced and fixed a source-level M5 contract defect in `markets/strategies/engine.py`: the engine previously accepted engine-owned reason codes in the dictionary returned by `strategy.evaluate()`, even though a strategy is required to emit only its own declared `reason_codes`. The engine now requires a list/tuple of declared string codes before producing the decision; engine-generated refusal/status codes remain available to the engine's own gating paths. The original fixture that returned `DATA_REFUSED` from a strategy now verifies a `StrategyError`.
+- Added `tests/test_strategy_core_isolation.py` and `.github/workflows/m5-strategy-core-isolated.yml`. The test harness inserts test-only package shells to bypass the package initializers and default strategy registry, so it imports only pure `contract.py`, `decision.py`, and `engine.py`. The workflow sparse checkout includes only those three modules and the isolated test. The test checks import boundaries, configuration validation, engine-owned code rejection, deterministic fingerprints, canonical serialization/rounding, and fail-closed decision gating for unsupported, mismatched, refused, partial, unavailable, missing-candle, and insufficient-history inputs.
+- Exact-head run [#45052999580](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45052999580) passed **13/13** isolated tests on Python **3.11.18**; all tests emitted `OK`, with no traceback or ResourceWarning. The initial isolated run #45052892661 failed 2/13: one assertion used the wrong case for the existing no-trading notice, and one exposed the reason-code enforcement defect. Both were corrected before the current 13/13 run.
+- PR #98 remains draft/open/unmerged and has no independent review. No protected S1 module, normal strategy registry, provider, market data, risk, validator, or report module was checked out/imported/executed. The synthetic fixture tests establish M5 interface/gate behavior, not BTC trading profitability, strategy quality, M5 integration, or PAPER readiness.
+
+Twin money maker.
