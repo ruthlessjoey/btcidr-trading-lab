@@ -135,6 +135,17 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertNotIn("python3 live_check.py", workflow)
         self.assertIn("no network request is made", workflow)
 
+    def test_research_workflows_do_not_checkout_protected_engine_sources(self):
+        for name in ("research-data.yml", "research-backtest.yml"):
+            path = os.path.join(ROOT, ".github", "workflows", name)
+            with open(path, encoding="utf-8") as f:
+                workflow = f.read()
+            sparse = workflow.split("sparse-checkout: |", 1)[1].split("\n\n", 1)[0]
+            self.assertNotIn("/run.py", sparse)
+            self.assertNotIn("/research/pipeline.py", sparse)
+            self.assertIn("/research/backtest_report.py", sparse)
+
+
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
         source = git_source_text("run.py")
         self.assertIn("assert_read_only(cfg)", source)

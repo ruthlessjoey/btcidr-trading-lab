@@ -16,6 +16,7 @@ from research.crosscheck import (
     CrosscheckError, AUTHORIZED_CROSSCHECK_PROVIDERS,
     load_required_crosscheck, validate_crosscheck_artifact,
 )
+from research.backtest_report import crosscheck_status_line
 
 MANIFEST = {"version_id": "v-test", "csv_sha256": "abc123"}
 CFG = {"flagged_dates": ["2020-03-12"]}
@@ -101,6 +102,24 @@ class CrosscheckGateTests(unittest.TestCase):
 
     def test_no_flagged_dates_does_not_require_crosscheck(self):
         self.assertIsNone(load_required_crosscheck({"flagged_dates": []}, MANIFEST, None))
+
+
+class BacktestReportCrosscheckBoundaryTests(unittest.TestCase):
+    def test_missing_crosscheck_is_reported_as_unverified(self):
+        rendered = crosscheck_status_line(None)
+        self.assertIn("No independent cross-check was run", rendered)
+        self.assertIn("flagged candle remains unverified", rendered)
+
+    def test_supplied_crosscheck_payload_is_suppressed_without_provider_authorization(self):
+        payload = {
+            "flagged": [{"date": "2020-03-12", "verdict": "CONFIRMED"}],
+            "summary": {"max_abs_close_diff_pct": "UNTRUSTED_PROVIDER_MARKER"},
+        }
+        rendered = crosscheck_status_line(payload)
+        self.assertIn("suppressed", rendered)
+        self.assertIn("no independent provider is authorized", rendered)
+        self.assertNotIn("CONFIRMED", rendered)
+        self.assertNotIn("UNTRUSTED_PROVIDER_MARKER", rendered)
 
 
 class HistoryGateStaticTests(unittest.TestCase):
