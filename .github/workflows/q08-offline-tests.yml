@@ -9,6 +9,7 @@ on:
       - "**/*.py"
       - "**/*.json"
       - ".github/workflows/q08-offline-tests.yml"
+      - ".github/workflows/q08-specialist-review.yml"
   workflow_dispatch:
 
 permissions:
