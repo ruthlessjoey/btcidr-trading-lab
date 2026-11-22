@@ -2047,3 +2047,10 @@ This addendum supersedes earlier head/run statements above where they differ.
 - PR #34 current head `e025896cf7b05a5018c2a950a513d18fb78b6335`, open/draft, exact-head run #44974161625 passed **25/25** isolated publisher tests on Python **3.11.18**. The tests cover descriptor identity after open, path replacement between check and open, strict bool/int structural equality, finite JSON numbers, run-identity type checks, malformed SHA-256, bounded enumeration, and validate-before-unlink behavior. Engine/pipeline imports remained excluded.
 - PR #82 remains open/draft at `290436766951ee586c298a854528a8b7d4c5a14c`; exact-head 59/59 selected tests, independent review on predecessor only COMMENTED.
 - Scope and acceptance measurements are unchanged: 40 requirements / 100 weighted points; 15.00/100 candidate-weighted maturity; 0/40 at the exact-main threshold; project completion UNRATED. Historical proxy return remains approximately -11% with PF 0.36; profitability NOT PROVEN. PAPER NOT READY; LIVE DISABLED.
+
+
+## Holdout workflow integration review — 2026-11-22
+
+- PR #34's patch deletes `.github/workflows/research-backtest.yml` (the former 77-line workflow with broad test discovery and research-data publication). The only new workflow is `.github/workflows/manual-offline-unit-tests.yml`, scoped to the standalone publisher and its isolated tests.
+- No replacement research-backtest workflow or workflow call to `prepare_test_reservation`, `verify_committed_test_reservation`, and `publish_completed_reservations` is included in this PR. The helper is tested in isolation but not wired end-to-end.
+- The deletion is fail-closed relative to the prior workflow, but it leaves the research-backtest lifecycle unavailable. End-to-end integration would require a separately reviewed workflow design, explicit least-privilege write access to the `research-data` branch, and safe integration tests. No such workflow was added or executed in this session. PR #34 therefore remains a tested publisher component, not a complete holdout lifecycle.
