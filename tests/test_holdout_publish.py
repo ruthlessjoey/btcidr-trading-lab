@@ -128,6 +128,25 @@ class HoldoutPublicationTests(unittest.TestCase):
             self.publish()
         self.assertTrue((self.root / (self.key + ".pending")).is_file())
 
+    def test_report_boolean_does_not_match_integer_evaluation_number(self):
+        self.install_pair()
+        mismatched_report = dict(self.completed, evaluation_number=True)
+        self.write_json(self.report, {"status": "OK", "test": mismatched_report})
+        with self.assertRaisesRegex(RuntimeError, "report does not match completed TEST record"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
+    def test_overflowing_json_float_refuses_cleanup(self):
+        self.install_pair()
+        raw = json.dumps({"status": "OK", "test": self.completed}, sort_keys=True)
+        needle = '"results": {"BASE": {}}'
+        self.assertIn(needle, raw)
+        raw = raw.replace(needle, '"results": {"BASE": {"metric": 1e999}}')
+        self.report.write_text(raw, encoding="utf-8")
+        with self.assertRaisesRegex(RuntimeError, "unreadable: ValueError"):
+            self.publish()
+        self.assertTrue((self.root / (self.key + ".pending")).is_file())
+
     def test_valid_first_record_is_not_removed_if_later_record_is_invalid(self):
         self.install_pair()
         other_key = "c" * 25
