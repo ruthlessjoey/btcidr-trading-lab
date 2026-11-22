@@ -1422,3 +1422,13 @@ Twin money maker.
 - Overall project completion remains **UNRATED** (scope/weights/evidence criteria not approved); profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**. No protected files were accessed or executed, no provider authorization was expanded, and no real-money action occurred.
 
 Twin money maker.
+
+
+### PR #95 Actionlint archive reader hardening — 2026-11-23
+
+- PR #95 current head: `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`, open/draft/unmerged.
+- Source review found a blocking-open edge case: opening an attacker-controlled FIFO with blocking `O_RDONLY` before `fstat` could hang the security lint job. The archive open now adds `O_NONBLOCK` and `O_NOFOLLOW`, then validates regular-file type and size. Archive and binary destination paths also reject symlinked parent components.
+- Added adversarial tests for FIFO archives, symlinked archive parents and symlinked binary-destination parents. Exact-head workflow run [#45056419053](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056419053) passed **13/13** Python 3.11.18 tests; all tests reported `ok`, including the FIFO nonblocking regression. Exact-head CodeQL run #45056420356 is pending at this update; no result claimed.
+- This is a standalone tooling security fix. It does not change trading, provider, risk, or execution code; no protected paths were accessed.
+
+Twin money maker.
