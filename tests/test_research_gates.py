@@ -249,6 +249,7 @@ class CrosscheckGateTests(unittest.TestCase):
             ("close_diff_pct", 4.0),
             ("return_gap_pp", 4.0),
             ("high_diff_pct", float("inf")),
+            ("low_diff_pct", 10 ** 1000),
             ("open_diff_pct", True),
         )
         for field, value in mutations:
