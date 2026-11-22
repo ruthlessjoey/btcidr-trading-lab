@@ -523,6 +523,41 @@ class CrosscheckMarkdownSanitizationTests(unittest.TestCase):
         self.assertIn("| Days over 1% / 2% / 5% | unavailable / 1 / 0 |", rendered)
 
 
+    def test_report_explains_high_and_low_are_part_of_the_agreement_rule(self):
+        rendered = build_markdown({
+            "dataset_version": "v-test",
+            "dataset_sha256": "a" * 64,
+            "rule": "open/close/high/low and daily-return gap",
+            "coinbase_error": None,
+            "bitstamp_error": None,
+            "common_days": 0,
+            "summary": None,
+            "worst_days": [],
+            "flagged": [{
+                "date": "2020-03-12",
+                "verdict": "NOT CONFIRMED",
+                "table": [],
+                "coinbase": {
+                    "open_diff_pct": 0.0,
+                    "close_diff_pct": 0.0,
+                    "high_diff_pct": 3.5,
+                    "low_diff_pct": 0.0,
+                    "binance_return_pct": 0.0,
+                    "other_return_pct": 0.0,
+                    "return_gap_pp": 0.0,
+                    "agrees": False,
+                },
+                "bitstamp": None,
+            }],
+        })
+        self.assertIn("high +3.50%", rendered)
+        self.assertIn(
+            "- Open, close, high and low price differences must each be within 3.0%; "
+            "the daily-return gap must be within 3.0 percentage points.",
+            rendered,
+        )
+        self.assertNotIn("High and low are shown but not used by the rule", rendered)
+
     def test_crosscheck_report_removes_markdown_html_and_table_injection(self):
         rendered = build_markdown({
             "dataset_version": "v-test",
