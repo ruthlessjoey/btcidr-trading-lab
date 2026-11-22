@@ -1936,3 +1936,30 @@ Static inspection of the unprotected `research/holdout_publish.py` and its dedic
 - PR #82 remains open/draft at `290436766951ee586c298a854528a8b7d4c5a14c`, on `main`. Exact-head run #44972046522 passed 59/59. The previously submitted independent review is COMMENTED on predecessor `883bc7c...`; exact compare shows the current head differs only by one workflow file adding the scoped push trigger. This is not APPROVED.
 - The 40-row audit and rubric remain unchanged: 15.00/100 candidate-weighted maturity, 0/40 exact-main verification threshold, overall completion UNRATED. Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
 - PR #34 static source review records the possible pending-file check/unlink TOCTOU race as an unconfirmed threat-model question, not a demonstrated exploit. No protected import path or engine integration was tested.
+
+
+## 2026-11-22 latest reconciliation — 09:56+08
+
+
+
+## Current-head quota checkpoint and recovery — 2026-11-22
+
+- Exact PR #60 head remains `d4edb4bc634e794b1957399471532ad7671576ba`; offline run #44972690427 passed 65/65 Python 3.11.18 tests on this SHA.
+- Full reviewer #44972690441 stopped at `provider-integration` on OpenRouter HTTP 429. Four bounded retries used 15/30/60/120 seconds; the provider then requested 240 seconds, above the 120-second safety ceiling. It uploaded checkpoint artifact #14733888650. ZIP digest is `82b6009e0b45be64ebf08e1f3d104af52fd2379a47dece597ba390232183fbb0`; extracted JSON digest is `545d9655f102b717c9447685f83a1b7644b094dfb06d3f83a2357f51aabd642d`. Exact identity matches repo, M6 base, SHA d4edb4b..., and approved model; it contains 2/16 specialist reports (architecture-architect and implementation-engineer), both PASS WITH FINDINGS. Commander/acceptance/verification are null.
+- Recovery attempt #44973343177 restored the artifact but failed at source-run identity validation because the resume-run environment value still named the older run. It stopped before model invocation and uploaded an unchanged checkpoint. The recovery workflow was corrected in commit `5e591f971ac010a8aa077fad4b0ec19d74dc1a1f` to bind both artifact and validation to source run #44972690441.
+- Same-SHA recovery run #44973396844 restored the checkpoint, validated its source run, checked out immutable runner `0eb085d...`, and passed Python 3.11 syntax validation. Its full review step is in progress; no additional completed role or final acceptance is claimed yet.
+- Q0.8 remains INCONCLUSIVE / NOT ACCEPTED until all 16 specialist roles, Commander, independent acceptance and final verification complete. Do not increase the retry ceiling or change provider/model configuration.
+
+
+
+## Latest automated review regression gate — exact-head 91/91 — 2026-11-22
+
+- Latest PR #92 head: `a115728d02cc374132f765a1752bb5e0d6efd714`. Automatic push run [#44973297492](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44973297492) checked out this exact SHA and passed **91/91** selected offline tests on Python **3.11.18**: 21 fetcher, 4 provider-boundary, 7 history/import-boundary, 2 disabled-probe, 7 static-pipeline, 34 research/report, and 16 sanitization. All seven suites ended OK.
+- This head includes the refactored `_crosscheck_markdown_lines()` helper, behavioral manifest-label rendering test, hostile custom-number formatter checks, and newline/Markdown-injection sanitization regressions. The 91/91 pass supersedes the earlier 90/90 evidence for head e808c3d....
+- PR #92 remains draft/open/unmerged and stacked on PR #60; the 55-ahead/0-behind comparison is candidate ancestry only. It has no independent acceptance approval or mainline integration credit.
+
+- Verified main baseline remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no PR was merged.
+- PR #82 remains open/draft, exact head `290436766951ee586c298a854528a8b7d4c5a14c`; exact-head offline run #44972046522 passed 59/59 Python 3.11.18 tests. The existing scoped independent review is COMMENTED, not APPROVED.
+- Whole-project completion remains UNRATED: 40 requirements / 100 weight points, 24 candidate rows / 60 weight points at 0.25 = 15.00/100 candidate-weighted maturity, 16 rows at zero, and 0/40 at exact-main threshold.
+- Profitability remains NOT PROVEN (historical proxy result approximately -11% return / 0.36 PF); costs and market identity remain unverified. PAPER NOT READY; LIVE DISABLED.
+- No protected module was inspected or executed; no external exchange/provider call, dataset publication, backtest, PAPER/LIVE execution, or financial/account action occurred.
