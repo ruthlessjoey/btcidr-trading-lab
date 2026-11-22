@@ -105,7 +105,7 @@ jobs:
           set -o pipefail
           python3 runner/tools/q08_specialist_review.py --mode review 2>&1 | tee "$RUNNER_TEMP/q08-model-review.log"
           review_status=${PIPESTATUS[0]}
-          if [ "$review_status" -ne 0 ] && grep -Eq '^MODEL_REQUEST_FAILED role=[a-z0-9-]+ .*reason=OpenRouter rate limit \\(HTTP 429\\)' "$RUNNER_TEMP/q08-model-review.log"; then
+          if [ "$review_status" -ne 0 ] && grep -Eq '^MODEL_REQUEST_FAILED role=[a-z0-9-]+ .*reason=OpenRouter rate limit \(HTTP 429\)' "$RUNNER_TEMP/q08-model-review.log"; then
             echo "rate_limited=true" >> "$GITHUB_OUTPUT"
           else
             echo "rate_limited=false" >> "$GITHUB_OUTPUT"
@@ -130,6 +130,7 @@ jobs:
     permissions:
       actions: write
       contents: read
+      pull-requests: read
     steps:
       - name: Confirm PR #60 is still open at the exact review head
         env:
@@ -254,11 +255,11 @@ jobs:
               sys.exit("Refusing resume: specialist report set is invalid")
           verdict_re = re.compile(r"VERDICT: (PASS|PASS WITH FINDINGS|BLOCKED|INCONCLUSIVE)")
           secret_patterns = (
-              re.compile(r"\\bsk-or-v1-[A-Za-z0-9]{20,}\\b"),
-              re.compile(r"\\bgh[pousr]_[A-Za-z0-9]{20,}\\b"),
-              re.compile(r"\\bgithub_pat_[A-Za-z0-9_]{20,}\\b"),
-              re.compile(r"\\bAKIA[0-9A-Z]{16}\\b"),
-              re.compile(r"\\bxox[baprs]-[A-Za-z0-9-]{12,}\\b"),
+              re.compile(r"\bsk-or-v1-[A-Za-z0-9]{20,}\b"),
+              re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
+              re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+              re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+              re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{12,}\b"),
               re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
           )
           def valid_report(report):
@@ -317,7 +318,7 @@ jobs:
                   "review_head_sha": os.environ["REVIEW_HEAD_SHA"],
                   "resume_from_run_id": os.environ["SOURCE_RUN_ID"],
                   "mode": "review",
-                  "auto_resume_count": os.environ["NEXT_RESUME_COUNT"],
+                  "auto_resume_count": int(os.environ["NEXT_RESUME_COUNT"]),
               },
               "return_run_details": True,
           }))
