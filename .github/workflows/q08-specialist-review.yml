@@ -2,13 +2,6 @@ name: Q0.8 immutable 19-role specialist review
 
 on:
   # Secret-bearing reviews are never launched automatically by topic-branch pushes.
-    paths:
-      - "*.py"
-      - "**/*.py"
-      - "*.json"
-      - "**/*.json"
-      - ".github/workflows/q08-specialist-review.yml"
-      - ".github/workflows/q08-offline-tests.yml"
   workflow_dispatch:
     inputs:
       review_head_sha:
