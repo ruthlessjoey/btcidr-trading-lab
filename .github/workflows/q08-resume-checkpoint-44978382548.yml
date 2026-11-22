@@ -1,4 +1,4 @@
-name: Q0.8 resume exact PR #60 head 0df66c1
+name: Q0.8 resume exact PR #60 head 0f79801
 
 on:
   push:
@@ -27,11 +27,11 @@ jobs:
       - name: Restore checkpoint from exact-head failed review
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: q08-review-checkpoint-44978382548
+          name: q08-review-checkpoint-44980188862
           path: ${{ runner.temp }}
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: 44978382548
+          run-id: 44980188862
 
       - name: Checkout immutable reviewer with bounded diff headroom
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -66,17 +66,17 @@ jobs:
           python3 runner/tools/q08_specialist_review.py --mode synthetic
 
       - name: Respect the exact provider reset before resuming
-        run: sleep 125
+        run: sleep 245
 
       - name: Resume exact current PR #60 head (read-only)
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_HEAD_SHA: 0df66c18a41bd5369e7e62bea57e3cd2508ade2a
+          REVIEW_HEAD_SHA: 0f79801e6fb9105358acdc3330112e6e5fd7e582
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
-          Q08_RESUME_FROM_RUN_ID: "44978382548"
+          Q08_RESUME_FROM_RUN_ID: "44980188862"
           Q08_REVIEW_BRANCH: security/q0-provider-sanitization-2026-11-18
         run: python3 runner/tools/q08_specialist_review.py --mode review
 
