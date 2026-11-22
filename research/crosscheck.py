@@ -62,7 +62,12 @@ def _valid_comparison_evidence(source):
     numeric_fields = required - {"agrees"}
     for field in numeric_fields:
         value = source[field]
-        if type(value) not in (int, float) or not math.isfinite(value):
+        if type(value) not in (int, float):
+            return False
+        try:
+            if not math.isfinite(float(value)):
+                return False
+        except (OverflowError, ValueError):
             return False
     expected = (
         abs(source["open_diff_pct"]) <= TOLERANCE_PCT
