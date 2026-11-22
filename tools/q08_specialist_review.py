@@ -92,7 +92,7 @@ MAX_FILE = 48_000
 # Each immutable snapshot is bounded independently; the two snapshots are never
 # retained beyond these explicit per-snapshot limits.
 MAX_TOTAL = 256_000
-MAX_DIFF = 192_000  # Allows the current 176,188-character PR #60 diff; requests remain capped at 256,000 bytes.
+MAX_DIFF = 208_000  # Bounded headroom for the reviewed 198,181-character PR #60 diff; total/request limits remain 256,000 bytes.
 MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
 MAX_OUTPUT = 24_000
