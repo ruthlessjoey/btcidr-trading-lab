@@ -1,5 +1,4 @@
 """Offline adversarial tests for the trusted Q0.8 workflow_run gate."""
-import copy
 import unittest
 from unittest.mock import Mock
 
@@ -96,10 +95,9 @@ class WorkflowRunGateTests(unittest.TestCase):
             validate_event(valid_event(), "x" * 32, self.fetch_json)
 
     def test_missing_token_fails_before_lookup(self):
-        with self.assertRaises(GateError):
+        with self.assertRaisesRegex(GateError, "token is unavailable"):
             validate_event(valid_event(), "", self.fetch_json)
-        # The injected reader models the API call; the helper passes the token to it.
-        self.fetch_json.assert_called_once()
+        self.fetch_json.assert_not_called()
 
 
 if __name__ == "__main__":
