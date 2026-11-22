@@ -1,5 +1,6 @@
 """Offline adversarial tests for the trusted Q0.8 workflow_run gate."""
 import unittest
+from pathlib import Path
 from unittest.mock import Mock
 
 from tools.q08_workflow_run_gate import (
@@ -32,6 +33,31 @@ def valid_event():
 
 
 class WorkflowRunGateTests(unittest.TestCase):
+    def test_trusted_workflow_restores_gate_selected_same_head_checkpoint(self):
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github" / "workflows" / "q08-specialist-review.yml"
+        ).read_text(encoding="utf-8")
+        gate_position = workflow.index("id: validate-gate")
+        restore_position = workflow.index("name: Restore checkpoint from an earlier run")
+        review_position = workflow.index("name: Run immutable branch review")
+        self.assertLess(gate_position, restore_position)
+        self.assertLess(restore_position, review_position)
+        self.assertIn("run: python3 runner/tools/q08_workflow_run_gate.py", workflow)
+        self.assertIn(
+            "github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id != ''",
+            workflow,
+        )
+        resume_expression = (
+            "github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id "
+            "|| inputs.resume_from_run_id"
+        )
+        self.assertEqual(workflow.count(resume_expression), 3)
+        self.assertIn(
+            "Q08_RESUME_FROM_RUN_ID: ${{ " + resume_expression + " || '' }}",
+            workflow,
+        )
+
     def setUp(self):
         self.fetch_json = Mock(return_value={"sha": OFFLINE_WORKFLOW_BLOB})
 
