@@ -1,0 +1,71 @@
+name: Q0.8 recover saved checkpoint 44970126651
+
+on:
+  push:
+    branches:
+      - security/q08-push-checkpoint-resume-2026-11-22
+    paths:
+      - .github/workflows/q08-resume-checkpoint-44970126651.yml
+
+permissions:
+  contents: read
+
+jobs:
+  resume:
+    name: Resume exact PR 60 review from saved push checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Restore exact failed-run checkpoint
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: q08-review-checkpoint-44970126651
+          path: ${{ runner.temp }}
+          github-token: ${{ github.token }}
+          repository: ruthlessjoey/btcidr-trading-lab
+          run-id: 44970126651
+
+      - name: Checkout immutable push-resume reviewer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ruthlessjoey/btcidr-trading-lab
+          ref: 0eb085dce3171c341347b7974500cba6f76e9186
+          path: runner
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/q08_specialist_review.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Verify immutable reviewer syntax
+        run: python3 -m py_compile runner/tools/q08_specialist_review.py
+
+      - name: Resume the exact PR 60 review (read-only GitHub source access)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_HEAD_SHA: f6c520f725973d6c98534aec340fdabd77898383
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          Q08_CHECKPOINT_PATH: ${{ runner.temp }}/q08-review-checkpoint.json
+          Q08_RESUME_FROM_RUN_ID: "44970126651"
+          Q08_REVIEW_BRANCH: security/q0-provider-sanitization-2026-11-18
+        run: python3 runner/tools/q08_specialist_review.py --mode review
+
+      - name: Persist resumable review checkpoint
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: q08-review-checkpoint-${{ github.run_id }}
+          path: ${{ runner.temp }}/q08-review-checkpoint.json
+          if-no-files-found: ignore
+          retention-days: 7
