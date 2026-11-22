@@ -2792,3 +2792,34 @@ This addendum records the latest read-only verification performed during the eme
 - PR #60, PR #92, PR #84 and PR #85 remain separate candidate branches with different bases; none was merged or retargeted. No test count from one branch is presented as integrated evidence for another.
 - Project inventory remains **40 requirements / 100 weights**. Historical candidate-weighted maturity remains **15.00/100**, **0/40** meeting exact-main 0.50 threshold, whole-project completion **UNRATED**. No new maturity credit is awarded.
 - Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**. No exchange/public market-data request, dataset publication, backtest, TEST evaluation, account/financial action, order, PAPER/LIVE execution, PR merge, protected-path access/import/execution occurred in this continuation.
+
+## Emergency continuation — exact-head cross-check report correction and isolated M5 tests — 2026-11-22 17:51+08
+
+### PR #60 latest candidate and exact-head CI
+- Current PR #60 branch and PR head are `7a20e86ca35ef614e2be997058fedb692e28eb5c`, open/draft/unmerged and based on historical M6 `cd451972e3a641ad6fa78e64abf3968655a4b82a`. Selected protected `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`.
+- Commit `7a20e86...` is a one-commit forward change after `7d2149f...`; it changes only `research/crosscheck.py` (+3/−2) and `tests/test_research_gates.py` (+24/−1). The cross-check Markdown report now accurately says high and low differences participate in the agreement threshold alongside open, close and return-gap differences. Added regression `test_crosscheck_markdown_matches_high_low_agreement_rule`.
+- Static source inspection at this exact SHA confirms both comparison generation (`judge()`) and artifact verdict validation apply the same 3% threshold to open, close, high, low and return-gap values. The Markdown regression asserts the new statement and rejects the old, incorrect wording. Cross-check provider authorization remains the empty immutable set; no provider was contacted.
+- Exact-head offline run [#45009212243](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45009212243) passed **98/98** selected tests on Python **3.11.18** across seven suites: 33 fetcher + 4 provider boundary + 7 history/import boundary + 2 disabled probe + 15 static pipeline + 13 research gates + 24 sanitization/cross-check. All suites ended `OK`.
+- Compare of PR #60 full tree to current main: **144 ahead / 92 behind**, merge base `733abeb931eddcb442220f9b73b092833282e671`. The selected PR branch is 132 ahead / 0 behind its historical M6 baseline by prior compare; direct comparison is not a merge recommendation. PR remains unsuitable for direct merge into current main.
+
+### Latest Q0.8 review state
+- Exact-head specialist run [#45009212249](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45009212249) targets `7a20e86...` and is still **IN PROGRESS** at this update. Immutable runner checkout, Python 3.11 setup, syntax compile and synthetic policy smoke test are successful; model-review step remains active. No specialist report, Commander, independent acceptance, final verification or checkpoint artifact is yet available.
+- Previous checkpoint artifacts from `a8d5de...`, `231434e...`, `78b9a7...` and `7d2149...` are all stale for `7a20e...`. Do not resume any of them or dispatch a duplicate while #45009212249 is running. Await this exact run's terminal result and validate its own checkpoint/artifact identity and provider cooldown if one is uploaded.
+- Current immutable reviewer pin is `fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1`; event handling permits same-workflow completed source runs from either `push` or `workflow_dispatch`. Limits unchanged: 224,000 diff characters, 256,000 snapshot/request bytes, approved model/provider, four retries, maximum 120-second reset wait.
+
+### New M5 generic strategy test candidate
+- New branch `security/m5-isolated-strategy-contract-tests-2026-11-22`, commit `467121177313943f726bdd8464625f211eb60b9c`, parented on exact historical M6 `cd451972e3a641ad6fa78e64abf3968655a4b82a`.
+- Exactly two added files: `.github/workflows/m5-isolated-strategy-tests.yml` and `tests/test_m5_isolated_strategy.py`. No application code was changed.
+- The workflow uses read-only contents permission, immutable checkout/setup-python pins and sparse checkout of only the generic M5 contract/decision/engine/registry modules, `markets/__init__.py`, and the single new test. It does not checkout `markets/strategies/btc_s1.py`, `signal/`, `markets/risk/`, root `validator.py` or root `report.py`.
+- Synthetic offline run [#45009283656](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45009283656) passed **12/12** tests on Python **3.11.18**; every case logged `ok`, total 0.002s. Test cases cover complete-data evaluation/serialization, unsupported listing/interval, report/listing mismatch, REFUSED/PARTIAL/UNAVAILABLE gates, missing candles, insufficient history, unknown status, invalid config/results, explicit registry identity/version and deterministic config fingerprints.
+- Test explicitly asserts neither `markets.strategies.btc_s1` nor `signal.btc_signal` was loaded. It never calls lazy `default_registry()`, performs network I/O or reads protected code. This validates only the generic M5 contract/engine/registry on M6 synthetic inputs. It does not validate actual S1 behavior or adapter compatibility; the real `btc_s1` implementation remains protected and its configured instrument is Binance BTC/USDT rather than verified Tokocrypto BTC/IDR.
+- No PR was opened for this candidate; it remains an isolated branch pending later integration/review. No project maturity score increment is awarded.
+
+### Existing recovery runbook
+- PR #94 remains draft/open/unmerged at `047e9b746b4d8c1b556a87cd98307b558f5bc92a`, one documentation path, 158 lines. It distinguishes job-level sparse checkout from independent scanner acquisition and directs unknown/full-tree protected-source scope to remain disabled pending owner/admin decision. Desk walkthrough only; no operational K5 exercise or acceptance.
+
+### Acceptance and safety
+- Approved scope remains **40 requirements / 100 weights**; candidate-weighted historical maturity **15.00/100**, **0/40** at exact-main 0.50 threshold, overall completion **UNRATED**. No row-level credit or project score change is claimed.
+- Historical proxy profitability remains approx **−11% strategy return**, **−16.2% buy-and-hold**, **10% win rate**, **0.36 profit factor**. Profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
+- No market-data request, provider acquisition, dataset publication, backtest, TEST evaluation, account/financial action, order, PAPER/LIVE execution, protected-path access/import/execution, PR merge or security-setting change occurred.
+
