@@ -104,4 +104,13 @@ def evaluate_report(strategy, listing, report, config=None):
     if raw["decision"] not in C.STRATEGY_DECISIONS:
         raise C.StrategyError(f"{strategy.strategy_id} returned {raw['decision']!r}; strategies may return only "
                               f"{', '.join(C.STRATEGY_DECISIONS)}")
+    if (not isinstance(raw["reason_codes"], list)
+            or any(not isinstance(code, str) for code in raw["reason_codes"])):
+        raise C.StrategyError(f"{strategy.strategy_id} reason_codes must be a list of strings")
+    if (not isinstance(raw["reasons"], list)
+            or any(not isinstance(reason, str) for reason in raw["reasons"])):
+        raise C.StrategyError(f"{strategy.strategy_id} reasons must be a list of strings")
+    if (not isinstance(raw["indicators"], dict)
+            or any(not isinstance(name, str) for name in raw["indicators"])):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must be a mapping with string keys")
     return make(raw["decision"], raw["reason_codes"], raw["reasons"], raw["indicators"], ref_open, ref_close)
