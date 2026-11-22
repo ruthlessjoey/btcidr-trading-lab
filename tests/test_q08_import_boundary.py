@@ -50,8 +50,7 @@ def _assert_no_dynamic_imports(tree, path):
                 )
         elif isinstance(node, ast.Call):
             func = node.func
-            if ((isinstance(func, ast.Name) and func.id in dynamic_names)
-                attribute_call = (
+            attribute_call = (
                 isinstance(func, ast.Attribute)
                 and func.attr in {"import_module", "__import__", "eval", "exec"}
             )
@@ -68,7 +67,6 @@ def _assert_no_dynamic_imports(tree, path):
                 or constant_getattr_call
             ):
                 raise AssertionError(f"{path}: dynamic import/evaluation is not permitted")
-
 
 def _source_imports_from_text(source, path="<source>"):
     tree = ast.parse(source, filename=path)
