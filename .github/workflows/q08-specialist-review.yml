@@ -81,15 +81,6 @@ jobs:
             /tools/q08_specialist_review.py
             /tools/q08_workflow_run_gate.py
 
-      - name: Restore checkpoint from an earlier run
-        if: ${{ (github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id != '') || (github.event_name == 'workflow_dispatch' && inputs.mode == 'review' && inputs.resume_from_run_id != '') }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: q08-review-checkpoint-${{ github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
-          path: ${{ runner.temp }}
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -110,6 +101,16 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: python3 runner/tools/q08_workflow_run_gate.py
+
+      - name: Restore checkpoint from an earlier run
+        if: ${{ (github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id != '') || (github.event_name == 'workflow_dispatch' && inputs.mode == 'review' && inputs.resume_from_run_id != '') }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: q08-review-checkpoint-${{ github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
+          path: ${{ runner.temp }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event_name == 'workflow_run' && steps.validate-gate.outputs.resume_from_run_id || inputs.resume_from_run_id }}
 
       - name: Run immutable branch review (read-only GitHub access; model receives scoped diffs)
         if: ${{ github.event_name == 'workflow_run' || inputs.mode == 'review' }}
