@@ -5,9 +5,27 @@ Do not import run.py here: it imports the protected validator.py module.
 import ast
 import json
 import os
+import subprocess
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+_STATIC_ONLY_SOURCES = frozenset({"research/pipeline.py", "run.py"})
+
+
+def git_source_text(path):
+    """Read an allowlisted source blob for AST/text checks without checking it out or importing it."""
+    if path not in _STATIC_ONLY_SOURCES:
+        raise ValueError("source path is not approved for static inspection")
+    result = subprocess.run(
+        ["git", "show", "HEAD:" + path],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return result.stdout
+
 
 
 class PipelineContainmentTests(unittest.TestCase):
@@ -33,8 +51,9 @@ class PipelineContainmentTests(unittest.TestCase):
         # Inspect the pipeline as text only. Do not import it: its dependency
         # chain reaches the protected research engine/validator boundary.
         pipeline_path = os.path.join(ROOT, "research", "pipeline.py")
-        with open(pipeline_path, encoding="utf-8") as f:
-            pipeline_tree = ast.parse(f.read(), filename=pipeline_path)
+        pipeline_tree = ast.parse(
+            git_source_text("research/pipeline.py"), filename="research/pipeline.py"
+        )
         wiring = [
             node for node in pipeline_tree.body
             if isinstance(node, ast.Assign)
@@ -84,8 +103,7 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertEqual(cfg["live_providers"], ["tokocrypto"])
 
     def test_run_pipeline_rejects_any_other_source_configuration_before_io(self):
-        with open(os.path.join(ROOT, "run.py"), encoding="utf-8") as f:
-            source = f.read()
+        source = git_source_text("run.py")
         guard = 'if cfg.get("sources") != [{"name": "tokocrypto-mbx"'
         self.assertIn(guard, source)
         self.assertLess(source.index(guard), source.index('os.makedirs(out_dir, exist_ok=True)'))
@@ -118,8 +136,7 @@ class PipelineContainmentTests(unittest.TestCase):
         self.assertIn("no network request is made", workflow)
 
     def test_run_pipeline_is_read_only_and_no_legacy_open_v1_style_is_constructible(self):
-        with open(os.path.join(ROOT, "run.py"), encoding="utf-8") as f:
-            source = f.read()
+        source = git_source_text("run.py")
         self.assertIn("assert_read_only(cfg)", source)
         self.assertIn("only supports mode 'read_only'", source)
         with open(os.path.join(ROOT, "fetcher.py"), encoding="utf-8") as f:

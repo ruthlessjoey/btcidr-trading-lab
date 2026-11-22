@@ -34,12 +34,11 @@ jobs:
             /fetcher.py
             /providers.py
             /probe.py
-            /run.py
             /config.json
+            # Protected-chain source is read via git show by AST-only tests, not checked out.
             /research_config.json
             /research/history.py
             /research/crosscheck.py
-            /research/pipeline.py
             /fetch_history.py
             /tests/test_fetcher.py
             /tests/test_live_check.py
