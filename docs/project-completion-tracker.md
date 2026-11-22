@@ -3045,3 +3045,13 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - Latest commit `6ad01d7...` adds a `pull_request` trigger to the secretless gate-test workflow so it validates PR updates. CodeQL Python and Actions were still in progress at last check.
 - These gate tests validate the event gate only. They do not authorize or execute the separate `workflow_run` trigger that starts the 19-role LLM review. That automatic secret-bearing behavior remains unapproved, lacks demonstrated same-head deduplication, and must not be merged/enabled until the owner chooses manual-only or explicitly approves automatic execution with safeguards.
 - PR #97 remains draft/open/unmerged; no 19-role review has run.
+
+
+## Manual-only trusted-main workflow candidate PR #99 — 23 November 2026
+
+- PR #99 isolates the previously approved manual-only trusted-main workflow: head `3dba39b969db376211906ee5e7d35631a1af74b1`, two commits, one changed path, base protected `main 731fc9f...`.
+- It pins reviewer `cf9f319bc86155e7669f2cf0ced5d4df53cebffa` (224,000-character diff cap, two context lines, 256,000-byte request cap), uses read-only permissions, sparse checkout and `persist-credentials: false`, and retains `workflow_dispatch` only. No `workflow_run` or automatic LLM invocation.
+- Current PR #60 raw patch is 232,545 characters across 26 paths; main's current runner pin has a 192,000-character cap. PR #99 is the manual-only candidate needed to move the bounded reviewer pin to protected main.
+- YAML was locally parsed. No exact-head Actionlint/Actions run on PR #99 yet. PR #97 is a separate automatic-trigger proposal with 7/7 gate tests, Actionlint and CodeQL success, but its automatic LLM trigger is not authorized and it must not be merged/activated.
+- PR #99 remains draft/open/unmerged. After owner/admin approval and merge, a manual Q0.8 review can be dispatched from protected `main` using the freshly fetched PR #60 head. No dispatch occurred.
+- Project score remains unchanged: first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; whole project UNRATED. Profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
