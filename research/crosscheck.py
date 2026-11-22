@@ -450,8 +450,8 @@ def build_markdown(r):
             else:
                 lines.append(f"- vs {name}: not available")
         lines.append(
-            "- High and low are shown but not used by the rule: they depend on when each venue "
-            "traded the extreme, and this strategy uses only closes and next-day opens."
+            f"- Open, close, high and low price differences must each be within {TOLERANCE_PCT:.1f}%; "
+            f"the daily-return gap must be within {TOLERANCE_PCT:.1f} percentage points."
         )
 
     lines.extend([
