@@ -1,0 +1,44 @@
+name: Actionlint archive extraction tests
+
+on:
+  push:
+    branches:
+      - security/bounded-actionlint-stream-extraction-2026-11-22
+    paths:
+      - "tools/actionlint_extract.py"
+      - "tests/test_actionlint_extract.py"
+      - ".github/workflows/actionlint-extraction-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actionlint-extraction-tests
+  cancel-in-progress: false
+
+jobs:
+  extraction-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout only the standalone helper and tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/actionlint_extract.py
+            /tests/test_actionlint_extract.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+          check-latest: false
+
+      - name: Run offline adversarial extraction tests
+        run: python3 -m unittest discover -s tests -p 'test_actionlint_extract.py' -v

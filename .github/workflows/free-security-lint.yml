@@ -20,16 +20,36 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /.github/workflows/
+            /tools/actionlint_extract.py
 
-      - name: Install and run actionlint with verified release digest
+      - name: Install and run actionlint with bounded, verified release extraction
         shell: bash
         run: |
           set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint_1.7.12_linux_amd64.tar.gz"
+          binary="$RUNNER_TEMP/actionlint"
+          max_archive_bytes=16777216
+          max_binary_bytes=33554432
           url="https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
-          curl -fsSLo actionlint.tar.gz "$url"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum -c -
-          tar -xzf actionlint.tar.gz actionlint
-          ./actionlint -color
+
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 90 \
+            --max-filesize "$max_archive_bytes" \
+            --retry 2 --retry-all-errors --retry-max-time 120 \
+            --output "$archive" "$url"
+
+          archive_bytes="$(stat -c '%s' "$archive")"
+          if [[ ! "$archive_bytes" =~ ^[0-9]+$ ]] || \
+             (( archive_bytes == 0 || archive_bytes > max_archive_bytes )); then
+            echo "::error::Actionlint archive size is invalid or exceeds the 16 MiB limit."
+            exit 1
+          fi
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum -c -
+
+          python3 tools/actionlint_extract.py "$archive" "$binary"
+
+          "$binary" -color
 
       - name: Run zizmor with hash-verified dependencies and no online audits
         uses: zizmorcore/zizmor-action@8aaeb6d158204e73d77eb4b50bcb325641de1bd4
