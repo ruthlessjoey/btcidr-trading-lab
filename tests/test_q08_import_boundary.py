@@ -1,0 +1,258 @@
+"""Static AST import-boundary guard for the exact offline Q0.8 test surface."""
+import ast
+from pathlib import Path
+import re
+import subprocess
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "q08-offline-tests.yml"
+SOURCE_FILES = {"fetcher": "fetcher.py", "providers": "providers.py", "probe": "probe.py"}
+TEST_FILES = (
+    "tests/test_fetcher.py", "tests/test_live_check.py", "tests/test_probe.py",
+    "tests/test_sanitization.py", "tests/test_pipeline.py", "tests/test_q08_import_boundary.py",
+)
+WORKFLOW_CHECKOUT = {
+    "CLAUDE.md", "PROJECT_HANDOFF.MD", "config.json", "fetcher.py", "providers.py",
+    "probe.py", "live_check.py", "tools/net_lab.py", *TEST_FILES,
+    ".github/workflows/market-data-check.yml", ".github/workflows/q08-offline-tests.yml",
+}
+FORBIDDEN_IMPORT_ROOTS = {
+    "P1", "signal", "markets", "validator", "report", "run", "live_check", "research",
+}
+
+
+def _source_text(path):
+    if path == "run.py":
+        result = subprocess.run(
+            ["git", "show", "HEAD:run.py"], cwd=ROOT, check=True,
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        return result.stdout
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _assert_no_dynamic_imports(tree, path):
+    dynamic_names = {"__import__", "eval", "exec"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module == "importlib":
+                dynamic_names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name == "import_module"
+                )
+            elif node.module == "builtins":
+                dynamic_names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name in {"__import__", "eval", "exec"}
+                )
+        elif isinstance(node, ast.Call):
+            func = node.func
+            attribute_call = (
+                isinstance(func, ast.Attribute)
+                and func.attr in {"import_module", "__import__", "eval", "exec"}
+            )
+            constant_getattr_call = (
+                isinstance(func, ast.Name)
+                and func.id == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value in {"import_module", "__import__", "eval", "exec"}
+            )
+            if (
+                (isinstance(func, ast.Name) and func.id in dynamic_names)
+                or attribute_call
+                or constant_getattr_call
+            ):
+                raise AssertionError(f"{path}: dynamic import/evaluation is not permitted")
+
+def _source_imports_from_text(source, path="<source>"):
+    tree = ast.parse(source, filename=path)
+    _assert_no_dynamic_imports(tree, path)
+    edges = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            edges.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                raise AssertionError(f"{path}: relative import is not permitted")
+            if node.module:
+                edges.add(node.module)
+    return edges
+
+
+def _source_imports(path):
+    return _source_imports_from_text(_source_text(path), path)
+
+
+def _network_client_imports(source):
+    tree = ast.parse(source)
+    network_roots = {
+        "requests", "httpx", "aiohttp", "socket", "urllib3",
+        "asyncio", "ftplib", "smtplib", "telnetlib", "xmlrpc",
+        "websocket", "websockets",
+    }
+    network_exact = {"urllib.request", "http.client"}
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(
+                alias.name for alias in node.names
+                if alias.name.split(".", 1)[0] in network_roots or alias.name in network_exact
+            )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module.split(".", 1)[0] in network_roots or module in network_exact:
+                found.add(module)
+            for alias in node.names:
+                imported = f"{module}.{alias.name}" if module else alias.name
+                if imported.split(".", 1)[0] in network_roots or imported in network_exact:
+                    found.add(imported)
+    return found
+
+
+def _local_edges(path):
+    result = set()
+    for edge in _source_imports(path):
+        if edge in SOURCE_FILES:
+            result.add(edge)
+        elif edge.split(".", 1)[0] in SOURCE_FILES:
+            raise AssertionError(f"{path}: unapproved local import {edge}")
+        if edge.split(".", 1)[0] in FORBIDDEN_IMPORT_ROOTS:
+            raise AssertionError(f"{path}: protected/forbidden import {edge}")
+    return result
+
+
+def _resolve_closure(path, seen=None):
+    seen = set() if seen is None else seen
+    if path in seen:
+        return seen
+    seen.add(path)
+    for module in _local_edges(path):
+        _resolve_closure(SOURCE_FILES[module], seen)
+    return seen
+
+
+class Q08ImportBoundaryTests(unittest.TestCase):
+    def test_selected_test_modules_have_only_the_approved_local_import_closure(self):
+        expected = {
+            "tests/test_fetcher.py": {"fetcher"},
+            "tests/test_live_check.py": {"providers", "fetcher"},
+            "tests/test_probe.py": {"probe"},
+            "tests/test_sanitization.py": {"fetcher", "providers"},
+            "tests/test_pipeline.py": set(),
+            "tests/test_q08_import_boundary.py": set(),
+        }
+        for test_path, allowed in expected.items():
+            with self.subTest(test=test_path):
+                closure = _resolve_closure(test_path)
+                self.assertLessEqual(closure, set(TEST_FILES) | set(SOURCE_FILES.values()))
+                for path in closure:
+                    self.assertFalse(any(
+                        edge.split(".", 1)[0] in FORBIDDEN_IMPORT_ROOTS
+                        for edge in _source_imports(path)
+                    ), f"{path} imports a protected dependency")
+                self.assertEqual({
+                    edge for edge in _source_imports(test_path)
+                    if edge.split(".", 1)[0] in SOURCE_FILES
+                }, allowed)
+
+    def test_fetcher_is_the_only_selected_module_with_an_http_client(self):
+        for path in ("providers.py", "probe.py", "run.py", "live_check.py", "tools/net_lab.py"):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    _network_client_imports(_source_text(path)),
+                    set(),
+                    f"{path} must not own a network client; use fetcher.py only",
+                )
+
+    def test_network_import_guard_recognizes_from_import_forms(self):
+        blocked = (
+            ("from urllib import request", "urllib.request"),
+            ("from urllib.request import urlopen", "urllib.request"),
+            ("from http import client", "http.client"),
+            ("from http.client import HTTPConnection", "http.client"),
+            ("from socket import socket", "socket"),
+            ("from requests import get", "requests"),
+            ("from asyncio import open_connection", "asyncio"),
+            ("from ftplib import FTP", "ftplib"),
+            ("from smtplib import SMTP", "smtplib"),
+            ("from telnetlib import Telnet", "telnetlib"),
+            ("from xmlrpc.client import ServerProxy", "xmlrpc.client"),
+            ("from websocket import create_connection", "websocket"),
+            ("from websockets.sync.client import connect", "websockets.sync.client"),
+        )
+        for statement, expected in blocked:
+            with self.subTest(statement=statement):
+                self.assertIn(expected, _network_client_imports(statement))
+        self.assertEqual(_network_client_imports("from urllib import parse"), set())
+        self.assertEqual(_network_client_imports("from http import cookies"), set())
+
+    def test_dynamic_import_guard_recognizes_aliased_importlib_and_builtins(self):
+        samples = (
+            "from importlib import import_module as load_module\nload_module('x')",
+            "from builtins import __import__ as load_module\nload_module('x')",
+            "from builtins import eval as run_code\nrun_code('1 + 1')",
+            "import builtins\nbuiltins.eval('1 + 1')",
+            "import builtins as runtime\nruntime.__import__('x')",
+            "import builtins\ngetattr(builtins, 'eval')('1 + 1')",
+            "import importlib as runtime\nruntime.import_module('x')",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample), self.assertRaisesRegex(
+                    AssertionError, "dynamic import/evaluation"):
+                _source_imports_from_text(sample)
+
+    def test_disabled_subprocess_script_has_no_network_or_protected_imports(self):
+        path = "tools/net_lab.py"
+        edges = _source_imports(path)
+        self.assertFalse(any(edge.split(".", 1)[0] in FORBIDDEN_IMPORT_ROOTS for edge in edges))
+        test_source = (ROOT / "tests/test_probe.py").read_text(encoding="utf-8")
+        self.assertIn("tools/net_lab.py", test_source)
+        self.assertIn("Network lab disabled", (ROOT / path).read_text(encoding="utf-8"))
+
+    def test_workflow_sparse_checkout_matches_exact_approved_file_set(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        match = re.search(r"(?m)^          sparse-checkout: \|\n((?:^            [^\n]*\n)+)", source)
+        self.assertIsNotNone(match, "sparse-checkout allowlist is missing or malformed")
+        actual = {line.strip()[1:] for line in match.group(1).splitlines() if line.strip()}
+        self.assertEqual(actual, WORKFLOW_CHECKOUT)
+        for forbidden in (
+            "/P1/", "/signal/", "/markets/risk/", "/validator.py", "/report.py",
+            "/run.py", "/research/engine.py", "/research/pipeline.py", "/tests/test_history.py",
+            "/tests/test_research_gates.py",
+        ):
+            self.assertNotIn(forbidden, source)
+
+    def test_repository_guidance_matches_current_candles_only_boundary(self):
+        claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "unauthenticated HTTPS GET candles from "
+            "`https://www.tokocrypto.site/api/v3/klines` for `BTCUSDT`",
+            claude,
+        )
+        self.assertNotIn("server-time/candles access", claude)
+
+        handoff = (ROOT / "PROJECT_HANDOFF.MD").read_text(encoding="utf-8")
+        self.assertIn("Superseding Tokocrypto public-market-data boundary", handoff)
+        self.assertIn("server-time (`/api/v3/time`)", handoff)
+        self.assertIn("symbol metadata/exchange-info, any `/open/v1` route", handoff)
+        self.assertIn("any `www.tokocrypto.com` API endpoint are **not authorized**", handoff)
+        self.assertIn("any `www.tokocrypto.com` API endpoint are **not authorized**", handoff)
+
+    def test_workflow_runs_only_exact_approved_offline_modules(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        commands = re.findall(r"python3 -m unittest discover -s tests -p '([^']+)' -v", source)
+        self.assertEqual(commands, [
+            "test_q08_import_boundary.py", "test_fetcher.py", "test_live_check.py",
+            "test_probe.py", "test_sanitization.py", "test_pipeline.py",
+        ])
+        self.assertIn("contents: read", source)
+        self.assertIn("persist-credentials: false", source)
+        self.assertIn('"$REVIEW_HEAD_SHA" != "$ACTUAL_HEAD_SHA"', source)
+
+
+if __name__ == "__main__":
+    unittest.main()
