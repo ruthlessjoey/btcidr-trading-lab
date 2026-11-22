@@ -78,6 +78,13 @@ def _iso(ts):
 
 
 class Kraken:
+    """Legacy Kraken adapter; normal construction is not authorized."""
+
+    def __new__(cls, *args, **kwargs):
+        raise fetcher.DisallowedRequestError(
+            "Kraken provider adapter is not authorized"
+        )
+
     name, label, quote = "kraken", "BTC/USD", "USD"
     symbol, base = "XBTUSD", "https://api.kraken.com"
     docs = "https://docs.kraken.com/api-reference/market-data/get-ohlc-data"
@@ -128,6 +135,13 @@ class Kraken:
 
 
 class Coinbase:
+    """Legacy Coinbase adapter; normal construction is not authorized."""
+
+    def __new__(cls, *args, **kwargs):
+        raise fetcher.DisallowedRequestError(
+            "Coinbase provider adapter is not authorized"
+        )
+
     name, label, quote = "coinbase", "BTC/USD", "USD"
     product, base = "BTC-USD", "https://api.exchange.coinbase.com"
     docs = "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles"

@@ -146,6 +146,16 @@ class ProviderSanitizationTests(unittest.TestCase):
         self.assertFalse(error.read_called)
         self.assertNotIn(MARKER, repr(http.log))
 
+    def test_legacy_venue_adapters_cannot_be_constructed(self):
+        for adapter, label in (
+            (providers.Kraken, "Kraken"),
+            (providers.Coinbase, "Coinbase"),
+        ):
+            with self.subTest(adapter=label), self.assertRaisesRegex(
+                    fetcher.DisallowedRequestError,
+                    f"{label} provider adapter is not authorized"):
+                adapter()
+
     def test_legacy_adapter_errors_are_fixed_safe_messages(self):
         with self.assertRaises(fetcher.ApiError) as ctx:
             providers.Kraken._result({"result": {}, "error": [MARKER]})
@@ -158,16 +168,19 @@ class ProviderSanitizationTests(unittest.TestCase):
             def get(self, url):
                 return self.response
 
+        legacy_coinbase = object.__new__(providers.Coinbase)
+        legacy_kraken = object.__new__(providers.Kraken)
+
         with self.assertRaises(fetcher.ApiError) as ctx:
-            providers.Coinbase().server_time(FakeHttp({"epoch": MARKER}))
+            legacy_coinbase.server_time(FakeHttp({"epoch": MARKER}))
         self.assertEqual(str(ctx.exception), "Coinbase server-time response is invalid")
 
         with self.assertRaises(fetcher.ApiError) as ctx:
-            providers.Kraken().server_time(FakeHttp({"error": [], "result": {"unixtime": MARKER}}))
+            legacy_kraken.server_time(FakeHttp({"error": [], "result": {"unixtime": MARKER}}))
         self.assertEqual(str(ctx.exception), "Kraken server-time response is invalid")
 
         with self.assertRaises(fetcher.ApiError) as ctx:
-            providers.Coinbase().candles("1h", 1, 3600, FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]))
+            legacy_coinbase.candles("1h", 1, 3600, FakeHttp([[MARKER, "1", "2", "1", "1", "1"]]))
         self.assertNotIn(MARKER, str(ctx.exception))
 
 

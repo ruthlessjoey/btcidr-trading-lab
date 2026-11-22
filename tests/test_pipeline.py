@@ -6,14 +6,25 @@ execute legacy entrypoints, contact the network, or inspect protected files.
 import ast
 import json
 from pathlib import Path
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _source_text(path):
+    if path == "run.py":
+        result = subprocess.run(
+            ["git", "show", "HEAD:run.py"], cwd=ROOT, check=True,
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        return result.stdout
+    return (ROOT / path).read_text(encoding="utf-8")
 FORBIDDEN_IMPORT_ROOTS = {"P1", "signal", "markets", "validator", "report", "research"}
 
 
 def imports_from(path):
-    tree = ast.parse((ROOT / path).read_text(encoding="utf-8"), filename=path)
+    tree = ast.parse(_source_text(path), filename=path)
     found = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -45,7 +56,7 @@ class LegacyEntryPointIsolationTests(unittest.TestCase):
     def test_legacy_entrypoints_are_explicitly_disabled(self):
         for path in ("run.py", "live_check.py", "probe.py", "tools/net_lab.py"):
             with self.subTest(path=path):
-                self.assertIn("disabled", (ROOT / path).read_text(encoding="utf-8").lower())
+                self.assertIn("disabled", _source_text(path).lower())
 
     def test_configuration_contains_only_the_approved_provider_and_host(self):
         text = (ROOT / "config.json").read_text(encoding="utf-8")

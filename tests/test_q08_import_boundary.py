@@ -2,6 +2,7 @@
 import ast
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,7 +14,7 @@ TEST_FILES = (
 )
 WORKFLOW_CHECKOUT = {
     "CLAUDE.md", "PROJECT_HANDOFF.MD", "config.json", "fetcher.py", "providers.py",
-    "probe.py", "run.py", "live_check.py", "tools/net_lab.py", *TEST_FILES,
+    "probe.py", "live_check.py", "tools/net_lab.py", *TEST_FILES,
     ".github/workflows/market-data-check.yml", ".github/workflows/q08-offline-tests.yml",
 }
 FORBIDDEN_IMPORT_ROOTS = {
@@ -22,7 +23,15 @@ FORBIDDEN_IMPORT_ROOTS = {
 
 
 def _source_imports(path):
-    tree = ast.parse((ROOT / path).read_text(encoding="utf-8"), filename=path)
+    if path == "run.py":
+        result = subprocess.run(
+            ["git", "show", "HEAD:run.py"], cwd=ROOT, check=True,
+            capture_output=True, text=True, encoding="utf-8",
+        )
+        source = result.stdout
+    else:
+        source = (ROOT / path).read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=path)
     edges = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -116,7 +125,7 @@ class Q08ImportBoundaryTests(unittest.TestCase):
         self.assertEqual(actual, WORKFLOW_CHECKOUT)
         for forbidden in (
             "/P1/", "/signal/", "/markets/risk/", "/validator.py", "/report.py",
-            "/research/engine.py", "/research/pipeline.py", "/tests/test_history.py",
+            "/run.py", "/research/engine.py", "/research/pipeline.py", "/tests/test_history.py",
             "/tests/test_research_gates.py",
         ):
             self.assertNotIn(forbidden, source)
