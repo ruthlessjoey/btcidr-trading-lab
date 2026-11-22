@@ -482,6 +482,13 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
             "unknown (market identity unverified)",
         )
 
+    def test_flagged_comparison_uses_the_manifest_market_label(self):
+        path = os.path.join(ROOT, "research", "backtest_report.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("vs {market_label}", source)
+        self.assertNotIn("vs Binance", source)
+
     def test_stopped_report_uses_manifest_label_and_never_hard_codes_binance(self):
         report = build_backtest_markdown({
             "run_id": "unit-test",
