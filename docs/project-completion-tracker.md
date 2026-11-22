@@ -1465,3 +1465,43 @@ Twin money maker.
 - Overall project completion remains **UNRATED**; profitability **NOT PROVEN**; PAPER **NOT READY**; LIVE **DISABLED**.
 
 Twin money maker.
+
+
+---
+
+## Authoritative current-session reconciliation — 23 November 2026
+
+This section supersedes earlier Q0.8 automation/hash notes above where they name older reviewer commits, helper versions, or gate-test runs.
+
+### Q0.8 unattended trigger and gate
+
+- PR [#97](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/97) current head: `62f1e7cacf065841373b9bac31f1444f98aecad7`; base `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`. It remains open/draft/unmerged and has no submitted independent review.
+- The trusted default-branch `workflow_run` listener responds only to the named Q0.8 offline workflow succeeding on `security/q0-provider-sanitization-2026-11-18`, then validates the event's workflow/repository identity, run name/event/conclusion/branch/repository/run ID/SHA, and the approved offline workflow blob `4821963a7b752a1e5bbc52e1d97c93ea296ff7f4`. It never checks out or executes candidate source or candidate workflow YAML.
+- The trusted workflow pins immutable reviewer commit `e76faed3520ea3dce0b06dfb5bc64ca5ad3554aa`. Reviewer source blob `20d3eba4d106c34aa89441e3febcf54104a934f6`; event/deduplication helper blob `3e9acdbe8bd4f346ff00211c525156cee985dcd4`. PR branch and immutable checkout use the identical helper blob.
+- The helper calls the GitHub workflow metadata endpoint by workflow filename, and lists run history via the documented workflow-specific route `/actions/workflows/{workflow_id}/runs`. It scans at most 2,000 results with exact page integrity checks. It blocks same-SHA running or successful duplicates, resumes only a failed same-SHA run with its own non-expired checkpoint artifact, and otherwise starts cleanly. All malformed or incomplete API responses fail closed.
+- Automatic checkpoint restore is wired **after** gate selection and **before** the model review step. The selected run ID is applied to artifact name, download run ID, and reviewer environment. Regression verifies ordering and all bindings.
+- Exact-head gate push run [#45057978430](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45057978430) passed **19/19** adversarial Python 3.11 tests and Actionlint on both trusted workflows. Exact-head PR run [#45057982638](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45057982638) also passed **19/19**. CodeQL [#45057979247](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45057979247) passed both Python and Actions analysis.
+- Immutable reviewer synthetic preflight [#45057968809](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45057968809) passed Python 3.11 compile and the synthetic policy/checkpoint/zero-context diff regression on the exact reviewer checkout.
+- **Activation remains blocked only by PR #97 integration into protected `main`.** GitHub's `workflow_run` event is delivered only to a workflow already present on the default branch. This session did not merge PR #97 or manually dispatch Q0.8. After PR #97 is integrated, future successful offline-test pushes on the authorized PR #60 branch will trigger specialist review automatically, with no repeated Actions form entry.
+
+### Q0.8 current PR #60 review failure and bounded correction
+
+- PR #60 current head remains `e8674dbfe3efd2339ddb028484362f9466f7b058`, open/draft/unmerged, based on M6. Exact-head offline tests [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) passed **103/103** across seven selected suites (33, 4, 7, 2, 15, 18, 24).
+- Review attempt [#45056820308](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056820308) stopped before the first specialist because the two-line-context diff was **230,101 characters**, exceeding the immutable `MAX_DIFF=224,000` ceiling. It made no model request, created no specialist report and uploaded no checkpoint artifact.
+- The immutable reviewer was changed to zero unchanged context lines. Every added and removed line remains included; path/commit identity and hunk coordinates remain in the diff. Both hard bounds remain unchanged: `MAX_DIFF=224,000` and `MAX_REQUEST=256,000`. Synthetic preflight [#45057968809](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45057968809) passed on the exact immutable reviewer commit.
+- Reconstructed sizing from the current 26-file GitHub PR patch estimates zero-context diff size at approximately **220,851 characters** after calibration against the previous exact runner measurement. This is a calculated estimate only, not a live reviewer measurement. A full 19-stage specialist review has still not run on current PR #60 head; no Commander verdict, independent acceptance or final verification exists.
+
+### Independent security and M5 evidence
+
+- PR #95 current head `49525eb0d761a5f266820b9a9d8d4e8ec671c9b0`: Actionlint archive suite [#45056419053](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056419053) passed **13/13** Python 3.11.18 tests, including nonblocking FIFO rejection and symlinked archive/destination parent cases. Exact-head CodeQL [#45056420356](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056420356) passed both Python and Actions analyses. PR remains open/draft/unmerged.
+- PR #98 current head `3576c8041d27b0f54a572adc826c462d892ffd0c`: pure M5 package/core run [#45054403126](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45054403126) passed **16/16**. It tests contract/decision/engine fail-closed behavior and import boundaries without loading the protected S1 adapter or validator chain. PR remains open/draft/unmerged.
+- PR #66 provider factory isolation remains 3/3 passed (run #45043119748), with exact-head CodeQL both analyses passed (run #45043120812).
+- PR #34 holdout publisher isolation remains 27/27 passed (run #44975483232), but this does not establish full holdout lifecycle integration. PR #68's pipeline/engine suites remain blocked by protected validator import closure; they were not executed.
+
+### Project acceptance
+
+- The proposed register contains **40 requirements / 100 weights**, but the owner has not approved the scope, weights or evidence criteria. Overall completion is therefore **UNRATED**, not a defensible percentage. Tracker still reflects no complete project-wide exact-main acceptance of the 40-item proposal.
+- Historical strategy proxy results are not freshly reproducible from the safe evidence available here. Profitability remains **NOT PROVEN**; PAPER readiness **NOT READY**; LIVE **DISABLED**.
+- No protected files were accessed or executed, no provider allowlist was expanded, no exchange or network market-data request was made, no real-money action occurred, and no PR was merged.
+
+Twin money maker.
