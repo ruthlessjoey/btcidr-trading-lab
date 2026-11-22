@@ -849,7 +849,7 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 | K1 | 3 | IN PROGRESS | 59 selected offline tests PASS on PR #82 exact head `883bc7c3c500102405dad884dd0995ee4e0e887d` (run #44861148424) | IN PROGRESS | Candidate only | 0.25 | The exact-head job verified the requested and checked-out SHA, then passed import-boundary 6, transport 30, provider/config 4, disabled probe 3, sanitization 12, and legacy isolation 4 tests. PR #82 remains unmerged; independent security acceptance and mainline integration remain outstanding. |
 | K2 | 3 | IN PROGRESS | 59 selected offline tests PASS on PR #82 exact head; project-wide verification NOT RUN | IN PROGRESS | Candidate only | 0.25 | PR #82 run #44861148424 passed 59/59 selected offline tests on exact head `883bc7c3c500102405dad884dd0995ee4e0e887d`. This is candidate-branch evidence only; full-suite, integration, mutation, and whole-project acceptance are not established. |
 | K3 | 2 | IN PROGRESS | Static checks PASS on candidates | IN PROGRESS | Candidate only | 0.25 | Several workflows/actions are pinned and CodeQL/Analyze passed on PR #82/#81/#83. Complete dependency/provenance/license inventory and integrated supply-chain acceptance remain outstanding. |
-| K4 | 2 | IN PROGRESS | Q0.8 specialist review run #44906083428 FAILED after bounded HTTP 429 retries; no Commander/acceptance/final verification | IN PROGRESS | Candidate only | 0.25 | The latest review attempt restored only a one-report checkpoint, completed architecture-architect, then exhausted retries at implementation-engineer due to OpenRouter HTTP 429. A prior checkpoint has five reports, but neither contains Commander synthesis, independent acceptance, or final verification. Q0.8 remains NOT ACCEPTED. |
+| K4 | 2 | IN PROGRESS | PR #60 push-triggered review #44970126651: synthetic preflight PASS; 19-role review RUNNING at last check. Offline workflow exact push tests: PR #60 run #44970096322 65/65 on `14f84a6...`; PR #92 run #44970101869 78/78 on `34c889c...` | IN PROGRESS | Candidate only | 0.25 | Branch-scoped push automation now covers PR #60 and PR #92 offline suites; PR #60 full reviewer auto-starts on its exact branch. Read-only permissions, sparse test scope, immutable reviewer pin, and checkpoint upload remain enforced. Full reviewer completion and independent acceptance are pending; no exact-main integration credit. |
 | K5 | 2 | IN PROGRESS | UNVERIFIED | IN PROGRESS | Candidate only | 0.00 | Tracker, README and handoff contain useful context, but a complete accepted rollback/incident/recovery runbook and operational proof are not established. Documentation alone earns no maturity credit. |
 
 ### First-pass weighted result (2026-11-20)
@@ -1640,3 +1640,30 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 
 - Live comparison of PR #92 head `893e71933448cd56edd53a2c4311baa9d3f30f38` against its target branch `security/q0-provider-sanitization-2026-11-18` now reports **20 commits ahead and 2 commits behind**. The target branch advanced with both the reviewer runner-pin correction and subsequent PR #60 documentation/metadata updates. PR #92 remains open/draft with its intended five unprotected research/test paths, but needs target synchronization before integration.
 - No rebase, force push, merge, or branch-ref movement was performed. PR #92 exact-head offline tests remain pending.
+
+
+
+## Push-triggered Q0.8 verification — 2026-11-22
+
+- Owner approved branch-scoped automatic workflow runs. The offline workflow now runs on pushes to the exact PR #60 and PR #92 branches, filtered to Python/JSON and its own workflow file; manual dispatch remains available. No test scope or sparse-checkout list was widened; job permissions remain `contents: read`.
+- Offline workflow commit: `14f84a6f97c78b006b5af12af7012304a7b82a91` (workflow blob `17a8bd3243117c6364ec974299618396ef29ceb7`). Push-triggered run [#44970096322](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44970096322) passed 65/65 selected tests on Python 3.11.18 at exact checkout SHA `14f84a6f97c78b006b5af12af7012304a7b82a91` (21+4+7+2+7+10+14).
+- Specialist-review workflow commit: `f6c520f725973d6c98534aec340fdabd77898383` (workflow blob `965805fdff2f6f97c5f780ce89ad94a824e96de8`). Push triggers a full review only on this exact branch; it binds `REVIEW_HEAD_SHA` to `github.sha`, retains the immutable self-contained runner `731fc9fbb892dadccc64bf52da2f91ff069da124`, read-only GitHub permissions, synthetic preflight, bounded checkpoints, and manual dispatch/resume.
+- Automatic reviewer run [#44970126651](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44970126651) checked out exact PR #60 head `f6c520f725973d6c98534aec340fdabd77898383`; synthetic preflight passed and the model-based review was still running at the last inspection. No 19-role completion, Commander synthesis, independent acceptance, or final verification is claimed yet.
+- PR #60 remains open/draft/unmerged on the M6 baseline. The offline test run predates only the later reviewer-workflow-only commit; its application source/test set was unchanged, but strict latest-HEAD CI should be rerun after reviewer completion if needed.
+
+
+
+## Push-triggered Q0.8 offline verification — 2026-11-22
+
+- Owner-approved automation now runs the bounded offline test workflow on pushes to this exact branch and PR #60's branch. The trigger is limited to Python/JSON changes and the offline-workflow file; manual dispatch remains available. Sparse checkout and test commands are unchanged; permissions remain `contents: read`.
+- Automation commit and exact test head: `34c889c679ddc803d928c039aafb93228707db61`; workflow blob `17a8bd3243117c6364ec974299618396ef29ceb7`.
+- Push-triggered run [#44970101869](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44970101869) passed **78/78** selected offline tests on Python 3.11.18 at exact checkout SHA `34c889c679ddc803d928c039aafb93228707db61`: fetcher 21, provider boundary 4, history 7, disabled probe 2, static pipeline 7, research gates 21, sanitization 16.
+- PR #92 remains draft/open/unmerged and stacked on PR #60. Live comparison against current PR #60 head `f6c520f725973d6c98534aec340fdabd77898383` is **21 ahead / 4 behind**; synchronize before integration. The offline pass does not resolve that ancestry drift or authorize merging this PR independently.
+
+## Project-wide assessment after Q0.8 workflow automation — 2026-11-22
+
+- Repository main baseline remains `731fc9fbb892dadccc64bf52da2f91ff069da124`; no changes were pushed to main and no PR was merged.
+- Current PR #60 head: `f6c520f725973d6c98534aec340fdabd77898383`, M6 base, 26 source-scope paths plus the existing workflow updates. Current PR #92 head: `34c889c679ddc803d928c039aafb93228707db61`, stacked on PR #60's older base; 21 ahead / 4 behind current target.
+- New offline Actions runs verify 65/65 and 78/78 selected tests at the exact workflow-automation commits listed above. Reviewer run #44970126651 is in progress; it is not yet an accepted 19-role review.
+- Candidate maturity remains 15.00/100 from the existing row audit; exact-main threshold remains 0/40. Overall project completion remains UNRATED until the full row-level evidence and integration assessment is reconciled. Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
+- No protected path was accessed or executed; no market request, dataset publication, backtest, PAPER operation, LIVE trade, or financial transaction occurred.
