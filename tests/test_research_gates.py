@@ -252,6 +252,8 @@ class CrosscheckGateTests(unittest.TestCase):
         mutations = (
             ("close_diff_pct", 4.0),
             ("return_gap_pp", 4.0),
+            ("high_diff_pct", 4.0),
+            ("low_diff_pct", 4.0),
             ("low_diff_pct", 10 ** 1000),
             ("open_diff_pct", True),
         )
@@ -275,6 +277,34 @@ class CrosscheckGateTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     CrosscheckError, "invalid comparison evidence"):
                 validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+    def test_comparison_agreement_requires_high_and_low_prices_within_tolerance(self):
+        previous = to_ts("2020-03-11")
+        target = to_ts("2020-03-12")
+
+        def candle(timestamp, open_price, high_price, low_price, close_price):
+            return SimpleNamespace(
+                time=timestamp, open=open_price, high=high_price,
+                low=low_price, close=close_price,
+            )
+
+        prior = candle(previous, 100, 105, 95, 100)
+        base = candle(target, 100, 110, 90, 100)
+        for divergent in (
+            candle(target, 100, 200, 90, 100),
+            candle(target, 100, 110, 50, 100),
+        ):
+            with self.subTest(high=divergent.high, low=divergent.low):
+                result = crosscheck.judge(
+                    {previous: prior, target: base},
+                    {previous: prior, target: divergent},
+                    target,
+                )
+                self.assertIsNotNone(result)
+                self.assertLessEqual(abs(result["open_diff_pct"]), crosscheck.TOLERANCE_PCT)
+                self.assertLessEqual(abs(result["close_diff_pct"]), crosscheck.TOLERANCE_PCT)
+                self.assertLessEqual(abs(result["return_gap_pp"]), crosscheck.TOLERANCE_PCT)
+                self.assertFalse(result["agrees"])
 
     def test_return_gap_must_match_the_two_reported_daily_returns(self):
         for field, value in (

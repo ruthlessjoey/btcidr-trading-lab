@@ -86,6 +86,8 @@ def _valid_comparison_evidence(source):
     expected = (
         abs(source["open_diff_pct"]) <= TOLERANCE_PCT
         and abs(source["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(source["high_diff_pct"]) <= TOLERANCE_PCT
+        and abs(source["low_diff_pct"]) <= TOLERANCE_PCT
         and abs(source["return_gap_pp"]) <= TOLERANCE_PCT
     )
     return type(source["agrees"]) is bool and source["agrees"] is expected
@@ -263,8 +265,13 @@ def judge(binance, other, t):
              "return_gap_pp": ret_b - ret_o}
     except (TypeError, ValueError, ZeroDivisionError):
         return None
-    d["agrees"] = (abs(d["open_diff_pct"]) <= TOLERANCE_PCT and abs(d["close_diff_pct"]) <= TOLERANCE_PCT
-                   and abs(d["return_gap_pp"]) <= TOLERANCE_PCT)
+    d["agrees"] = (
+        abs(d["open_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["close_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["high_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["low_diff_pct"]) <= TOLERANCE_PCT
+        and abs(d["return_gap_pp"]) <= TOLERANCE_PCT
+    )
     return d
 
 
