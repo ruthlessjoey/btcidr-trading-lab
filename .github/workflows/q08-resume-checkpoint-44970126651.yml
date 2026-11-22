@@ -1,4 +1,4 @@
-name: Q0.8 resume latest checkpoint after quota stop 44971089583
+name: Q0.8 resume current-head checkpoint after quota stop 44972690441
 
 on:
   push:
@@ -20,14 +20,14 @@ jobs:
       pull-requests: read
       actions: read
     steps:
-      - name: Restore latest checkpoint from quota-interrupted resume
+      - name: Restore exact PR 60 checkpoint from quota-interrupted push review
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: q08-review-checkpoint-44971089583
+          name: q08-review-checkpoint-44972690441
           path: ${{ runner.temp }}
           github-token: ${{ github.token }}
           repository: ruthlessjoey/btcidr-trading-lab
-          run-id: 44971089583
+          run-id: 44972690441
 
       - name: Checkout immutable push-resume reviewer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -52,7 +52,7 @@ jobs:
       - name: Resume the exact PR 60 review (read-only GitHub source access)
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_HEAD_SHA: f6c520f725973d6c98534aec340fdabd77898383
+          REVIEW_HEAD_SHA: d4edb4bc634e794b1957399471532ad7671576ba
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
