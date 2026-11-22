@@ -103,6 +103,58 @@ class HistoryContainmentTests(unittest.TestCase):
                     f"{path} imports a protected module or uses a relative import",
                 )
 
+    def test_run_entrypoint_source_guard_precedes_filesystem_and_source_iteration(self):
+        # run.py imports protected validator/report modules, so inspect its AST only.
+        path = os.path.join(ROOT, "run.py")
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename="run.py")
+        run_pipeline = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_pipeline"
+        )
+        body = run_pipeline.body
+
+        def call_index(function_name, owner=None):
+            for index, statement in enumerate(body):
+                for node in ast.walk(statement):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    if owner is None and isinstance(node.func, ast.Name) and node.func.id == function_name:
+                        return index
+                    if (owner is not None and isinstance(node.func, ast.Attribute)
+                            and node.func.attr == function_name
+                            and isinstance(node.func.value, ast.Name)
+                            and node.func.value.id == owner):
+                        return index
+            self.fail(f"run_pipeline does not call {owner + '.' if owner else ''}{function_name}")
+
+        readonly_index = call_index("assert_read_only")
+        mkdir_index = call_index("makedirs", "os")
+        source_loop_index = next(
+            index for index, statement in enumerate(body)
+            if isinstance(statement, ast.For)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id == "source_cfg"
+            and ast.unparse(statement.iter) == "cfg['sources']"
+        )
+        source_guard_index = next(
+            index for index, statement in enumerate(body)
+            if isinstance(statement, ast.If)
+            and any(
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and "source configuration is not the exact approved Tokocrypto endpoint" in node.value
+                for node in ast.walk(statement)
+            )
+        )
+        guard = body[source_guard_index]
+        guard_expression = ast.unparse(guard.test)
+        self.assertIn("cfg.get('sources')", guard_expression)
+        self.assertIn("tokocrypto-mbx", guard_expression)
+        self.assertLess(readonly_index, source_guard_index)
+        self.assertLess(source_guard_index, mkdir_index)
+        self.assertLess(source_guard_index, source_loop_index)
+
     def test_step1_behavior_fails_closed_without_network_or_dataset(self):
         cfg = {
             "mode": "read_only",
