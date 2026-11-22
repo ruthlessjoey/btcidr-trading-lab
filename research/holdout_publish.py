@@ -10,6 +10,7 @@ import math
 import os
 import re
 import stat
+import tempfile
 from pathlib import Path
 
 MAX_JSON_BYTES = 1024 * 1024
@@ -65,7 +66,7 @@ def _unique_object(pairs):
     return value
 
 
-def _read_object(path, description):
+def _read_object(path, description, return_identity=False):
     _regular_file(path, description)
     flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     if hasattr(os, "O_NOFOLLOW"):
@@ -97,7 +98,47 @@ def _read_object(path, description):
         raise RuntimeError(f"{description} is unreadable: {type(exc).__name__}") from exc
     if not isinstance(value, dict):
         raise RuntimeError(f"{description} must contain a JSON object")
+    if return_identity:
+        return value, (metadata.st_dev, metadata.st_ino)
     return value
+
+
+def _remove_exact_reservation(path, expected_identity):
+    """Atomically stage, verify, then remove only the reservation inode we read."""
+    quarantine = Path(tempfile.mkdtemp(prefix=".holdout-publish-", dir=path.parent))
+    staged = quarantine / path.name
+    try:
+        os.rename(path, staged)
+        metadata = os.lstat(staged)
+        actual_identity = (metadata.st_dev, metadata.st_ino)
+        if not stat.S_ISREG(metadata.st_mode) or actual_identity != expected_identity:
+            # The path was replaced after validation. Restore the replacement when
+            # possible; never delete it merely because it occupied the old path.
+            try:
+                if not os.path.lexists(path):
+                    os.rename(staged, path)
+                    quarantine.rmdir()
+            except OSError:
+                # Preserve the staged entry in its quarantine directory for recovery.
+                pass
+            raise RuntimeError(
+                "durable reservation changed before cleanup; replacement was preserved"
+            )
+        staged.unlink()
+        quarantine.rmdir()
+    except RuntimeError:
+        raise
+    except OSError as exc:
+        try:
+            if os.path.lexists(staged) and not os.path.lexists(path):
+                os.rename(staged, path)
+            if quarantine.is_dir() and not any(quarantine.iterdir()):
+                quarantine.rmdir()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"durable reservation cleanup failed safely: {type(exc).__name__}"
+        ) from exc
 
 
 def publish_completed_reservations(registry_dir, output_dir, report_path):
@@ -132,12 +173,15 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         raise RuntimeError("backtest report does not confirm a completed TEST evaluation")
 
     pending_to_remove = []
+    reservation_identities = {}
     for completed in completed_files:
         _regular_file(completed, "local completed record")
         pending = root / (completed.stem + ".pending")
         if not os.path.lexists(pending):
             raise RuntimeError("durable reservation is missing; refusing to publish completion")
-        reservation_record = _read_object(pending, "durable reservation")
+        reservation_record, reservation_identity = _read_object(
+            pending, "durable reservation", return_identity=True
+        )
         completed_record = _read_object(completed, "local completed record")
         branch_completed = root / completed.name
         branch_record = _read_object(branch_completed, "branch completed record")
@@ -170,10 +214,14 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         if not _same_json_value(report_test, completed_record):
             raise RuntimeError("report does not match completed TEST record")
         pending_to_remove.append(pending)
+        reservation_identities[pending] = reservation_identity
 
     # Do not mutate even the temporary publisher checkout until every result validates.
     for pending in pending_to_remove:
-        pending.unlink()
+        # A validated path may be replaced before cleanup. The staging rename is
+        # atomic within the registry directory; its inode must still match the
+        # descriptor opened and checked during validation.
+        _remove_exact_reservation(pending, reservation_identities[pending])
     return len(pending_to_remove)
 
 
