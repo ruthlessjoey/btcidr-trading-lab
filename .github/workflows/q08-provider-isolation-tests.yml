@@ -1,0 +1,50 @@
+name: Q0.8 provider factory isolation tests
+
+on:
+  push:
+    branches:
+      - security/q08-unprotected-live-check-tests-2026-11-18
+    paths:
+      - "config.json"
+      - "fetcher.py"
+      - "providers.py"
+      - "tests/test_live_check.py"
+      - ".github/workflows/q08-provider-isolation-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: q08-provider-isolation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  provider-factory-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout only the safe provider factory test closure
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /config.json
+            /fetcher.py
+            /providers.py
+            /tests/test_live_check.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Run only the provider factory isolation tests
+        run: python3 -W error::ResourceWarning -m unittest discover -s tests -p 'test_live_check.py' -v
