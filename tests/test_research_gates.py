@@ -526,6 +526,34 @@ class BacktestReportMarketProvenanceTests(unittest.TestCase):
         self.assertIn("vs {market_label}", source)
         self.assertNotIn("vs Binance", source)
 
+    def test_report_sanitizes_stopped_run_and_manifest_metadata(self):
+        report = build_backtest_markdown({
+            "run_id": "run-42\\n# injected run heading",
+            "status": "STOPPED",
+            "error": "market identity gate failed\\n# injected error heading",
+            "dataset": {
+                "market": {
+                    "provider": "tokocrypto\\n# injected provider",
+                    "pair_label": "BTC/USDT",
+                    "timeframe": "1d",
+                    "market_type": "spot",
+                },
+            },
+        })
+        self.assertIn("Run run-42 injected run heading", report)
+        self.assertIn("market identity gate failed injected error heading", report)
+        self.assertIn("unknown (market identity unverified)", report)
+        self.assertNotIn("\\n# injected", report)
+        self.assertNotIn("# injected", report)
+
+        path = os.path.join(ROOT, "research", "backtest_report.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("_safe_report_text(d.get('version_id'))", source)
+        self.assertIn("_safe_report_hash(d.get('sha256'))", source)
+        self.assertNotIn("d['market']['provider']", source)
+        self.assertNotIn("r['error']", source)
+
     def test_stopped_report_uses_manifest_label_and_never_hard_codes_binance(self):
         report = build_backtest_markdown({
             "run_id": "unit-test",
