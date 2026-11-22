@@ -22,14 +22,6 @@ on:
           - synthetic
           - review
         default: synthetic
-  # The PR60 offline workflow runs without secrets. This trusted default-branch workflow
-  # starts the model review only after that exact offline workflow succeeds.
-  workflow_run:
-    workflows:
-      - "Q0.8 offline security regression tests (sparse unprotected scope)"
-    types: [completed]
-    branches:
-      - security/q0-provider-sanitization-2026-11-18
   # Successful offline workflow runs on the approved PR60 branch automatically review that exact SHA.
   workflow_run:
     workflows:
