@@ -1,5 +1,8 @@
 """research/backtest_report.py - Markdown for the Step 2 backtest, readable on a phone."""
 
+import math
+import re
+
 METRIC_LIMITS = [
     "**Total return** - one number for one start and end date; moving either by a few weeks can change "
     "it a lot. Open positions are valued at the last close without exit costs, for the strategy and "
@@ -19,70 +22,181 @@ METRIC_LIMITS = [
 ]
 
 
+def _safe_report_number(value):
+    """Return only finite built-in numeric values; never format caller objects."""
+    if type(value) not in (int, float):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _safe_report_percent_points(value, signed=True):
+    number = _safe_report_number(value)
+    if number is None:
+        return "unavailable"
+    return f"{number:+.2f}%" if signed else f"{number:.2f}%"
+
+
 def pct(x):
-    return "n/a" if x is None else f"{x * 100:+.1f}%"
+    number = _safe_report_number(x)
+    return "n/a" if number is None else f"{number * 100:+.1f}%"
 
 
 def plain(x):
-    return "n/a" if x is None else f"{x * 100:.1f}%"
+    number = _safe_report_number(x)
+    return "n/a" if number is None else f"{number * 100:.1f}%"
 
 
 def short(name):
-    return name.split(":")[0]
+    return _safe_report_text(name, 64).split(":")[0]
+
+
+def _safe_report_text(value, limit=160):
+    """Collapse and bound untrusted report text; strip Markdown/control syntax."""
+    if type(value) is not str:
+        return "unavailable"
+    cleaned = " ".join(value.split())
+    allowed = []
+    for char in cleaned:
+        if char.isascii() and (char.isalnum() or char in " .,:;_()/+-"):
+            allowed.append(char)
+    result = " ".join("".join(allowed).split())
+    return result[:limit] if result else "unavailable"
+
+
+def _safe_report_hash(value):
+    """Render only a lowercase SHA-256 digest."""
+    return value if type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) else "unavailable"
+
+
+def _safe_report_count(value):
+    """Render non-negative built-in integer counts only."""
+    return str(value) if type(value) is int and value >= 0 else "unavailable"
+
+
+def market_source_label(market):
+    """Return a bounded manifest label; it is descriptive, not identity proof."""
+    unknown = "unknown (market identity unverified)"
+    if type(market) is not dict:
+        return unknown
+    fields = (
+        market.get("provider"),
+        market.get("pair_label"),
+        market.get("timeframe"),
+        market.get("market_type"),
+    )
+    if any(
+        type(value) is not str
+        or not value
+        or len(value) > 64
+        or any(not (char.isascii() and (char.isalnum() or char in "._/-"))
+               for char in value)
+        for value in fields
+    ):
+        return unknown
+    return " ".join(fields)
 
 
 def metric_row(label, scenario, m):
-    pf = "n/a" if m["profit_factor"] is None else f"{m['profit_factor']:.2f}"
-    trades = f"{m['closed_trades']}" + (" (+1 open)" if m["open_position"] else "")
-    return (f"| {scenario} | {label} | {pct(m['total_return'])} | {plain(m['max_drawdown'])} | {trades} | "
-            f"{plain(m['win_rate'])} | {pf} | {plain(m['exposure'])} |")
+    profit_factor = _safe_report_number(m.get("profit_factor"))
+    pf = "n/a" if profit_factor is None else f"{profit_factor:.2f}"
+    closed_trades = _safe_report_count(m.get("closed_trades"))
+    trades = closed_trades + (" (+1 open)" if m.get("open_position") is True else "")
+    return (f"| {_safe_report_text(scenario, 48)} | {_safe_report_text(label, 48)} | "
+            f"{pct(m.get('total_return'))} | {plain(m.get('max_drawdown'))} | {trades} | "
+            f"{plain(m.get('win_rate'))} | {pf} | {plain(m.get('exposure'))} |")
 
 
 def seg_table(block):
     L = ["| Costs | Row | Return | Max drawdown | Closed trades | Win rate | Profit factor | Exposure |",
          "|---|---|---|---|---|---|---|---|"]
+    if type(block) is not dict:
+        return L
     for scen, parts in block.items():
-        L.append(metric_row("Strategy", short(scen), parts["strategy"]))
-        L.append(metric_row("Buy and hold", short(scen), parts["buy_and_hold"]))
-        L.append(metric_row("Cash", short(scen), parts["cash"]))
+        if type(parts) is not dict:
+            continue
+        for name, key in (("Strategy", "strategy"),
+                          ("Buy and hold", "buy_and_hold"),
+                          ("Cash", "cash")):
+            metrics = parts.get(key)
+            if type(metrics) is dict:
+                L.append(metric_row(name, short(scen), metrics))
     return L
 
 
+def _crosscheck_markdown_lines(c, market_label):
+    """Render untrusted cross-check evidence as sanitized Markdown lines."""
+    lines = []
+    flagged = c.get("flagged")
+    if type(flagged) is list:
+        safe_rule = _safe_report_text(c.get("rule"))
+        for entry in flagged:
+            if type(entry) is not dict:
+                continue
+            date = _safe_report_text(entry.get("date"), 32)
+            verdict = _safe_report_text(entry.get("verdict"), 48)
+            lines.append(f"- **{date}: {verdict}** (rule: {safe_rule}).")
+            for name in ("coinbase", "bitstamp"):
+                source = entry.get(name)
+                if type(source) is dict:
+                    lines.append(
+                        f"  - {name}: day return "
+                        f"{_safe_report_percent_points(source.get('other_return_pct'))} vs "
+                        f"{market_label} {_safe_report_percent_points(source.get('binance_return_pct'))}, "
+                        f"close diff {_safe_report_percent_points(source.get('close_diff_pct'))}, "
+                        f"low diff {_safe_report_percent_points(source.get('low_diff_pct'))}"
+                    )
+    summary = c.get("summary")
+    if type(summary) is dict:
+        lines.append(
+            "- Whole history vs Coinbase: median close difference "
+            f"{_safe_report_percent_points(summary.get('median_abs_close_diff_pct'), signed=False)}, "
+            "99th percentile "
+            f"{_safe_report_percent_points(summary.get('p99_abs_close_diff_pct'), signed=False)}, "
+            "max "
+            f"{_safe_report_percent_points(summary.get('max_abs_close_diff_pct'), signed=False)}."
+        )
+    for key in ("coinbase_error", "bitstamp_error"):
+        error = c.get(key)
+        if type(error) is str and error:
+            label = key.split("_", 1)[0]
+            lines.append(f"- {label} could not be fetched: {_safe_report_text(error)}")
+    return lines
+
+
 def build_markdown(r):
+    dataset = r.get("dataset")
+    market = dataset.get("market") if type(dataset) is dict else None
+    market_label = market_source_label(market)
+    run_id = _safe_report_text(r.get("run_id"))
     L = ["# BTC/USDT trend-filter backtest (research only)",
-         f"Run `{r.get('run_id')}` · **READ-ONLY** · no keys, no orders, no live trading", "",
-         "> **This is a historical simulation on a proxy market. It does not show that the strategy is "
-         "profitable and it is not a signal.** Costs are unverified assumptions, past data is one sample, "
-         "and the market is Binance BTC/USDT, **not** Tokocrypto execution prices.", ""]
+         f"Run {run_id} · **READ-ONLY** · no keys, no orders, no live trading", "",
+         f"> **This is a historical simulation on a proxy dataset labelled `{market_label}`. "
+         "The manifest label is not independent proof of instrument identity or executable venue prices. "
+         "It does not demonstrate profitability and is not a signal.** Costs are unverified assumptions; "
+         "the period is one historical sample.", ""]
     if r["status"] != "OK":
-        L += ["## STOPPED", "", f"The backtest did not run: **{r['error']}**", "",
+        L += ["## STOPPED", "", f"The backtest did not run: {_safe_report_text(r.get('error'))}", "",
               "Nothing was simulated and no results are shown."]
         return "\n".join(L) + "\n"
     d = r["dataset"]
     L += ["## Data (preserved version, pinned)", "",
-          f"- `{d['version_id']}` · sha256 `{d['sha256']}`",
-          f"- {d['market']['provider']} {d['market']['pair_label']} {d['market']['timeframe']} spot · "
-          f"{d['rows']} candles · {d['first_open_utc'][:10]} to {d['last_open_utc'][:10]} (UTC open times)",
-          "- Re-verified at load: hash, market identity, order, no duplicates, no gaps, only completed candles."]
+          f"- {_safe_report_text(d.get('version_id'))} · sha256 {_safe_report_hash(d.get('sha256'))}",
+          f"- {market_label} · {_safe_report_count(d.get('rows'))} candles · "
+          f"{_safe_report_text(d.get('first_open_utc'))[:10]} to "
+          f"{_safe_report_text(d.get('last_open_utc'))[:10]} (UTC open times)",
+          "- Re-verified at load: hash, manifest fields, order, no duplicates, no gaps, only completed candles.",
+          "- The manifest market label is descriptive provenance; independent instrument identity remains a separate gate."]
     # flagged candle
     L += ["", "## Flagged candle (2020-03-12, -39.5% in one day)", ""]
     c = r.get("crosscheck")
-    if c:
-        for e in c["flagged"]:
-            L.append(f"- **{e['date']}: {e['verdict']}** (rule: {c['rule']}).")
-            for name in ("coinbase", "bitstamp"):
-                j = e[name]
-                if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs Binance "
-                             f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
-                             f"low diff {j['low_diff_pct']:+.2f}%")
-        if c.get("summary"):
-            s = c["summary"]
-            L.append(f"- Whole history vs Coinbase: median close difference {s['median_abs_close_diff_pct']:.2f}%, "
-                     f"99th percentile {s['p99_abs_close_diff_pct']:.2f}%, max {s['max_abs_close_diff_pct']:.2f}%.")
-        for k in ("coinbase_error", "bitstamp_error"):
-            if c.get(k):
-                L.append(f"- {k.split('_')[0]} could not be fetched: {c[k]}")
+    if type(c) is dict:
+        L += _crosscheck_markdown_lines(c, market_label)
+        if not c.get("flagged"):
+            L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     else:
         L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     sv = r.get("sensitivity")
@@ -174,7 +288,8 @@ def build_markdown(r):
           "- Before trusting anything: more trades, other periods or assets, real fees, and paper trading with live prices.",
           "", "## Metric limitations", ""] + [f"- {m}" for m in METRIC_LIMITS]
     L += ["", "## Unresolved concerns", "",
-          "- The market is Binance BTC/USDT; Tokocrypto prices, spreads, fees and order rules are unverified.",
+          f"- Dataset market label: {market_label}. Independent market identity and executable venue prices remain unverified.",
+          "- Tokocrypto prices, spreads, fees and order rules are not verified for execution.",
           "- Cost and trading-rule numbers above are assumptions.",
           "- Only closes and opens are used; intraday stops and intraday drawdowns are not simulated.",
           "- No independent cross-check was run: Coinbase and Bitstamp are excluded pending separate provider authorization. The flagged candle remains unverified."]

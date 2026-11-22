@@ -1,5 +1,6 @@
 """Offline tests for the deliberately disabled legacy probe."""
 import os
+import subprocess
 import sys
 import unittest
 
@@ -21,6 +22,29 @@ class DisabledProbeTests(unittest.TestCase):
         self.assertNotIn("urllib.request", source)
         self.assertNotIn("exchangeInfo", source)
         self.assertNotIn("open/v1", source)
+
+    def test_probe_exit_two_is_a_policy_block_not_a_retry_signal(self):
+        path = os.path.join(ROOT, "probe.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("Permanently disabled legacy probe", source)
+        self.assertIn("Exit code 2 means the diagnostic is blocked by policy", source)
+        self.assertIn("not that it should be retried", source)
+        self.assertEqual(probe.run_probe(), 2)
+
+    def test_network_lab_exit_two_is_a_policy_block_not_a_retry_signal(self):
+        path = os.path.join(ROOT, "tools", "net_lab.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("Permanently disabled broad network scanner", source)
+        self.assertIn("Exit code 2 means the scanner is blocked by policy", source)
+        self.assertIn("not that it should be retried", source)
+        result = subprocess.run(
+            [sys.executable, path], cwd=ROOT, capture_output=True, text=True, check=False
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Network lab disabled", result.stdout)
+        self.assertEqual(result.stderr, "")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 name: Q0.8 offline security regression tests (sparse unprotected scope)
+# Re-run the exact approved sparse offline gates after PR #60 reviewer-workflow synchronization.
 
 on:
   push:
@@ -34,11 +35,13 @@ jobs:
             /fetcher.py
             /providers.py
             /probe.py
+            /tools/net_lab.py
             /run.py
             /config.json
             /research_config.json
             /research/history.py
             /research/crosscheck.py
+            /research/backtest_report.py
             /research/pipeline.py
             /fetch_history.py
             /tests/test_fetcher.py

@@ -1,4 +1,8 @@
-"""Disabled legacy probe: the previous implementation queried unapproved symbol metadata routes."""
+"""Permanently disabled legacy probe.
+
+Exit code 2 means the diagnostic is blocked by policy, not that it should be retried.
+No network request or symbol-metadata discovery is performed.
+"""
 import sys
 
 
