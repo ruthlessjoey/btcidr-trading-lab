@@ -167,3 +167,17 @@ An incident is closed only when all applicable items are evidenced:
 This file is a draft on a branch based on `main`. It has not been operationally exercised and earns no verified project-maturity credit until accepted.
 
 At the recorded baseline: project scope contains 40 owner-approved requirements / 100 points; overall completion is UNRATED; the historical first-pass candidate maturity is 15.00/100 and is not a completion percentage; profitability is NOT PROVEN; PAPER is NOT READY; LIVE is DISABLED. Candidate PR and Actions states must be re-read before acting because they can change after this document is written.
+
+
+## 9. Superseding Q0.8 trusted-workflow dispatch correction — 23 November 2026
+
+**This section supersedes the branch-selection instruction in §4 for any review that uses the LLM secrets. Do not select the PR #60 topic branch for a secret-bearing review.**
+
+- PR #97 is the trusted-default-branch workflow correction. Its current draft head is `3dba39b969db376211906ee5e7d35631a1af74b1`; it pins immutable reviewer `cf9f319bc86155e7669f2cf0ced5d4df53cebffa`, matching the latest PR #60 branch workflow. PR #97 is still open/draft/unmerged.
+- The current default `main` workflow still pins the older reviewer `ed28a0ace6ddd19fb5a1bdb97ec2c21ab7cebae9`. Do not treat it as the current bounded reviewer for the latest PR #60 diff.
+- Until PR #97 is separately approved and merged, **do not dispatch review mode from the unprotected PR #60 topic branch**: that branch's workflow definition receives `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL`. A manual-only trigger does not make an unprotected workflow definition trusted.
+- After PR #97 is merged and the updated workflow is present on protected `main`, open Actions and select **Q0.8 immutable 19-role specialist review**. Select **`main`** in the branch dropdown so GitHub runs the trusted default-branch workflow; do not select the PR #60 topic branch.
+- Immediately before dispatch, re-fetch PR #60 and copy its exact current head SHA into `review_head_sha`. At this 23 November refresh the head is `a68b759b75adde426402eb39ef9c360f60e5bc27`; this is a snapshot, not a permanent value.
+- For that head, use a fresh review: leave `resume_from_run_id` blank because no checkpoint has been verified for SHA `a68b759b...`. Set `mode=review` and submit once. Never reuse a checkpoint from an earlier SHA.
+- If a 429 interrupts the run, preserve the artifact and run ID. Resume only after the reported reset window and only when repository, workflow, branch, base SHA, exact review SHA, reviewer, model and checkpoint schema all match. Keep the approved four retries and 120-second maximum wait; do not switch providers/models or increase limits.
+- PR #97's merge is an owner/admin decision and is not authorized by this runbook. This section does not authorize merging, changing secrets/permissions, or accessing protected paths.
