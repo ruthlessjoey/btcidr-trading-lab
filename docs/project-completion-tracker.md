@@ -2360,3 +2360,17 @@ This section qualifies any earlier broad statement that all automation on PR #82
 - The same external PR #82 push triggered dynamic CodeQL run [#44980862853](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44980862853). Both Actions/Python jobs again ran `actions/checkout@v6`, `git sparse-checkout disable`, and a full checkout of `refs/remotes/pull/82/head`. This is another potential protected-path boundary exposure and is excluded from accepted K1/K2 evidence.
 - This repeated scan confirms the issue is caused by repository-level dynamic CodeQL behavior on main-target code PRs, independent of the dedicated sparse Q0.8 offline workflows. Owner/admin scope review remains required. Do not deliberately push to PR #82/#93/#95 to test the setting.
 - The current PR #60 head remains `0f79801e6fb9105358acdc3330112e6e5fd7e582`; exact-head offline tests passed 80/80 on #44980188828. Q0.8 review #44980188862 remains in the model-review step after preflight; no role report or checkpoint has been returned. The stale 5f predecessor review #44979974879 failed at architecture-architect on HTTP 429, with a 0/16 checkpoint, and cannot be reused against 0f798.
+
+## PR #95 Actionlint archive extraction CI — exact-head 9/9 — 2026-11-22
+
+- PR #95 current head `8b3f97ecb935bdca8a2041cacbb6ba9bef4b1ba8`, based on selected `main` at `731fc9fbb892dadccc64bf52da2f91ff069da124`, open/draft/unmerged. Live compare: **5 ahead / 0 behind**, exactly four changed paths:
+  - `.github/workflows/actionlint-extraction-tests.yml`
+  - `.github/workflows/free-security-lint.yml`
+  - `tests/test_actionlint_extract.py`
+  - `tools/actionlint_extract.py`
+- The Actionlint archive reader is now a standalone standard-library helper. It rejects symlink/nonregular/oversized archives; caps compressed archive at 16 MiB, expanded stream at 64 MiB, archive members at 64 and the binary at 32 MiB; requires exactly one regular file named `actionlint`; never extracts archive-controlled paths; and creates the executable at a fixed destination with exclusive creation.
+- The manual `free-security-lint.yml` continues to be manual-only with read-only permissions, HTTPS-only curl, bounded connect/transfer/retry and archive-size limits, and verifies the pinned SHA-256 before invoking the standalone extractor. It then runs Actionlint.
+- New push-triggered extraction workflow uses read-only permissions and sparse-checks out only `tools/actionlint_extract.py` and `tests/test_actionlint_extract.py`. Exact-head run [#44981040971](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44981040971) passed **9/9** synthetic adversarial tests on Python **3.11.18**.
+- The 9 cases cover valid extraction, duplicate actionlint members, symlink member, member-count cap, decompressed-byte cap, oversized binary, missing actionlint member, preexisting destination preservation, and symlink archive refusal.
+- This run verifies the helper only. **The actual manual Actionlint/zizmor scanner workflow has not yet been dispatched**, so semantic workflow linting and zizmor findings are unverified. PR #95 remains draft/open/unmerged and earns no mainline maturity credit.
+- Project status unchanged: overall completion UNRATED; candidate maturity 15.00/100; 0/40 at exact-main threshold; profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
