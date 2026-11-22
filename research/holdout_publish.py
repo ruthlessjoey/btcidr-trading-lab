@@ -8,6 +8,7 @@ import itertools
 import json
 import math
 import os
+import re
 import stat
 from pathlib import Path
 
@@ -157,7 +158,13 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
             raise RuntimeError("reservation/completion status or shape mismatch")
         if reservation_record.get("key") != completed.stem or completed_record.get("key") != completed.stem:
             raise RuntimeError("reservation/completion filename does not match its key")
-        if any(reservation_record.get(field) != completed_record.get(field)
+        if any(
+            type(record.get(field)) is not str or not record[field]
+            for record in (reservation_record, completed_record)
+            for field in IDENTITY_FIELDS
+        ) or not re.fullmatch(r"[0-9a-f]{64}", completed_record["frozen_hash"]):
+            raise RuntimeError("reservation/completion identity fields are invalid")
+        if any(reservation_record[field] != completed_record[field]
                for field in IDENTITY_FIELDS):
             raise RuntimeError("completed record does not match its durable reservation")
         if not _same_json_value(report_test, completed_record):
