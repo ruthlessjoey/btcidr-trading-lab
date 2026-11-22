@@ -3055,3 +3055,10 @@ This is an evidence refresh, not a scope change or a completion re-rating. The a
 - YAML was locally parsed. No exact-head Actionlint/Actions run on PR #99 yet. PR #97 is a separate automatic-trigger proposal with 7/7 gate tests, Actionlint and CodeQL success, but its automatic LLM trigger is not authorized and it must not be merged/activated.
 - PR #99 remains draft/open/unmerged. After owner/admin approval and merge, a manual Q0.8 review can be dispatched from protected `main` using the freshly fetched PR #60 head. No dispatch occurred.
 - Project score remains unchanged: first-pass candidate maturity 15.00/100; candidate coverage 60/100; 0/40 exact-main threshold; whole project UNRATED. Profitability UNVERIFIED, PAPER NOT READY, LIVE DISABLED.
+
+
+## Manual dispatch preflight blocked by tool availability — 23 November 2026
+
+- PR #99 manual-only workflow candidate remains draft/unmerged. Its workflow YAML was locally parsed but no exact-head synthetic run occurred.
+- GitHub connector has no `workflow_dispatch` action. The browser automation attempt to dispatch `mode=synthetic` did not start because its wallet balance was $0.00 and the error was non-retryable. No payment/top-up/retry was made.
+- No 19-role review or LLM call occurred. After PR #99 is approved/merged, an operator must use GitHub Actions UI on protected `main`: synthetic first, then review only if synthetic passes, with the freshly fetched PR #60 SHA.
