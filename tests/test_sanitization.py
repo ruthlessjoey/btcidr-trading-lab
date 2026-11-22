@@ -255,6 +255,50 @@ class CrosscheckEvidenceValidationTests(unittest.TestCase):
                     cfg, manifest, path, frozenset({"coinbase"})
                 )
 
+    def test_high_and_low_divergence_are_rejected_in_artifact_evidence(self):
+        for field in ("high_diff_pct", "low_diff_pct"):
+            with self.subTest(field=field):
+                payload = self._payload()
+                for provider in ("coinbase", "bitstamp"):
+                    payload["flagged"][0][provider][field] = 3.01
+                with self.assertRaisesRegex(
+                    crosscheck.CrosscheckError, "lacks confirmed"
+                ):
+                    self._validate(payload)
+
+    def test_comparison_requires_high_and_low_to_be_within_tolerance(self):
+        previous_btc = fetcher.Candle(
+            1_583_884_800, 100.0, 101.0, 99.0, 100.0, 1.0
+        )
+        previous_other = fetcher.Candle(
+            1_583_884_800, 100.0, 101.0, 99.0, 100.0, 1.0
+        )
+        for field, high, low in (
+            ("high_diff_pct", 111.0, 99.0),
+            ("low_diff_pct", 101.0, 89.0),
+        ):
+            with self.subTest(field=field):
+                current_btc = fetcher.Candle(
+                    1_583_971_200, 100.0, 101.0, 99.0, 100.0, 1.0
+                )
+                current_other = fetcher.Candle(
+                    1_583_971_200, 100.0, high, low, 100.0, 1.0
+                )
+                btc = {
+                    previous_btc.time: previous_btc,
+                    current_btc.time: current_btc,
+                }
+                other = {
+                    previous_other.time: previous_other,
+                    current_other.time: current_other,
+                }
+                result = crosscheck.compare(
+                    [previous_btc, current_btc], other, other, ["2020-03-12"]
+                )
+                self.assertEqual(
+                    result["flagged"][0]["verdict"], "NOT CONFIRMED"
+                )
+
     def test_comparison_is_unavailable_when_bitstamp_evidence_is_missing(self):
         previous = fetcher.Candle(1_583_884_800, 100.0, 101.0, 99.0, 100.0, 1.0)
         current = fetcher.Candle(1_583_971_200, 100.0, 101.0, 99.0, 100.0, 1.0)
