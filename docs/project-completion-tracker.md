@@ -1667,3 +1667,21 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - New offline Actions runs verify 65/65 and 78/78 selected tests at the exact workflow-automation commits listed above. Reviewer run #44970126651 is in progress; it is not yet an accepted 19-role review.
 - Candidate maturity remains 15.00/100 from the existing row audit; exact-main threshold remains 0/40. Overall project completion remains UNRATED until the full row-level evidence and integration assessment is reconciled. Profitability NOT PROVEN; PAPER NOT READY; LIVE DISABLED.
 - No protected path was accessed or executed; no market request, dataset publication, backtest, PAPER operation, LIVE trade, or financial transaction occurred.
+
+
+## PR #92 synchronized exact-head delivery evidence — 2026-11-22
+
+- PR #92 parent synchronization used normal two-parent merge commit `7a8ac3fdead130a04d5fb5d5702e42b40d377848`, with PR #60 current head `f6c520f725973d6c98534aec340fdabd77898383` as first parent and PR #92 prior head `34c889c679ddc803d928c039aafb93228707db61` as second parent. No force update, reset, or PR merge was used.
+- Latest PR #92 head is `c2bda64b728384500245465ea239126e184933d7`; compare against PR #60 now reports **23 ahead / 0 behind**, with five research/test paths and one single-line offline-workflow path-filter addition.
+- Push-triggered exact-head run [#44970450162](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44970450162) checked out `c2bda64...` and passed **78/78** selected Python 3.11.18 tests: 21 fetcher, 4 provider boundary, 7 history, 2 disabled probe, 7 static pipeline, 21 research gates, and 16 sanitization. Every suite emitted `OK`.
+- PR #92 remains stacked on PR #60, draft/open/unmerged. This test evidence does not constitute external independent review, mainline integration, or approval to merge.
+
+## Current verified repository and delivery snapshot — 2026-11-22
+
+- Default branch `main` remains at `731fc9fbb892dadccc64bf52da2f91ff069da124`; no pull request has been merged and no candidate commit has been integrated into main during this session.
+- PR #60 is open/draft on the M6 baseline at head `f6c520f725973d6c98534aec340fdabd77898383`. Its automatic full Q0.8 review run [#44970126651](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44970126651) checked out that exact head; syntax/synthetic preflight passed, but the 19-role model-review step was still in progress at last poll. No final role coverage, Commander, independent acceptance, final verification, or checkpoint artifact is yet verified.
+- PR #60 automatic offline run #44970096322 passed 65/65 on exact head `14f84a6f97c78b006b5af12af7012304a7b82a91`; it is before the later reviewer-workflow-only commit, so strict exact-latest-head CI still needs to be produced without invalidating the active reviewer run.
+- PR #92 latest exact head and selected offline gate pass are recorded above. It remains unmerged and has no independent review acceptance yet.
+- Whole-project completion remains **UNRATED**. Existing candidate-weighted maturity remains **15.00/100** and exact-main threshold **0/40**; no new project maturity points are claimed. Profitability remains **NOT PROVEN**; the historical proxy strategy evidence remains approximately **−11% return / 0.36 profit factor** with venue costs unverified. PAPER remains **NOT READY**; LIVE remains disabled.
+- The 40-row approved scope remains the authoritative acceptance inventory. Unfinished requirements include expanded public market coverage (B1/B2), instrument identity/provenance (C1), dataset publication and holdout integration (C3/D4), cost-sensitive leakage-safe strategy research (D2/D3), universe/scanner/ranking (E1–E3), accepted signal contract/expiry/generation (F1–F4), integrated risk/portfolio boundaries (G1–G4), protected FIFO/accounting/position/approval bridge (H1–H4), PAPER lifecycle/independent stop/replay (I1–I3), mobile operator/dashboard/monitoring/manual controls (J1–J3), and integrated security/test/supply-chain/recovery acceptance (K1–K5). Candidate artifacts and isolated test passes do not constitute current-main acceptance.
+- Safety held: no protected path inspection/execution, no provider call, dataset publication, backtest, PAPER or LIVE trade, credentials, account activity, or financial transaction.
