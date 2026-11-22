@@ -1,0 +1,65 @@
+name: M5 isolated strategy package and core tests
+
+on:
+  push:
+    branches:
+      - test/m5-strategy-core-safe-isolation-2026-11-23
+    paths:
+      - "markets/__init__.py"
+      - "markets/strategies/__init__.py"
+      - "markets/strategies/registry.py"
+      - "markets/strategies/contract.py"
+      - "markets/strategies/decision.py"
+      - "markets/strategies/engine.py"
+      - "tests/test_strategy_core_isolation.py"
+      - ".github/workflows/m5-strategy-core-isolated.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m5-strategy-core-isolated
+  cancel-in-progress: false
+
+jobs:
+  isolated-strategy-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout safe strategy package initializer, registry and core tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /markets/__init__.py
+            /markets/strategies/__init__.py
+            /markets/strategies/contract.py
+            /markets/strategies/decision.py
+            /markets/strategies/engine.py
+            /markets/strategies/registry.py
+            /tests/test_strategy_core_isolation.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Compile the isolated strategy modules and tests
+        run: |
+          python3 -m py_compile markets/__init__.py
+          python3 -m py_compile markets/strategies/__init__.py
+          python3 -m py_compile markets/strategies/contract.py
+          python3 -m py_compile markets/strategies/decision.py
+          python3 -m py_compile markets/strategies/engine.py
+          python3 -m py_compile markets/strategies/registry.py
+          python3 -m py_compile tests/test_strategy_core_isolation.py
+
+      - name: Run pure M5 strategy contract and engine tests
+        run: python3 -W error::ResourceWarning -m unittest discover -s tests -p 'test_strategy_core_isolation.py' -v
