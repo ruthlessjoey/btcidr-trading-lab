@@ -168,9 +168,9 @@ class Q08ImportBoundaryTests(unittest.TestCase):
 
     def test_dynamic_import_guard_recognizes_aliased_importlib_and_builtins(self):
         samples = (
-            "from importlib import import_module as load_module\\nload_module('x')",
-            "from builtins import __import__ as load_module\\nload_module('x')",
-            "from builtins import eval as run_code\\nrun_code('1 + 1')",
+            "from importlib import import_module as load_module\nload_module('x')",
+            "from builtins import __import__ as load_module\nload_module('x')",
+            "from builtins import eval as run_code\nrun_code('1 + 1')",
         )
         for sample in samples:
             with self.subTest(sample=sample), self.assertRaisesRegex(
