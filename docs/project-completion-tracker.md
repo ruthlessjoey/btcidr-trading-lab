@@ -2950,3 +2950,45 @@ This addendum records the latest read-only verification performed during the eme
 - Current branch workflow blob: cb8bff2fdbdd7a2c7130a79364c8fb57efd44e57. It is workflow_dispatch only, has no push trigger, and pins immutable reviewer fd154588e88a20fb1a38f7ba7db9eb1afbf9eca1. This ensures topic-branch pushes do not automatically release the model-review secret.
 - The last checkpoint is bound to stale SHA 7a20e86... and is invalid for 3d7a651... . No current-head review has run since the last source changes. Do not reuse any checkpoint artifact from 7a20e86 or earlier.
 - Fresh manual inputs: select workflow Q0.8 immutable 19-role specialist review; branch security/q0-provider-sanitization-2026-11-18; review_head_sha=3d7a6511f56c1c1ebc68ffcb9c9b08c99a54e127; leave resume_from_run_id blank; mode=review. Re-fetch the branch SHA immediately before dispatch. The connected GitHub tools do not expose workflow_dispatch; do not pay/top up browser automation to bypass this.
+
+
+## Emergency delivery evidence refresh — 23 November 2026
+
+This is an evidence refresh, not a scope change or a completion re-rating. The approved inventory remains 40 requirements / 100 points; no PR was merged during this session.
+
+### Selected baseline and integration state
+
+- Protected `main` remains `731fc9fbb892dadccc64bf52da2f91ff069da124`.
+- The current main Q0.8 offline run `44681951337` is **FAIL** on that exact main SHA: `tests/test_live_check.py` imports `live_check.py`, which is absent from the workflow's sparse checkout. The failure is a test/checkout mismatch, not a market-data result.
+- PR #60 remains draft/open/unmerged, based on `feature/m6-risk-engine` at `cd451972e3a641ad6fa78e64abf3968655a4b82a`; current head `a68b759b75adde426402eb39ef9c360f60e5bc27`, 138 commits ahead / 0 behind its M6 base, 26 changed paths. Exact-head offline run `45052517363` passed **103/103** tests on Python 3.11.18 (33 + 4 + 7 + 2 + 15 + 18 + 24). The Q0.8 review check is skipped; no current-head 19-role review or Commander/independent acceptance exists.
+- PR #60's current branch workflow is on an unprotected topic branch and receives the LLM secrets. Do not dispatch review mode from that branch. PR #97 is the trusted-main workflow correction; see below.
+
+### Current candidate evidence
+
+| Candidate | Exact head / base | Verified evidence | Status / limits |
+|---|---|---|---|
+| PR #82 clean-main transport and legacy isolation | `cfb901a12bddede332cd0019dadde7de4cca85f3` / `main 731fc9f...` | Run `45054739564`: **63/63** Python 3.11.18 tests (8 + 30 + 5 + 3 + 13 + 4). Direct Kraken/Coinbase constructors, test-only bypass instances, and a custom adapter aimed at api.kraken.com are rejected before the opener. CodeQL Python/Actions passed on source-identical predecessor `045a4dc5...`; no new exact-head CodeQL run after the test-only change. | 42 commits ahead / 0 behind main; 17 paths; draft/open/unmerged. Prior review is COMMENTED on a predecessor, not APPROVED. Market identity remains FAIL/CLOSED. |
+| PR #98 isolated M5 contract/engine | `3576c8041d27b0f54a572adc826c462d892ffd0c` / PR #60 head `a68b759b...` | Run `45054403126`: **16/16** Python 3.11.18 tests. Adds positive plain-integer history validation, strict reason/reason-code/indicator payload checks, and a real package-import subprocess test proving the normal initializer/registry path does not load `markets.strategies.btc_s1` or `signal.btc_signal`. | 10 commits / 3 paths; draft/open/unmerged; review check skipped. No protected S1 execution, M6 integration, backtest, profitability or PAPER evidence. |
+| PR #84 M6 risk corrections | `7cbfbcce269aa6ccde28d2d6681dbc76680b5a47` / `feature/m6-risk-engine` | Run `44686093112`: **117/117** risk tests passed. | Candidate only; draft/open/unmerged; not integrated into main or accepted end-to-end with portfolio/PAPER. |
+| PR #97 trusted-main Q0.8 workflow | `3dba39b969db376211906ee5e7d35631a1af74b1` / `main 731fc9f...` | Manual-only workflow, read-only permissions, sparse checkout of the pinned reviewer, no candidate checkout/execution; reviewer pin updated to `cf9f319bc86155e7669f2cf0ced5d4df53cebffa`. Static YAML parse passed in this session. | Draft/open/unmerged; no workflow dispatch or runtime test. Merge is an owner/admin decision. |
+| PR #94 incident/recovery runbook | `f68f224053fce9393b9e11684d6a79b6f9f9131e` / `main 731fc9f...` | Added a superseding 23 Nov dispatch correction: after PR #97 is merged, select `main` as workflow branch; pass the freshly re-fetched PR #60 SHA; blank resume ID for a fresh same-head review. | Documentation only; draft/open/unmerged; no operational dispatch. |
+
+### Review and dispatch blockers
+
+1. PR #97 must be separately approved/merged before the updated trusted-main reviewer pin `cf9f...` is available on protected `main`. This is not authorized by the current execution order; do not merge automatically.
+2. The GitHub connector has no `workflow_dispatch` action and browser automation is unavailable in this session. After PR #97 is merged, an operator must manually run **Q0.8 immutable 19-role specialist review** from branch `main`, set `review_head_sha` to the exact current PR #60 head, leave `resume_from_run_id` blank for a fresh head without a verified checkpoint, and set `mode=review`.
+3. Do not dispatch the secret-bearing review workflow from PR #60's unprotected topic branch. Do not reuse checkpoints from an earlier SHA. Preserve the four-retry / 120-second maximum wait and approved model/provider; stop on longer 429 reset requests.
+4. PR #82 and PR #98 remain draft and have no fresh independent approval. Passing offline tests and CodeQL are component/candidate evidence only.
+
+### Quantitative validation, PAPER and LIVE
+
+- The existing strategy evidence remains negative: historical BTC-USDT strategy return approximately **-11%** and profit factor **0.36**. Fees/slippage and market identity were not verified for that historical run. No new backtest was run because C1 market identity/publication remains FAIL/CLOSED.
+- Profitability remains **UNVERIFIED / NOT ESTABLISHED**. Do not describe the project as profitable.
+- PAPER remains **NOT READY**: no accepted integrated strategy → risk → portfolio approval → FIFO ledger → partial-close → emergency-stop → replay/recovery lifecycle.
+- LIVE remains **DISABLED**. No credentials, private endpoints, orders, account access, withdrawals, funding or real-money actions were used.
+
+### Measurement disposition
+
+- The historical first-pass candidate maturity remains **15.00/100**, with candidate implementation coverage **60/100** and **0/40** requirements meeting the exact-main implementation-plus-focused-test threshold.
+- The new PR #82, #84, #97, #98 and PR #60 results are unmerged candidate evidence. They strengthen individual rows but do not change the integrated score or denominator.
+- Whole-project completion remains **UNRATED** until the 40 rows are reconciled against the current selected baseline, integration, focused tests, independent review and owner acceptance. No percentage is inferred from candidate coverage.
