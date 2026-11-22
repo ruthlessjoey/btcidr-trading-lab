@@ -141,7 +141,7 @@ def publish_completed_reservations(registry_dir, output_dir, report_path):
         branch_completed = root / completed.name
         branch_record = _read_object(branch_completed, "branch completed record")
 
-        if branch_record != completed_record:
+        if not _same_json_value(branch_record, completed_record):
             raise RuntimeError("branch completed record differs from this run's result")
         reservation_fields = {"status", *IDENTITY_FIELDS}
         completion_fields = reservation_fields | {"evaluation_number", "re_evaluation", "results"}
