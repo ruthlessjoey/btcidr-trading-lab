@@ -20,6 +20,8 @@ Decision mapping (the engine owns it; strategies cannot change it):
 No strategy evaluation happens on any path except COMPLETE with enough history. The provider error, if any, stays in
 provenance.provider_error, whatever the top-level decision.
 """
+import math
+
 from markets.strategies import contract as C
 from markets.strategies.decision import StrategyDecision, config_fingerprint
 
@@ -92,6 +94,10 @@ def evaluate_report(strategy, listing, report, config=None):
 
     # 3. History, then the strategy itself.
     need = strategy.required_history(cfg)
+    if type(need) is not int or need <= 0:
+        raise C.StrategyError(
+            f"{strategy.strategy_id} required_history must return a positive integer"
+        )
     if len(candles) < need:
         return make(C.NO_DATA, ["INSUFFICIENT_HISTORY"],
                     [f"need {need} completed candles, have {len(candles)}"])
@@ -105,15 +111,29 @@ def evaluate_report(strategy, listing, report, config=None):
         raise C.StrategyError(f"{strategy.strategy_id} returned {raw['decision']!r}; strategies may return only "
                               f"{', '.join(C.STRATEGY_DECISIONS)}")
     strategy_reason_codes = raw["reason_codes"]
-    if not isinstance(strategy_reason_codes, (list, tuple)):
-        raise C.StrategyError(f"{strategy.strategy_id} returned reason_codes outside the contract")
-    undeclared = [
-        code for code in strategy_reason_codes
-        if not isinstance(code, str) or code not in strategy.reason_codes
-    ]
+    if type(strategy_reason_codes) is not list or any(type(code) is not str for code in strategy_reason_codes):
+        raise C.StrategyError(f"{strategy.strategy_id} reason_codes must be a list of strings")
+    undeclared = [code for code in strategy_reason_codes if code not in strategy.reason_codes]
     if undeclared:
         raise C.StrategyError(
             f"{strategy.strategy_id} returned undeclared strategy reason code(s) {undeclared}"
         )
-    return make(raw["decision"], strategy_reason_codes, raw["reasons"],
-                raw["indicators"], ref_open, ref_close)
+
+    strategy_reasons = raw["reasons"]
+    if type(strategy_reasons) is not list or any(type(reason) is not str for reason in strategy_reasons):
+        raise C.StrategyError(f"{strategy.strategy_id} reasons must be a list of strings")
+
+    indicators = raw["indicators"]
+    if type(indicators) is not dict or any(type(name) is not str or not name for name in indicators):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must be a mapping with non-empty string keys")
+    if any(
+        value is not None and (
+            type(value) not in (int, float)
+            or (type(value) is float and not math.isfinite(value))
+        )
+        for value in indicators.values()
+    ):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must contain only finite numbers or None")
+
+    return make(raw["decision"], strategy_reason_codes, strategy_reasons,
+                indicators, ref_open, ref_close)
