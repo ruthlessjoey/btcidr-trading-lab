@@ -248,7 +248,6 @@ class CrosscheckGateTests(unittest.TestCase):
         mutations = (
             ("close_diff_pct", 4.0),
             ("return_gap_pp", 4.0),
-            ("high_diff_pct", float("inf")),
             ("low_diff_pct", 10 ** 1000),
             ("open_diff_pct", True),
         )
@@ -260,6 +259,18 @@ class CrosscheckGateTests(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaisesRegex(
                         CrosscheckError, "invalid comparison evidence"):
                     validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
+
+        payload = self.payload()
+        raw = json.dumps(payload).replace(
+            '"high_diff_pct": 1.0', '"high_diff_pct": 1e999', 1
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "crosscheck.json")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(raw)
+            with self.assertRaisesRegex(
+                    CrosscheckError, "invalid comparison evidence"):
+                validate_crosscheck_artifact(CFG, MANIFEST, path, TEST_APPROVED)
 
     def test_invalid_pinned_dataset_manifest_identity_is_rejected(self):
         for manifest in (
