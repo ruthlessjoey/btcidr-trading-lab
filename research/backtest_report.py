@@ -42,7 +42,7 @@ def _safe_report_text(value, limit=160):
     for char in cleaned:
         if char.isascii() and (char.isalnum() or char in " .,:;_()/+-"):
             allowed.append(char)
-    result = "".join(allowed).strip()
+    result = " ".join("".join(allowed).split())
     return result[:limit] if result else "unavailable"
 
 
