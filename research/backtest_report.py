@@ -127,6 +127,46 @@ def seg_table(block):
     return L
 
 
+def _crosscheck_markdown_lines(c, market_label):
+    """Render untrusted cross-check evidence as sanitized Markdown lines."""
+    lines = []
+    flagged = c.get("flagged")
+    if type(flagged) is list:
+        safe_rule = _safe_report_text(c.get("rule"))
+        for entry in flagged:
+            if type(entry) is not dict:
+                continue
+            date = _safe_report_text(entry.get("date"), 32)
+            verdict = _safe_report_text(entry.get("verdict"), 48)
+            lines.append(f"- **{date}: {verdict}** (rule: {safe_rule}).")
+            for name in ("coinbase", "bitstamp"):
+                source = entry.get(name)
+                if type(source) is dict:
+                    lines.append(
+                        f"  - {name}: day return "
+                        f"{_safe_report_percent_points(source.get('other_return_pct'))} vs "
+                        f"{market_label} {_safe_report_percent_points(source.get('binance_return_pct'))}, "
+                        f"close diff {_safe_report_percent_points(source.get('close_diff_pct'))}, "
+                        f"low diff {_safe_report_percent_points(source.get('low_diff_pct'))}"
+                    )
+    summary = c.get("summary")
+    if type(summary) is dict:
+        lines.append(
+            "- Whole history vs Coinbase: median close difference "
+            f"{_safe_report_percent_points(summary.get('median_abs_close_diff_pct'), signed=False)}, "
+            "99th percentile "
+            f"{_safe_report_percent_points(summary.get('p99_abs_close_diff_pct'), signed=False)}, "
+            "max "
+            f"{_safe_report_percent_points(summary.get('max_abs_close_diff_pct'), signed=False)}."
+        )
+    for key in ("coinbase_error", "bitstamp_error"):
+        error = c.get(key)
+        if type(error) is str and error:
+            label = key.split("_", 1)[0]
+            lines.append(f"- {label} could not be fetched: {_safe_report_text(error)}")
+    return lines
+
+
 def build_markdown(r):
     dataset = r.get("dataset")
     market = dataset.get("market") if type(dataset) is dict else None
@@ -154,40 +194,9 @@ def build_markdown(r):
     L += ["", "## Flagged candle (2020-03-12, -39.5% in one day)", ""]
     c = r.get("crosscheck")
     if type(c) is dict:
-        flagged = c.get("flagged")
-        if type(flagged) is list:
-            safe_rule = _safe_report_text(c.get("rule"))
-            for entry in flagged:
-                if type(entry) is not dict:
-                    continue
-                date = _safe_report_text(entry.get("date"), 32)
-                verdict = _safe_report_text(entry.get("verdict"), 48)
-                L.append(f"- **{date}: {verdict}** (rule: {safe_rule}).")
-                for name in ("coinbase", "bitstamp"):
-                    source = entry.get(name)
-                    if type(source) is dict:
-                        L.append(
-                            f"  - {name}: day return "
-                            f"{_safe_report_percent_points(source.get('other_return_pct'))} vs "
-                            f"{market_label} {_safe_report_percent_points(source.get('binance_return_pct'))}, "
-                            f"close diff {_safe_report_percent_points(source.get('close_diff_pct'))}, "
-                            f"low diff {_safe_report_percent_points(source.get('low_diff_pct'))}"
-                        )
-        summary = c.get("summary")
-        if type(summary) is dict:
-            L.append(
-                "- Whole history vs Coinbase: median close difference "
-                f"{_safe_report_percent_points(summary.get('median_abs_close_diff_pct'), signed=False)}, "
-                "99th percentile "
-                f"{_safe_report_percent_points(summary.get('p99_abs_close_diff_pct'), signed=False)}, "
-                "max "
-                f"{_safe_report_percent_points(summary.get('max_abs_close_diff_pct'), signed=False)}."
-            )
-        for key in ("coinbase_error", "bitstamp_error"):
-            error = c.get(key)
-            if type(error) is str and error:
-                label = key.split("_", 1)[0]
-                L.append(f"- {label} could not be fetched: {_safe_report_text(error)}")
+        L += _crosscheck_markdown_lines(c, market_label)
+        if not c.get("flagged"):
+            L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     else:
         L.append("- **No cross-check evidence was available in this run: the candle is NOT verified.**")
     sv = r.get("sensitivity")
