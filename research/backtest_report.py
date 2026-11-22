@@ -101,7 +101,7 @@ def build_markdown(r):
             for name in ("coinbase", "bitstamp"):
                 j = e[name]
                 if j:
-                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs Binance "
+                    L.append(f"  - {name}: day return {j['other_return_pct']:+.2f}% vs {market_label} "
                              f"{j['binance_return_pct']:+.2f}%, close diff {j['close_diff_pct']:+.2f}%, "
                              f"low diff {j['low_diff_pct']:+.2f}%")
         if c.get("summary"):
