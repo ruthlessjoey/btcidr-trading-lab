@@ -1,0 +1,44 @@
+name: Q0.8 reviewer checkpoint-resume runner synthetic tests
+
+on:
+  push:
+    branches:
+      - security/q08-push-checkpoint-resume-2026-11-22
+    paths:
+      - tools/q08_specialist_review.py
+      - .github/workflows/q08-runner-synthetic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  runner-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout immutable reviewer runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ruthlessjoey/btcidr-trading-lab
+          ref: 33853fcc5eed81d07d7e74995cf43149fa0de15e
+          path: runner
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/q08_specialist_review.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Verify reviewer syntax
+        run: python3 -m py_compile runner/tools/q08_specialist_review.py
+
+      - name: Verify synthetic reviewer and checkpoint guards
+        env:
+          REVIEW_HEAD_SHA: ${{ github.sha }}
+        run: python3 runner/tools/q08_specialist_review.py --mode synthetic
