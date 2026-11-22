@@ -76,7 +76,11 @@ def _source_imports(path):
 
 def _network_client_imports(source):
     tree = ast.parse(source)
-    network_roots = {"requests", "httpx", "aiohttp", "socket", "urllib3"}
+    network_roots = {
+        "requests", "httpx", "aiohttp", "socket", "urllib3",
+        "asyncio", "ftplib", "smtplib", "telnetlib", "xmlrpc",
+        "websocket", "websockets",
+    }
     network_exact = {"urllib.request", "http.client"}
     found = set()
     for node in ast.walk(tree):
@@ -159,6 +163,13 @@ class Q08ImportBoundaryTests(unittest.TestCase):
             ("from http.client import HTTPConnection", "http.client"),
             ("from socket import socket", "socket"),
             ("from requests import get", "requests"),
+            ("from asyncio import open_connection", "asyncio"),
+            ("from ftplib import FTP", "ftplib"),
+            ("from smtplib import SMTP", "smtplib"),
+            ("from telnetlib import Telnet", "telnetlib"),
+            ("from xmlrpc.client import ServerProxy", "xmlrpc"),
+            ("from websocket import create_connection", "websocket"),
+            ("from websockets.sync.client import connect", "websockets"),
         )
         for statement, expected in blocked:
             with self.subTest(statement=statement):
