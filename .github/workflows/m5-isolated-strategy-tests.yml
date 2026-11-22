@@ -1,0 +1,44 @@
+name: M5 isolated strategy contract regression
+
+on:
+  push:
+    branches:
+      - security/m5-isolated-strategy-contract-tests-2026-11-22
+    paths:
+      - "markets/__init__.py"
+      - "markets/strategies/**"
+      - "tests/test_m5_isolated_strategy.py"
+      - ".github/workflows/m5-isolated-strategy-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  m5-isolated-strategy:
+    name: Synthetic M5 contract and engine tests (no S1/protected imports)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Sparse checkout only M5 pure modules and synthetic tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /markets/__init__.py
+            /markets/strategies/__init__.py
+            /markets/strategies/contract.py
+            /markets/strategies/decision.py
+            /markets/strategies/engine.py
+            /markets/strategies/registry.py
+            /tests/test_m5_isolated_strategy.py
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Run pure M5 contract and engine regressions
+        run: python3 -m unittest discover -s tests -p "test_m5_isolated_strategy.py" -v
