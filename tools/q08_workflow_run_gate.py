@@ -106,6 +106,9 @@ def select_resume_run(
                 raise GateError("Specialist workflow history exceeds the bounded deduplication scan")
         elif page_total != total_count:
             raise GateError("Specialist workflow run list changed during the deduplication scan")
+        expected_page_size = min(RUNS_PER_PAGE, max(0, total_count - ((page - 1) * RUNS_PER_PAGE)))
+        if len(page_runs) != expected_page_size:
+            raise GateError("Specialist workflow run list page is incomplete")
         for prior in page_runs:
             if type(prior) is not dict:
                 raise GateError("Specialist workflow run entry is malformed")
@@ -113,7 +116,7 @@ def select_resume_run(
                 continue
             if prior.get("display_title") == marker:
                 matching_runs.append(prior)
-        if page * RUNS_PER_PAGE >= total_count or len(page_runs) < RUNS_PER_PAGE:
+        if page * RUNS_PER_PAGE >= total_count:
             break
     else:
         if total_count and total_count > MAX_RUN_PAGES * RUNS_PER_PAGE:
