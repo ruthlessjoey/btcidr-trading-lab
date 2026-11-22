@@ -92,7 +92,7 @@ MAX_FILE = 48_000
 # Each immutable snapshot is bounded independently; the two snapshots are never
 # retained beyond these explicit per-snapshot limits.
 MAX_TOTAL = 256_000
-MAX_DIFF = 224_000  # Absolute diff-character ceiling; serialized requests remain separately capped at 256,000 bytes.
+MAX_DIFF = 240_000  # Bounded raw diff ceiling; serialized requests remain capped at 256,000 bytes.
 MAX_REQUEST = 256_000
 MAX_RESPONSE = 512_000
 MAX_OUTPUT = 24_000
