@@ -1841,3 +1841,24 @@ This addendum corrects the 2026-11-21 checkpoint with exact live repository and 
 - PAPER remains **NOT READY**; LIVE remains **DISABLED**.
 - Production cross-check provider authorization remains empty and fail-closed; no Coinbase/Bitstamp or other provider was enabled or contacted. Tokocrypto access was not used in this session.
 - No protected paths were accessed or executed. No dataset was published, no backtest was run, no PAPER/LIVE operation, order, credential/account action, payment, funding or withdrawal occurred.
+
+
+## Holdout publisher and latest Q0.8 verification refresh — 2026-11-22 09:45+08
+
+### Additional exact-head evidence
+
+- PR #34 (durable holdout reservation publisher) remains open/draft/unmerged on branch `security/implement-durable-holdout-reservations`, current head `af3e1fdd76f3f398ed8c8f9923e4fbbd80634e42`, stacked on `security/durable-holdout-reservations` (not main).
+  - The dedicated offline workflow was changed to run automatically only for pushes to this branch when `research/holdout_publish.py`, `tests/test_holdout_publish.py`, or that workflow changes.
+  - Run [#44972845068](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972845068) checked out the exact PR #34 head and passed **18/18** `test_holdout_publish.py` tests on Python **3.11.18**. The job was explicitly named “Holdout publisher tests only (no protected imports)”; its sparse checkout contains only `research/__init__.py`, `research/holdout_publish.py`, and `tests/test_holdout_publish.py`.
+  - The engine/pipeline test surface was not run: PR #34 also changes `tests/test_engine.py` and `research/pipeline.py`, and that broader import closure has not been proven safe with respect to protected modules. The isolated 18/18 pass does not establish end-to-end holdout or TEST evaluation acceptance.
+
+- PR #92 current head `e808c3dc45e6813b8b4ffcebd5c196de8217be6d` remains draft/open/unmerged, stacked on PR #60. The exact-head push run [#44972824721](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972824721) passed **90/90** selected Python **3.11.18** tests: 21 fetcher, 4 provider boundary, 7 history/import-boundary, 2 disabled probe, 7 static pipeline, 33 research-gate/report, and 16 sanitization. The latest workflow-only annotation commit does not alter those implementation sources; the run was nevertheless bound to the exact current SHA.
+  - Current PR #92-to-PR #60 comparison is diverged: **47 ahead / 1 behind**, merge base `6e6d8b768c4ce89ebb546705420a387a85c3c59b`. It is not synchronized or integrated.
+
+- PR #60 current head remains `d4edb4bc634e794b1957399471532ad7671576ba`; its exact-head offline run [#44972690427](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690427) passed **65/65** tests on Python **3.11.18**. The new 19-role reviewer run [#44972690441](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44972690441) has passed trusted-runner checkout, Python 3.11 setup, syntax validation and synthetic policy smoke test. Its model-based 19-role job is still in progress at this snapshot; no report, Commander synthesis, independent acceptance or final verification is yet available. The previous 3/16 checkpoint belongs to older head `f6c520f...`, not this current review SHA.
+
+### No change to acceptance score or safety state
+
+- Candidate evidence above remains on unmerged, stacked PRs. It does not satisfy the approved exact-main 0.50 threshold. The first-pass measurement remains **15.00/100 candidate-weighted maturity**, **0/40** exact-main threshold, and overall project completion **UNRATED**.
+- Profitability remains **NOT PROVEN** (historical proxy result approximately −11% return / 0.36 profit factor); PAPER remains **NOT READY**; LIVE remains **DISABLED**.
+- No protected path was accessed or executed; no provider or exchange API request, dataset publication, full backtest, PAPER/LIVE operation, order, payment, funding, withdrawal, or account action occurred.
