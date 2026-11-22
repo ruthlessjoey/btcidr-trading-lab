@@ -20,6 +20,8 @@ Decision mapping (the engine owns it; strategies cannot change it):
 No strategy evaluation happens on any path except COMPLETE with enough history. The provider error, if any, stays in
 provenance.provider_error, whatever the top-level decision.
 """
+import math
+
 from markets.strategies import contract as C
 from markets.strategies.decision import StrategyDecision, config_fingerprint
 
@@ -115,6 +117,14 @@ def evaluate_report(strategy, listing, report, config=None):
             or any(not isinstance(reason, str) for reason in raw["reasons"])):
         raise C.StrategyError(f"{strategy.strategy_id} reasons must be a list of strings")
     if (not isinstance(raw["indicators"], dict)
-            or any(not isinstance(name, str) for name in raw["indicators"])):
-        raise C.StrategyError(f"{strategy.strategy_id} indicators must be a mapping with string keys")
+            or any(not isinstance(name, str) or not name for name in raw["indicators"])):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must be a mapping with non-empty string keys")
+    if any(
+        value is not None and (
+            type(value) not in (int, float)
+            or (type(value) is float and not math.isfinite(value))
+        )
+        for value in raw["indicators"].values()
+    ):
+        raise C.StrategyError(f"{strategy.strategy_id} indicators must contain only finite numbers or None")
     return make(raw["decision"], raw["reason_codes"], raw["reasons"], raw["indicators"], ref_open, ref_close)

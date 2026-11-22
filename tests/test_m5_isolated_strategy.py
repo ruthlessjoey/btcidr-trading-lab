@@ -208,6 +208,9 @@ class M5IsolatedStrategyTests(unittest.TestCase):
             {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": []},
             {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": {1: 1.0}},
             {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": {"score": float("nan")}},
+            {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": {"score": True}},
+            {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": {"score": "1.0"}},
+            {"decision": C.BUY, "reason_codes": ["SYNTHETIC_SIGNAL"], "reasons": [], "indicators": {"score": float("inf")}},
         )
         for raw in invalid_results:
             with self.subTest(raw=raw):
