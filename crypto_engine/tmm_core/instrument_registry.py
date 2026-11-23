@@ -106,7 +106,8 @@ def evaluate_market_lifecycle(*, records: Sequence[InstrumentVersion], market_id
 
     A market is eligible for new entries only when ACTIVE, metadata is fresh,
     a sell-side path is explicitly available, and any reactivation after an
-    inactive state is explicitly confirmed. These flags are not order approval.
+    inactive state is explicitly confirmed by newer source evidence.
+    These flags are not order approval.
     """
     clean = validate_instrument_registry(records=records, decision_time=decision_time,
                                          max_metadata_age_seconds=max_metadata_age_seconds)
@@ -126,8 +127,13 @@ def evaluate_market_lifecycle(*, records: Sequence[InstrumentVersion], market_id
     prior = [r for r in versions if r.effective_from < record.effective_from]
     previous = prior[-1] if prior else None
     reactivation_required = previous is not None and previous.status != "ACTIVE" and record.status == "ACTIVE"
-    if reactivation_required and record.reactivation_confirmed is not True:
-        reasons.append("REACTIVATION_NOT_CONFIRMED")
+    if reactivation_required:
+        if record.reactivation_confirmed is not True:
+            reasons.append("REACTIVATION_NOT_CONFIRMED")
+        if (previous is not None and
+                (record.source_timestamp <= previous.source_timestamp
+                 or record.observed_at <= previous.observed_at)):
+            reasons.append("REACTIVATION_EVIDENCE_NOT_NEWER")
 
     sell_available = record.sell_side_available is True and metadata_fresh
     if record.status == "ACTIVE":
@@ -144,7 +150,8 @@ def evaluate_market_lifecycle(*, records: Sequence[InstrumentVersion], market_id
         exit_path = False
         reasons.append(f"MARKET_{record.status}")
 
-    if reactivation_required and record.reactivation_confirmed is not True:
+    if reactivation_required and (record.reactivation_confirmed is not True
+                                  or "REACTIVATION_EVIDENCE_NOT_NEWER" in reasons):
         entries = False
     return {
         "market_id": record.market_id,
