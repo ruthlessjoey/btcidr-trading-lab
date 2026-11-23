@@ -64,8 +64,8 @@ def evaluate_token_eligibility(*, evidence: TokenRiskEvidence,
         raise TokenRiskError("typed TokenRiskEvidence and TokenRiskPolicy are required")
     if isinstance(decision_time, bool) or not isinstance(decision_time, int) or decision_time < 0:
         raise TokenRiskError("decision_time must be a nonnegative integer timestamp")
-    if (not evidence.token_id or not evidence.token_id.strip()
-            or not evidence.source_id or not evidence.source_id.strip()):
+    if (not isinstance(evidence.token_id, str) or not evidence.token_id.strip()
+            or not isinstance(evidence.source_id, str) or not evidence.source_id.strip()):
         raise TokenRiskError("token_id and source_id are required")
     if not isinstance(evidence.source_sha256, str) or not HASH_RE.fullmatch(evidence.source_sha256):
         raise TokenRiskError("source_sha256 must be a lowercase 64-character SHA-256 hex digest")
@@ -86,8 +86,8 @@ def evaluate_token_eligibility(*, evidence: TokenRiskEvidence,
             or any(not isinstance(check, str) for check in policy.required_checks)
             or len(set(policy.required_checks)) != len(policy.required_checks)):
         raise TokenRiskError("required_checks must be a tuple of unique string check names")
-    if any(check not in BOOLEAN_CHECKS for check in policy.required_checks):
-        raise TokenRiskError("required_checks contains an unsupported boolean evidence field")
+    if set(policy.required_checks) != BOOLEAN_CHECKS:
+        raise TokenRiskError("required_checks must include every mandatory contract, authority, honeypot and market-status check")
 
     try:
         min_liquidity = _d(policy.min_liquidity_usd, "min_liquidity_usd")
