@@ -50,7 +50,7 @@ def valid_evidence():
 class ProfitabilityEvidenceGateTests(unittest.TestCase):
     def test_complete_evidence_is_only_eligible_for_independent_review(self):
         result = evaluate_profitability_evidence(valid_evidence())
-        self.assertEqual(result["promotion_status"], "ELIGIBLE_FOR_INDEPENDENT_REVIEW")
+        self.assertEqual(result["promotion_status"], "READY_FOR_INDEPENDENT_REVIEW")
         self.assertFalse(result["order_authorized"])
         self.assertFalse(result["paper_execution_authorized"])
         self.assertFalse(result["profitability_claim_authorized"])
