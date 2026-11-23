@@ -7,6 +7,7 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 - Spot-only and long-only accounting; no shorts, leverage, margin or derivatives.
 - Research/synthetic mode only. The package contains no network client or exchange connector.
 - The only represented data source is an offline policy validator for the specifically approved Tokocrypto NextMe BTCIDR kline URL. It does not perform HTTP requests.
+- The validator rejects all request headers and permits only unauthenticated GET to the exact approved host/path with BTCIDR candles.
 - No credentials, account access, wallet access, order placement, cancellation, deposits or withdrawals.
 - LIVE trading is not implemented and remains disabled.
 - MEME_INTEL is not imported or integrated; that project requires independent readiness and separate approval.
@@ -23,7 +24,7 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 - Explicit price tick, quantity step, minimum quantity and minimum quote notional.
 - Conservative price rounding: BUY up, SELL down; quantity always rounds down.
 - Latched portfolio drawdown stop. After the threshold is breached at a completed bar close, later signals are ignored and next opens attempt liquidation. Partial liquidity leaves the halt latched.
-- Point-in-time sample-covariance volatility overlay. It requires aligned timestamped returns, rejects stale/future/misaligned data, and only scales long-only weights down to an explicit per-observation volatility cap. It does not annualize or impute missing data.
+- Point-in-time sample-covariance volatility overlay. It requires aligned, equally spaced timestamped returns, rejects stale/future/misaligned data, and only scales long-only weights down to an explicit per-observation volatility cap. It does not annualize or impute missing data.
 - Synthetic tests only. No profitability claim.
 
 ## Verify
@@ -38,4 +39,4 @@ This creates a local virtual environment, runs static checks and the isolated sy
 
 ## Not production-ready
 
-No authentic current multi-market datasets, point-in-time meme-token universe, contract/ownership risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage/regime-aware stress model, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
+No authentic current multi-market datasets, point-in-time meme-token universe, meme-specific contract/ownership/liquidity risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
