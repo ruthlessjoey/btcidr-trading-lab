@@ -72,6 +72,15 @@ class CovarianceRiskOverlayTests(unittest.TestCase):
                 target_weights={"A/USDT": ".5"}, returns={"A/USDT": stale},
                 decision_time=self.NOW, policy=CovarianceRiskPolicy(".1", max_return_age_seconds=10))
 
+    def test_irregular_observation_intervals_are_rejected(self):
+        values = [".01", "-.01"] * 10
+        irregular = self.series(values)
+        irregular[8] = (irregular[8][0] + 1, irregular[8][1])
+        with self.assertRaises(RiskOverlayError):
+            apply_covariance_risk_overlay(
+                target_weights={"A/USDT": ".5"}, returns={"A/USDT": irregular},
+                decision_time=self.NOW, policy=CovarianceRiskPolicy(".1"))
+
     def test_invalid_weights_and_insufficient_observations_are_rejected(self):
         values = [".01", "-.01"] * 10
         with self.assertRaises(RiskOverlayError):
