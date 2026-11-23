@@ -16,7 +16,7 @@ _REQUIRED = {
     "dataset_sha256", "result_sha256", "strategy_config_sha256", "experiment_registry_sha256", "holdout_id",
     "holdout_sealed", "holdout_used_for_tuning", "source_license_approved",
     "point_in_time_verified", "coverage_complete", "no_lookahead_verified",
-    "execution_costs_included", "two_x_costs_positive", "all_trials_registered",
+    "execution_costs_included", "execution_cost_model_verified", "benchmark_same_costs_verified", "two_x_costs_positive", "all_trials_registered",
     "spot_long_only_verified", "paper_only_verified", "live_trading_enabled",
     "venue_rules_verified", "registry_replay_verified", "trial_count",
     "observations", "closed_trades", "net_cagr", "net_expectancy", "win_rate",
@@ -29,7 +29,7 @@ _FOLD_KEYS = {"fold_id", "test_start", "test_end", "net_return",
               "max_drawdown", "closed_trades"}
 _TRUE_CHECKS = (
     "holdout_sealed", "source_license_approved", "point_in_time_verified",
-    "coverage_complete", "no_lookahead_verified", "execution_costs_included",
+    "coverage_complete", "no_lookahead_verified", "execution_costs_included", "execution_cost_model_verified", "benchmark_same_costs_verified",
     "two_x_costs_positive", "all_trials_registered", "spot_long_only_verified",
     "paper_only_verified", "venue_rules_verified", "registry_replay_verified",
 )
