@@ -61,7 +61,8 @@ class InstrumentRegistryTests(unittest.TestCase):
     def test_reactivation_requires_explicit_confirmation(self):
         halted = self.record(status="HALTED", effective_to=self.NOW - 100,
                              sell_side_available=False)
-        active = self.record(effective_from=self.NOW - 50, reactivation_confirmed=None)
+        active = self.record(effective_from=self.NOW - 50, source_timestamp=self.NOW - 10,
+                             observed_at=self.NOW - 5, reactivation_confirmed=None)
         result = evaluate_market_lifecycle(records=[halted, active],
                                            market_id="solana:pool-address-1",
                                            decision_time=self.NOW)
@@ -72,6 +73,18 @@ class InstrumentRegistryTests(unittest.TestCase):
                                            market_id="solana:pool-address-1",
                                            decision_time=self.NOW)
         self.assertTrue(result["market_eligible_for_new_entries"])
+
+    def test_reactivation_requires_newer_source_evidence(self):
+        halted = self.record(status="HALTED", effective_to=self.NOW - 100,
+                             sell_side_available=False, source_timestamp=self.NOW - 50,
+                             observed_at=self.NOW - 40)
+        active = self.record(effective_from=self.NOW - 50, reactivation_confirmed=True,
+                             source_timestamp=self.NOW - 60, observed_at=self.NOW - 55)
+        result = evaluate_market_lifecycle(records=[halted, active],
+                                           market_id="solana:pool-address-1",
+                                           decision_time=self.NOW)
+        self.assertFalse(result["market_eligible_for_new_entries"])
+        self.assertIn("REACTIVATION_EVIDENCE_NOT_NEWER", result["reasons"])
 
     def test_stale_metadata_fails_closed(self):
         result = evaluate_market_lifecycle(
