@@ -117,6 +117,20 @@ class ProfitabilityEvidenceGateTests(unittest.TestCase):
             evidence[field] = value
             self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
 
+    def test_net_return_must_be_positive_and_returns_cannot_exceed_total_loss(self):
+        for field, value in (("net_return", -0.01), ("buy_hold_return", -1.01), ("two_x_cost_net_return", -1.01)):
+            evidence = valid_evidence()
+            evidence[field] = value
+            self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
+
+    def test_each_walk_forward_fold_has_a_25_percent_drawdown_ceiling(self):
+        evidence = valid_evidence()
+        evidence["walk_forward_folds"][0]["max_drawdown"] = 0.26
+        self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
+        evidence = valid_evidence()
+        evidence["walk_forward_folds"][0]["net_return"] = -1.01
+        self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
+
     def test_must_beat_benchmark_and_survive_double_costs(self):
         for field, value in (("net_return", 0.20), ("two_x_cost_net_return", 0.0)):
             evidence = valid_evidence()
