@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +27,19 @@ for path in modules:
                 node.func.attr if isinstance(node.func, ast.Attribute) else "")
             if name in FORBIDDEN_CALLS:
                 errors.append(f"{path.name}: forbidden call {name}")
+
+config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
+required = {
+    "mode": "RESEARCH_ONLY",
+    "position_mode": "SPOT_LONG_ONLY",
+    "live_trading_enabled": False,
+    "private_exchange_api_enabled": False,
+    "network_enabled": False,
+}
+for key, expected in required.items():
+    if config.get(key) != expected:
+        errors.append(f"config.example.json: {key} must equal {expected!r}")
+
 if errors:
     raise SystemExit("\n".join(errors))
-print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls found.")
+print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
