@@ -13,12 +13,12 @@ from typing import Any
 
 _HASH = re.compile(r"^[0-9a-f]{64}$")
 _REQUIRED = {
-    "dataset_sha256", "result_sha256", "strategy_config_sha256", "holdout_id",
+    "dataset_sha256", "result_sha256", "strategy_config_sha256", "experiment_registry_sha256", "holdout_id",
     "holdout_sealed", "holdout_used_for_tuning", "source_license_approved",
     "point_in_time_verified", "coverage_complete", "no_lookahead_verified",
     "execution_costs_included", "two_x_costs_positive", "all_trials_registered",
     "spot_long_only_verified", "paper_only_verified", "live_trading_enabled",
-    "venue_rules_verified", "independent_review_passed", "trial_count",
+    "venue_rules_verified", "registry_replay_verified", "trial_count",
     "observations", "closed_trades", "net_cagr", "net_expectancy", "win_rate",
     "profit_factor", "max_drawdown", "sharpe_annualized",
     "deflated_sharpe_probability", "bootstrap_excess_lower_bound",
@@ -31,9 +31,9 @@ _TRUE_CHECKS = (
     "holdout_sealed", "source_license_approved", "point_in_time_verified",
     "coverage_complete", "no_lookahead_verified", "execution_costs_included",
     "two_x_costs_positive", "all_trials_registered", "spot_long_only_verified",
-    "paper_only_verified", "venue_rules_verified", "independent_review_passed",
+    "paper_only_verified", "venue_rules_verified", "registry_replay_verified",
 )
-_HASH_FIELDS = ("dataset_sha256", "result_sha256", "strategy_config_sha256")
+_HASH_FIELDS = ("dataset_sha256", "result_sha256", "strategy_config_sha256", "experiment_registry_sha256")
 
 
 def _finite_number(value: object, field: str) -> float:
@@ -69,7 +69,7 @@ def evaluate_profitability_evidence(evidence: Mapping[str, Any]) -> dict[str, An
         raise TypeError("evidence must be a mapping")
     reasons: list[str] = []
     missing = sorted(_REQUIRED - set(evidence))
-    extra = sorted(set(evidence) - _REQUIRED)
+    extra = sorted(str(key) for key in set(evidence) - _REQUIRED)
     if missing:
         reasons.append("missing required fields: " + ", ".join(missing))
     if extra:
@@ -177,7 +177,7 @@ def evaluate_profitability_evidence(evidence: Mapping[str, Any]) -> dict[str, An
             reasons.append("at least 75% of walk-forward folds must be net profitable")
 
     return {
-        "promotion_status": "ELIGIBLE_FOR_INDEPENDENT_REVIEW" if not reasons else "BLOCKED",
+        "promotion_status": "READY_FOR_INDEPENDENT_REVIEW" if not reasons else "BLOCKED",
         "reasons": reasons,
         "walk_forward_positive_fold_ratio": (
             positive_folds / valid_folds if "valid_folds" in locals() and valid_folds else 0.0
