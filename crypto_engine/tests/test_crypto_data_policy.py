@@ -48,6 +48,9 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
                 validate_approved_kline_request(method="GET", url=url)
         with self.assertRaises(ProviderPolicyError):
             validate_approved_kline_request(method="POST", url=self.URL)
+        with self.assertRaises(ProviderPolicyError):
+            validate_approved_kline_request(method="GET", url=self.URL,
+                                            headers={"Authorization": "Bearer forbidden"})
 
     def test_other_symbols_credentials_and_duplicate_parameters_are_rejected(self):
         for url in (self.URL.replace("BTCIDR", "BTCUSDT"),
