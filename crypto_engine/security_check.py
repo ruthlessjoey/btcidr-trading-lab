@@ -17,10 +17,12 @@ for path in modules:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.split(".")[0] in FORBIDDEN_MODULES:
+                safe_parser = alias.name == "urllib.parse"
+                if alias.name.split(".")[0] in FORBIDDEN_MODULES and not safe_parser:
                     errors.append(f"{path.name}: forbidden import {alias.name}")
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            if node.module.split(".")[0] in FORBIDDEN_MODULES:
+            safe_parser = node.module == "urllib.parse"
+            if node.module.split(".")[0] in FORBIDDEN_MODULES and not safe_parser:
                 errors.append(f"{path.name}: forbidden import {node.module}")
         elif isinstance(node, ast.Call):
             name = node.func.id if isinstance(node.func, ast.Name) else (
@@ -42,4 +44,4 @@ for key, expected in required.items():
 
 if errors:
     raise SystemExit("\n".join(errors))
-print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
+print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; only urllib.parse URL validation; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
