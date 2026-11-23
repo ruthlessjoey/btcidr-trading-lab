@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any
 
 from .provider_policy import ProviderPolicyError, build_kline_provenance
@@ -30,7 +31,8 @@ def _reject_json_constant(value: str) -> None:
 
 def validate_approved_kline_payload(*, method: str, url: str, raw_response: bytes,
                                     retrieved_at_ms: int, decision_time_ms: int,
-                                    expected_symbol: str, expected_interval: str) -> dict[str, Any]:
+                                    expected_symbol: str, expected_interval: str,
+                                    headers: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Validate URL policy, raw response integrity, schema and as-of time.
 
     The function accepts bytes already obtained by an external caller. It does
@@ -43,7 +45,8 @@ def validate_approved_kline_payload(*, method: str, url: str, raw_response: byte
     try:
         provenance = build_kline_provenance(method=method, url=url,
                                              raw_payload=raw_response,
-                                             retrieved_at_ms=retrieved_at_ms)
+                                             retrieved_at_ms=retrieved_at_ms,
+                                             headers=headers)
         request_parameters = provenance["request"]["parameters"]
         if request_parameters.get("symbol") != expected_symbol:
             raise IngestionError("requested symbol does not match expected symbol")
