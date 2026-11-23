@@ -20,6 +20,8 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 
 - Exact-host/path/method/query validation for unauthenticated GET candles from `https://cloudme-toko.2meta.app/api/v1/klines`, BTCIDR only.
 - Raw payload size, UTF-8, duplicate-key, schema, closed-candle and SHA-256 provenance validation. Provenance does not independently authenticate the network peer.
+- Versioned point-in-time CEX spot / DEX pool instrument registry keyed by stable market and asset identifiers, not ticker symbols alone.
+- Market lifecycle gate for ACTIVE, HALTED, DELISTING_ANNOUNCED, DELISTED, MIGRATION_PENDING and UNKNOWN states. Stale metadata blocks both new entries and assumed exit availability; reactivation requires explicit confirmation.
 - Deterministic shared-account multi-market allocation across quote currencies.
 - Stale/future price and FX rejection, gross exposure, per-market, base-asset and quote-asset caps.
 - Synchronized shared-cash backtest with next-bar-open execution, market-specific fees, spread, slippage and prior-bar volume limits.
@@ -42,4 +44,4 @@ This creates a local virtual environment, runs static checks and the isolated sy
 
 ## Not production-ready
 
-No authentic current multi-market datasets, point-in-time meme-token universe, independent contract/ownership/LP verification, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The token gate only evaluates supplied evidence and cannot authenticate its source. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
+No authentic current multi-market datasets, independently verified contract/ownership/LP evidence, DEX transaction/reorg/gas model, order-book queue or market-impact model, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The token gate only evaluates supplied evidence and cannot authenticate its source. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
