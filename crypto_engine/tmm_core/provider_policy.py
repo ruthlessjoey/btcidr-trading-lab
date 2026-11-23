@@ -6,6 +6,7 @@ unauthenticated GET to the specifically approved Tokocrypto NextMe BTCIDR kline 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
@@ -21,10 +22,13 @@ class ProviderPolicyError(ValueError):
     """Raised when a data request violates the approved-source policy."""
 
 
-def validate_approved_kline_request(*, method: str, url: str) -> dict[str, Any]:
+def validate_approved_kline_request(*, method: str, url: str,
+                                    headers: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Validate and return a safe request descriptor; does not perform I/O."""
     if not isinstance(method, str) or method.upper() != "GET":
         raise ProviderPolicyError("only unauthenticated GET is approved")
+    if headers is not None and (not isinstance(headers, Mapping) or len(headers) != 0):
+        raise ProviderPolicyError("request headers are not approved; send no authentication or custom headers")
     if not isinstance(url, str) or not url:
         raise ProviderPolicyError("request URL is required")
     try:
@@ -71,15 +75,17 @@ def validate_approved_kline_request(*, method: str, url: str) -> dict[str, Any]:
         "path": APPROVED_PATH,
         "parameters": dict(sorted(params.items())),
         "authentication": "NONE",
+        "request_headers": "NONE",
         "source_scope": "APPROVED_PUBLIC_KLINE_ONLY",
         "network_action_performed": False,
     }
 
 
 def build_kline_provenance(*, method: str, url: str, raw_payload: bytes,
-                           retrieved_at_ms: int) -> dict[str, Any]:
+                           retrieved_at_ms: int,
+                           headers: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Bind raw response bytes to the approved request descriptor with SHA-256."""
-    descriptor = validate_approved_kline_request(method=method, url=url)
+    descriptor = validate_approved_kline_request(method=method, url=url, headers=headers)
     if not isinstance(raw_payload, bytes) or not raw_payload:
         raise ProviderPolicyError("raw_payload must be non-empty response bytes")
     if (isinstance(retrieved_at_ms, bool) or not isinstance(retrieved_at_ms, int)
