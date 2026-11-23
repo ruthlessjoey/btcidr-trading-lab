@@ -808,7 +808,7 @@ Current terms impose a strict separation:
 - pumpdata.fun's sample declares CC BY 4.0 with attribution. It covers 15 October 2026 only and is not point-in-time evidence that its parsed archive was available to a strategy at event time.
 
 Observed retrieval:
-- A 100-row Hugging Face preview was successfully retrieved from dataset revision `60ab4739e4a0d4f99e1aae7486e9b6320602c50b`. The preview included curve and PumpSwap venues, landed and failed rows, token-quoted trades, migration-pool trades and a multi-hop leg. Basic schema checks passed.
+- A 100-row Hugging Face preview was successfully retrieved from dataset revision `60ab4739e4a0d4f99e1aae7486e9b6320602c50b`. The preview included curve and PumpSwap venues, landed and failed rows, token-quoted trades, migration-pool trades and a multi-hop leg. Basic schema checks passed. Four representative records (curve landed, token-quoted curve, PumpSwap multi-hop and failed attempt) were also passed through the Python parser.
 - The paginated rows endpoint returned HTTP 503. No Parquet shard or full Pump.fun archive was downloaded. The dataset card reports 42,230,410 trade rows; four trade shards total 1,489,189,804 bytes; the separate signature archive adds about 2.77 GB.
 - Binance archive retrieval was not completed in this runtime. No Binance data is represented as downloaded or tested.
 
