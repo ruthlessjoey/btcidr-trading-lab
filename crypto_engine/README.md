@@ -2,6 +2,8 @@
 
 This is an isolated, offline-only foundation for multi-market crypto spot research. It is additive: it does not replace, import, or modify the existing BTC/IDR application pipeline.
 
+See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the research-only review of CEX, DEX and meme-coin data options, license constraints and provider approval requirements.
+
 ## Safety
 
 - Spot-only and long-only accounting; no shorts, leverage, margin or derivatives.
