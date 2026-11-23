@@ -25,6 +25,7 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 - Conservative price rounding: BUY up, SELL down; quantity always rounds down.
 - Latched portfolio drawdown stop. After the threshold is breached at a completed bar close, later signals are ignored and next opens attempt liquidation. Partial liquidity leaves the halt latched.
 - Point-in-time sample-covariance volatility overlay. It requires aligned, equally spaced timestamped returns, rejects stale/future/misaligned data, and only scales long-only weights down to an explicit per-observation volatility cap. It does not annualize or impute missing data.
+- Evidence-driven token eligibility gate for crypto/meme research. Missing or failed required controls, stale evidence, insufficient liquidity/LP lock/holders, concentrated top holders or excessive taxes block eligibility. A pass means only `ELIGIBLE_FOR_HUMAN_REVIEW`; it never authorizes an order and does not verify the truth of supplied evidence.
 - Synthetic tests only. No profitability claim.
 
 ## Verify
@@ -39,4 +40,4 @@ This creates a local virtual environment, runs static checks and the isolated sy
 
 ## Not production-ready
 
-No authentic current multi-market datasets, point-in-time meme-token universe, meme-specific contract/ownership/liquidity risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
+No authentic current multi-market datasets, point-in-time meme-token universe, independent contract/ownership/LP verification, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The token gate only evaluates supplied evidence and cannot authenticate its source. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
