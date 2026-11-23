@@ -770,3 +770,63 @@ The PR body has been corrected to state this precisely. PR #68's inherited publi
 - Dispatched review run [#44732925668](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/44732925668) on the current PR #83 workflow commit `91ab93c5ae0957a32b9bc007d252b92388fe450f`, immutable runner `0ebe25b4aa4a0f9c04fa86a28303d107429cf655`, frozen PR #60 target `d5d5db6cc5d3f11bf579eed45c873b630ed560a4`.
 - Correctly resumed from run `44730063361` / artifact `14625709210`, which contains four accepted specialist reports. Checkpoint restore and synthetic preflight passed; model review remains **IN PROGRESS** at this snapshot. No additional role or acceptance is claimed.
 - Run `44731612974` is explicitly superseded for resume purposes because it restored the less-complete one-report checkpoint from `44728818302` and added no report.
+
+
+## Multi-market scope and research integration update — 23 November 2026
+
+### Approved target-market scope
+
+Twin Money Maker is a multi-market research/trading platform, not a BTC-only product. The target scope is:
+- Crypto spot across multiple assets, trading pairs and venues, with meme coins as a core capability.
+- Equities and ETFs.
+- FX.
+- Commodities and cash-market research; futures may be researched as cash-market context only, not traded as derivatives.
+- Signal-only research such as Olymptrade; no execution integration is implied.
+- BTC/IDR is the initial engineering foundation, not the final market boundary.
+- MEME_INTEL remains a separate project; no import or integration until independently ready and separately approved.
+
+The operating mode remains spot-only, long-only, PAPER-only. LIVE trading remains disabled. No real-money orders, deposits, withdrawals, payments, funding, margin, leverage, shorts or derivatives. Existing protected paths remain off-limits without separate approval.
+
+### PR #100 — multi-market crypto spot foundation
+
+- PR #100 remains open/draft/unmerged: [Install isolated crypto spot research core foundation](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/100).
+- Base: `main` at `0426e1ecd5bd01913a568272792c355c4b7059c7`.
+- Head: `integration/crypto-spot-core-foundation-2026-11-23` at `d7487c97eac4abebef89fbd9ea59067dccbabfd6`.
+- 24 changed files; 41 commits ahead / 0 behind at the last exact comparison.
+- The isolated package provides shared-cash multi-market allocation, quote-currency conversion, venue constraints, synthetic next-open backtesting, latched drawdown controls, point-in-time covariance overlay, instrument lifecycle metadata and a fail-closed token eligibility screen.
+- Exact isolated-copy verification previously recorded: Python 3.13.5, 40 synthetic tests, static boundary check and compileall passed. No exchange/network request, credentials, wallet, order or paper execution.
+- The package is an engineering foundation, not a complete trading system; no authentic multi-period strategy profitability is demonstrated.
+
+### Approved dataset retrieval and restrictions
+
+The user approved two research sources on 23 November 2026:
+1. Binance Public Data spot archives for personal, non-commercial, non-production historical backtesting only.
+2. The pumpdata.fun one-day sample for offline meme-coin parser and execution/microstructure testing only; no payment, full-history purchase or redistribution.
+
+Current terms impose a strict separation:
+- Binance Vision's current CC BY-NC-SA 4.0 terms expressly restrict use to personal non-production research and prohibit commercial order generation or integration into commercial trading-bot products. Any Binance research must remain isolated from Twin Money Maker's product, model-training, validation and trading pipeline unless a separate written commercial license is obtained.
+- pumpdata.fun's sample declares CC BY 4.0 with attribution. It covers 15 October 2026 only and is not point-in-time evidence that its parsed archive was available to a strategy at event time.
+
+Observed retrieval:
+- A 100-row Hugging Face preview was successfully retrieved from dataset revision `60ab4739e4a0d4f99e1aae7486e9b6320602c50b`. The preview included curve and PumpSwap venues, landed and failed rows, token-quoted trades, migration-pool trades and a multi-hop leg. Basic schema checks passed.
+- The paginated rows endpoint returned HTTP 503. No Parquet shard or full Pump.fun archive was downloaded. The dataset card reports 42,230,410 trade rows; four trade shards total 1,489,189,804 bytes; the separate signature archive adds about 2.77 GB.
+- Binance archive retrieval was not completed in this runtime. No Binance data is represented as downloaded or tested.
+
+### PR #101 — offline Pump.fun/PumpSwap parser
+
+- PR #101 remains open/draft/unmerged: [Add offline Pump.fun and PumpSwap trade parser](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/101).
+- Stacked on PR #100's integration branch, not directly on `main`.
+- Head: `integration/solana-dex-ingest-2026-11-23` at `ee2a19afbd541e9ac3910a63f0dd533694f38a31`.
+- Three additive files: offline parser, 18 isolated tests, and a source/license/point-in-time research note. No raw dataset rows are committed.
+- The parser validates the exact 29-field schema, timestamps, integer bounds, landed/failed semantics, ordering and transaction metadata; preserves raw units; counts transaction fees once; does not retain wallet addresses; does not guess missing multi-hop mint identity; and flags float64 reserve precision risk.
+- Exact local copy verified with Python 3.13.5: 18 tests passed, compileall passed, and static import scan found no network/process imports. No workflow was dispatched.
+- This parser is not a DEX execution engine, strategy, paper runner, chain verifier or profitability result.
+
+### Current evidence limits and project rating
+
+- No Binance archive data has been downloaded in this runtime.
+- The full pumpdata.fun sample has not been downloaded; only a 100-row preview was retrieved.
+- No independent chain receipt verification, multi-day meme-coin history, current market universe, paper execution, external security acceptance or profitability proof is established by this work.
+- Overall project completion remains **UNRATED** pending owner-approved scope weights and evidence criteria.
+- Profitability remains **NOT PROVEN**.
+- PRs #100 and #101 remain draft/unmerged; no workflow was dispatched and no protected paths were accessed or modified.
