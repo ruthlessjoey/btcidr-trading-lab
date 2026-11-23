@@ -55,13 +55,13 @@ def apply_covariance_risk_overlay(*, target_weights: Mapping[str, object],
         raise RiskOverlayError("target_weights must be a non-empty mapping")
     if not isinstance(returns, Mapping) or set(returns) != set(target_weights):
         raise RiskOverlayError("return series must exactly cover the target market universe")
+    if any(not isinstance(market_id, str) or not market_id for market_id in target_weights):
+        raise RiskOverlayError("market IDs must be non-empty strings")
 
     weights: dict[str, Decimal] = {}
-    for market_id, raw_weight in target_weights.items():
-        if not isinstance(market_id, str) or not market_id:
-            raise RiskOverlayError("market IDs must be non-empty strings")
+    for market_id in sorted(target_weights):
         try:
-            weight = _d(raw_weight, f"{market_id}.weight")
+            weight = _d(target_weights[market_id], f"{market_id}.weight")
         except PortfolioError as exc:
             raise RiskOverlayError(str(exc)) from exc
         if weight < 0 or weight > 1:
@@ -108,6 +108,10 @@ def apply_covariance_risk_overlay(*, target_weights: Mapping[str, object],
     assert canonical_timestamps is not None
     if decision_time - canonical_timestamps[-1] > policy.max_return_age_seconds:
         raise RiskOverlayError("latest return observation is stale")
+    intervals = [right - left for left, right in zip(canonical_timestamps, canonical_timestamps[1:])]
+    if not intervals or len(set(intervals)) != 1:
+        raise RiskOverlayError("return observations must use one consistent interval")
+    observation_interval_seconds = intervals[0]
 
     count = len(canonical_timestamps)
     means = {m: sum(values, D("0")) / D(count) for m, values in clean_returns.items()}
@@ -136,6 +140,7 @@ def apply_covariance_risk_overlay(*, target_weights: Mapping[str, object],
         "max_period_volatility": max_vol,
         "observations": count,
         "last_return_timestamp": canonical_timestamps[-1],
+        "observation_interval_seconds": observation_interval_seconds,
         "risk_status": "SCALED_DOWN" if scale < 1 else "WITHIN_LIMIT",
         "method": "SAMPLE_COVARIANCE_PROPORTIONAL_LONG_ONLY_SCALING",
     }
