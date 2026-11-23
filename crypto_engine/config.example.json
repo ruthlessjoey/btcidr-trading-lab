@@ -1,0 +1,8 @@
+{
+  "mode": "RESEARCH_ONLY",
+  "position_mode": "SPOT_LONG_ONLY",
+  "live_trading_enabled": false,
+  "private_exchange_api_enabled": false,
+  "network_enabled": false,
+  "memo": "Offline synthetic research fixture. Not venue rules or an execution configuration."
+}
