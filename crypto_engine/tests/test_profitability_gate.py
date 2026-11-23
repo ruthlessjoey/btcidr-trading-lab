@@ -9,6 +9,7 @@ def valid_evidence():
         "dataset_sha256": "a" * 64,
         "result_sha256": "b" * 64,
         "strategy_config_sha256": "c" * 64,
+        "experiment_registry_sha256": "d" * 64,
         "holdout_id": "holdout-2026-v1",
         "holdout_sealed": True,
         "holdout_used_for_tuning": False,
@@ -23,7 +24,7 @@ def valid_evidence():
         "paper_only_verified": True,
         "live_trading_enabled": False,
         "venue_rules_verified": True,
-        "independent_review_passed": True,
+        "registry_replay_verified": True,
         "trial_count": 46,
         "observations": 500,
         "closed_trades": 120,
@@ -48,7 +49,7 @@ def valid_evidence():
 
 
 class ProfitabilityEvidenceGateTests(unittest.TestCase):
-    def test_complete_evidence_is_only_eligible_for_independent_review(self):
+    def test_complete_evidence_is_ready_for_independent_review(self):
         result = evaluate_profitability_evidence(valid_evidence())
         self.assertEqual(result["promotion_status"], "READY_FOR_INDEPENDENT_REVIEW")
         self.assertFalse(result["order_authorized"])
@@ -82,7 +83,7 @@ class ProfitabilityEvidenceGateTests(unittest.TestCase):
             self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
 
     def test_spot_paper_and_live_disabled_controls_are_mandatory(self):
-        for field, value in (("spot_long_only_verified", False), ("paper_only_verified", False), ("live_trading_enabled", True)):
+        for field, value in (("spot_long_only_verified", False), ("paper_only_verified", False), ("live_trading_enabled", True), ("registry_replay_verified", False)):
             evidence = valid_evidence()
             evidence[field] = value
             self.assertEqual(evaluate_profitability_evidence(evidence)["promotion_status"], "BLOCKED")
