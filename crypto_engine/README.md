@@ -23,6 +23,7 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 - Explicit price tick, quantity step, minimum quantity and minimum quote notional.
 - Conservative price rounding: BUY up, SELL down; quantity always rounds down.
 - Latched portfolio drawdown stop. After the threshold is breached at a completed bar close, later signals are ignored and next opens attempt liquidation. Partial liquidity leaves the halt latched.
+- Point-in-time sample-covariance volatility overlay. It requires aligned timestamped returns, rejects stale/future/misaligned data, and only scales long-only weights down to an explicit per-observation volatility cap. It does not annualize or impute missing data.
 - Synthetic tests only. No profitability claim.
 
 ## Verify
@@ -37,4 +38,4 @@ This creates a local virtual environment, runs static checks and the isolated sy
 
 ## Not production-ready
 
-No authentic current multi-market datasets, point-in-time meme-token universe, contract/ownership risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, covariance-aware de-risking, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
+No authentic current multi-market datasets, point-in-time meme-token universe, contract/ownership risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, robust covariance shrinkage/regime-aware stress model, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
