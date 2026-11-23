@@ -830,3 +830,39 @@ Observed retrieval:
 - Overall project completion remains **UNRATED** pending owner-approved scope weights and evidence criteria.
 - Profitability remains **NOT PROVEN**.
 - PRs #100 and #101 remain draft/unmerged; no workflow was dispatched and no protected paths were accessed or modified.
+
+
+
+## 2026-11-23 profitability research, promotion gate, and integration status
+
+### Research-only market data and strategy results
+
+- Under the user's 23 November approval, Binance Public Data spot archives were retrieved only for isolated personal, non-commercial, non-production historical backtesting. No Binance data, raw rows, or derived strategy data were integrated into Twin Money Maker's runtime, model-training or trading pipeline.
+- Retrieved BTCUSDT 1d archives: 111 monthly ZIPs, 3,363 validated daily rows, 17 August 2017 through 31 October 2026; no missing monthly archives or daily gaps were found.
+- Retrieved seven additional spot pairs on 1d: ETHUSDT, BNBUSDT, DOGEUSDT, SOLUSDT, SHIBUSDT, PEPEUSDT and BONKUSDT. 494 monthly archives were retrieved; all observed per-symbol daily series were contiguous after listing. The fixed-currently-listed universe has survivorship/listing bias and is not a point-in-time market universe.
+- Retrieved 1h archives for BTCUSDT, ETHUSDT, SOLUSDT, DOGEUSDT, SHIBUSDT, PEPEUSDT and BONKUSDT. 423 monthly archives were retrieved. Missing hourly intervals were recorded; no forward-filling was used.
+- Research ran a 46-variant BTC daily trend/momentum family and a 36-variant seven-asset cross-sectional momentum family with next-open execution and explicit transaction-cost assumptions. The best validation-selected candidates failed the later test period; the seven-asset strategy also failed to beat cash and buy-and-hold on its later test period.
+- A 486-variant 1h mean-reversion family on PEPEUSDT and BONKUSDT did not meet the predeclared minimum trade-count, profitability, win-rate and drawdown criteria. No strategy was selected.
+- These are isolated research findings, not an approved production strategy, not DEX/Pump.fun execution evidence, and not an independent profitability acceptance. No strategy is promoted as profitable. Do not reuse the already inspected periods as an untouched holdout.
+
+### Isolated research-engine hardening
+
+- The separately supplied offline prototype bundle was revalidated from a clean disposable copy using Python 3.13.5: **183/183 tests passed**, static boundary check passed across 18 modules, compilation passed, and the isolated virtual-environment `pip check` passed with no broken requirements.
+- The prototype's stale Tokocrypto policy reference to `www.tokocrypto.site/api/v3/klines` was corrected in that local copy to the exact currently approved NextMe BTCIDR endpoint `https://cloudme-toko.2meta.app/api/v1/klines`; all request headers are rejected. Its example config is `RESEARCH_ONLY`, network/private APIs/LIVE are disabled, and paper execution is disabled by default. This corrected prototype bundle is not yet integrated into the repository.
+- The earlier global Python environment's `pip check` reported an unrelated pre-existing `moviepy`/Pillow version conflict; the clean isolated environment passed. Do not conflate the global environment warning with the clean package result.
+
+### PR #102 — fail-closed profitability evidence gate
+
+- PR #102 is open/draft/unmerged: [Add fail-closed profitability evidence promotion gate](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/102).
+- Branch: `integration/profitability-evidence-gate-2026-11-23`, head `eba2afb61c95248555df834c1f45cffa72fe1426`; base is PR #101 head `ee2a19afbd541e9ac3910a63f0dd533694f38a31`. GitHub currently reports mergeable true; the comparison is 10 commits ahead / 0 behind and exactly three changed files.
+- Adds a strict, standard-library-only evidence gate and 10 local unit tests. Required criteria include a sealed untouched holdout, source rights, point-in-time integrity, full coverage, no-lookahead, replay-verified experiment registry, calibrated costs and same-cost benchmark, at least 30 registered trials, 250 out-of-sample observations, 100 closed trades, >=55% win rate, positive expectancy, profit factor >=1.30, drawdown <=25%, Sharpe >=1.0, DSR >=0.95, positive paired-bootstrap lower bound, positive 2x-cost result, and four chronological walk-forward folds with at least 75% profitable.
+- A pass returns only `READY_FOR_INDEPENDENT_REVIEW`; it never authorizes orders, PAPER execution, LIVE trading or a profitability claim. The gate validates the supplied evidence structure and attestations; independent review must still verify the underlying artifacts and claims.
+- The 10 local unit tests and compile check passed. No GitHub Actions workflow run is associated with the PR head; no workflow was dispatched.
+
+### Current integration and authorization state
+
+- PR #100 (crypto spot foundation), PR #101 (offline Solana DEX parser) and PR #102 (profitability evidence gate) remain separate open draft PRs; none is merged or installed into `main`.
+- No protected path was accessed, modified, imported or executed. No exchange account, credentials, wallet, order, payment, deposit, withdrawal, PAPER execution or LIVE execution occurred.
+- Binance archives remain restricted to isolated personal non-commercial historical research. The pumpdata.fun one-day sample approval remains limited to offline parser and microstructure testing; no payment, full-history purchase or redistribution.
+- Target market remains multi-market, not BTC-only: crypto spot across assets/pairs/venues with meme coins as a core capability; broader research includes equities, ETFs, FX, commodities/cash markets and signal-only research. BTC/IDR remains the initial engineering foundation. MEME_INTEL remains separate pending independent readiness and separate integration approval.
+- Overall project completion remains **UNRATED** pending owner-approved scope weights and evidence criteria. Profitability remains **NOT VERIFIED**.
