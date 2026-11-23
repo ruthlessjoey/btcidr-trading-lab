@@ -6,6 +6,7 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 
 - Spot-only and long-only accounting; no shorts, leverage, margin or derivatives.
 - Research/synthetic mode only. The package contains no network client or exchange connector.
+- The only represented data source is an offline policy validator for the specifically approved Tokocrypto NextMe BTCIDR kline URL. It does not perform HTTP requests.
 - No credentials, account access, wallet access, order placement, cancellation, deposits or withdrawals.
 - LIVE trading is not implemented and remains disabled.
 - MEME_INTEL is not imported or integrated; that project requires independent readiness and separate approval.
@@ -14,6 +15,8 @@ This is an isolated, offline-only foundation for multi-market crypto spot resear
 
 ## Included
 
+- Exact-host/path/method/query validation for unauthenticated GET candles from `https://cloudme-toko.2meta.app/api/v1/klines`, BTCIDR only.
+- Raw payload size, UTF-8, duplicate-key, schema, closed-candle and SHA-256 provenance validation. Provenance does not independently authenticate the network peer.
 - Deterministic shared-account multi-market allocation across quote currencies.
 - Stale/future price and FX rejection, gross exposure, per-market, base-asset and quote-asset caps.
 - Synchronized shared-cash backtest with next-bar-open execution, market-specific fees, spread, slippage and prior-bar volume limits.
@@ -34,4 +37,4 @@ This creates a local virtual environment, runs static checks and the isolated sy
 
 ## Not production-ready
 
-No authentic current multi-market datasets, point-in-time meme-token universe, contract/ownership risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, covariance-aware de-risking, fee-token accounting, independent external security review, or profitability evidence are included. This core is not approved for paper execution or exchange connection.
+No authentic current multi-market datasets, point-in-time meme-token universe, contract/ownership risk analysis, DEX transaction/reorg/gas model, order-book queue or market-impact model, venue market-halt/delisting lifecycle, covariance-aware de-risking, fee-token accounting, independent external security review, or profitability evidence are included. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
