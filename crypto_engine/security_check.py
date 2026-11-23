@@ -27,7 +27,11 @@ for path in modules:
         elif isinstance(node, ast.Call):
             name = node.func.id if isinstance(node.func, ast.Name) else (
                 node.func.attr if isinstance(node.func, ast.Attribute) else "")
-            if name in FORBIDDEN_CALLS:
+            safe_regex_compile = (isinstance(node.func, ast.Attribute)
+                                  and node.func.attr == "compile"
+                                  and isinstance(node.func.value, ast.Name)
+                                  and node.func.value.id == "re")
+            if name in FORBIDDEN_CALLS and not safe_regex_compile:
                 errors.append(f"{path.name}: forbidden call {name}")
 
 config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
@@ -44,4 +48,4 @@ for key, expected in required.items():
 
 if errors:
     raise SystemExit("\n".join(errors))
-print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; only urllib.parse URL validation; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
+print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; only urllib.parse URL validation and re.compile; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
