@@ -866,3 +866,13 @@ Observed retrieval:
 - Binance archives remain restricted to isolated personal non-commercial historical research. The pumpdata.fun one-day sample approval remains limited to offline parser and microstructure testing; no payment, full-history purchase or redistribution.
 - Target market remains multi-market, not BTC-only: crypto spot across assets/pairs/venues with meme coins as a core capability; broader research includes equities, ETFs, FX, commodities/cash markets and signal-only research. BTC/IDR remains the initial engineering foundation. MEME_INTEL remains separate pending independent readiness and separate integration approval.
 - Overall project completion remains **UNRATED** pending owner-approved scope weights and evidence criteria. Profitability remains **NOT VERIFIED**.
+
+
+### 23 November — integrated validation and meme-token gate hardening
+
+- PR #103: [Harden mandatory meme-token eligibility checks](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/103), open/draft/unmerged, stacked on PR #102. Head `9215d2103c2a65ceda56a4fa4e1ce4458343ab9b`; base PR #102 head `2570a6f142f0fefccfe6bde52321660e23458384`; GitHub reports mergeable true, 3 commits ahead / 0 behind, 2 files changed.
+- Security finding: PR #100's original meme-token gate let callers choose a subset of required boolean controls. That allowed an overly permissive policy to omit contract verification, mint/freeze/upgrade authority, honeypot and market-active checks while still reaching human-review eligibility.
+- Correction: PR #103 now requires the exact six mandatory checks and rejects non-string token/source identifiers. The gate remains only a preliminary human-review screen; it does not authenticate evidence or authorize orders.
+- Exact PR #103 branch snapshot was fetched to a disposable Python 3.11.8 environment. **80/80 integrated tests passed**, including the two new security regression tests; static boundary check passed across all 12 core modules; compileall passed. No workflow was dispatched.
+- PR #103 includes changes only to `crypto_engine/tmm_core/token_risk.py`, its test file, and package documentation? The actual comparison is exactly two changed files (module and test); documentation update is included in the earlier package README on the parent branch, not a third PR #103 file.
+- No protected files accessed; no network, chain, wallet, account, paper execution or live execution occurred.
