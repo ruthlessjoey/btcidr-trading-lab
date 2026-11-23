@@ -80,6 +80,18 @@ class TokenRiskGateTests(unittest.TestCase):
         self.assertIn("MISSING_VALUE:liquidity_usd", result["reasons"])
         self.assertIn("MISSING_VALUE:top_holder_share", result["reasons"])
 
+    def test_policy_cannot_omit_mandatory_token_security_checks(self):
+        for checks in ((), ("contract_verified",), ("contract_verified", "mint_authority_disabled", "freeze_authority_disabled", "upgrade_authority_disabled", "honeypot_check_passed")):
+            with self.subTest(checks=checks), self.assertRaises(TokenRiskError):
+                evaluate_token_eligibility(evidence=self.evidence(),
+                                           policy=replace(self.policy(), required_checks=checks),
+                                           decision_time=self.NOW)
+
+    def test_non_string_token_identity_is_rejected(self):
+        with self.assertRaises(TokenRiskError):
+            evaluate_token_eligibility(evidence=replace(self.evidence(), token_id=123),
+                                       policy=self.policy(), decision_time=self.NOW)
+
     def test_bad_hash_or_invalid_policy_is_rejected(self):
         with self.assertRaises(TokenRiskError):
             evaluate_token_eligibility(evidence=replace(self.evidence(), source_sha256="bad"),
