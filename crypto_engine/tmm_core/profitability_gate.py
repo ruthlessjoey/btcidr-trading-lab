@@ -119,6 +119,11 @@ def evaluate_profitability_evidence(evidence: Mapping[str, Any]) -> dict[str, An
 
     if "net_cagr" in metrics and metrics["net_cagr"] <= 0:
         reasons.append("net_cagr must be positive")
+    if "net_return" in metrics and metrics["net_return"] <= 0:
+        reasons.append("net_return must be positive")
+    for field in ("net_return", "buy_hold_return", "two_x_cost_net_return"):
+        if field in metrics and metrics[field] <= -1:
+            reasons.append(f"{field} must be greater than -1 (loss cannot exceed 100%)")
     if "net_expectancy" in metrics and metrics["net_expectancy"] <= 0:
         reasons.append("net_expectancy must be positive")
     if "win_rate" in metrics and not 0.55 <= metrics["win_rate"] <= 1:
@@ -163,8 +168,10 @@ def evaluate_profitability_evidence(evidence: Mapping[str, Any]) -> dict[str, An
                 net = _finite_number(fold["net_return"], f"fold {index} net_return")
                 drawdown = _finite_number(fold["max_drawdown"], f"fold {index} max_drawdown")
                 trades = _positive_int(fold["closed_trades"], f"fold {index} closed_trades")
-                if not 0 <= drawdown <= 1:
-                    raise ValueError(f"fold {index} max_drawdown must be between 0 and 1")
+                if net <= -1:
+                    raise ValueError(f"fold {index} net_return must be greater than -1")
+                if not 0 <= drawdown <= 0.25:
+                    raise ValueError(f"fold {index} max_drawdown must be between 0 and 0.25")
                 if trades < 1:
                     raise ValueError(f"fold {index} must contain a closed trade")
                 if net > 0:
