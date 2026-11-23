@@ -18,6 +18,8 @@ def valid_evidence():
         "coverage_complete": True,
         "no_lookahead_verified": True,
         "execution_costs_included": True,
+        "execution_cost_model_verified": True,
+        "benchmark_same_costs_verified": True,
         "two_x_costs_positive": True,
         "all_trials_registered": True,
         "spot_long_only_verified": True,
