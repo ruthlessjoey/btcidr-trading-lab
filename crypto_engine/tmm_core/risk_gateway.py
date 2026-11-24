@@ -74,6 +74,12 @@ class SQLiteRiskStateStore:
     def _validate_storage_path(self, *, create_file: bool) -> None:
         """Reject shared directories, symlinks, foreign ownership and hard links."""
         try:
+            if os.name == "posix":
+                current = Path(self.path.anchor)
+                for component in self.path.parent.parts[1:]:
+                    current = current / component
+                    if current.is_symlink():
+                        raise RiskGatewayError("risk-state parent path must not contain symlinks")
             parent_stat = self.path.parent.lstat()
             if not self.path.parent.is_dir() or self.path.parent.is_symlink():
                 raise RiskGatewayError("risk-state parent must be a real private directory")
