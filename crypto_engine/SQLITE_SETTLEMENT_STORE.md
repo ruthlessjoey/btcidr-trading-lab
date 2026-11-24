@@ -16,7 +16,7 @@ For every market, the sum of SELL fill quantities must equal the sum of nonzero 
 
 ## Storage and limits
 
-- Uses SQLite foreign keys, FULL synchronous mode, DELETE journaling, trusted_schema OFF and bounded busy timeout. Startup runs PRAGMA integrity_check and verifies the local audit chain before accepting the store.
+- Uses SQLite foreign keys, FULL synchronous mode, DELETE journaling, trusted_schema OFF and bounded busy timeout. Startup runs PRAGMA integrity_check and verifies the local audit chain before accepting the store. Existing databases must contain the complete expected table and column layout and a recognized schema-version row; incomplete or altered schemas are rejected rather than silently recreated. Only a genuinely empty database is initialized automatically.
 - Requires an absolute path in an existing private directory; rejects symlinked and hard-linked database files and enforces mode 0600.
 - Database schema version is explicit; unsupported versions fail closed. No automatic migration, backup/restore or external audit anchoring is implemented.
 - Monetary values use canonical Decimal text, not binary floating point.
