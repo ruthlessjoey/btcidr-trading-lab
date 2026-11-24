@@ -159,6 +159,12 @@ class PolicyGatewayTests(unittest.TestCase):
                     exposure_policy_authorizer=ExposureApproval(False),
                 )
 
+    def test_strategy_facade_exposes_no_settlement_or_reset_controls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            gateway, _, _, _, _ = self.make_gateway(directory)
+            self.assertFalse(hasattr(gateway, "settle_sell"))
+            self.assertFalse(hasattr(gateway, "reset"))
+
     def test_exposure_limits_are_not_agent_selectable(self):
         with tempfile.TemporaryDirectory() as directory:
             gateway, _, _, _, approval = self.make_gateway(directory)
