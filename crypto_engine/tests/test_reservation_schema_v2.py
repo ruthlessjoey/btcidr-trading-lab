@@ -73,6 +73,39 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_rejects_generated_parent_column_hidden_from_table_info(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL,
+                shadow TEXT GENERATED ALWAYS AS (base_asset || quote_asset) VIRTUAL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_rejects_parent_collation_change_with_same_columns_and_primary_key(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY COLLATE NOCASE,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_requires_caller_owned_transaction(self):
         db = self.connection()
         with self.assertRaisesRegex(ReservationSchemaError, "transaction"):
