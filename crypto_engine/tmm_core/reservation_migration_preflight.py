@@ -88,7 +88,9 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
             )
             if encoded != event_json:
                 return False, count
-        except (TypeError, ValueError, json.JSONDecodeError):
+        except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
+            # Deeply nested JSON can exceed Python's parser/encoder recursion limit.
+            # Treat it as invalid audit evidence rather than leaking an exception.
             return False, count
         expected = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
         if event_hash != expected:
