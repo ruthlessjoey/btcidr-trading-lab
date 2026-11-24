@@ -301,6 +301,15 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_rejects_unapproved_index_on_parent_settlement_table(self):
+        db = self.connection()
+        db.execute("CREATE INDEX injected_fill_market_idx ON fills(market_id)")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "unapproved reservation schema objects"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")
