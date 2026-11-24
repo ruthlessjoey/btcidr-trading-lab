@@ -105,7 +105,7 @@ def authorize_exposure(*, account_equity: object, holdings: Mapping[str, object]
         if h < 0:
             raise ExposurePolicyError(f"{market_id}: short inventory is prohibited")
         qty[market_id] = h
-        delta[market_id] = min(d, h) if d < 0 else d
+        delta[market_id] = max(d, -h) if d < 0 else d
         clean_marks[market_id] = (mark.base_asset, mark.quote_asset, unit, liquidity)
 
     # Liquidity cap each positive proposal before evaluating portfolio limits.
