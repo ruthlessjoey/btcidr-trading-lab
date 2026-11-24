@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -74,6 +75,41 @@ class RiskGatewayTests(unittest.TestCase):
             store=store, anchor=anchor, reset_authorizer=authorizer,
             session_policy_authorizer=policy_authorizer)
         return gateway, store, anchor, ledger, authorizer, policy_authorizer
+
+    def test_sqlite_store_rejects_shared_parent_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "shared"
+            parent.mkdir()
+            os.chmod(parent, 0o755)
+            try:
+                with self.assertRaises(RiskGatewayError):
+                    SQLiteRiskStateStore(parent / "risk.sqlite3")
+            finally:
+                os.chmod(parent, 0o700)
+
+    def test_sqlite_store_rejects_symlink_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target.db"
+            target.write_bytes(b"not a database")
+            link = Path(directory) / "risk.sqlite3"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are unavailable on this platform")
+            with self.assertRaises(RiskGatewayError):
+                SQLiteRiskStateStore(link)
+
+    def test_sqlite_store_rejects_hard_linked_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "original.db"
+            original.write_bytes(b"not a database")
+            linked = Path(directory) / "risk.sqlite3"
+            try:
+                os.link(original, linked)
+            except (OSError, NotImplementedError):
+                self.skipTest("hard links are unavailable on this platform")
+            with self.assertRaises(RiskGatewayError):
+                SQLiteRiskStateStore(linked)
 
     def test_account_start_requires_owner_approved_non_null_loss_limit(self):
         with tempfile.TemporaryDirectory() as d:
