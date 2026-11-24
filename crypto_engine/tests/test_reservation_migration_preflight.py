@@ -147,6 +147,16 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
+    def test_deeply_nested_audit_json_is_blocked_without_recursion_error(self):
+        payload = "[" * 10000 + "0" + "]" * 10000
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,?,?,?)",
+            (payload, "0" * 64, "f" * 64),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
     def test_changed_column_contract_is_blocked(self):
         self.db.execute("ALTER TABLE outbox ADD COLUMN unexpected TEXT")
         result = self.inspect()
