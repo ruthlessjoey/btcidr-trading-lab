@@ -6,6 +6,7 @@ composition-root code and must never be exposed to strategy agents.
 """
 from __future__ import annotations
 
+import hashlib
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from decimal import Decimal, InvalidOperation, ROUND_DOWN, ROUND_UP
 from typing import Protocol
 
 from .offline_portfolio import (
-    PortfolioLedgerError, SyntheticFill, SyntheticPortfolioLedger,
+    D, SyntheticFill, SyntheticPortfolioLedger,
 )
 
 
@@ -103,17 +104,47 @@ class OfflineSettlementController:
         self._ledger = ledger
         self._rules = dict(rules)
         self._lock = threading.RLock()
+        # Process-local replay fence; not durable across restarts.
+        self._seen_batches: set[str] = set()
 
-    def process(self, *, proposals: Mapping[str, object],
+    def process(self, *, batch_id: str, proposals: Mapping[str, object],
                 bars: Mapping[str, SyntheticBar], timestamp: int) -> tuple[ExecutionResult, ...]:
-        """Authorize once, execute against supplied synthetic bars, then settle sells."""
+        """Process one trusted batch once within this process lifetime."""
+        if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
+            raise ValueError("batch_id must be a non-empty trusted identifier up to 256 characters")
         if not isinstance(timestamp, int) or isinstance(timestamp, bool) or timestamp < 0:
             raise ValueError("timestamp must be a nonnegative epoch second")
         if not isinstance(proposals, Mapping) or not proposals:
             raise ValueError("non-empty proposals are required")
+        if not all(isinstance(m, str) and m.strip() for m in proposals):
+            raise ValueError("proposal market IDs must be non-empty strings")
         if not isinstance(bars, Mapping) or set(bars) != set(proposals):
             raise ValueError("bars must exactly cover proposed markets")
+
+        # Validate caller-controlled bars and rules before the stateful risk call.
+        clean = {}
+        for market_id in sorted(proposals):
+            if market_id not in self._rules:
+                raise ValueError(f"execution rules missing for {market_id}")
+            requested_delta = _d(proposals[market_id], "proposal_delta")
+            bar = bars[market_id]
+            if not isinstance(bar, SyntheticBar) or bar.market_id != market_id or bar.timestamp != timestamp:
+                raise ValueError("bar identity or timestamp mismatch")
+            o, h, l, c, volume = (_d(bar.open, "open"), _d(bar.high, "high"),
+                                  _d(bar.low, "low"), _d(bar.close, "close"),
+                                  _d(bar.volume, "volume"))
+            if min(o, h, l, c) <= 0 or volume < 0 or h < max(o, c, l) or l > min(o, c, h):
+                raise ValueError("invalid OHLCV bar")
+            self._rules[market_id].validated()
+            clean[market_id] = (requested_delta, o, volume)
+
         with self._lock:
+            if batch_id in self._seen_batches:
+                raise ValueError("duplicate or previously attempted batch_id rejected")
+            # Burn the ID before stateful calls. A failed/partial batch requires
+            # reconciliation and cannot be retried under the same process.
+            self._seen_batches.add(batch_id)
+            batch_digest = hashlib.sha256(batch_id.encode("utf-8")).hexdigest()
             authorization = self._proposal_client.propose(proposals=proposals, timestamp=timestamp)
             if not isinstance(authorization, Mapping):
                 raise ValueError("risk gateway returned malformed authorization")
@@ -121,27 +152,23 @@ class OfflineSettlementController:
             if not isinstance(permitted, Mapping) or set(permitted) != set(proposals):
                 raise ValueError("risk gateway authorization does not exactly cover proposals")
             staged = []
+            total_buy_debit = D("0")
+            holdings = self._ledger.snapshot_holdings(self._ledger.account_id)
             for market_id in sorted(proposals):
-                if market_id not in self._rules:
-                    raise ValueError(f"execution rules missing for {market_id}")
-                bar = bars[market_id]
-                if not isinstance(bar, SyntheticBar) or bar.market_id != market_id or bar.timestamp != timestamp:
-                    raise ValueError("bar identity or timestamp mismatch")
-                o, h, l, c, volume = (_d(bar.open, "open"), _d(bar.high, "high"),
-                                      _d(bar.low, "low"), _d(bar.close, "close"),
-                                      _d(bar.volume, "volume"))
-                if min(o, h, l, c) <= 0 or volume < 0 or h < max(o, c, l) or l > min(o, c, h):
-                    raise ValueError("invalid OHLCV bar")
+                requested_delta, o, volume = clean[market_id]
                 step, tick, fee_bps, spread_bps, slip_bps, participation = self._rules[market_id].validated()
                 delta = _d(permitted[market_id], "permitted_delta")
+                if delta != 0 and (requested_delta == 0 or (delta > 0) != (requested_delta > 0)
+                                   or abs(delta) > abs(requested_delta)):
+                    raise ValueError("authorization must preserve direction and not exceed requested size")
                 if delta == 0:
                     continue
                 side = "BUY" if delta > 0 else "SELL"
-                requested = abs(delta)
+                requested, authorized = abs(requested_delta), abs(delta)
                 capacity = _floor_step(volume * participation, step)
-                qty = min(_floor_step(requested, step), capacity)
+                qty = min(_floor_step(authorized, step), capacity)
                 if qty <= 0:
-                    staged.append((market_id, side, requested, D("0"), None, D("0"), step))
+                    staged.append((market_id, side, requested, authorized, D("0"), None, D("0")))
                     continue
                 adverse = (spread_bps + slip_bps) / D("10000")
                 raw_price = o * (D("1") + adverse if side == "BUY" else D("1") - adverse)
@@ -149,13 +176,20 @@ class OfflineSettlementController:
                 if price <= 0:
                     raise ValueError("execution price rounded to nonpositive value")
                 fee = qty * price * fee_bps / D("10000")
-                staged.append((market_id, side, requested, qty, price, fee, step))
+                if side == "BUY":
+                    total_buy_debit += qty * price + fee
+                elif qty > _d(holdings[market_id], "held_inventory"):
+                    raise ValueError("synthetic SELL fill exceeds pre-batch inventory")
+                staged.append((market_id, side, requested, authorized, qty, price, fee))
+
+            if total_buy_debit > _d(self._ledger.snapshot_cash(self._ledger.account_id), "available_cash"):
+                raise ValueError("synthetic BUY batch exceeds available quote cash")
 
             results = []
-            for market_id, side, requested, qty, price, fee, _ in staged:
+            for market_id, side, requested, authorized, qty, price, fee in staged:
                 if qty > 0 and price is not None:
                     fill = SyntheticFill(
-                        fill_id=f"sim:{timestamp}:{market_id}:{side}",
+                        fill_id=f"sim:{batch_digest}:{market_id}:{side}",
                         market_id=market_id, side=side, quantity=qty,
                         price=price, fee_quote=fee, timestamp=timestamp,
                     )
@@ -164,11 +198,11 @@ class OfflineSettlementController:
                     # Settlement releases the entire reservation, including unfilled
                     # quantity caused by bar-volume limits or zero executable size.
                     self._settlement.settle_sell(
-                        market_id=market_id, authorized_quantity=requested,
+                        market_id=market_id, authorized_quantity=authorized,
                         filled_quantity=qty, timestamp=timestamp,
                     )
                 results.append(ExecutionResult(
-                    market_id, side, requested, requested, qty, price, fee,
+                    market_id, side, requested, authorized, qty, price, fee,
                     "FILLED" if qty == requested else ("PARTIAL" if qty > 0 else "UNFILLED"),
                 ))
             return tuple(results)
