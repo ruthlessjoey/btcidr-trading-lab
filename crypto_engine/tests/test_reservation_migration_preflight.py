@@ -182,6 +182,20 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("indexes or triggers" in item for item in result.blockers))
 
+
+    def test_malformed_foreign_key_target_is_reported_without_sql_crash(self):
+        self.db.execute("DROP TABLE holdings")
+        self.db.execute(
+            "CREATE TABLE holdings(market_id TEXT PRIMARY KEY "
+            "REFERENCES missing_markets(market_id), quantity TEXT NOT NULL)"
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any(
+            "foreign_key_check could not be completed" in item
+            for item in result.blockers
+        ))
+
     def test_preflight_does_not_modify_database(self):
         before = self.db.execute(
             "SELECT name,sql FROM sqlite_master ORDER BY name"

@@ -195,13 +195,24 @@ def inspect_v1_migration_eligibility(
         if not audit_ok:
             blockers.append("audit chain verification failed")
 
-    integrity = db.execute("PRAGMA integrity_check").fetchone()
-    if integrity != ("ok",):
-        blockers.append("SQLite integrity_check failed")
+    # Malformed database metadata can make SQLite's PRAGMA checks raise
+    # DatabaseError (for example, a foreign key referencing a missing table).
+    # Treat inability to complete either check as a deterministic blocker.
+    try:
+        integrity = db.execute("PRAGMA integrity_check").fetchone()
+    except sqlite3.DatabaseError:
+        blockers.append("SQLite integrity_check could not be completed")
+    else:
+        if integrity != ("ok",):
+            blockers.append("SQLite integrity_check failed")
 
-    fk_errors = db.execute("PRAGMA foreign_key_check").fetchall()
-    if fk_errors:
-        blockers.append("SQLite foreign_key_check failed")
+    try:
+        fk_errors = db.execute("PRAGMA foreign_key_check").fetchall()
+    except sqlite3.DatabaseError:
+        blockers.append("SQLite foreign_key_check could not be completed")
+    else:
+        if fk_errors:
+            blockers.append("SQLite foreign_key_check failed")
 
     return MigrationPreflight(
         eligible=not blockers,
