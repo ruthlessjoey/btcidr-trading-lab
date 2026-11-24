@@ -147,19 +147,17 @@ def validate_sell_allocations(
                 "reservation_version": version,
             })
 
-        with localcontext() as decimal_context:
-        decimal_context.prec = 80
         for fill_id, fill in fill_by_id.items():
-                allocated = allocated_by_fill.get(fill_id, Decimal("0"))
-                if fill["side"] == "SELL" and allocated != fill["quantity"]:
-                    raise ReservationAllocationError(
-                        "SELL allocations must equal each fill quantity exactly"
-                    )
-                if fill["side"] == "BUY" and allocated != 0:
-                    raise ReservationAllocationError("BUY fills cannot have allocations")
+            allocated = allocated_by_fill.get(fill_id, Decimal("0"))
+            if fill["side"] == "SELL" and allocated != fill["quantity"]:
+                raise ReservationAllocationError(
+                    "SELL allocations must equal each fill quantity exactly"
+                )
+            if fill["side"] == "BUY" and allocated != 0:
+                raise ReservationAllocationError("BUY fills cannot have allocations")
 
-            for reservation_id, allocated in allocated_by_reservation.items():
-                if allocated > reservation_by_id[reservation_id]["remaining"]:
-                    raise ReservationAllocationError("reservation over-consumption rejected")
+        for reservation_id, allocated in allocated_by_reservation.items():
+            if allocated > reservation_by_id[reservation_id]["remaining"]:
+                raise ReservationAllocationError("reservation over-consumption rejected")
 
     return sorted(normalized, key=lambda row: str(row["allocation_id"]))
