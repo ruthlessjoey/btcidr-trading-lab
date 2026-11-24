@@ -202,7 +202,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             CREATE TEMP TRIGGER injected_temp_fill_reservation_trigger
             AFTER INSERT ON main.fills
             BEGIN
-                UPDATE main.reservations SET version=version+1
+                UPDATE reservations SET version=version+1
                 WHERE reservation_id='r1';
             END
         """)
