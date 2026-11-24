@@ -1,0 +1,142 @@
+import sqlite3
+import unittest
+
+from tmm_core.reservation_schema_v2 import (
+    ReservationSchemaError,
+    ensure_reservation_schema_v2,
+)
+
+
+class ReservationSchemaV2Tests(unittest.TestCase):
+    def connection(self):
+        db = sqlite3.connect(":memory:")
+        db.execute("PRAGMA foreign_keys=ON")
+        db.executescript("""
+            CREATE TABLE markets(market_id TEXT PRIMARY KEY);
+            CREATE TABLE batches(batch_id TEXT PRIMARY KEY);
+            CREATE TABLE fills(fill_id TEXT PRIMARY KEY);
+        """)
+        return db
+
+    def test_requires_caller_owned_transaction(self):
+        db = self.connection()
+        with self.assertRaisesRegex(ReservationSchemaError, "transaction"):
+            ensure_reservation_schema_v2(db)
+        db.close()
+
+    def test_requires_parent_settlement_tables(self):
+        db = sqlite3.connect(":memory:")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_creates_all_three_objects_in_caller_transaction(self):
+        db = self.connection()
+        db.execute("BEGIN IMMEDIATE")
+        ensure_reservation_schema_v2(db)
+        names = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        self.assertTrue({
+            "reservations", "reservation_allocations", "reservation_outbox"
+        }.issubset(names))
+        self.assertTrue(db.in_transaction)
+        db.commit()
+        db.close()
+
+    def test_is_idempotent_for_exact_schema(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.close()
+
+    def test_rejects_partial_schema_without_completing_it(self):
+        db = self.connection()
+        db.execute("""
+            CREATE TABLE reservations(
+                reservation_id TEXT PRIMARY KEY, account_id TEXT NOT NULL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "partial"):
+            ensure_reservation_schema_v2(db)
+        self.assertIsNone(db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='reservation_allocations'"
+        ).fetchone())
+        db.rollback()
+        db.close()
+
+    def test_rejects_altered_constraint_with_same_columns(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("PRAGMA writable_schema=ON")
+        db.execute(
+            "UPDATE sqlite_master SET sql=replace(sql, "
+            "'CHECK(status IN (' || char(39) || 'ACTIVE' || char(39), "
+            "'CHECK(status IN (' || char(39) || 'INVALID' || char(39)) "
+            "WHERE type='table' AND name='reservations'"
+        )
+        db.execute("PRAGMA writable_schema=OFF")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "definition mismatch"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_rejects_unapproved_trigger(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("""
+            CREATE TRIGGER injected_reservation_trigger
+            AFTER INSERT ON reservations
+            BEGIN SELECT 1; END
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "unapproved"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_foreign_keys_reject_unknown_parent_rows(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute("""
+                INSERT INTO reservations VALUES(
+                    'r1','acct','UNKNOWN','BTC','USDT','1','0',1,1,'ACTIVE'
+                )
+            """)
+        db.close()
+
+    def test_schema_creation_rolls_back_with_callers_transaction(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.rollback()
+        names = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        self.assertNotIn("reservations", names)
+        self.assertNotIn("reservation_allocations", names)
+        self.assertNotIn("reservation_outbox", names)
+        db.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
