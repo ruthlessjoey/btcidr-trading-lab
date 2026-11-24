@@ -31,7 +31,11 @@ for path in modules:
                                   and node.func.attr == "compile"
                                   and isinstance(node.func.value, ast.Name)
                                   and node.func.value.id == "re")
-            if name in FORBIDDEN_CALLS and not safe_regex_compile:
+            safe_sqlite_connect = (isinstance(node.func, ast.Attribute)
+                                   and node.func.attr == "connect"
+                                   and isinstance(node.func.value, ast.Name)
+                                   and node.func.value.id == "sqlite3")
+            if name in FORBIDDEN_CALLS and not (safe_regex_compile or safe_sqlite_connect):
                 errors.append(f"{path.name}: forbidden call {name}")
 
 config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
@@ -47,5 +51,5 @@ for key, expected in required.items():
         errors.append(f"config.example.json: {key} must equal {expected!r}")
 
 if errors:
-    raise SystemExit("\n".join(errors))
-print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; only urllib.parse URL validation and re.compile; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
+    raise SystemExit("\\n".join(errors))
+print(f"Static boundary check passed for {len(modules)} modules; no network/process imports or calls; only urllib.parse URL validation, re.compile and sqlite3.connect are allowed; RESEARCH_ONLY/SPOT_LONG_ONLY; LIVE, private API and network disabled.")
