@@ -382,6 +382,30 @@ class SQLiteSettlementStore:
         return True
 
     def _initialize(self, db: sqlite3.Connection, opening_cash: str) -> None:
+        expected_columns = {
+            "metadata": ("key", "value"),
+            "account": ("singleton", "account_id", "currency", "cash"),
+            "markets": ("market_id", "base_asset", "quote_asset"),
+            "holdings": ("market_id", "quantity"),
+            "batches": ("batch_id", "request_hash", "status", "created_at", "result_json"),
+            "fills": ("fill_id", "batch_id", "market_id", "side", "quantity", "price", "fee_quote", "timestamp"),
+            "audit": ("seq", "event_json", "previous_hash", "event_hash"),
+            "outbox": ("idempotency_key", "batch_id", "market_id", "authorized_quantity", "filled_quantity", "status", "receiver_receipt"),
+        }
+        existing_tables = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        is_new_database = not existing_tables
+        expected_tables = set(expected_columns)
+        if existing_tables and existing_tables != expected_tables:
+            missing = sorted(expected_tables - existing_tables)
+            unexpected = sorted(existing_tables - expected_tables)
+            raise SettlementStoreError(
+                f"database schema mismatch; missing={missing}, unexpected={unexpected}"
+            )
+
         db.executescript("""
         CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS account(
@@ -411,8 +435,17 @@ class SQLiteSettlementStore:
             status TEXT NOT NULL CHECK(status IN ('PENDING','ACKNOWLEDGED')),
             receiver_receipt TEXT);
         """)
+        for table, columns in expected_columns.items():
+            actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
+            if actual != columns:
+                raise SettlementStoreError(
+                    f"database schema mismatch for {table}: expected {columns}, found {actual}"
+                )
+
         version = db.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
         if version is None:
+            if not is_new_database:
+                raise SettlementStoreError("existing database is missing schema version; recovery required")
             db.execute("INSERT INTO metadata VALUES('schema_version',?)", (str(self.SCHEMA_VERSION),))
             db.execute("INSERT INTO account VALUES(1,?,?,?)",
                        (self.account_id, self.currency, opening_cash))
