@@ -81,9 +81,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.commit()
         db.execute("PRAGMA writable_schema=ON")
         db.execute(
-            "UPDATE sqlite_master SET sql=replace(sql, "
-            "'CHECK(status IN (' || char(39) || 'ACTIVE' || char(39), "
-            "'CHECK(status IN (' || char(39) || 'INVALID' || char(39)) "
+            "UPDATE sqlite_master SET sql=replace(sql, 'ACTIVE', 'INVALID') "
             "WHERE type='table' AND name='reservations'"
         )
         db.execute("PRAGMA writable_schema=OFF")
