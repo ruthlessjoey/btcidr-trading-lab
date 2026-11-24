@@ -83,6 +83,8 @@ class SQLiteSettlementStore:
             ).fetchone()
             if row != (account_id, currency):
                 raise SettlementStoreError("database account identity mismatch")
+            if db.execute("PRAGMA integrity_check").fetchone() != ("ok",):
+                raise SettlementStoreError("SQLite integrity check failed; store locked")
             if not self._verify_chain(db):
                 raise SettlementStoreError("audit chain verification failed; store locked")
 
@@ -102,7 +104,7 @@ class SQLiteSettlementStore:
                        (market_id, base_asset, quote_asset))
             db.commit()
 
-    def apply_batch(self, *, batch_id: str, request_hash: str,
+    def apply_batch(self, *, batch_id: str,
                     fills: Sequence[Mapping[str, object]],
                     sell_settlements: Sequence[Mapping[str, object]] = (),
                     timestamp: int) -> dict[str, Any]:
@@ -114,12 +116,6 @@ class SQLiteSettlementStore:
         """
         if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
             raise SettlementStoreError("batch_id is required")
-        if not isinstance(request_hash, str) or len(request_hash) != 64:
-            raise SettlementStoreError("request_hash must be a SHA-256 hex digest")
-        try:
-            int(request_hash, 16)
-        except ValueError as exc:
-            raise SettlementStoreError("request_hash must be hexadecimal") from exc
         if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp < 0:
             raise SettlementStoreError("timestamp must be a nonnegative integer")
         if not isinstance(fills, Sequence) or isinstance(fills, (str, bytes)):
@@ -173,6 +169,26 @@ class SQLiteSettlementStore:
                 "filled_quantity": format(filled, "f"),
             })
 
+        request_envelope = {
+            "schema": 1, "account_id": self.account_id, "currency": self.currency,
+            "batch_id": batch_id, "timestamp": timestamp,
+            "fills": normalized_fills, "sell_settlements": normalized_outbox,
+        }
+        request_json = json.dumps(request_envelope, sort_keys=True, separators=(",", ":"),
+                                  ensure_ascii=False, allow_nan=False)
+        request_hash = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
+        sell_totals: dict[str, Decimal] = {}
+        outbox_totals: dict[str, Decimal] = {}
+        for fill in normalized_fills:
+            if fill["side"] == "SELL":
+                market_id = fill["market_id"]
+                sell_totals[market_id] = sell_totals.get(market_id, Decimal("0")) + _decimal(fill["quantity"], "SELL quantity")
+        for item in normalized_outbox:
+            market_id = item["market_id"]
+            outbox_totals[market_id] = outbox_totals.get(market_id, Decimal("0")) + _decimal(item["filled_quantity"], "outbox filled_quantity")
+        nonzero_outbox = {key: value for key, value in outbox_totals.items() if value != 0}
+        if sell_totals != nonzero_outbox:
+            raise SettlementStoreError("SELL outbox filled quantities must equal SELL fills per market")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             existing = db.execute(
@@ -185,8 +201,10 @@ class SQLiteSettlementStore:
                     db.rollback()
                     raise SettlementStoreError("batch_id reused with different request hash")
                 if status in ("COMMITTED_PENDING_OUTBOX", "COMPLETE"):
+                    result = json.loads(result_json)
+                    result["status"] = status
                     db.commit()
-                    return json.loads(result_json)
+                    return result
                 db.rollback()
                 raise SettlementStoreError("batch unresolved; trusted reconciliation required")
 
@@ -257,12 +275,7 @@ class SQLiteSettlementStore:
                     "batch_id": batch_id, **fill, "cash_after": format(cash_after, "f"),
                     "holding_after": format(holding_after, "f"), "timestamp": timestamp,
                 }
-                head = _event_hash(head, event)
-                db.execute("INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
-                           (json.dumps(event, sort_keys=True, separators=(",", ":")),
-                            "0" * 64 if db.execute("SELECT COUNT(*) FROM audit").fetchone()[0] == 0
-                            else db.execute("SELECT event_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()[0],
-                            head))
+                head = self._append_audit(db, event)
             for item in normalized_outbox:
                 db.execute(
                     "INSERT INTO outbox(idempotency_key,batch_id,market_id,authorized_quantity,"
@@ -320,9 +333,21 @@ class SQLiteSettlementStore:
                 "SELECT COUNT(*) FROM outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
                 (batch_id,),
             ).fetchone()[0]
+            receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
+            self._append_audit(db, {
+                "kind": "OUTBOX_ACKNOWLEDGED", "account_id": self.account_id,
+                "batch_id": batch_id, "idempotency_key": idempotency_key,
+                "receipt_sha256": receipt_digest,
+            })
             if remaining == 0:
                 db.execute("UPDATE batches SET status='COMPLETE' WHERE batch_id=? "
                            "AND status='COMMITTED_PENDING_OUTBOX'", (batch_id,))
+                result_row = db.execute("SELECT result_json FROM batches WHERE batch_id=?",
+                                        (batch_id,)).fetchone()
+                result = json.loads(result_row[0])
+                result["status"] = "COMPLETE"
+                db.execute("UPDATE batches SET result_json=? WHERE batch_id=?",
+                           (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id))
             db.commit()
 
     def snapshot(self) -> dict[str, Any]:
@@ -331,6 +356,16 @@ class SQLiteSettlementStore:
             holdings = dict(db.execute("SELECT market_id,quantity FROM holdings"))
             return {"account_id": self.account_id, "currency": self.currency,
                     "cash": account[0], "holdings": holdings}
+
+    def _append_audit(self, db: sqlite3.Connection, event: Mapping[str, Any]) -> str:
+        row = db.execute("SELECT event_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
+        previous = row[0] if row else "0" * 64
+        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False, allow_nan=False)
+        digest = _event_hash(previous, event)
+        db.execute("INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+                   (encoded, previous, digest))
+        return digest
 
     def verify_audit_chain(self) -> bool:
         with self._connect() as db:
