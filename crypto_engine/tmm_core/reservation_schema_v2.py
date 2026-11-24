@@ -161,7 +161,8 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     unexpected = db.execute(
         "SELECT type,name FROM sqlite_master "
         "WHERE (type='index' AND name NOT LIKE 'sqlite_autoindex_%' "
-        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox')) "
+        "AND lower(tbl_name) IN "
+        "('markets','batches','fills','reservations','reservation_allocations','reservation_outbox')) "
         "OR (type='trigger' AND lower(tbl_name) IN "
         "('markets','batches','fills','reservations','reservation_allocations','reservation_outbox')) "
         "ORDER BY type,name"
