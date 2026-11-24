@@ -147,11 +147,11 @@ def inspect_v1_migration_eligibility(
     if tables == _EXPECTED_TABLES:
         unexpected_objects = db.execute(
             "SELECT type,name FROM main.sqlite_master "
-            "WHERE type IN ('index','trigger') "
+            "WHERE type IN ('index','trigger','view') "
             "AND name NOT LIKE 'sqlite_autoindex_%' ORDER BY type,name"
         ).fetchall()
         if unexpected_objects:
-            blockers.append("unapproved indexes or triggers are present")
+            blockers.append("unapproved indexes, triggers, or views are present")
 
     version = None
     sell_count = outbox_count = unresolved_count = audit_count = 0
