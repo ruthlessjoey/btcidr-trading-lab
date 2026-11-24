@@ -49,3 +49,9 @@ This creates a local virtual environment, runs static checks and the isolated sy
 ## Not production-ready
 
 No authentic current multi-market datasets, independently verified contract/ownership/LP evidence, DEX transaction/reorg/gas model, order-book queue or market-impact model, robust covariance shrinkage or regime-aware stress analysis, fee-token accounting, independent external security review, or profitability evidence are included. The token gate only evaluates supplied evidence and cannot authenticate its source. The approved BTCIDR feed was previously observed to be stale; no new request was made in this package. This core is not approved for paper execution or exchange connection.
+
+## Deterministic exposure policy (PR #106)
+
+`tmm_core.exposure_policy` provides an offline, fail-closed pure policy function for long-only spot proposals. It requires trusted equity, holdings, fresh per-market valuation marks, and a precomputed executable buy-liquidity capacity. It caps buys against shared gross exposure, per-market exposure, aggregate base-asset concentration, aggregate quote-asset concentration, and per-market liquidity capacity. Sells are capped to held inventory. Invalid or stale inputs reject the request.
+
+Important: this module is currently a tested policy primitive, not yet wired into `RiskGateway` or a production ledger/agent runtime. Do not treat it as an active account control or advance PAPER. The next integration step must make trusted exposure marks and owner-approved policy mandatory at the gateway boundary, then test restart, concurrency, failure and agent-isolation paths.
