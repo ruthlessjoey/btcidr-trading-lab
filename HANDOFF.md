@@ -96,3 +96,10 @@ PR #108 adds `tmm_core.offline_portfolio.SyntheticPortfolioLedger` and focused t
 ## Follow-on milestone — broker-free settlement controller (24 Nov 2026)
 
 PR #109 adds `tmm_core.offline_settlement.OfflineSettlementController`, a trusted offline composition-root component. It requests authorization from an injected proposal-only risk client, requires exact market coverage, validates timestamp-matched synthetic OHLCV bars, applies explicit per-market quantity steps, price ticks, fees, adverse half-spread/slippage and bar-volume participation limits, applies synthetic fills to the in-memory portfolio ledger, then settles SELL reservations using authorized versus actually filled quantities, including partial and zero fills. This is a deterministic bar-level approximation, not a production broker or order-book model. It has no network, provider, exchange, account, wallet, order, PAPER or LIVE capability. The controller must remain outside strategy-agent processes. Exact-head full-suite tests and independent review remain required.
+
+
+## Follow-on hardening — settlement batch replay guard (24 Nov 2026)
+
+PR #110 adds a trusted `batch_id` to the offline settlement controller. Duplicate or previously attempted batch IDs are rejected before a second proposal-gateway call; fill IDs are derived from the batch ID. Bars and execution rules are prevalidated before the stateful risk call. Aggregate BUY cash and SELL inventory are preflighted before ledger mutation. A concrete undefined Decimal alias was corrected by importing the ledger's `D` alias.
+
+Replay protection is in-memory only and does not survive restart. Failed attempts burn their batch IDs; they require trusted reconciliation before a new batch. Ledger mutation and the SELL settlement callback are not one durable transaction: callback/process failure can leave partial state. This PR does not claim atomic batch execution or production-grade durable idempotency. Focused tests and exact-head full-suite/CI/independent review remain pending.
