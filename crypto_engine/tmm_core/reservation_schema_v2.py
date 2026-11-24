@@ -98,6 +98,23 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             f"base settlement schema missing: {sorted(missing_parents)}"
         )
 
+    parent_columns = {
+        "markets": ("market_id", "base_asset", "quote_asset"),
+        "batches": ("batch_id", "request_hash", "status", "created_at", "result_json"),
+        "fills": (
+            "fill_id", "batch_id", "market_id", "side", "quantity",
+            "price", "fee_quote", "timestamp",
+        ),
+    }
+    for table, expected_columns in parent_columns.items():
+        info = list(db.execute(f"PRAGMA main.table_info({table})"))
+        actual_columns = tuple(row[1] for row in info)
+        primary_key = tuple((row[1], row[5]) for row in info if row[5])
+        if actual_columns != expected_columns or primary_key != ((expected_columns[0], 1),):
+            raise ReservationSchemaError(
+                f"base settlement schema mismatch for {table}"
+            )
+
     if db.execute("PRAGMA foreign_keys").fetchone() != (1,):
         raise ReservationSchemaError(
             "SQLite foreign key enforcement must be enabled"
