@@ -442,6 +442,40 @@ class SQLiteSettlementStore:
                     f"database schema mismatch for {table}: expected {columns}, found {actual}"
                 )
 
+        # Column names alone do not protect CHECK, PRIMARY KEY, UNIQUE and
+        # FOREIGN KEY constraints. Compare SQLite's stored table definitions
+        # against the schema-v1 contract and reject unapproved executable schema
+        # objects (indexes/triggers) before trusting persisted accounting state.
+        expected_sql = {
+            "metadata": "CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+            "account": "CREATE TABLE account(singleton INTEGER PRIMARY KEY CHECK(singleton=1), account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL)",
+            "markets": "CREATE TABLE markets(market_id TEXT PRIMARY KEY, base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL)",
+            "holdings": "CREATE TABLE holdings(market_id TEXT PRIMARY KEY REFERENCES markets(market_id), quantity TEXT NOT NULL)",
+            "batches": "CREATE TABLE batches(batch_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')), created_at INTEGER NOT NULL, result_json TEXT)",
+            "fills": "CREATE TABLE fills(fill_id TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id), market_id TEXT NOT NULL REFERENCES markets(market_id), side TEXT NOT NULL CHECK(side IN ('BUY','SELL')), quantity TEXT NOT NULL, price TEXT NOT NULL, fee_quote TEXT NOT NULL, timestamp INTEGER NOT NULL)",
+            "audit": "CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL)",
+            "outbox": "CREATE TABLE outbox(idempotency_key TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id), market_id TEXT NOT NULL REFERENCES markets(market_id), authorized_quantity TEXT NOT NULL, filled_quantity TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PENDING','ACKNOWLEDGED')), receiver_receipt TEXT)",
+        }
+        normalize_sql = lambda value: "".join(value.split()).casefold()
+        for table, expected in expected_sql.items():
+            row = db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            if row is None or normalize_sql(row[0]) != normalize_sql(expected):
+                raise SettlementStoreError(
+                    f"database schema definition mismatch for {table}; recovery required"
+                )
+
+        unexpected_objects = db.execute(
+            "SELECT type,name FROM sqlite_master "
+            "WHERE type IN ('index','trigger') AND name NOT LIKE 'sqlite_autoindex_%' "
+            "ORDER BY type,name"
+        ).fetchall()
+        if unexpected_objects:
+            raise SettlementStoreError(
+                f"database contains unapproved schema objects: {unexpected_objects}; recovery required"
+            )
+
         version = db.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
         if version is None:
             if not is_new_database:
