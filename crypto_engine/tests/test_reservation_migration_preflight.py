@@ -31,6 +31,7 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.db.close()
 
     def inspect(self):
+        self.db.commit()
         self.db.execute("PRAGMA query_only=ON")
         self.db.execute("BEGIN")
         try:
