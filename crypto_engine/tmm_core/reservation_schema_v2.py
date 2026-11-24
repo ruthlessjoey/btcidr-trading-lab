@@ -103,6 +103,11 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             "SQLite foreign key enforcement must be enabled"
         )
 
+    if db.execute("PRAGMA ignore_check_constraints").fetchone() != (0,):
+        raise ReservationSchemaError(
+            "SQLite CHECK constraint enforcement must be enabled"
+        )
+
     targets = set(_SCHEMA)
     existing_targets = targets & present
     if existing_targets and existing_targets != targets:
