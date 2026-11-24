@@ -62,3 +62,19 @@ This test evidence applies to the exact SHA above. After this handoff document c
 8. Profitability is not established. Any profitability work must use preregistration, realistic costs/impact, point-in-time data, untouched holdouts, multiple-testing control and independent reproduction. No win-rate or profit claim without this evidence.
 
 This branch is an engineering source handoff, NOT an install-ready trading system, NOT permission to advance PAPER, and NOT evidence of profitability. Overall project completion remains UNRATED.
+
+
+## PR #107 — trusted exposure enforcement integration (24 Nov 2026)
+
+- PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/107
+- Branch: `security/exposure-gateway-enforcement-2026-11-24`
+- Current source head at handoff update: `31946a535af24d0013bbff84b8b941d253e95772`
+- Draft/open/unmerged; stacked on PR #106. Do not merge without separate approval.
+
+Added `crypto_engine/tmm_core/policy_gateway.py` with `PolicyEnforcedRiskGateway`. It requires exact-True owner authorization of the exposure policy at create and restore, reads the complete authoritative holdings/equity, requests marks for the full holdings market set, rejects incomplete mark coverage, applies the exposure/liquidity policy, then passes only permitted proposal deltas to the existing session-loss gateway. The existing gateway still independently re-reads holdings/equity and persists/anchors its session-risk journal.
+
+Added `crypto_engine/tests/test_policy_gateway.py` covering per-market cap enforcement, stale and missing marks, agent override attempts, unknown markets, owner-policy approval, and agent-inaccessible policy parameters. Added `crypto_engine/POLICY_GATEWAY.md` documenting interfaces, flow and limitations.
+
+**Verification is pending.** No exact-head tests have been run, no GitHub Actions runs/checks exist for this head, and no independent review is claimed. Do not treat the wrapper as production-ready.
+
+Important security limitation: Python private attributes are not an isolation boundary. The raw gateway and trusted dependencies must remain inside a trusted composition root; strategy agents require separate process/container isolation and capability-limited IPC. Production ledger, marks/liquidity, owner policy/reset and independent external audit-anchor services remain unimplemented. The wrapper does not create a broker or paper runner. PAPER remains on hold and LIVE remains disabled.
