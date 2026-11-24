@@ -52,7 +52,7 @@ This test evidence applies to the exact SHA above. After this handoff document c
 
 ## Critical remaining blockers
 
-1. PR #106 policy primitive is NOT wired into `RiskGateway`. Trusted exposure marks and owner-approved exposure policy must become mandatory gateway inputs, inaccessible to strategy agents.
+1. PR #107 adds a proposal-only `PolicyEnforcedRiskGateway` wrapper around `RiskGateway`; production composition must expose only this facade to strategy agents. The raw gateway still exists as a lower-level class and the isolated agent runtime/composition root is not yet implemented.
 2. Production authoritative multi-market ledger/equity/holdings implementation is absent; PR #105 currently uses injected protocols and test doubles.
 3. Production owner-policy and reset authorization services are absent.
 4. Production external audit-anchor service is absent; the interface is injected.
@@ -68,13 +68,16 @@ This branch is an engineering source handoff, NOT an install-ready trading syste
 
 - PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/107
 - Branch: `security/exposure-gateway-enforcement-2026-11-24`
-- Current source head at handoff update: `31946a535af24d0013bbff84b8b941d253e95772`
+- Current source head before this handoff refresh: `fd3c7f4558758611039f464b6799916403277d32`
 - Draft/open/unmerged; stacked on PR #106. Do not merge without separate approval.
 
 Added `crypto_engine/tmm_core/policy_gateway.py` with `PolicyEnforcedRiskGateway`. It requires exact-True owner authorization of the exposure policy at create and restore, reads the complete authoritative holdings/equity, requests marks for the full holdings market set, rejects incomplete mark coverage, applies the exposure/liquidity policy, then passes only permitted proposal deltas to the existing session-loss gateway. The existing gateway still independently re-reads holdings/equity and persists/anchors its session-risk journal.
 
-Added `crypto_engine/tests/test_policy_gateway.py` covering per-market cap enforcement, stale and missing marks, agent override attempts, unknown markets, owner-policy approval, and agent-inaccessible policy parameters. Added `crypto_engine/POLICY_GATEWAY.md` documenting interfaces, flow and limitations.
+Added `crypto_engine/tests/test_policy_gateway.py` covering per-market cap enforcement, stale and missing marks, agent override attempts, unknown markets, owner-policy approval, agent-inaccessible policy parameters, and the absence of public settlement/reset methods on the strategy facade. The facade exposes only `propose` and `is_halted`; settlement and reset remain reserved for trusted future services. Added `crypto_engine/POLICY_GATEWAY.md` documenting interfaces, flow and limitations.
 
-**Verification is pending.** No exact-head tests have been run, no GitHub Actions runs/checks exist for this head, and no independent review is claimed. Do not treat the wrapper as production-ready.
+**Offline verification on the current code snapshot (Python 3.11 runtime):** 78/78 `crypto_engine` unit tests passed; `security_check.py` passed after narrowing its static rule to permit only the explicit local `sqlite3.connect` persistence call; `compileall` passed. The test run used the uploaded PR #107 branch archive plus the exact latest changed source/test/checker edits fetched from GitHub and applied locally; it is not a GitHub Actions run. No Actions acceptance or independent security review is claimed. Do not treat the wrapper as production-ready.
 
 Important security limitation: Python private attributes are not an isolation boundary. The raw gateway and trusted dependencies must remain inside a trusted composition root; strategy agents require separate process/container isolation and capability-limited IPC. Production ledger, marks/liquidity, owner policy/reset and independent external audit-anchor services remain unimplemented. The wrapper does not create a broker or paper runner. PAPER remains on hold and LIVE remains disabled.
+
+
+Verification note: The 78-test/static/compile results above are a local replay against the uploaded PR #107 branch archive with latest branch file edits applied. They do not establish GitHub CI status for the final branch SHA. The workflow run observed for the earlier PR #107 head was skipped, not passed.
