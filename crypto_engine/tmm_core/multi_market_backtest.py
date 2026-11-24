@@ -174,6 +174,11 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
         open_values = {m: bar["markets"][m]["open_quote"] * bar["markets"][m]["open_fx"]
                        for m in market_ids}
         equity_at_open = cash + sum((holdings[m] * open_values[m] for m in market_ids), D("0"))
+        # Re-mark at the executable open before authorizing any new exposure.
+        try:
+            session_guard.observe_equity(equity=equity_at_open, timestamp=bar["open_timestamp"])
+        except SessionRiskError as exc:
+            raise MultiMarketBacktestError(f"shared session risk open-mark failed: {exc}") from exc
         weights = {} if session_guard.is_halted else clean_signals[i - 1]
         desired = {m: (equity_at_open * weights.get(m, D("0"))) / open_values[m]
                    for m in market_ids}
