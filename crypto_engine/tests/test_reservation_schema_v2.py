@@ -48,7 +48,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             )
         """)
         db.execute("BEGIN")
-        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
             ensure_reservation_schema_v2(db)
         self.assertIsNone(db.execute(
             "SELECT 1 FROM sqlite_master WHERE name='reservations'"
@@ -68,7 +68,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             )
         """)
         db.execute("BEGIN")
-        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
             ensure_reservation_schema_v2(db)
         db.rollback()
         db.close()
