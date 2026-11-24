@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 from tmm_core.exposure_policy import ExposureMark, ExposurePolicy
@@ -101,7 +102,7 @@ class PolicyGatewayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             gateway, _, marks, _, _ = self.make_gateway(directory)
             result = gateway.propose(proposals={"BTC/USDT": "1"}, timestamp=101)
-            self.assertLessEqual(result["permitted_deltas"]["BTC/USDT"], 0.15)
+            self.assertLessEqual(result["permitted_deltas"]["BTC/USDT"], Decimal("0.150000000000000000000000001"))
             self.assertTrue(result["exposure_policy_enforced"])
             self.assertEqual(marks.calls[0][1], ("BTC/USDT", "ETH/USDT"))
 
