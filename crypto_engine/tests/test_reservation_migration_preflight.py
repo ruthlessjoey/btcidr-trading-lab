@@ -115,6 +115,14 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
             inspect_v1_migration_eligibility(self.db)
         self.db.execute("PRAGMA query_only=OFF")
 
+    def test_unapproved_trigger_is_blocked(self):
+        self.db.execute(
+            "CREATE TRIGGER injected AFTER INSERT ON fills BEGIN SELECT 1; END"
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("indexes or triggers" in item for item in result.blockers))
+
     def test_preflight_does_not_modify_database(self):
         before = self.db.execute(
             "SELECT name,sql FROM sqlite_master ORDER BY name"
