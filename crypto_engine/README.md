@@ -55,3 +55,8 @@ No authentic current multi-market datasets, independently verified contract/owne
 `tmm_core.exposure_policy` provides an offline, fail-closed pure policy function for long-only spot proposals. It requires trusted equity, holdings, fresh per-market valuation marks, and a precomputed executable buy-liquidity capacity. It caps buys against shared gross exposure, per-market exposure, aggregate base-asset concentration, aggregate quote-asset concentration, and per-market liquidity capacity. Sells are capped to held inventory. Invalid or stale inputs reject the request.
 
 Important: this module is currently a tested policy primitive, not yet wired into `RiskGateway` or a production ledger/agent runtime. Do not treat it as an active account control or advance PAPER. The next integration step must make trusted exposure marks and owner-approved policy mandatory at the gateway boundary, then test restart, concurrency, failure and agent-isolation paths.
+
+
+## Offline synthetic ledger (PR #108)
+
+`tmm_core.offline_portfolio.SyntheticPortfolioLedger` supplies a trusted-test-side in-memory ledger for registered spot markets quoted in one account currency. It applies Decimal BUY/SELL synthetic fills atomically, rejects insufficient cash/oversells, deduplicates fill IDs, requires complete fresh marks for equity, scopes reads to one account ID and exposes a hash-chained audit snapshot. It is not durable production accounting and must only be mutated by a trusted offline simulator. See [OFFLINE_PORTFOLIO.md](OFFLINE_PORTFOLIO.md). No PAPER advancement or exchange integration is included.
