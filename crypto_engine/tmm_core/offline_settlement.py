@@ -7,6 +7,7 @@ composition-root code and must never be exposed to strategy agents.
 from __future__ import annotations
 
 import hashlib
+import json
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from typing import Protocol
 from .offline_portfolio import (
     D, SyntheticFill, SyntheticPortfolioLedger,
 )
+from .offline_batch_journal import SQLiteBatchJournal
 
 
 def _d(value: object, field: str) -> Decimal:
@@ -94,22 +96,24 @@ class OfflineSettlementController:
     def __init__(self, *, proposal_client: ProposalClient,
                  settlement: SellSettlement,
                  ledger: SyntheticPortfolioLedger,
-                 rules: Mapping[str, ExecutionRules]) -> None:
+                 rules: Mapping[str, ExecutionRules],
+                 batch_journal: SQLiteBatchJournal) -> None:
         if not isinstance(ledger, SyntheticPortfolioLedger):
             raise ValueError("synthetic offline ledger required")
         if not isinstance(rules, Mapping) or not rules:
             raise ValueError("execution rules are required")
+        if not isinstance(batch_journal, SQLiteBatchJournal):
+            raise ValueError("durable SQLite batch journal is required")
         self._proposal_client = proposal_client
         self._settlement = settlement
         self._ledger = ledger
         self._rules = dict(rules)
+        self._batch_journal = batch_journal
         self._lock = threading.RLock()
-        # Process-local replay fence; not durable across restarts.
-        self._seen_batches: set[str] = set()
 
     def process(self, *, batch_id: str, proposals: Mapping[str, object],
                 bars: Mapping[str, SyntheticBar], timestamp: int) -> tuple[ExecutionResult, ...]:
-        """Process one trusted batch once within this process lifetime."""
+        """Process one trusted batch with durable fail-closed replay tracking."""
         if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
             raise ValueError("batch_id must be a non-empty trusted identifier up to 256 characters")
         if not isinstance(timestamp, int) or isinstance(timestamp, bool) or timestamp < 0:
@@ -138,12 +142,36 @@ class OfflineSettlementController:
             self._rules[market_id].validated()
             clean[market_id] = (requested_delta, o, volume)
 
+        request_record = {
+            "timestamp": timestamp,
+            "proposals": {key: str(proposals[key]) for key in sorted(proposals)},
+            "bars": {key: {
+                "timestamp": bars[key].timestamp, "open": str(bars[key].open),
+                "high": str(bars[key].high), "low": str(bars[key].low),
+                "close": str(bars[key].close), "volume": str(bars[key].volume),
+            } for key in sorted(bars)},
+            "rules": {key: {
+                "quantity_step": str(self._rules[key].quantity_step),
+                "price_tick": str(self._rules[key].price_tick),
+                "fee_bps": str(self._rules[key].fee_bps),
+                "half_spread_bps": str(self._rules[key].half_spread_bps),
+                "slippage_bps": str(self._rules[key].slippage_bps),
+                "max_volume_participation": str(self._rules[key].max_volume_participation),
+            } for key in sorted(proposals)},
+        }
+        request_hash = hashlib.sha256(
+            json.dumps(request_record, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
         with self._lock:
-            if batch_id in self._seen_batches:
-                raise ValueError("duplicate or previously attempted batch_id rejected")
-            # Burn the ID before stateful calls. A failed/partial batch requires
-            # reconciliation and cannot be retried under the same process.
-            self._seen_batches.add(batch_id)
+            previous = self._batch_journal.claim(batch_id, request_hash)
+            if previous is not None:
+                return tuple(ExecutionResult(
+                    item["market_id"], item["side"], D(item["requested_quantity"]),
+                    D(item["authorized_quantity"]), D(item["filled_quantity"]),
+                    None if item["fill_price"] is None else D(item["fill_price"]),
+                    D(item["fee_quote"]), item["status"],
+                ) for item in previous)
             batch_digest = hashlib.sha256(batch_id.encode("utf-8")).hexdigest()
             authorization = self._proposal_client.propose(proposals=proposals, timestamp=timestamp)
             if not isinstance(authorization, Mapping):
@@ -205,4 +233,13 @@ class OfflineSettlementController:
                     market_id, side, requested, authorized, qty, price, fee,
                     "FILLED" if qty == authorized else ("PARTIAL" if qty > 0 else "UNFILLED"),
                 ))
+            journal_results = [{
+                "market_id": item.market_id, "side": item.side,
+                "requested_quantity": str(item.requested_quantity),
+                "authorized_quantity": str(item.authorized_quantity),
+                "filled_quantity": str(item.filled_quantity),
+                "fill_price": None if item.fill_price is None else str(item.fill_price),
+                "fee_quote": str(item.fee_quote), "status": item.status,
+            } for item in results]
+            self._batch_journal.complete(batch_id, request_hash, journal_results)
             return tuple(results)
