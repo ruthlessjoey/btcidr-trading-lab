@@ -147,7 +147,7 @@ class RiskGatewayTests(unittest.TestCase):
 
     def test_ledger_equity_triggers_stop_before_any_new_buy(self):
         with tempfile.TemporaryDirectory() as d:
-            gateway, _, _, ledger, _ = self.make_gateway(d)
+            gateway, _, _, ledger, _, _ = self.make_gateway(d)
             ledger.equity = "949"
             result = gateway.propose(proposals={"BTC/USDT": "0.1", "ETH/USDT": "0"},
                                      timestamp=101)
