@@ -24,7 +24,7 @@ class SessionRiskError(ValueError):
 
 
 class SessionLossGuard:
-    """Serializes risk decisions for all assets in one shared account session."""
+    """Serializes risk decisions and reserves exits across concurrent proposals."""
 
     SNAPSHOT_VERSION = 1
 
@@ -53,6 +53,7 @@ class SessionLossGuard:
         self.halted = False
         self.halt_timestamp: int | None = None
         self.halt_reason: str | None = None
+        self._reserved_sells: dict[str, Decimal] = {}
         self._events: list[dict[str, object]] = []
         self._head_hash = _ZERO_HASH
 
@@ -122,11 +123,11 @@ class SessionLossGuard:
 
     def authorize_proposals(self, *, proposals: Mapping[str, object],
                             holdings: Mapping[str, object], timestamp: int) -> dict[str, Decimal]:
-        """Return permitted signed quantity deltas; never allow a short position.
+        """Authorize signed deltas, reserve exits, and prevent shorts/double sells.
 
         Positive deltas are BUY exposure; negative deltas are SELL exits. After
         any latched stop all BUYs are rejected. SELLs are capped at actual
-        inventory, including before a stop, so a proposal cannot create a short.
+        inventory less outstanding concurrent sell reservations.
         """
         with self._lock:
             self._timestamp(timestamp)
@@ -152,28 +153,63 @@ class SessionLossGuard:
                     permitted[market_id] = D("0")
                     rejected[market_id] = "SESSION_RISK_HALT_BLOCKS_BUY"
                 elif delta < 0:
-                    permitted[market_id] = -min(-delta, held)
-                    if -delta > held:
-                        rejected[market_id] = "SELL_CAPPED_TO_HELD_QUANTITY"
+                    reserved = self._reserved_sells.get(market_id, D("0"))
+                    available = max(D("0"), held - reserved)
+                    allowed = min(-delta, available)
+                    permitted[market_id] = -allowed
+                    if allowed < -delta:
+                        rejected[market_id] = "SELL_CAPPED_TO_UNRESERVED_HELD_QUANTITY"
+                    if allowed:
+                        self._reserved_sells[market_id] = reserved + allowed
                 else:
                     permitted[market_id] = delta
             self.last_timestamp = timestamp
             self._append("PROPOSALS_AUTHORIZED", timestamp, {
                 "halted": self.halted,
                 "holdings": {k: str(v) for k, v in normalized_holdings.items()},
+                "reserved_sells": {k: str(v) for k, v in sorted(self._reserved_sells.items())},
                 "proposed_deltas": {k: str(_d(proposals[k], f"{k}.proposal")) for k in sorted(proposals)},
                 "permitted_deltas": {k: str(v) for k, v in permitted.items()},
                 "rejections": rejected,
             })
             return permitted
 
+    def settle_sell(self, *, market_id: str, authorized_quantity: object,
+                    filled_quantity: object, timestamp: int) -> None:
+        """Release an exit reservation after fill or rejection is definitively known."""
+        with self._lock:
+            self._timestamp(timestamp)
+            if not isinstance(market_id, str) or not market_id:
+                raise SessionRiskError("market_id must be a non-empty string")
+            try:
+                authorized = _d(authorized_quantity, "authorized_quantity")
+                filled = _d(filled_quantity, "filled_quantity")
+            except PortfolioError as exc:
+                raise SessionRiskError(str(exc)) from exc
+            reserved = self._reserved_sells.get(market_id, D("0"))
+            if authorized <= 0 or filled < 0 or filled > authorized or authorized > reserved:
+                raise SessionRiskError("sell settlement exceeds a valid outstanding reservation")
+            remaining = reserved - authorized
+            if remaining:
+                self._reserved_sells[market_id] = remaining
+            else:
+                self._reserved_sells.pop(market_id, None)
+            self.last_timestamp = timestamp
+            self._append("SELL_SETTLED", timestamp, {
+                "market_id": market_id, "authorized_quantity": str(authorized),
+                "filled_quantity": str(filled), "released_quantity": str(authorized - filled),
+                "remaining_reserved": str(remaining),
+            })
+
     def reset(self, *, new_session_id: str, opening_equity: object, timestamp: int,
               actor: str, reason: str, approval_ref: str) -> None:
-        """Explicitly start a new session; reset is impossible without audit metadata."""
+        """Explicitly start a new session; reset requires audit metadata and no pending exits."""
         with self._lock:
             self._timestamp(timestamp)
             if not self.halted:
                 raise SessionRiskError("session reset is allowed only after a latched stop")
+            if any(value > 0 for value in self._reserved_sells.values()):
+                raise SessionRiskError("cannot reset while sell reservations are unresolved")
             for field, value in (("new_session_id", new_session_id), ("actor", actor),
                                  ("reason", reason), ("approval_ref", approval_ref)):
                 if not isinstance(value, str) or not value.strip():
@@ -209,6 +245,7 @@ class SessionLossGuard:
                 "started_at": self.started_at, "last_timestamp": self.last_timestamp,
                 "last_equity": str(self.last_equity), "halted": self.halted,
                 "halt_timestamp": self.halt_timestamp, "halt_reason": self.halt_reason,
+                "reserved_sells": {k: str(v) for k, v in sorted(self._reserved_sells.items())},
                 "head_hash": self._head_hash,
             }
             return {"snapshot_version": self.SNAPSHOT_VERSION, "state": state,
@@ -246,6 +283,12 @@ class SessionLossGuard:
             guard.halted = state["halted"]
             guard.halt_timestamp = state["halt_timestamp"]
             guard.halt_reason = state["halt_reason"]
+            reservations = state["reserved_sells"]
+            if not isinstance(reservations, Mapping):
+                raise SessionRiskError("snapshot sell reservations are malformed")
+            guard._reserved_sells = {k: _d(v, f"{k}.reserved_sell") for k, v in reservations.items()}
+            if any(not isinstance(k, str) or not k or v <= 0 for k, v in guard._reserved_sells.items()):
+                raise SessionRiskError("snapshot sell reservations are invalid")
             if (not isinstance(guard.halted, bool) or
                     (guard.halted and (guard.halt_timestamp is None or not guard.halt_reason)) or
                     (not guard.halted and (guard.halt_timestamp is not None or guard.halt_reason is not None))):
