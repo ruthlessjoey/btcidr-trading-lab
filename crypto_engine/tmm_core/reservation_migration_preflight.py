@@ -75,7 +75,7 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
     previous = "0" * 64
     count = 0
     for event_json, previous_hash, event_hash in db.execute(
-        "SELECT event_json,previous_hash,event_hash FROM audit ORDER BY seq"
+        "SELECT event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
     ):
         if previous_hash != previous:
             return False, count
@@ -121,7 +121,7 @@ def inspect_v1_migration_eligibility(
     blockers: list[str] = []
     tables = {
         row[0] for row in db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            "SELECT name FROM main.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         )
     }
     if tables != _EXPECTED_TABLES:
@@ -132,13 +132,13 @@ def inspect_v1_migration_eligibility(
     usable_tables = set()
     for table in sorted(tables & _EXPECTED_TABLES):
         columns = _EXPECTED_COLUMNS[table]
-        actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
+        actual = tuple(row[1] for row in db.execute(f"PRAGMA main.table_info({table})"))
         if actual != columns:
             blockers.append(f"v1 column contract mismatch: {table}")
             continue
         usable_tables.add(table)
         ddl_row = db.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            "SELECT sql FROM main.sqlite_master WHERE type='table' AND name=?",
             (table,),
         ).fetchone()
         if ddl_row is None or ddl_row[0] is None or _normalize_sql(ddl_row[0]) != _normalize_sql(_EXPECTED_SQL[table]):
@@ -146,7 +146,7 @@ def inspect_v1_migration_eligibility(
 
     if tables == _EXPECTED_TABLES:
         unexpected_objects = db.execute(
-            "SELECT type,name FROM sqlite_master "
+            "SELECT type,name FROM main.sqlite_master "
             "WHERE type IN ('index','trigger') "
             "AND name NOT LIKE 'sqlite_autoindex_%' ORDER BY type,name"
         ).fetchall()
@@ -157,7 +157,7 @@ def inspect_v1_migration_eligibility(
     sell_count = outbox_count = unresolved_count = audit_count = 0
     if "metadata" in usable_tables:
         row = db.execute(
-            "SELECT value FROM metadata WHERE key='schema_version'"
+            "SELECT value FROM main.metadata WHERE key='schema_version'"
         ).fetchone()
         version = row[0] if row else None
         if version != "1":
@@ -165,10 +165,10 @@ def inspect_v1_migration_eligibility(
 
     if "fills" in usable_tables:
         sell_count = db.execute(
-            "SELECT COUNT(*) FROM fills WHERE side='SELL'"
+            "SELECT COUNT(*) FROM main.fills WHERE side='SELL'"
         ).fetchone()[0]
         invalid_sides = db.execute(
-            "SELECT COUNT(*) FROM fills WHERE side NOT IN ('BUY','SELL')"
+            "SELECT COUNT(*) FROM main.fills WHERE side NOT IN ('BUY','SELL')"
         ).fetchone()[0]
         if invalid_sides:
             blockers.append("fill side values violate v1 contract")
@@ -178,7 +178,7 @@ def inspect_v1_migration_eligibility(
             )
 
     if "outbox" in usable_tables:
-        outbox_count = db.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
+        outbox_count = db.execute("SELECT COUNT(*) FROM main.outbox").fetchone()[0]
         if outbox_count:
             blockers.append(
                 "historical outbox rows lack allocation-bound v2 identity and require reconciliation"
@@ -186,7 +186,7 @@ def inspect_v1_migration_eligibility(
 
     if "batches" in usable_tables:
         unresolved_count = db.execute(
-            "SELECT COUNT(*) FROM batches WHERE status IN "
+            "SELECT COUNT(*) FROM main.batches WHERE status IN "
             "('PROCESSING','RECONCILIATION_REQUIRED')"
         ).fetchone()[0]
         if unresolved_count:

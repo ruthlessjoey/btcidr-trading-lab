@@ -163,6 +163,20 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("column contract mismatch" in item for item in result.blockers))
 
+    def test_temp_view_cannot_shadow_main_audit_table(self):
+        self.db.execute(
+            "INSERT INTO main.audit VALUES(1,'{}',?,?)",
+            ("0" * 64, "f" * 64),
+        )
+        self.db.execute(
+            "CREATE TEMP VIEW audit AS "
+            "SELECT seq,event_json,previous_hash,event_hash "
+            "FROM main.audit WHERE 0"
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
     def test_broken_audit_chain_is_blocked(self):
         self.db.execute(
             "INSERT INTO audit VALUES(1,'{}',?,?)",
