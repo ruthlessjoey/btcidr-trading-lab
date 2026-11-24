@@ -27,6 +27,9 @@ class InventoryLedger(Protocol):
     def snapshot_holdings(self, account_id: str) -> Mapping[str, object]:
         """Return authoritative base-asset quantities keyed by stable market ID."""
 
+    def snapshot_equity(self, account_id: str) -> object:
+        """Return authoritative account equity in the configured account currency."""
+
 
 class ResetAuthorizer(Protocol):
     def verify_reset(self, request: Mapping[str, str]) -> bool:
@@ -174,6 +177,8 @@ class RiskGateway:
         with self._lock:
             self._require_healthy()
             try:
+                equity = self._ledger.snapshot_equity(self._account_id)
+                self._guard.observe_equity(equity=equity, timestamp=timestamp)
                 holdings = self._ledger.snapshot_holdings(self._account_id)
                 permitted = self._guard.authorize_proposals(
                     proposals=proposals, holdings=holdings, timestamp=timestamp
