@@ -48,7 +48,27 @@ _EXPECTED_SQL = {
 
 
 def _normalize_sql(value: str) -> str:
-    return "".join(value.split()).casefold()
+    """Normalize SQL formatting without changing quoted literals or identifiers."""
+    output = []
+    quote = None
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if quote is not None:
+            output.append(char)
+            if char == quote:
+                if index + 1 < len(value) and value[index + 1] == quote:
+                    output.append(value[index + 1])
+                    index += 1
+                else:
+                    quote = None
+        elif char in ("'", '"', "`", "["):
+            quote = "]" if char == "[" else char
+            output.append(char)
+        elif not char.isspace():
+            output.append(char.casefold())
+        index += 1
+    return "".join(output)
 
 
 def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
