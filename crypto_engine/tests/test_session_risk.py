@@ -120,5 +120,16 @@ class SessionLossGuardTests(unittest.TestCase):
                         actor="owner", reason="reset", approval_ref="approval-2")
 
 
+    def test_snapshot_cannot_clear_a_halt_by_editing_state_only(self):
+        guard = self.make_guard()
+        guard.observe_equity(equity="800", timestamp=101)
+        snapshot = guard.snapshot()
+        snapshot["state"]["halted"] = False
+        snapshot["state"]["halt_timestamp"] = None
+        snapshot["state"]["halt_reason"] = None
+        with self.assertRaises(SessionRiskError):
+            SessionLossGuard.restore(snapshot)
+
+
 if __name__ == "__main__":
     unittest.main()
