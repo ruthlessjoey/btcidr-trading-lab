@@ -34,3 +34,17 @@ The current repository package has no strategy-agent runtime, broker, exchange c
 - The session threshold is relative to session opening equity, not a trailing high-water mark.
 - The backtest stop is latched for the remainder of that replay. The explicit reset API is tested separately.
 - No real exchange, wallet, network or account activity is performed.
+
+## Independent code-level boundary review (24 November 2026)
+
+**Disposition: NOT APPROVED for a multi-market PAPER account.** The exact-head offline test suite passes after the restore correction, but this guard is not yet an enforceable account boundary.
+
+Required blockers before PAPER integration:
+
+1. **Trusted holdings:** `authorize_proposals` accepts caller-supplied holdings. It must receive inventory from a broker-owned/ledger-owned authoritative portfolio service, never from a strategy agent or strategy-provided payload. Otherwise a caller can overstate inventory and obtain an oversized SELL authorization.
+2. **Reset authority:** `reset` checks that actor, reason and approval reference are non-empty strings; it does not authenticate the actor or verify the approval reference against an owner-controlled authorization service. A caller with the guard reference can clear a halt by supplying fabricated strings. Reset must be moved behind a trusted risk-control interface with verifiable owner authorization.
+3. **Single enforcement gateway:** no strategy-agent runtime, portfolio service, paper broker or order router exists in this package. Therefore there is no integration evidence that every agent proposal is intercepted or that agents cannot call a lower-level path. Agents must be unable to access guard mutation methods or any direct order interface.
+4. **Durable recovery:** snapshots are not yet written atomically to trusted durable storage and their hash-chain head is not externally anchored. A process restart must fail closed if the latest state cannot be authenticated and recovered.
+5. **Mandatory limits:** the backtest API permits `max_session_loss=None`. The PAPER configuration layer must require a non-null, owner-approved session-loss limit and must independently enforce gross, per-market, per-asset and liquidity limits before authorizing exposure.
+
+The current implementation is a useful isolated simulation control, not a complete production risk boundary. Do not enable or advance the multi-market PAPER account until all five blockers are implemented and independently tested. LIVE remains absent/disabled.
