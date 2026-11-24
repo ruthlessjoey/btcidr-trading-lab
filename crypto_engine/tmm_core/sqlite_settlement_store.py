@@ -409,12 +409,28 @@ class SQLiteSettlementStore:
                 or max_bytes > _AUDIT_MAX_EVENT_BYTES):
             return False
         previous = "0" * 64
-        for event_json, stored_previous, stored_hash in db.execute(
-                "SELECT event_json,previous_hash,event_hash FROM audit ORDER BY seq"):
-            event = json.loads(event_json)
-            if stored_previous != previous or _event_hash(previous, event) != stored_hash:
-                return False
-            previous = stored_hash
+        try:
+            cursor = db.execute(
+                "SELECT event_json,previous_hash,event_hash FROM audit ORDER BY seq"
+            )
+            while True:
+                try:
+                    row = cursor.fetchone()
+                except (sqlite3.DatabaseError, UnicodeError):
+                    # Invalid UTF-8 stored as SQLite TEXT can fail during row decoding.
+                    return False
+                if row is None:
+                    break
+                event_json, stored_previous, stored_hash = row
+                try:
+                    event = json.loads(event_json)
+                    if stored_previous != previous or _event_hash(previous, event) != stored_hash:
+                        return False
+                except (TypeError, ValueError, UnicodeError, RecursionError):
+                    return False
+                previous = stored_hash
+        except (sqlite3.DatabaseError, UnicodeError):
+            return False
         return True
 
     def _initialize(self, db: sqlite3.Connection, opening_cash: str) -> None:
