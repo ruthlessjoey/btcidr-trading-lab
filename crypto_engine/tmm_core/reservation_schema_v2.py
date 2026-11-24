@@ -98,21 +98,34 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             f"base settlement schema missing: {sorted(missing_parents)}"
         )
 
-    parent_columns = {
-        "markets": ("market_id", "base_asset", "quote_asset"),
-        "batches": ("batch_id", "request_hash", "status", "created_at", "result_json"),
+    parent_schema = {
+        "markets": (
+            "CREATE TABLE markets(market_id TEXT PRIMARY KEY, "
+            "base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL)"
+        ),
+        "batches": (
+            "CREATE TABLE batches(batch_id TEXT PRIMARY KEY, "
+            "request_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN "
+            "('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')), "
+            "created_at INTEGER NOT NULL, result_json TEXT)"
+        ),
         "fills": (
-            "fill_id", "batch_id", "market_id", "side", "quantity",
-            "price", "fee_quote", "timestamp",
+            "CREATE TABLE fills(fill_id TEXT PRIMARY KEY, "
+            "batch_id TEXT NOT NULL REFERENCES batches(batch_id), "
+            "market_id TEXT NOT NULL REFERENCES markets(market_id), "
+            "side TEXT NOT NULL CHECK(side IN ('BUY','SELL')), "
+            "quantity TEXT NOT NULL, price TEXT NOT NULL, "
+            "fee_quote TEXT NOT NULL, timestamp INTEGER NOT NULL)"
         ),
     }
-    for table, expected_columns in parent_columns.items():
-        info = list(db.execute(f"PRAGMA main.table_info({table})"))
-        actual_columns = tuple(row[1] for row in info)
-        primary_key = tuple((row[1], row[5]) for row in info if row[5])
-        if actual_columns != expected_columns or primary_key != ((expected_columns[0], 1),):
+    for table, expected_ddl in parent_schema.items():
+        row = db.execute(
+            "SELECT sql FROM main.sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        if row is None or _normalize(row[0]) != _normalize(expected_ddl):
             raise ReservationSchemaError(
-                f"base settlement schema mismatch for {table}"
+                f"base settlement schema definition mismatch for {table}"
             )
 
     if db.execute("PRAGMA foreign_keys").fetchone() != (1,):

@@ -20,7 +20,8 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             CREATE TABLE batches(
                 batch_id TEXT PRIMARY KEY,
                 request_hash TEXT NOT NULL,
-                status TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN
+                  ('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')),
                 created_at INTEGER NOT NULL,
                 result_json TEXT
             );
@@ -28,7 +29,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
                 fill_id TEXT PRIMARY KEY,
                 batch_id TEXT NOT NULL REFERENCES batches(batch_id),
                 market_id TEXT NOT NULL REFERENCES markets(market_id),
-                side TEXT NOT NULL,
+                side TEXT NOT NULL CHECK(side IN ('BUY','SELL')),
                 quantity TEXT NOT NULL,
                 price TEXT NOT NULL,
                 fee_quote TEXT NOT NULL,
@@ -48,7 +49,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             )
         """)
         db.execute("BEGIN")
-        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
             ensure_reservation_schema_v2(db)
         self.assertIsNone(db.execute(
             "SELECT 1 FROM sqlite_master WHERE name='reservations'"
@@ -68,7 +69,40 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             )
         """)
         db.execute("BEGIN")
-        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_rejects_generated_parent_column_hidden_from_table_info(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL,
+                shadow TEXT GENERATED ALWAYS AS (base_asset || quote_asset) VIRTUAL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_rejects_parent_collation_change_with_same_columns_and_primary_key(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY COLLATE NOCASE,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
             ensure_reservation_schema_v2(db)
         db.rollback()
         db.close()
