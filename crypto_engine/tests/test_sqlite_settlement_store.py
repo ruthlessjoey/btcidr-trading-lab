@@ -51,6 +51,27 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "different request hash"):
             self.store.apply_batch(batch_id="b-3", fills=[self.buy(qty="2")], timestamp=10)
 
+    def test_replay_rejects_changed_timestamp(self):
+        self.store.apply_batch(batch_id="b-time", fills=[self.buy()], timestamp=10)
+        with self.assertRaisesRegex(SettlementStoreError, "different request hash"):
+            self.store.apply_batch(batch_id="b-time", fills=[self.buy()], timestamp=11)
+
+    def test_sell_outbox_must_match_actual_sell_fills(self):
+        with self.assertRaisesRegex(SettlementStoreError, "SELL outbox filled quantities"):
+            self.store.apply_batch(
+                batch_id="b-mismatch",
+                fills=[self.buy(), {
+                    "fill_id": "sell-mismatch", "market_id": "BTC/USDT", "side": "SELL",
+                    "quantity": "0.2", "price": "110", "fee_quote": "0"
+                }],
+                sell_settlements=[{
+                    "idempotency_key": "settle:mismatch", "market_id": "BTC/USDT",
+                    "authorized_quantity": "0.5", "filled_quantity": "0.1"
+                }],
+                timestamp=10,
+            )
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+
     def test_failed_batch_rolls_back_claim_and_every_accounting_table(self):
         invalid = {"fill_id": "bad", "market_id": "BTC/USDT", "side": "SELL",
                    "quantity": "1", "price": "100", "fee_quote": "0"}
