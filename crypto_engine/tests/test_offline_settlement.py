@@ -45,7 +45,7 @@ class OfflineSettlementTests(unittest.TestCase):
 
     def test_buy_applies_adverse_price_fee_and_volume_cap(self):
         result = self.controller.process(
-            proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": self.bar}, timestamp=101
+            batch_id="case-1", proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": self.bar}, timestamp=101
         )[0]
         self.assertEqual(result.filled_quantity, Decimal("0.500"))
         self.assertGreater(result.fill_price, Decimal("100"))
@@ -55,7 +55,7 @@ class OfflineSettlementTests(unittest.TestCase):
     def test_sell_partial_fill_releases_reservation(self):
         self.gateway.permitted = {"BTC/USDT": "-1"}
         result = self.controller.process(
-            proposals={"BTC/USDT": "-1"}, bars={"BTC/USDT": self.bar}, timestamp=101
+            batch_id="case-2", proposals={"BTC/USDT": "-1"}, bars={"BTC/USDT": self.bar}, timestamp=101
         )[0]
         self.assertEqual(result.status, "PARTIAL")
         self.assertEqual(len(self.settlement.calls), 1)
@@ -66,32 +66,61 @@ class OfflineSettlementTests(unittest.TestCase):
         self.gateway.permitted = {}
         with self.assertRaises(ValueError):
             self.controller.process(
-                proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": self.bar}, timestamp=101
+            batch_id="case-3", proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": self.bar}, timestamp=101
             )
 
     def test_missing_or_wrong_time_bar_rejected(self):
         bad = SyntheticBar("BTC/USDT", 100, "100", "105", "95", "102", "10")
         with self.assertRaises(ValueError):
             self.controller.process(
-                proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": bad}, timestamp=101
+            batch_id="case-4", proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": bad}, timestamp=101
             )
 
     def test_invalid_ohlcv_and_unknown_rules_rejected(self):
         bad = SyntheticBar("BTC/USDT", 101, "100", "90", "95", "102", "10")
         with self.assertRaises(ValueError):
             self.controller.process(
-                proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": bad}, timestamp=101
+            batch_id="case-5", proposals={"BTC/USDT": "1"}, bars={"BTC/USDT": bad}, timestamp=101
             )
 
     def test_zero_liquidity_sell_is_settled_unfilled(self):
         self.gateway.permitted = {"BTC/USDT": "-1"}
         no_volume = SyntheticBar("BTC/USDT", 101, "100", "105", "95", "102", "0")
         result = self.controller.process(
-            proposals={"BTC/USDT": "-1"}, bars={"BTC/USDT": no_volume}, timestamp=101
+            batch_id="case-6", proposals={"BTC/USDT": "-1"}, bars={"BTC/USDT": no_volume}, timestamp=101
         )[0]
         self.assertEqual(result.status, "UNFILLED")
         self.assertEqual(self.settlement.calls[0]["filled_quantity"], Decimal("0"))
 
+
+    def test_duplicate_batch_rejected_before_second_gateway_call(self):
+        kwargs = {"batch_id": "stable-batch", "proposals": {"BTC/USDT": "1"},
+                  "bars": {"BTC/USDT": self.bar}, "timestamp": 101}
+        self.controller.process(**kwargs)
+        calls = self.gateway.calls
+        cash = self.ledger.snapshot_cash("a")
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.controller.process(**kwargs)
+        self.assertEqual(self.gateway.calls, calls)
+        self.assertEqual(self.ledger.snapshot_cash("a"), cash)
+
+    def test_invalid_bar_rejected_before_gateway_call(self):
+        bad = SyntheticBar("BTC/USDT", 100, "100", "105", "95", "102", "10")
+        with self.assertRaises(ValueError):
+            self.controller.process(batch_id="bad-bar", proposals={"BTC/USDT": "1"},
+                                    bars={"BTC/USDT": bad}, timestamp=101)
+        self.assertEqual(self.gateway.calls, 0)
+
+    def test_failed_attempt_burns_batch_id_for_safe_reconciliation(self):
+        self.gateway.permitted = {}
+        kwargs = {"batch_id": "failed-batch", "proposals": {"BTC/USDT": "1"},
+                  "bars": {"BTC/USDT": self.bar}, "timestamp": 101}
+        with self.assertRaises(ValueError):
+            self.controller.process(**kwargs)
+        self.gateway.permitted = {"BTC/USDT": "1"}
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.controller.process(**kwargs)
+        self.assertEqual(self.gateway.calls, 1)
 
 if __name__ == "__main__":
     unittest.main()
