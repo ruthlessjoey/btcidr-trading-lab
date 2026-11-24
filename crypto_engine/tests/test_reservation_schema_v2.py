@@ -91,6 +91,23 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_rejects_whitespace_change_inside_check_literal(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("PRAGMA writable_schema=ON")
+        db.execute(
+            "UPDATE sqlite_master SET sql=replace(sql, 'ACTIVE', 'ACT IVE') "
+            "WHERE type='table' AND name='reservations'"
+        )
+        db.execute("PRAGMA writable_schema=OFF")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "definition mismatch"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")
