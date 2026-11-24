@@ -456,7 +456,7 @@ class SQLiteSettlementStore:
             "audit": "CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL)",
             "outbox": "CREATE TABLE outbox(idempotency_key TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id), market_id TEXT NOT NULL REFERENCES markets(market_id), authorized_quantity TEXT NOT NULL, filled_quantity TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PENDING','ACKNOWLEDGED')), receiver_receipt TEXT)",
         }
-        normalize_sql = lambda value: " ".join(value.split()).casefold()
+        normalize_sql = lambda value: "".join(value.split()).casefold()
         for table, expected in expected_sql.items():
             row = db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
