@@ -61,9 +61,13 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
             return False, count
         try:
             event = json.loads(event_json)
+            if not isinstance(event, dict):
+                return False, count
             encoded = json.dumps(
                 event, sort_keys=True, separators=(",", ":"), allow_nan=False
             )
+            if encoded != event_json:
+                return False, count
         except (TypeError, ValueError, json.JSONDecodeError):
             return False, count
         expected = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
@@ -100,17 +104,23 @@ def inspect_v1_migration_eligibility(
     }
     if tables != _EXPECTED_TABLES:
         blockers.append("v1 table set mismatch")
-    else:
-        for table, columns in _EXPECTED_COLUMNS.items():
-            actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
-            if actual != columns:
-                blockers.append(f"v1 column contract mismatch: {table}")
-            ddl_row = db.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
-                (table,),
-            ).fetchone()
-            if ddl_row is None or _normalize_sql(ddl_row[0]) != _normalize_sql(_EXPECTED_SQL[table]):
-                blockers.append(f"v1 schema definition mismatch: {table}")
+
+    # Never issue data queries against a table whose required columns are absent.
+    # Schema drift is a deterministic blocker, not an uncontrolled SQL exception.
+    usable_tables = set()
+    for table in sorted(tables & _EXPECTED_TABLES):
+        columns = _EXPECTED_COLUMNS[table]
+        actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
+        if actual != columns:
+            blockers.append(f"v1 column contract mismatch: {table}")
+            continue
+        usable_tables.add(table)
+        ddl_row = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        if ddl_row is None or ddl_row[0] is None or _normalize_sql(ddl_row[0]) != _normalize_sql(_EXPECTED_SQL[table]):
+            blockers.append(f"v1 schema definition mismatch: {table}")
 
     if tables == _EXPECTED_TABLES:
         unexpected_objects = db.execute(
@@ -123,7 +133,7 @@ def inspect_v1_migration_eligibility(
 
     version = None
     sell_count = outbox_count = unresolved_count = audit_count = 0
-    if "metadata" in tables:
+    if "metadata" in usable_tables:
         row = db.execute(
             "SELECT value FROM metadata WHERE key='schema_version'"
         ).fetchone()
@@ -131,7 +141,7 @@ def inspect_v1_migration_eligibility(
         if version != "1":
             blockers.append("database is not schema version 1")
 
-    if "fills" in tables:
+    if "fills" in usable_tables:
         sell_count = db.execute(
             "SELECT COUNT(*) FROM fills WHERE side='SELL'"
         ).fetchone()[0]
@@ -145,14 +155,14 @@ def inspect_v1_migration_eligibility(
                 "historical SELL fills have no provable v1 reservation allocation identity"
             )
 
-    if "outbox" in tables:
+    if "outbox" in usable_tables:
         outbox_count = db.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
         if outbox_count:
             blockers.append(
                 "historical outbox rows lack allocation-bound v2 identity and require reconciliation"
             )
 
-    if "batches" in tables:
+    if "batches" in usable_tables:
         unresolved_count = db.execute(
             "SELECT COUNT(*) FROM batches WHERE status IN "
             "('PROCESSING','RECONCILIATION_REQUIRED')"
@@ -160,7 +170,7 @@ def inspect_v1_migration_eligibility(
         if unresolved_count:
             blockers.append("unresolved or processing batches require reconciliation")
 
-    if "audit" in tables:
+    if "audit" in usable_tables:
         audit_ok, audit_count = _audit_is_valid(db)
         if not audit_ok:
             blockers.append("audit chain verification failed")
