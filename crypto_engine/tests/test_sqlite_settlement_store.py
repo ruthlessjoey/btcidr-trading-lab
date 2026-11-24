@@ -167,6 +167,16 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SQLiteSettlementStore(self.path, account_id="paper-research",
                                   currency="USDT", opening_cash="10000")
 
+    def test_oversized_audit_event_rolls_back_batch(self):
+        oversized = self.buy(fill_id="x" * (64 * 1024))
+        with self.assertRaisesRegex(SettlementStoreError, "audit event exceeds"):
+            self.store.apply_batch(batch_id="b-large-audit", fills=[oversized], timestamp=10)
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 0)
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
