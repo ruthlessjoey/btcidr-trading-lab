@@ -99,6 +99,19 @@ class RiskGatewayTests(unittest.TestCase):
             with self.assertRaises(RiskGatewayError):
                 SQLiteRiskStateStore(link)
 
+    def test_sqlite_store_rejects_symlinked_parent_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            real_parent = Path(directory) / "private"
+            real_parent.mkdir()
+            os.chmod(real_parent, 0o700)
+            alias = Path(directory) / "alias"
+            try:
+                alias.symlink_to(real_parent, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symlinks are unavailable on this platform")
+            with self.assertRaises(RiskGatewayError):
+                SQLiteRiskStateStore(alias / "risk.sqlite3")
+
     def test_sqlite_store_rejects_hard_linked_database(self):
         with tempfile.TemporaryDirectory() as directory:
             original = Path(directory) / "original.db"
