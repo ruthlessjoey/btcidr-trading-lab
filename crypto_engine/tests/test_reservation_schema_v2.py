@@ -108,6 +108,18 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_temp_table_cannot_shadow_main_reservation_columns(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("CREATE TEMP TABLE reservations(shadow_only TEXT)")
+        db.execute("BEGIN")
+        # Verification must inspect main.reservations, not temp.reservations.
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")
