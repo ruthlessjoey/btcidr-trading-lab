@@ -223,7 +223,7 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         )
         result = self.inspect()
         self.assertFalse(result.eligible)
-        self.assertTrue(any("indexes or triggers" in item for item in result.blockers))
+        self.assertTrue(any("indexes, triggers, or views" in item for item in result.blockers))
 
 
     def test_malformed_foreign_key_target_is_reported_without_sql_crash(self):
