@@ -11,11 +11,16 @@ from tmm_core.session_risk import SessionLossGuard
 class Ledger:
     def __init__(self, holdings):
         self.holdings = holdings
+        self.equity = "1000"
         self.requested_account = None
 
     def snapshot_holdings(self, account_id):
         self.requested_account = account_id
         return dict(self.holdings)
+
+    def snapshot_equity(self, account_id):
+        self.requested_account = account_id
+        return self.equity
 
 
 class Anchor:
@@ -44,13 +49,15 @@ class ResetAuthorizer:
 
 
 class RiskGatewayTests(unittest.TestCase):
-    def make_gateway(self, directory, *, approved=False):
+    def make_gateway(self, directory, *, approved=False, halted=False):
         store = SQLiteRiskStateStore(Path(directory) / "risk.sqlite3")
         anchor = Anchor()
         ledger = Ledger({"BTC/USDT": "0.25", "ETH/USDT": "1.0"})
         authorizer = ResetAuthorizer(approved)
         guard = SessionLossGuard(session_id="s1", opening_equity="1000",
                                  max_session_loss=".05", started_at=100)
+        if halted:
+            guard.force_halt(timestamp=101, reason="TEST_STOP")
         gateway = RiskGateway.create_new(
             account_id="paper-account-1", guard=guard, ledger=ledger,
             store=store, anchor=anchor, reset_authorizer=authorizer)
@@ -85,15 +92,26 @@ class RiskGatewayTests(unittest.TestCase):
 
     def test_unverified_reset_is_refused_and_verified_reset_is_audited(self):
         with tempfile.TemporaryDirectory() as d:
-            gateway, _, _, _, authorizer = self.make_gateway(d, approved=False)
-            gateway.propose(proposals={"BTC/USDT": "0"}, timestamp=101)
-            # Recreate with a halted initial state via an explicit proposal-time
-            # equity mark is outside this facade; halt through test-owned guard
-            # is covered by the underlying SessionLossGuard suite.
-            self.assertFalse(authorizer.requests)
+            gateway, _, _, _, authorizer = self.make_gateway(d, approved=False, halted=True)
             with self.assertRaises(RiskGatewayError):
                 gateway.reset(new_session_id="s2", opening_equity="1000", timestamp=102,
                               actor="owner", reason="test", approval_ref="fake")
+            self.assertEqual(authorizer.requests[0]["account_id"], "paper-account-1")
+        with tempfile.TemporaryDirectory() as d:
+            gateway, _, _, _, authorizer = self.make_gateway(d, approved=True, halted=True)
+            gateway.reset(new_session_id="s2", opening_equity="1000", timestamp=102,
+                          actor="owner", reason="reviewed", approval_ref="verified-123")
+            self.assertEqual(authorizer.requests[0]["approval_ref"], "verified-123")
+            self.assertFalse(gateway.is_halted)
+
+    def test_ledger_equity_triggers_stop_before_any_new_buy(self):
+        with tempfile.TemporaryDirectory() as d:
+            gateway, _, _, ledger, _ = self.make_gateway(d)
+            ledger.equity = "949"
+            result = gateway.propose(proposals={"BTC/USDT": "0.1", "ETH/USDT": "0"},
+                                     timestamp=101)
+            self.assertEqual(str(result["permitted_deltas"]["BTC/USDT"]), "0")
+            self.assertTrue(result["risk_halted"])
 
     def test_anchor_failure_locks_gateway(self):
         with tempfile.TemporaryDirectory() as d:
