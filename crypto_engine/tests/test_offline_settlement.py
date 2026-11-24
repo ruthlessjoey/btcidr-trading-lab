@@ -100,11 +100,10 @@ class OfflineSettlementTests(unittest.TestCase):
         self.assertEqual(result.status, "UNFILLED")
         self.assertEqual(self.settlement.calls[0]["filled_quantity"], Decimal("0"))
 
-
     def test_duplicate_completed_batch_returns_recorded_result_without_gateway_call(self):
         kwargs = {"batch_id": "stable-batch", "proposals": {"BTC/USDT": "1"},
                   "bars": {"BTC/USDT": self.bar}, "timestamp": 101}
-        self.controller.process(**kwargs)
+        first = self.controller.process(**kwargs)
         calls = self.gateway.calls
         cash = self.ledger.snapshot_cash("a")
         replay = self.controller.process(**kwargs)
