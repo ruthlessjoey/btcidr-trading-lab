@@ -31,6 +31,11 @@ class InventoryLedger(Protocol):
         """Return authoritative account equity in the configured account currency."""
 
 
+class SessionPolicyAuthorizer(Protocol):
+    def verify_session_start(self, request: Mapping[str, str]) -> bool:
+        """Verify owner-approved opening equity and mandatory loss policy."""
+
+
 class ResetAuthorizer(Protocol):
     def verify_reset(self, request: Mapping[str, str]) -> bool:
         """Verify owner authorization outside the strategy-agent trust boundary."""
@@ -129,7 +134,8 @@ class RiskGateway:
 
     def __init__(self, *, account_id: str, guard: SessionLossGuard,
                  ledger: InventoryLedger, store: RiskStateStore,
-                 anchor: AuditAnchor, reset_authorizer: ResetAuthorizer) -> None:
+                 anchor: AuditAnchor, reset_authorizer: ResetAuthorizer,
+                 session_policy_authorizer: SessionPolicyAuthorizer) -> None:
         if not isinstance(account_id, str) or not account_id.strip():
             raise RiskGatewayError("account_id is required")
         self._account_id = account_id
@@ -138,22 +144,33 @@ class RiskGateway:
         self._store = store
         self._anchor = anchor
         self._reset_authorizer = reset_authorizer
+        self._session_policy_authorizer = session_policy_authorizer
         self._lock = threading.RLock()
         self._failed = False
 
     @classmethod
     def create_new(cls, *, account_id: str, guard: SessionLossGuard,
                    ledger: InventoryLedger, store: RiskStateStore,
-                   anchor: AuditAnchor, reset_authorizer: ResetAuthorizer) -> "RiskGateway":
+                   anchor: AuditAnchor, reset_authorizer: ResetAuthorizer,
+                   session_policy_authorizer: SessionPolicyAuthorizer) -> "RiskGateway":
+        if guard.max_session_loss is None:
+            raise RiskGatewayError("a mandatory session-loss limit is required for account startup")
+        request = {"account_id": account_id, "session_id": guard.session_id,
+                   "opening_equity": str(guard.opening_equity),
+                   "max_session_loss": str(guard.max_session_loss)}
+        if session_policy_authorizer.verify_session_start(request) is not True:
+            raise RiskGatewayError("owner approval of session policy was not verified")
         gateway = cls(account_id=account_id, guard=guard, ledger=ledger, store=store,
-                      anchor=anchor, reset_authorizer=reset_authorizer)
+                      anchor=anchor, reset_authorizer=reset_authorizer,
+                      session_policy_authorizer=session_policy_authorizer)
         gateway._commit()
         return gateway
 
     @classmethod
     def restore(cls, *, account_id: str, ledger: InventoryLedger,
                 store: RiskStateStore, anchor: AuditAnchor,
-                reset_authorizer: ResetAuthorizer) -> "RiskGateway":
+                reset_authorizer: ResetAuthorizer,
+                session_policy_authorizer: SessionPolicyAuthorizer) -> "RiskGateway":
         snapshot = store.load(account_id)
         if snapshot is None:
             raise RiskGatewayError("no persisted risk state; account startup is refused")
@@ -163,10 +180,13 @@ class RiskGateway:
             raise RiskGatewayError("external audit anchor verification failed; startup refused")
         try:
             guard = SessionLossGuard.restore(snapshot)
+            if guard.max_session_loss is None:
+                raise SessionRiskError("persisted account session has no mandatory loss limit")
         except SessionRiskError as exc:
             raise RiskGatewayError("risk journal recovery failed; startup refused") from exc
         return cls(account_id=account_id, guard=guard, ledger=ledger, store=store,
-                   anchor=anchor, reset_authorizer=reset_authorizer)
+                   anchor=anchor, reset_authorizer=reset_authorizer,
+                   session_policy_authorizer=session_policy_authorizer)
 
     def _require_healthy(self) -> None:
         if self._failed:
