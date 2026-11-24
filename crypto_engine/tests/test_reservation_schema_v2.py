@@ -140,6 +140,23 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.commit()
         db.close()
 
+    def test_rejects_temp_trigger_on_main_reservation_table(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("CREATE TEMP TABLE trigger_log(value TEXT)")
+        db.execute("""
+            CREATE TEMP TRIGGER injected_temp_reservation_trigger
+            AFTER INSERT ON main.reservations
+            BEGIN INSERT INTO trigger_log VALUES ('unexpected'); END
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "TEMP reservation triggers"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")

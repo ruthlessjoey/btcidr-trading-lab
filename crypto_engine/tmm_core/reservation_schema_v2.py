@@ -140,6 +140,17 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             f"unapproved reservation schema objects: {unexpected}"
         )
 
+    unexpected_temp_triggers = db.execute(
+        "SELECT type,name FROM temp.sqlite_master "
+        "WHERE type='trigger' "
+        "AND tbl_name IN ('reservations','reservation_allocations','reservation_outbox') "
+        "ORDER BY name"
+    ).fetchall()
+    if unexpected_temp_triggers:
+        raise ReservationSchemaError(
+            f"unapproved TEMP reservation triggers: {unexpected_temp_triggers}"
+        )
+
     for table, expected_columns in {
         "reservations": (
             "reservation_id", "account_id", "market_id", "base_asset",
