@@ -876,3 +876,14 @@ Observed retrieval:
 - Exact PR #103 branch snapshot was fetched to a disposable Python 3.11.8 environment. **80/80 integrated tests passed**, including the two new security regression tests; static boundary check passed across all 12 core modules; compileall passed. No workflow was dispatched.
 - PR #103 changes exactly three files: `crypto_engine/tmm_core/token_risk.py`, `crypto_engine/tests/test_token_risk.py`, and `crypto_engine/README.md`.
 - No protected files accessed; no network, chain, wallet, account, paper execution or live execution occurred.
+
+
+### 24 November — shared multi-market session-loss guard (PR #104)
+
+- PR #104: [Enforce shared multi-market session loss stops](https://github.com/ruthlessjoey/btcidr-trading-lab/pull/104), open/draft/unmerged, stacked on PR #100's crypto spot foundation. Branch `security/multi-market-session-loss-stop-2026-11-24`; latest recorded head `6e387b3063341cdc212b54061ed1f58ea5275445`; base PR #100 branch head `d7487c97eac4abebef89fbd9ea59067dccbabfd6`. GitHub reports mergeable true.
+- Adds `crypto_engine/tmm_core/session_risk.py`: thread-safe shared-session guard, opening-equity loss latch, global BUY rejection after stop, SELL quantity caps, outstanding sell reservations against concurrent stale proposals, explicit settlement, hash-chained audit journal, JSON snapshot/restore, and reset requiring a new session ID plus actor/reason/approval reference.
+- Routes the multi-market backtest through the guard and marks equity at executable bar opens before authorizing new exposure, then at closes. A latched stop remains active for the rest of the replay; post-stop signals cannot create BUY fills.
+- Adds tests for multi-market BUY blocking, partial exits, short prevention, concurrent stale proposals, restart recovery, audit-chain tampering, state-only halt-clearing tampering, audited reset, unresolved reservation reset refusal, and end-to-end backtest loss-stop behavior.
+- Scope is isolated to six paths under `crypto_engine/`; no protected paths changed. No strategy-agent runtime, broker, order router, exchange connector, network request, credential, wallet or account functionality is introduced. The mandatory risk-interception boundary for future agent/simulator paths remains a required integration contract, not a proven existing agent-runtime control.
+- **Verification pending:** no local execution result is claimed and no GitHub Actions workflow run/status is associated with the exact PR head. GitHub currently reports mergeable true; that is not a test result. The test suite, Python 3.11 compatibility and independent review remain unverified.
+- PR #104 is not merged. No PAPER runner is activated; LIVE remains unavailable. Profitability is NOT VERIFIED. Overall completion remains UNRATED.
