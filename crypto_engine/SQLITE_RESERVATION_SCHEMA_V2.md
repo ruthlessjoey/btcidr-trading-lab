@@ -10,7 +10,7 @@ The v2 helper defines three normalized tables:
 - `reservation_allocations`: exact allocation rows linking a batch, SELL fill, reservation, account, market, quantity and observed reservation version.
 - `reservation_outbox`: one durable delivery row per allocation, binding idempotency key, allocation, reservation, fill, owner, market, version, quantity, payload digest and receiver receipt state.
 
-Primary keys, foreign keys, uniqueness and lifecycle CHECK constraints are part of the expected schema definition. The helper verifies exact stored DDL and rejects partial schema creation or unapproved indexes/triggers on these tables.
+Primary keys, foreign keys, uniqueness and lifecycle CHECK constraints are part of the expected schema definition. The helper verifies stored DDL while normalizing formatting whitespace only outside quoted SQL literals and identifiers; quoted contents are preserved exactly. This prevents whitespace changes inside CHECK values from being normalized away. It rejects partial schema creation or unapproved indexes/triggers on these tables.
 
 ## Transaction contract
 
