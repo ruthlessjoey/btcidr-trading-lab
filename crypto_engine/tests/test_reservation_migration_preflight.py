@@ -195,10 +195,14 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
 
     def test_malformed_foreign_key_target_is_reported_without_sql_crash(self):
         self.db.execute("DROP TABLE holdings")
+        # SQLite reports a foreign-key mismatch (rather than an empty result)
+        # when the referenced parent key is not UNIQUE/PRIMARY KEY.
+        self.db.execute("CREATE TABLE missing_markets(market_id TEXT)")
         self.db.execute(
             "CREATE TABLE holdings(market_id TEXT PRIMARY KEY "
             "REFERENCES missing_markets(market_id), quantity TEXT NOT NULL)"
         )
+        self.db.execute("INSERT INTO holdings VALUES('unknown-market','1')")
         result = self.inspect()
         self.assertFalse(result.eligible)
         self.assertTrue(any(
