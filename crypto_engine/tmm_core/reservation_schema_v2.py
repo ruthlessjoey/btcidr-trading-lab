@@ -132,7 +132,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         "SELECT type,name FROM sqlite_master "
         "WHERE type IN ('index','trigger') "
         "AND name NOT LIKE 'sqlite_autoindex_%' "
-        "AND (tbl_name IN ('reservations','reservation_allocations','reservation_outbox')) "
+        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox') "
         "ORDER BY type,name"
     ).fetchall()
     if unexpected:
@@ -143,7 +143,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     unexpected_temp_triggers = db.execute(
         "SELECT type,name FROM temp.sqlite_master "
         "WHERE type='trigger' "
-        "AND tbl_name IN ('reservations','reservation_allocations','reservation_outbox') "
+        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox') "
         "ORDER BY name"
     ).fetchall()
     if unexpected_temp_triggers:
