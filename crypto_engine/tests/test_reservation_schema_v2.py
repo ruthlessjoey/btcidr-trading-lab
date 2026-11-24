@@ -319,6 +319,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.execute(
             "INSERT INTO fills VALUES('f1','missing-batch','missing-market','BUY','1','1','0',1)"
         )
+        db.commit()
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("BEGIN")
         with self.assertRaisesRegex(ReservationSchemaError, "foreign-key violation"):
