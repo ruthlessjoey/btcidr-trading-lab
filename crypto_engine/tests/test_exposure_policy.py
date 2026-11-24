@@ -64,7 +64,8 @@ class ExposurePolicyTests(unittest.TestCase):
     def test_stale_or_future_marks_fail_closed(self):
         with self.assertRaises(ExposurePolicyError):
             self.authorize({"BTC/USDT": "0"}, {"BTC/USDT": "1"},
-                           {"BTC/USDT": self.mark("BTC/USDT", "BTC", ts=0)})
+                           {"BTC/USDT": self.mark("BTC/USDT", "BTC", ts=0)},
+                           policy=ExposurePolicy(max_mark_age_seconds=30))
         with self.assertRaises(ExposurePolicyError):
             self.authorize({"BTC/USDT": "0"}, {"BTC/USDT": "1"},
                            {"BTC/USDT": self.mark("BTC/USDT", "BTC", ts=101)})
