@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from .portfolio import PortfolioError, _d
 from .market_rules import MarketRules, MarketRulesError
+from .session_risk import SessionLossGuard, SessionRiskError
 
 D = Decimal
 
@@ -25,7 +26,8 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
                               initial_cash: Decimal | str | float,
                               max_gross_weight: Decimal | str | float = "0.95",
                               max_fx_age_seconds: int = 3600,
-                              max_portfolio_drawdown: Decimal | str | float | None = None) -> dict[str, object]:
+                              max_portfolio_drawdown: Decimal | str | float | None = None,
+                              max_session_loss: Decimal | str | float | None = None) -> dict[str, object]:
     """Replay synchronized market bars against one shared account-currency cash pool.
 
     Each bar: {timestamp, open_timestamp, markets: {id: {open_quote, close_quote,
@@ -34,6 +36,11 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
     Signals made at bar close execute at the next bar open. Previous completed
     bar volume caps next-open fills. Sells process before buys; buys are sorted
     by market ID, so shared-cash contention is deterministic.
+
+    max_session_loss is measured against the initial session equity. Once
+    reached at a completed bar close, the shared SessionLossGuard blocks all
+    later BUY proposals and authorizes only inventory-capped SELL exits. The
+    stop remains latched until an explicit, audited reset outside this replay.
     """
     try:
         cash = _d(initial_cash, "initial_cash")
@@ -146,6 +153,13 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
             raise MultiMarketBacktestError(f"invalid costs or volume participation for {market_id}")
         costs[market_id] = vals
 
+    try:
+        session_guard = SessionLossGuard(
+            session_id="backtest-session", opening_equity=cash,
+            max_session_loss=max_session_loss, started_at=clean_bars[0]["timestamp"])
+    except SessionRiskError as exc:
+        raise MultiMarketBacktestError(str(exc)) from exc
+
     holdings = {market_id: D("0") for market_id in market_ids}
     fills = []
     equity_curve = [{"timestamp": clean_bars[0]["timestamp"], "equity": str(cash)}]
@@ -153,9 +167,6 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
     turnover = D("0")
     max_drawdown = D("0")
     peak = cash
-    risk_halted = False
-    risk_halt_timestamp = None
-    risk_halt_reason = None
 
     for i in range(1, len(clean_bars)):
         bar = clean_bars[i]
@@ -163,13 +174,15 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
         open_values = {m: bar["markets"][m]["open_quote"] * bar["markets"][m]["open_fx"]
                        for m in market_ids}
         equity_at_open = cash + sum((holdings[m] * open_values[m] for m in market_ids), D("0"))
-        # A portfolio drawdown stop is latched. Once triggered at a completed
-        # bar close, all later target signals are ignored and the next opens
-        # attempt to liquidate using prior-bar volume capacity. No auto-restart.
-        weights = {} if risk_halted else clean_signals[i - 1]
+        weights = {} if session_guard.is_halted else clean_signals[i - 1]
         desired = {m: (equity_at_open * weights.get(m, D("0"))) / open_values[m]
                    for m in market_ids}
-        deltas = {m: desired[m] - holdings[m] for m in market_ids}
+        proposed_deltas = {m: desired[m] - holdings[m] for m in market_ids}
+        try:
+            deltas = session_guard.authorize_proposals(
+                proposals=proposed_deltas, holdings=holdings, timestamp=bar["open_timestamp"])
+        except SessionRiskError as exc:
+            raise MultiMarketBacktestError(f"shared session risk authorization failed: {exc}") from exc
         capacity = {m: prior["markets"][m]["volume_base"] * costs[m]["max_volume_participation"]
                     for m in market_ids}
 
@@ -219,22 +232,28 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
         peak = max(peak, close_equity)
         if peak > 0:
             max_drawdown = max(max_drawdown, (peak - close_equity) / peak)
-        if (not risk_halted and drawdown_limit is not None
-                and max_drawdown >= drawdown_limit):
-            risk_halted = True
-            risk_halt_timestamp = bar["timestamp"]
-            risk_halt_reason = "MAX_PORTFOLIO_DRAWDOWN"
+        try:
+            session_guard.observe_equity(equity=close_equity, timestamp=bar["timestamp"])
+            if (not session_guard.is_halted and drawdown_limit is not None
+                    and max_drawdown >= drawdown_limit):
+                session_guard.force_halt(timestamp=bar["timestamp"], reason="MAX_PORTFOLIO_DRAWDOWN")
+        except SessionRiskError as exc:
+            raise MultiMarketBacktestError(f"shared session risk state update failed: {exc}") from exc
 
     final_equity = D(equity_curve[-1]["equity"])
+    risk_snapshot = session_guard.snapshot()
     return {"initial_cash": str(_d(initial_cash, "initial_cash")),
             "final_equity": str(final_equity),
             "total_return": str(final_equity / _d(initial_cash, "initial_cash") - D("1")),
             "max_drawdown": str(max_drawdown), "fees_paid": str(fees_paid),
             "turnover": str(turnover), "fills": fills,
-            "risk_halted": risk_halted,
-            "risk_halt_timestamp": risk_halt_timestamp,
-            "risk_halt_reason": risk_halt_reason,
-            "liquidation_complete": all(qty == 0 for qty in holdings.values()) if risk_halted else None,
+            "risk_halted": session_guard.is_halted,
+            "risk_halt_timestamp": session_guard.halt_timestamp,
+            "risk_halt_reason": session_guard.halt_reason,
+            "risk_audit_event_count": len(risk_snapshot["events"]),
+            "risk_audit_head_hash": risk_snapshot["state"]["head_hash"],
+            "risk_state_snapshot": risk_snapshot,
+            "liquidation_complete": all(qty == 0 for qty in holdings.values()) if session_guard.is_halted else None,
             "final_cash": str(cash),
             "final_holdings": {m: str(holdings[m]) for m in sorted(holdings)},
             "dust_holdings": {m: str(qty) for m, qty in sorted(holdings.items())
