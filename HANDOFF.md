@@ -86,3 +86,8 @@ Verification note: The 82-test/static/compile results above are a local replay a
 ## PR #107 follow-on storage hardening
 
 The lower-level SQLite risk-state store now requires a private, current-user-owned parent directory on POSIX; rejects symlinked parent path components, symlinked/non-regular database files and hard links; creates/enforces a mode-0600 database; enables SQLite FULL synchronous commits, foreign keys, trusted-schema disablement and DELETE journaling. Four tests cover shared directory, symlink, symlinked-parent and hard-link rejection. The policy-enforced strategy facade exposes only `propose` and `is_halted`; it does not expose sell settlement or reset. Latest local replay: 82 tests passed, static check passed, compile passed. This is defense-in-depth, not a substitute for OS isolation, production trusted services or independent audit anchoring.
+
+
+## Follow-on milestone — offline synthetic portfolio ledger (24 Nov 2026)
+
+PR #108 adds `tmm_core.offline_portfolio.SyntheticPortfolioLedger` and focused tests. It provides thread-safe Decimal cash/inventory accounting for a registered multi-market universe, idempotent synthetic fills, strict BUY cash and SELL inventory checks, exact quote-currency matching, complete fresh mark requirements for equity, account scoping and a hash-chained in-memory audit log. This is a synthetic test/research ledger only. It has no network, exchange, broker, account, wallet, order, PAPER or LIVE capability. It is not yet composed into `PolicyEnforcedRiskGateway`; the next step is a trusted offline settlement/simulation controller, with agent access remaining proposal-only.
