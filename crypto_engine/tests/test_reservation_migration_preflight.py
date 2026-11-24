@@ -99,6 +99,42 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("schema definition mismatch: account" in item for item in result.blockers))
 
+    def test_missing_required_column_is_reported_without_sql_crash(self):
+        self.db.execute("ALTER TABLE fills RENAME TO fills_old")
+        self.db.execute(
+            "CREATE TABLE fills(fill_id TEXT PRIMARY KEY, batch_id TEXT NOT NULL, "
+            "market_id TEXT NOT NULL, quantity TEXT NOT NULL, price TEXT NOT NULL, "
+            "fee_quote TEXT NOT NULL, timestamp INTEGER NOT NULL)"
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("column contract mismatch: fills" in item for item in result.blockers))
+
+    def test_non_object_audit_event_is_blocked(self):
+        import hashlib
+        payload = "[]"
+        digest = hashlib.sha256(("0" * 64 + payload).encode("utf-8")).hexdigest()
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,?,?,?)",
+            (payload, "0" * 64, digest),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
+    def test_noncanonical_audit_json_is_blocked(self):
+        import hashlib
+        payload = '{ "kind" : "TEST" }'
+        canonical = '{"kind":"TEST"}'
+        digest = hashlib.sha256(("0" * 64 + canonical).encode("utf-8")).hexdigest()
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,?,?,?)",
+            (payload, "0" * 64, digest),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
     def test_changed_column_contract_is_blocked(self):
         self.db.execute("ALTER TABLE outbox ADD COLUMN unexpected TEXT")
         result = self.inspect()
