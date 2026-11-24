@@ -310,6 +310,23 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_rejects_existing_foreign_key_violations(self):
+        db = self.connection()
+        db.execute("PRAGMA foreign_keys=OFF")
+        db.execute(
+            "INSERT INTO batches VALUES('b1','hash','COMPLETE',1,NULL)"
+        )
+        db.execute(
+            "INSERT INTO fills VALUES('f1','missing-batch','missing-market','BUY','1','1','0',1)"
+        )
+        db.commit()
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "foreign-key violation"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")
