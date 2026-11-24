@@ -184,6 +184,19 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             f"unapproved TEMP reservation triggers: {unexpected_temp_triggers}"
         )
 
+    try:
+        foreign_key_violation = db.execute(
+            "PRAGMA main.foreign_key_check"
+        ).fetchone()
+    except sqlite3.DatabaseError as exc:
+        raise ReservationSchemaError(
+            "SQLite foreign-key integrity check failed"
+        ) from exc
+    if foreign_key_violation is not None:
+        raise ReservationSchemaError(
+            f"SQLite foreign-key violation detected: {foreign_key_violation}"
+        )
+
     for table, expected_columns in {
         "reservations": (
             "reservation_id", "account_id", "market_id", "base_asset",
