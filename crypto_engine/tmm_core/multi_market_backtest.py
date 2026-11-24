@@ -208,6 +208,10 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
                     raw_qty = min(delta, capacity[market_id], affordable)
                 qty = rules[market_id].round_quantity(raw_qty)
                 if qty <= 0 or not rules[market_id].meets_minimums(qty, fill_price_quote):
+                    if side == "SELL":
+                        session_guard.settle_sell(
+                            market_id=market_id, authorized_quantity=-delta,
+                            filled_quantity="0", timestamp=bar["open_timestamp"])
                     continue
                 notional_account = qty * fill_price_account
                 fee = notional_account * fee_rate
@@ -224,6 +228,10 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
                               "price_quote": str(fill_price_quote),
                               "price_account": str(fill_price_account),
                               "fee_account": str(fee), "signal_timestamp": prior["timestamp"]})
+                if side == "SELL":
+                    session_guard.settle_sell(
+                        market_id=market_id, authorized_quantity=-delta,
+                        filled_quantity=qty, timestamp=bar["open_timestamp"])
         if cash < 0 or any(qty < 0 for qty in holdings.values()):
             raise AssertionError("multi-market long-only cash/inventory invariant failed")
         close_equity = cash + sum((holdings[m] * bar["markets"][m]["close_quote"]
