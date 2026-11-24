@@ -8,13 +8,13 @@ from tmm_core.reservation_migration_preflight import (
 
 DDL = """
 CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-CREATE TABLE account(singleton INTEGER PRIMARY KEY,account_id TEXT,currency TEXT,cash TEXT);
-CREATE TABLE markets(market_id TEXT PRIMARY KEY,base_asset TEXT,quote_asset TEXT);
-CREATE TABLE holdings(market_id TEXT PRIMARY KEY,quantity TEXT);
-CREATE TABLE batches(batch_id TEXT PRIMARY KEY,request_hash TEXT,status TEXT,created_at INTEGER,result_json TEXT);
-CREATE TABLE fills(fill_id TEXT PRIMARY KEY,batch_id TEXT,market_id TEXT,side TEXT,quantity TEXT,price TEXT,fee_quote TEXT,timestamp INTEGER);
-CREATE TABLE audit(seq INTEGER PRIMARY KEY,event_json TEXT,previous_hash TEXT,event_hash TEXT);
-CREATE TABLE outbox(idempotency_key TEXT PRIMARY KEY,batch_id TEXT,market_id TEXT,authorized_quantity TEXT,filled_quantity TEXT,status TEXT,receiver_receipt TEXT);
+CREATE TABLE account(singleton INTEGER PRIMARY KEY CHECK(singleton=1), account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL);
+CREATE TABLE markets(market_id TEXT PRIMARY KEY, base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL);
+CREATE TABLE holdings(market_id TEXT PRIMARY KEY REFERENCES markets(market_id), quantity TEXT NOT NULL);
+CREATE TABLE batches(batch_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')), created_at INTEGER NOT NULL, result_json TEXT);
+CREATE TABLE fills(fill_id TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id), market_id TEXT NOT NULL REFERENCES markets(market_id), side TEXT NOT NULL CHECK(side IN ('BUY','SELL')), quantity TEXT NOT NULL, price TEXT NOT NULL, fee_quote TEXT NOT NULL, timestamp INTEGER NOT NULL);
+CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL);
+CREATE TABLE outbox(idempotency_key TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id), market_id TEXT NOT NULL REFERENCES markets(market_id), authorized_quantity TEXT NOT NULL, filled_quantity TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PENDING','ACKNOWLEDGED')), receiver_receipt TEXT);
 """
 
 
@@ -87,6 +87,17 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         result = self.inspect()
         self.assertFalse(result.eligible)
         self.assertTrue(any("schema version" in item for item in result.blockers))
+
+    def test_altered_constraint_with_same_columns_is_blocked(self):
+        self.db.execute("PRAGMA writable_schema=ON")
+        self.db.execute(
+            "UPDATE sqlite_master SET sql=replace(sql, 'CHECK(singleton=1)', "
+            "'CHECK(singleton=2)') WHERE type='table' AND name='account'"
+        )
+        self.db.execute("PRAGMA writable_schema=OFF")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("schema definition mismatch: account" in item for item in result.blockers))
 
     def test_changed_column_contract_is_blocked(self):
         self.db.execute("ALTER TABLE outbox ADD COLUMN unexpected TEXT")
