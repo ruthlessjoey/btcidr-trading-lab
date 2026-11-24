@@ -1,6 +1,7 @@
 import sqlite3
 import unittest
 
+from tmm_core import reservation_migration_preflight as preflight_module
 from tmm_core.reservation_migration_preflight import (
     inspect_v1_migration_eligibility,
 )
@@ -184,6 +185,34 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
             (payload, "0" * 64, "f" * 64),
         )
         result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
+    def test_audit_total_byte_budget_blocks_preflight(self):
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,'{}',?,?)",
+            ("0" * 64, "f" * 64),
+        )
+        original = preflight_module._AUDIT_MAX_TOTAL_BYTES
+        preflight_module._AUDIT_MAX_TOTAL_BYTES = 1
+        try:
+            result = self.inspect()
+        finally:
+            preflight_module._AUDIT_MAX_TOTAL_BYTES = original
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
+    def test_audit_event_count_budget_blocks_preflight(self):
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,'{}',?,?)",
+            ("0" * 64, "f" * 64),
+        )
+        original = preflight_module._AUDIT_MAX_EVENTS
+        preflight_module._AUDIT_MAX_EVENTS = 0
+        try:
+            result = self.inspect()
+        finally:
+            preflight_module._AUDIT_MAX_EVENTS = original
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
