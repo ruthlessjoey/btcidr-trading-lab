@@ -27,7 +27,9 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 - Synchronized shared-cash backtest with next-bar-open execution, market-specific fees, spread, slippage and prior-bar volume limits.
 - Explicit price tick, quantity step, minimum quantity and minimum quote notional.
 - Conservative price rounding: BUY up, SELL down; quantity always rounds down.
-- Latched portfolio drawdown stop. After the threshold is breached at a completed bar close, later signals are ignored and next opens attempt liquidation. Partial liquidity leaves the halt latched.
+- Latched portfolio drawdown stop. After the threshold is breached, later signals are ignored and next opens attempt liquidation. Partial liquidity leaves the halt latched.
+- Thread-safe shared session-loss guard: re-marks equity at executable opens before new exposure, blocks all BUY proposals after the configured session-loss threshold, caps SELL proposals to unreserved held inventory, and reserves concurrent exits to prevent duplicate sells.
+- Hash-chained session risk audit journal, JSON snapshot/restore, and explicit reset requiring actor, reason and approval reference. Snapshot integrity checks detect event changes; durable trusted storage and external hash anchoring remain deployment responsibilities.
 - Point-in-time sample-covariance volatility overlay. It requires aligned, equally spaced timestamped returns, rejects stale/future/misaligned data, and only scales long-only weights down to an explicit per-observation volatility cap. It does not annualize or impute missing data.
 - Evidence-driven token eligibility gate for crypto/meme research. Missing or failed required controls, stale evidence, insufficient liquidity/LP lock/holders, concentrated top holders or excessive taxes block eligibility. A pass means only `ELIGIBLE_FOR_HUMAN_REVIEW`; it never authorizes an order and does not verify the truth of supplied evidence.
 - Synthetic tests only. No profitability claim.

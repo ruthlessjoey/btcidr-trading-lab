@@ -143,5 +143,20 @@ class CryptoSpotCoreTests(unittest.TestCase):
         self.assertTrue(all(D(q) > 0 for q in result["final_holdings"].values()))
 
 
+    def test_session_loss_stop_blocks_buys_at_open_and_liquidates_all_assets(self):
+        bars = self.make_bars(prices=(10, 10, 5, 5))
+        result = self.run_bt(bars=bars, max_session_loss=".20")
+        self.assertTrue(result["risk_halted"])
+        self.assertEqual(result["risk_halt_reason"], "SESSION_LOSS_LIMIT")
+        self.assertEqual(result["risk_halt_timestamp"], 120)
+        post_stop_fills = [f for f in result["fills"] if f["timestamp"] >= 120]
+        self.assertTrue(post_stop_fills)
+        self.assertTrue(all(f["side"] == "SELL" for f in post_stop_fills))
+        self.assertTrue(result["liquidation_complete"])
+        self.assertTrue(all(D(q) == 0 for q in result["final_holdings"].values()))
+        self.assertGreater(result["risk_audit_event_count"], 0)
+        self.assertEqual(len(result["risk_audit_head_hash"]), 64)
+
+
 if __name__ == "__main__":
     unittest.main()
