@@ -60,3 +60,8 @@ Important: this module is currently a tested policy primitive, not yet wired int
 ## Offline synthetic ledger (PR #108)
 
 `tmm_core.offline_portfolio.SyntheticPortfolioLedger` supplies a trusted-test-side in-memory ledger for registered spot markets quoted in one account currency. It applies Decimal BUY/SELL synthetic fills atomically, rejects insufficient cash/oversells, deduplicates fill IDs, requires complete fresh marks for equity, scopes reads to one account ID and exposes a hash-chained audit snapshot. It is not durable production accounting and must only be mutated by a trusted offline simulator. See [OFFLINE_PORTFOLIO.md](OFFLINE_PORTFOLIO.md). No PAPER advancement or exchange integration is included.
+
+
+## Offline settlement controller (PR #109)
+
+See [OFFLINE_SETTLEMENT.md](OFFLINE_SETTLEMENT.md). The trusted controller composes a proposal-only risk client, explicit synthetic OHLCV bars, fixed adverse cost assumptions, participation caps, the synthetic ledger and a trusted SELL-settlement callback. It must remain inside the trusted simulator/composition root, never in an agent process. Bar-level execution is an approximation; it does not model order-book queues, intrabar paths or nonlinear market impact. No real provider, exchange, broker, account, wallet, PAPER or LIVE capability exists.
