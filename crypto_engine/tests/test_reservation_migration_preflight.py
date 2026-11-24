@@ -99,6 +99,18 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("schema definition mismatch: account" in item for item in result.blockers))
 
+    def test_whitespace_inside_check_literal_is_not_normalized_away(self):
+        self.db.execute("PRAGMA writable_schema=ON")
+        self.db.execute(
+            "UPDATE sqlite_master SET sql=replace(sql, "
+            "'PROCESSING','PRO CESSING') "
+            "WHERE type='table' AND name='batches'"
+        )
+        self.db.execute("PRAGMA writable_schema=OFF")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("schema definition mismatch: batches" in item for item in result.blockers))
+
     def test_missing_required_column_is_reported_without_sql_crash(self):
         self.db.execute("ALTER TABLE fills RENAME TO fills_old")
         self.db.execute(
