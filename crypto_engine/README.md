@@ -18,6 +18,8 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 
 ## Included
 
+- Fail-closed account risk gateway: strategy proposals cannot supply holdings/equity; those are read from an injected authoritative ledger, state snapshots are transactionally stored, an external audit anchor is mandatory, account startup requires owner approval of a non-null session-loss threshold, and resets require an injected owner authorization verifier. See [RISK_GATEWAY.md](RISK_GATEWAY.md). This is an interface/test implementation only; no trusted production ledger, reset service, external anchor, agent sandbox or paper broker is supplied.
+
 - Exact-host/path/method/query validation for unauthenticated GET candles from `https://cloudme-toko.2meta.app/api/v1/klines`, BTCIDR only.
 - Raw payload size, UTF-8, duplicate-key, schema, closed-candle and SHA-256 provenance validation. Provenance does not independently authenticate the network peer.
 - Versioned point-in-time CEX spot / DEX pool instrument registry keyed by stable market and asset identifiers, not ticker symbols alone.
