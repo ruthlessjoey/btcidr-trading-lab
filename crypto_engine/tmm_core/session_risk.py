@@ -272,6 +272,11 @@ class SessionLossGuard:
         try:
             guard = cls(session_id=state["session_id"], opening_equity=state["opening_equity"],
                         max_session_loss=state["max_session_loss"], started_at=state["started_at"])
+            # __init__ creates a fresh SESSION_STARTED event. Discard that
+            # temporary event before replaying the persisted journal, otherwise
+            # restore duplicates the start event and rejects the valid journal.
+            guard._events = []
+            guard._head_hash = _ZERO_HASH
             expected_previous = _ZERO_HASH
             for index, event in enumerate(events, start=1):
                 if not isinstance(event, Mapping):
