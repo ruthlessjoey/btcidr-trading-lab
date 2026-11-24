@@ -105,14 +105,16 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         ),
         "batches": (
             "CREATE TABLE batches(batch_id TEXT PRIMARY KEY, "
-            "request_hash TEXT NOT NULL, status TEXT NOT NULL, "
+            "request_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN "
+            "('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')), "
             "created_at INTEGER NOT NULL, result_json TEXT)"
         ),
         "fills": (
             "CREATE TABLE fills(fill_id TEXT PRIMARY KEY, "
             "batch_id TEXT NOT NULL REFERENCES batches(batch_id), "
             "market_id TEXT NOT NULL REFERENCES markets(market_id), "
-            "side TEXT NOT NULL, quantity TEXT NOT NULL, price TEXT NOT NULL, "
+            "side TEXT NOT NULL CHECK(side IN ('BUY','SELL')), "
+            "quantity TEXT NOT NULL, price TEXT NOT NULL, "
             "fee_quote TEXT NOT NULL, timestamp INTEGER NOT NULL)"
         ),
     }
@@ -125,7 +127,6 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             raise ReservationSchemaError(
                 f"base settlement schema definition mismatch for {table}"
             )
-    for table, expected_columns in parent_columns.items():
 
     if db.execute("PRAGMA foreign_keys").fetchone() != (1,):
         raise ReservationSchemaError(
