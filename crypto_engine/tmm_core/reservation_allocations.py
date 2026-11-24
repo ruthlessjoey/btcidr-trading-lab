@@ -93,9 +93,12 @@ def validate_sell_allocations(
         consumed = _quantity(raw.get("consumed_quantity", "0"), "consumed_quantity")
         if authorized <= 0 or consumed < 0 or consumed > authorized:
             raise ReservationAllocationError("invalid reservation quantity state")
+        with localcontext() as decimal_context:
+            decimal_context.prec = 80
+            remaining = authorized - consumed
         reservation_by_id[reservation_id] = {
             "account_id": owner, "market_id": market_id, "version": version,
-            "remaining": authorized - consumed,
+            "remaining": remaining,
         }
 
     normalized: list[dict[str, object]] = []
