@@ -104,6 +104,11 @@ class SellAllocationPreflightTests(unittest.TestCase):
                 with self.assertRaisesRegex(ReservationAllocationError, "positive"):
                     self.validate()
 
+    def test_excessive_decimal_precision_is_rejected(self):
+        self.allocations[0]["allocated_quantity"] = "0.0000000000000000001"
+        with self.assertRaisesRegex(ReservationAllocationError, "precision"):
+            self.validate()
+
     def test_non_finite_decimal_is_rejected(self):
         self.allocations[0]["allocated_quantity"] = "NaN"
         with self.assertRaisesRegex(ReservationAllocationError, "finite"):
