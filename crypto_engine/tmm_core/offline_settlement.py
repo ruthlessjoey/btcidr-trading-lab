@@ -203,6 +203,6 @@ class OfflineSettlementController:
                     )
                 results.append(ExecutionResult(
                     market_id, side, requested, authorized, qty, price, fee,
-                    "FILLED" if qty == requested else ("PARTIAL" if qty > 0 else "UNFILLED"),
+                    "FILLED" if qty == authorized else ("PARTIAL" if qty > 0 else "UNFILLED"),
                 ))
             return tuple(results)
