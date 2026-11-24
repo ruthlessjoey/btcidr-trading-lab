@@ -17,6 +17,15 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """Connection context manager that also closes the handle on exit."""
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            return super().__exit__(exc_type, exc, tb)
+        finally:
+            self.close()
+
+
 class SettlementStoreError(RuntimeError):
     """Unsafe, inconsistent, or unresolved durable settlement state."""
 
@@ -395,7 +404,7 @@ class SQLiteSettlementStore:
 
     def _connect(self) -> sqlite3.Connection:
         self._validate_path()
-        db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
+        db = sqlite3.connect(self.path, timeout=5, isolation_level=None, factory=_ClosingConnection)
         os.chmod(self.path, 0o600)
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA synchronous=FULL")
