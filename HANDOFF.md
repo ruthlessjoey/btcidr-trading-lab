@@ -68,16 +68,21 @@ This branch is an engineering source handoff, NOT an install-ready trading syste
 
 - PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/107
 - Branch: `security/exposure-gateway-enforcement-2026-11-24`
-- Current source head before this handoff refresh: `fd3c7f4558758611039f464b6799916403277d32`
+- Current source head before this handoff refresh: `e505aef3eab93cda213092a23fce40ed829ad97f`
 - Draft/open/unmerged; stacked on PR #106. Do not merge without separate approval.
 
 Added `crypto_engine/tmm_core/policy_gateway.py` with `PolicyEnforcedRiskGateway`. It requires exact-True owner authorization of the exposure policy at create and restore, reads the complete authoritative holdings/equity, requests marks for the full holdings market set, rejects incomplete mark coverage, applies the exposure/liquidity policy, then passes only permitted proposal deltas to the existing session-loss gateway. The existing gateway still independently re-reads holdings/equity and persists/anchors its session-risk journal.
 
 Added `crypto_engine/tests/test_policy_gateway.py` covering per-market cap enforcement, stale and missing marks, agent override attempts, unknown markets, owner-policy approval, agent-inaccessible policy parameters, and the absence of public settlement/reset methods on the strategy facade. The facade exposes only `propose` and `is_halted`; settlement and reset remain reserved for trusted future services. Added `crypto_engine/POLICY_GATEWAY.md` documenting interfaces, flow and limitations.
 
-**Offline verification on the current code snapshot (Python 3.11 runtime):** 78/78 `crypto_engine` unit tests passed; `security_check.py` passed after narrowing its static rule to permit only the explicit local `sqlite3.connect` persistence call; `compileall` passed. The test run used the uploaded PR #107 branch archive plus the exact latest changed source/test/checker edits fetched from GitHub and applied locally; it is not a GitHub Actions run. No Actions acceptance or independent security review is claimed. Do not treat the wrapper as production-ready.
+**Offline verification on the current code snapshot (Python 3.11 runtime):** 82/82 `crypto_engine` unit tests passed; `security_check.py` passed after narrowing its static rule to permit only the explicit local `sqlite3.connect` persistence call; `compileall` passed. The test run used the uploaded PR #107 branch archive plus the latest changed source/test/checker edits fetched from GitHub and applied locally; it is not a GitHub Actions run. Added SQLite storage checks for private parent-directory permissions, symlinked parent components, symlinked DB files and hard-linked DB files. No Actions acceptance or independent security review is claimed. Do not treat the wrapper as production-ready.
 
 Important security limitation: Python private attributes are not an isolation boundary. The raw gateway and trusted dependencies must remain inside a trusted composition root; strategy agents require separate process/container isolation and capability-limited IPC. Production ledger, marks/liquidity, owner policy/reset and independent external audit-anchor services remain unimplemented. The wrapper does not create a broker or paper runner. PAPER remains on hold and LIVE remains disabled.
 
 
-Verification note: The 78-test/static/compile results above are a local replay against the uploaded PR #107 branch archive with latest branch file edits applied. They do not establish GitHub CI status for the final branch SHA. The workflow run observed for the earlier PR #107 head was skipped, not passed.
+Verification note: The 82-test/static/compile results above are a local replay against the uploaded PR #107 branch archive with latest branch file edits applied. They do not establish GitHub CI status for the final branch SHA. The workflow run observed for the earlier PR #107 head was skipped, not passed.
+
+
+## PR #107 follow-on storage hardening
+
+The lower-level SQLite risk-state store now requires a private, current-user-owned parent directory on POSIX; rejects symlinked parent path components, symlinked/non-regular database files and hard links; creates/enforces a mode-0600 database; enables SQLite FULL synchronous commits, foreign keys, trusted-schema disablement and DELETE journaling. Four tests cover shared directory, symlink, symlinked-parent and hard-link rejection. The policy-enforced strategy facade exposes only `propose` and `is_halted`; it does not expose sell settlement or reset. Latest local replay: 82 tests passed, static check passed, compile passed. This is defense-in-depth, not a substitute for OS isolation, production trusted services or independent audit anchoring.
