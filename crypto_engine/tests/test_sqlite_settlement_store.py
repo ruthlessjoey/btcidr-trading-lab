@@ -138,6 +138,35 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )}
         self.assertNotIn("outbox", tables)
 
+    def test_changed_table_constraint_is_rejected_even_when_columns_match(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("PRAGMA writable_schema=ON")
+            db.execute(
+                "UPDATE sqlite_master SET sql=replace(sql, 'CHECK(singleton=1)', "
+                "'CHECK(singleton=2)') WHERE type='table' AND name='account'"
+            )
+            db.execute("PRAGMA writable_schema=OFF")
+        with self.assertRaisesRegex(SettlementStoreError, "schema definition mismatch"):
+            SQLiteSettlementStore(self.path, account_id="paper-research",
+                                  currency="USDT", opening_cash="10000")
+
+    def test_unapproved_trigger_is_rejected(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "CREATE TRIGGER injected_audit_trigger AFTER INSERT ON fills "
+                "BEGIN UPDATE account SET cash='0' WHERE singleton=1; END"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "unapproved schema objects"):
+            SQLiteSettlementStore(self.path, account_id="paper-research",
+                                  currency="USDT", opening_cash="10000")
+
+    def test_unapproved_index_is_rejected(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("CREATE INDEX injected_fill_index ON fills(market_id)")
+        with self.assertRaisesRegex(SettlementStoreError, "unapproved schema objects"):
+            SQLiteSettlementStore(self.path, account_id="paper-research",
+                                  currency="USDT", opening_cash="10000")
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
