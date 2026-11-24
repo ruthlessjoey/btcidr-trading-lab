@@ -198,6 +198,15 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
             inspect_v1_migration_eligibility(self.db)
         self.db.execute("PRAGMA query_only=OFF")
 
+    def test_unapproved_persistent_view_is_blocked(self):
+        self.db.execute("CREATE VIEW injected_view AS SELECT 'shadow' AS value")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any(
+            "indexes, triggers, or views" in item
+            for item in result.blockers
+        ))
+
     def test_unapproved_trigger_is_blocked(self):
         self.db.execute(
             "CREATE TRIGGER injected AFTER INSERT ON fills BEGIN SELECT 1; END"
