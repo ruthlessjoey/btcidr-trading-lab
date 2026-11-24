@@ -179,7 +179,10 @@ class RiskGateway:
             try:
                 equity = self._ledger.snapshot_equity(self._account_id)
                 self._guard.observe_equity(equity=equity, timestamp=timestamp)
-                holdings = self._ledger.snapshot_holdings(self._account_id)
+                account_holdings = self._ledger.snapshot_holdings(self._account_id)
+                if not isinstance(account_holdings, Mapping) or not set(proposals).issubset(account_holdings):
+                    raise RiskGatewayError("authoritative ledger is missing one or more proposed markets")
+                holdings = {market_id: account_holdings[market_id] for market_id in proposals}
                 permitted = self._guard.authorize_proposals(
                     proposals=proposals, holdings=holdings, timestamp=timestamp
                 )
