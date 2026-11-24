@@ -18,7 +18,7 @@ For every market, the sum of SELL fill quantities must equal the sum of nonzero 
 
 New audit events are limited to 64 KiB of canonical UTF-8 JSON each. The retained audit chain is limited to 1,000,000 events and 256 MiB of aggregate canonical event bytes. The writer checks these limits inside the same SQLite transaction as the accounting mutation; an oversized event or exhausted history budget aborts and rolls back the entire batch/acknowledgement.
 
-The read-only v1 migration preflight applies the same limits before parsing or hashing audit payloads. Historical audit data above any limit is a migration blocker. It is never truncated, skipped, rewritten, or partially accepted. These limits are a deliberate operational envelope for this store; any future increase requires a reviewed change to both writer and preflight, plus resource and compatibility tests.
+The read-only v1 migration preflight applies the same limits before parsing or hashing audit payloads. Both the preflight and store verifier also treat SQLite text-decoding errors, including invalid UTF-8 stored in an audit event, as a failed audit chain rather than propagating an exception. Historical audit data above any limit is a migration blocker. It is never truncated, skipped, rewritten, or partially accepted. These limits are a deliberate operational envelope for this store; any future increase requires a reviewed change to both writer and preflight, plus resource and compatibility tests.
 
 ## Storage and limits
 

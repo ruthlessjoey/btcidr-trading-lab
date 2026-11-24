@@ -198,6 +198,15 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             store_module._AUDIT_MAX_EVENTS = original
         self.assertEqual(self.store.snapshot()["cash"], "10000")
 
+    def test_invalid_utf8_audit_text_fails_chain_verification_closed(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "INSERT INTO audit(event_json,previous_hash,event_hash) "
+                "VALUES(CAST(x'80' AS TEXT),?,?)",
+                ("0" * 64, "f" * 64),
+            )
+        self.assertFalse(self.store.verify_audit_chain())
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)

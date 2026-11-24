@@ -91,29 +91,41 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
         return False, count
     previous = "0" * 64
     verified_count = 0
-    for event_json, previous_hash, event_hash in db.execute(
-        "SELECT event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
-    ):
-        if previous_hash != previous:
-            return False, verified_count
-        try:
-            event = json.loads(event_json)
-            if not isinstance(event, dict):
+    try:
+        cursor = db.execute(
+            "SELECT event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
+        )
+        while True:
+            try:
+                row = cursor.fetchone()
+            except (sqlite3.DatabaseError, UnicodeError):
+                # SQLite TEXT decoding can fail before Python receives the row
+                # when an attacker stores invalid UTF-8 bytes in event_json.
                 return False, verified_count
-            encoded = json.dumps(
-                event, sort_keys=True, separators=(",", ":"), allow_nan=False
-            )
-            if encoded != event_json:
+            if row is None:
+                break
+            event_json, previous_hash, event_hash = row
+            if previous_hash != previous:
                 return False, verified_count
-        except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
-            # Deeply nested JSON can exceed Python's parser/encoder recursion limit.
-            # Treat it as invalid audit evidence rather than leaking an exception.
-            return False, verified_count
-        expected = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
-        if event_hash != expected:
-            return False, verified_count
-        previous = event_hash
-        verified_count += 1
+            try:
+                event = json.loads(event_json)
+                if not isinstance(event, dict):
+                    return False, verified_count
+                encoded = json.dumps(
+                    event, sort_keys=True, separators=(",", ":"), allow_nan=False
+                )
+                if encoded != event_json:
+                    return False, verified_count
+            except (TypeError, ValueError, json.JSONDecodeError, RecursionError, UnicodeError):
+                # Malformed or deeply nested JSON is invalid audit evidence.
+                return False, verified_count
+            expected = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
+            if event_hash != expected:
+                return False, verified_count
+            previous = event_hash
+            verified_count += 1
+    except (sqlite3.DatabaseError, UnicodeError):
+        return False, verified_count
     return True, verified_count
 
 

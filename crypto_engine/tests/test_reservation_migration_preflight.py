@@ -216,6 +216,15 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
+    def test_invalid_utf8_audit_text_blocks_preflight_without_sql_crash(self):
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,CAST(x'80' AS TEXT),?,?)",
+            ("0" * 64, "f" * 64),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
     def test_broken_audit_chain_is_blocked(self):
         self.db.execute(
             "INSERT INTO audit VALUES(1,'{}',?,?)",
