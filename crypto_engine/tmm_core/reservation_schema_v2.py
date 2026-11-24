@@ -126,7 +126,6 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         )
 
     targets = set(_SCHEMA)
-    settlement_trigger_targets = targets | required_parents
     existing_targets = targets & present
     if existing_targets and existing_targets != targets:
         raise ReservationSchemaError(
