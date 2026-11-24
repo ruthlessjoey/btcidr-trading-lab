@@ -131,5 +131,19 @@ class SessionLossGuardTests(unittest.TestCase):
             SessionLossGuard.restore(snapshot)
 
 
+    def test_restore_replays_audited_session_reset(self):
+        guard = self.make_guard()
+        guard.observe_equity(equity="800", timestamp=101)
+        guard.reset(new_session_id="session-2", opening_equity="800", timestamp=102,
+                    actor="owner", reason="reviewed recovery", approval_ref="approval-2")
+        snapshot = json.loads(json.dumps(guard.snapshot()))
+        restored = SessionLossGuard.restore(snapshot)
+        self.assertFalse(restored.is_halted)
+        self.assertEqual(restored.session_id, "session-2")
+        result = restored.observe_equity(equity="700", timestamp=103)
+        self.assertTrue(result["halted"])
+        self.assertEqual(result["halt_reason"], "SESSION_LOSS_LIMIT")
+
+
 if __name__ == "__main__":
     unittest.main()
