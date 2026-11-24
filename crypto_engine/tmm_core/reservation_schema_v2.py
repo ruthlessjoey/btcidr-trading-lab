@@ -146,7 +146,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             "allocated_quantity", "payload_sha256", "status", "receiver_receipt",
         ),
     }.items():
-        actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
+        actual = tuple(row[1] for row in db.execute(f"PRAGMA main.table_info({table})"))
         if actual != expected_columns:
             raise ReservationSchemaError(
                 f"reservation schema columns mismatch for {table}"
