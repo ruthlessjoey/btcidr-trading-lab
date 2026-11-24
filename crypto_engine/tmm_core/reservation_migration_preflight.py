@@ -92,6 +92,15 @@ def inspect_v1_migration_eligibility(
             if actual != columns:
                 blockers.append(f"v1 column contract mismatch: {table}")
 
+    if tables == _EXPECTED_TABLES:
+        unexpected_objects = db.execute(
+            "SELECT type,name FROM sqlite_master "
+            "WHERE type IN ('index','trigger') "
+            "AND name NOT LIKE 'sqlite_autoindex_%' ORDER BY type,name"
+        ).fetchall()
+        if unexpected_objects:
+            blockers.append("unapproved indexes or triggers are present")
+
     version = None
     sell_count = outbox_count = unresolved_count = audit_count = 0
     if "metadata" in tables:
