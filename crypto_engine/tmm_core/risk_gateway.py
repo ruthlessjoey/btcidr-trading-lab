@@ -55,12 +55,12 @@ class RiskStateStore(Protocol):
 
 
 class SQLiteRiskStateStore:
-    """Local transactional snapshot store; external anchoring remains mandatory."""
+    """Private-directory SQLite snapshot store; external anchoring remains mandatory."""
 
     def __init__(self, path: str | Path) -> None:
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = Path(path).absolute()
         self._lock = threading.RLock()
+        self._validate_storage_path(create_file=True)
         db = self._connect()
         try:
             db.execute(
@@ -69,15 +69,55 @@ class SQLiteRiskStateStore:
             )
         finally:
             db.close()
+        self._validate_storage_path(create_file=False)
+
+    def _validate_storage_path(self, *, create_file: bool) -> None:
+        """Reject shared directories, symlinks, foreign ownership and hard links."""
         try:
+            parent_stat = self.path.parent.lstat()
+            if not self.path.parent.is_dir() or self.path.parent.is_symlink():
+                raise RiskGatewayError("risk-state parent must be a real private directory")
+            if os.name == "posix":
+                if parent_stat.st_mode & 0o077:
+                    raise RiskGatewayError("risk-state parent directory must not grant group/other access")
+                if hasattr(os, "geteuid") and parent_stat.st_uid != os.geteuid():
+                    raise RiskGatewayError("risk-state parent directory must be owned by the current user")
+            try:
+                file_stat = self.path.lstat()
+            except FileNotFoundError:
+                if not create_file:
+                    raise RiskGatewayError("risk-state database disappeared")
+                flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                flags |= getattr(os, "O_NOFOLLOW", 0)
+                try:
+                    fd = os.open(self.path, flags, 0o600)
+                except FileExistsError:
+                    file_stat = self.path.lstat()
+                else:
+                    os.close(fd)
+                    file_stat = self.path.lstat()
+            if self.path.is_symlink() or not self.path.is_file():
+                raise RiskGatewayError("risk-state database must be a regular non-symlink file")
+            if getattr(file_stat, "st_nlink", 1) != 1:
+                raise RiskGatewayError("risk-state database hard links are prohibited")
+            if os.name == "posix":
+                if file_stat.st_mode & 0o077:
+                    raise RiskGatewayError("risk-state database must not grant group/other access")
+                if hasattr(os, "geteuid") and file_stat.st_uid != os.geteuid():
+                    raise RiskGatewayError("risk-state database must be owned by the current user")
             os.chmod(self.path, 0o600)
+        except RiskGatewayError:
+            raise
         except OSError as exc:
-            raise RiskGatewayError("cannot restrict risk-state database permissions") from exc
+            raise RiskGatewayError("risk-state storage path could not be securely validated") from exc
 
     def _connect(self) -> sqlite3.Connection:
+        self._validate_storage_path(create_file=False)
         db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         db.execute("PRAGMA synchronous=FULL")
         db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA trusted_schema=OFF")
+        db.execute("PRAGMA journal_mode=DELETE")
         return db
 
     def load(self, account_id: str) -> Mapping[str, object] | None:
@@ -119,14 +159,12 @@ class SQLiteRiskStateStore:
                 )
                 db.execute("COMMIT")
             except Exception:
-                db.execute("ROLLBACK")
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
                 raise
             finally:
                 db.close()
-        try:
-            os.chmod(self.path, 0o600)
-        except OSError as exc:
-            raise RiskGatewayError("cannot preserve restrictive risk-state permissions") from exc
+            self._validate_storage_path(create_file=False)
 
 
 class RiskGateway:
