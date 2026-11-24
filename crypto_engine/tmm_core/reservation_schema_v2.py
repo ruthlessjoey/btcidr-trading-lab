@@ -98,6 +98,11 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
             f"base settlement schema missing: {sorted(missing_parents)}"
         )
 
+    if db.execute("PRAGMA foreign_keys").fetchone() != (1,):
+        raise ReservationSchemaError(
+            "SQLite foreign key enforcement must be enabled"
+        )
+
     targets = set(_SCHEMA)
     existing_targets = targets & present
     if existing_targets and existing_targets != targets:

@@ -24,6 +24,15 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             ensure_reservation_schema_v2(db)
         db.close()
 
+    def test_requires_foreign_key_enforcement(self):
+        db = self.connection()
+        db.execute("PRAGMA foreign_keys=OFF")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "foreign key enforcement"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_requires_parent_settlement_tables(self):
         db = sqlite3.connect(":memory:")
         db.execute("BEGIN")
