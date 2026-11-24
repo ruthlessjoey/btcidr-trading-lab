@@ -56,11 +56,14 @@ class SQLiteRiskStateStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        with self._connect() as db:
+        db = self._connect()
+        try:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS risk_state ("
                 "account_id TEXT PRIMARY KEY, snapshot_json TEXT NOT NULL, head_hash TEXT NOT NULL)"
             )
+        finally:
+            db.close()
         try:
             os.chmod(self.path, 0o600)
         except OSError as exc:
@@ -73,19 +76,23 @@ class SQLiteRiskStateStore:
         return db
 
     def load(self, account_id: str) -> Mapping[str, object] | None:
-        with self._lock, self._connect() as db:
-            row = db.execute(
-                "SELECT snapshot_json FROM risk_state WHERE account_id=?", (account_id,)
-            ).fetchone()
-            if row is None:
-                return None
+        with self._lock:
+            db = self._connect()
             try:
-                value = json.loads(row[0])
-            except (TypeError, ValueError) as exc:
-                raise RiskGatewayError("stored risk snapshot is malformed") from exc
-            if not isinstance(value, dict):
-                raise RiskGatewayError("stored risk snapshot must be an object")
-            return value
+                row = db.execute(
+                    "SELECT snapshot_json FROM risk_state WHERE account_id=?", (account_id,)
+                ).fetchone()
+                if row is None:
+                    return None
+                try:
+                    value = json.loads(row[0])
+                except (TypeError, ValueError) as exc:
+                    raise RiskGatewayError("stored risk snapshot is malformed") from exc
+                if not isinstance(value, dict):
+                    raise RiskGatewayError("stored risk snapshot must be an object")
+                return value
+            finally:
+                db.close()
 
     def save_atomic(self, account_id: str, snapshot: Mapping[str, object]) -> None:
         if not account_id:
@@ -95,15 +102,22 @@ class SQLiteRiskStateStore:
         head_hash = state.get("head_hash") if isinstance(state, Mapping) else None
         if not isinstance(head_hash, str) or len(head_hash) != 64:
             raise RiskGatewayError("snapshot has no valid journal head")
-        with self._lock, self._connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "INSERT INTO risk_state(account_id,snapshot_json,head_hash) VALUES(?,?,?) "
-                "ON CONFLICT(account_id) DO UPDATE SET "
-                "snapshot_json=excluded.snapshot_json, head_hash=excluded.head_hash",
-                (account_id, encoded, head_hash),
-            )
-            db.execute("COMMIT")
+        with self._lock:
+            db = self._connect()
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    "INSERT INTO risk_state(account_id,snapshot_json,head_hash) VALUES(?,?,?) "
+                    "ON CONFLICT(account_id) DO UPDATE SET "
+                    "snapshot_json=excluded.snapshot_json, head_hash=excluded.head_hash",
+                    (account_id, encoded, head_hash),
+                )
+                db.execute("COMMIT")
+            except Exception:
+                db.execute("ROLLBACK")
+                raise
+            finally:
+                db.close()
         try:
             os.chmod(self.path, 0o600)
         except OSError as exc:
