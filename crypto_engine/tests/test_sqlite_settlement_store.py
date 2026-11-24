@@ -126,6 +126,18 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SQLiteSettlementStore(self.path, account_id="other", currency="USDT",
                                   opening_cash="10000")
 
+    def test_missing_table_is_not_silently_recreated(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TABLE outbox")
+        with self.assertRaisesRegex(SettlementStoreError, "schema mismatch"):
+            SQLiteSettlementStore(self.path, account_id="paper-research",
+                                  currency="USDT", opening_cash="10000")
+        with sqlite3.connect(self.path) as db:
+            tables = {row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+        self.assertNotIn("outbox", tables)
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
