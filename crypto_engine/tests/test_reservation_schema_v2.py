@@ -103,6 +103,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             "WHERE type='table' AND name='reservations'"
         )
         db.execute("PRAGMA writable_schema=OFF")
+        db.commit()
         db.execute("BEGIN")
         with self.assertRaisesRegex(ReservationSchemaError, "definition mismatch"):
             ensure_reservation_schema_v2(db)
@@ -120,6 +121,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             "WHERE type='table' AND name='reservations'"
         )
         db.execute("PRAGMA writable_schema=OFF")
+        db.commit()
         db.execute("BEGIN")
         with self.assertRaisesRegex(ReservationSchemaError, "definition mismatch"):
             ensure_reservation_schema_v2(db)
