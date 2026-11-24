@@ -13,6 +13,13 @@ from dataclasses import dataclass
 from typing import Tuple
 
 
+# Must match sqlite_settlement_store.py. Oversized history blocks migration;
+# preflight never truncates, skips, or rewrites audit evidence.
+_AUDIT_MAX_EVENT_BYTES = 64 * 1024
+_AUDIT_MAX_TOTAL_BYTES = 256 * 1024 * 1024
+_AUDIT_MAX_EVENTS = 1_000_000
+
+
 @dataclass(frozen=True)
 class MigrationPreflight:
     eligible: bool
@@ -72,32 +79,42 @@ def _normalize_sql(value: str) -> str:
 
 
 def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
+    try:
+        count, total_bytes, max_bytes = db.execute(
+            "SELECT COUNT(*),COALESCE(SUM(length(CAST(event_json AS BLOB))),0),"
+            "COALESCE(MAX(length(CAST(event_json AS BLOB))),0) FROM main.audit"
+        ).fetchone()
+    except sqlite3.DatabaseError:
+        return False, 0
+    if (count > _AUDIT_MAX_EVENTS or total_bytes > _AUDIT_MAX_TOTAL_BYTES
+            or max_bytes > _AUDIT_MAX_EVENT_BYTES):
+        return False, count
     previous = "0" * 64
-    count = 0
+    verified_count = 0
     for event_json, previous_hash, event_hash in db.execute(
         "SELECT event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
     ):
         if previous_hash != previous:
-            return False, count
+            return False, verified_count
         try:
             event = json.loads(event_json)
             if not isinstance(event, dict):
-                return False, count
+                return False, verified_count
             encoded = json.dumps(
                 event, sort_keys=True, separators=(",", ":"), allow_nan=False
             )
             if encoded != event_json:
-                return False, count
+                return False, verified_count
         except (TypeError, ValueError, json.JSONDecodeError, RecursionError):
             # Deeply nested JSON can exceed Python's parser/encoder recursion limit.
             # Treat it as invalid audit evidence rather than leaking an exception.
-            return False, count
+            return False, verified_count
         expected = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
         if event_hash != expected:
-            return False, count
+            return False, verified_count
         previous = event_hash
-        count += 1
-    return True, count
+        verified_count += 1
+    return True, verified_count
 
 
 def inspect_v1_migration_eligibility(

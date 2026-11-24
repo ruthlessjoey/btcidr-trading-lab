@@ -17,6 +17,12 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 
+# Resource envelope shared with the read-only migration preflight.
+_AUDIT_MAX_EVENT_BYTES = 64 * 1024
+_AUDIT_MAX_TOTAL_BYTES = 256 * 1024 * 1024
+_AUDIT_MAX_EVENTS = 1_000_000
+
+
 class _ClosingConnection(sqlite3.Connection):
     """Connection context manager that also closes the handle on exit."""
     def __exit__(self, exc_type, exc, tb):
@@ -263,6 +269,10 @@ class SQLiteSettlementStore:
                 )
             previous = db.execute("SELECT event_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
             head = previous[0] if previous else "0" * 64
+            audit_count, audit_bytes = db.execute(
+                "SELECT COUNT(*),COALESCE(SUM(length(CAST(event_json AS BLOB))),0) FROM audit"
+            ).fetchone()
+            audit_budget = [audit_count, audit_bytes]
             for fill, holding_after, cash_after in staged:
                 db.execute(
                     "INSERT INTO fills(fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp) "
@@ -275,7 +285,7 @@ class SQLiteSettlementStore:
                     "batch_id": batch_id, **fill, "cash_after": format(cash_after, "f"),
                     "holding_after": format(holding_after, "f"), "timestamp": timestamp,
                 }
-                head = self._append_audit(db, event)
+                head = self._append_audit(db, event, budget=audit_budget)
             for item in normalized_outbox:
                 db.execute(
                     "INSERT INTO outbox(idempotency_key,batch_id,market_id,authorized_quantity,"
@@ -357,14 +367,30 @@ class SQLiteSettlementStore:
             return {"account_id": self.account_id, "currency": self.currency,
                     "cash": account[0], "holdings": holdings}
 
-    def _append_audit(self, db: sqlite3.Connection, event: Mapping[str, Any]) -> str:
+    def _append_audit(self, db: sqlite3.Connection, event: Mapping[str, Any], *,
+                      budget: list[int] | None = None) -> str:
         row = db.execute("SELECT event_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
         previous = row[0] if row else "0" * 64
-        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=False, allow_nan=False)
+        # Keep the stored canonical representation aligned with _event_hash,
+        # which uses json.dumps' default ensure_ascii=True behavior.
+        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        event_bytes = len(encoded.encode("utf-8"))
+        if event_bytes > _AUDIT_MAX_EVENT_BYTES:
+            raise SettlementStoreError("audit event exceeds the 64 KiB resource limit")
+        if budget is None:
+            count, total_bytes = db.execute(
+                "SELECT COUNT(*),COALESCE(SUM(length(CAST(event_json AS BLOB))),0) FROM audit"
+            ).fetchone()
+            budget = [count, total_bytes]
+        if budget[0] >= _AUDIT_MAX_EVENTS:
+            raise SettlementStoreError("audit event count exceeds the 1,000,000 event resource limit")
+        if budget[1] + event_bytes > _AUDIT_MAX_TOTAL_BYTES:
+            raise SettlementStoreError("audit history exceeds the 256 MiB resource limit")
         digest = _event_hash(previous, event)
         db.execute("INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
                    (encoded, previous, digest))
+        budget[0] += 1
+        budget[1] += event_bytes
         return digest
 
     def verify_audit_chain(self) -> bool:
@@ -372,6 +398,16 @@ class SQLiteSettlementStore:
             return self._verify_chain(db)
 
     def _verify_chain(self, db: sqlite3.Connection) -> bool:
+        try:
+            count, total_bytes, max_bytes = db.execute(
+                "SELECT COUNT(*),COALESCE(SUM(length(CAST(event_json AS BLOB))),0),"
+                "COALESCE(MAX(length(CAST(event_json AS BLOB))),0) FROM audit"
+            ).fetchone()
+        except sqlite3.DatabaseError:
+            return False
+        if (count > _AUDIT_MAX_EVENTS or total_bytes > _AUDIT_MAX_TOTAL_BYTES
+                or max_bytes > _AUDIT_MAX_EVENT_BYTES):
+            return False
         previous = "0" * 64
         for event_json, stored_previous, stored_hash in db.execute(
                 "SELECT event_json,previous_hash,event_hash FROM audit ORDER BY seq"):

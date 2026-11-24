@@ -14,6 +14,12 @@ A batch with SELL settlement messages commits as `COMMITTED_PENDING_OUTBOX`. A t
 
 For every market, the sum of SELL fill quantities must equal the sum of nonzero outbox filled quantities. Zero-fill reservation notifications are allowed. This is an aggregate invariant; reservation identity/ownership still requires integration-level proof. The store does not implement a network worker or receiver. Never retry an ambiguous delivery unless the receiver guarantees idempotency. An acknowledgement receipt is evidence supplied by the trusted adapter, not independently verified by this module. A receipt digest and outbox acknowledgement audit event are committed atomically with the acknowledgement; the batch result is updated to COMPLETE in the same transaction after the final acknowledgement.
 
+## Audit resource envelope
+
+New audit events are limited to 64 KiB of canonical UTF-8 JSON each. The retained audit chain is limited to 1,000,000 events and 256 MiB of aggregate canonical event bytes. The writer checks these limits inside the same SQLite transaction as the accounting mutation; an oversized event or exhausted history budget aborts and rolls back the entire batch/acknowledgement.
+
+The read-only v1 migration preflight applies the same limits before parsing or hashing audit payloads. Historical audit data above any limit is a migration blocker. It is never truncated, skipped, rewritten, or partially accepted. These limits are a deliberate operational envelope for this store; any future increase requires a reviewed change to both writer and preflight, plus resource and compatibility tests.
+
 ## Storage and limits
 
 - Uses SQLite foreign keys, FULL synchronous mode, DELETE journaling, trusted_schema OFF and bounded busy timeout. Startup runs PRAGMA integrity_check and verifies the local audit chain before accepting the store. Existing databases must contain the complete expected table and column layout and a recognized schema-version row; incomplete or altered schemas are rejected rather than silently recreated. Only a genuinely empty database is initialized automatically.
