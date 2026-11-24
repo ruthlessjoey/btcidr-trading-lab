@@ -112,6 +112,18 @@ class OfflineSettlementTests(unittest.TestCase):
         self.assertEqual(self.gateway.calls, calls)
         self.assertEqual(self.ledger.snapshot_cash("a"), cash)
 
+    def test_same_batch_id_with_different_payload_is_rejected(self):
+        kwargs = {"batch_id": "payload-bound", "proposals": {"BTC/USDT": "1"},
+                  "bars": {"BTC/USDT": self.bar}, "timestamp": 101}
+        self.controller.process(**kwargs)
+        with self.assertRaises(BatchJournalError):
+            self.controller.process(batch_id="payload-bound", proposals={"BTC/USDT": "0.5"},
+                                    bars={"BTC/USDT": self.bar}, timestamp=101)
+
+    def test_journal_rejects_new_runtime_after_restart(self):
+        with self.assertRaises(BatchJournalError):
+            SQLiteBatchJournal(self.journal_path, runtime_id="different-runtime")
+
     def test_invalid_bar_rejected_before_gateway_call(self):
         bad = SyntheticBar("BTC/USDT", 100, "100", "105", "95", "102", "10")
         with self.assertRaises(ValueError):
