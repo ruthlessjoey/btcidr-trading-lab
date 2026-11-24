@@ -177,6 +177,16 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
+    def test_oversized_audit_event_blocks_preflight_without_parsing(self):
+        payload = " " * (64 * 1024 + 1)
+        self.db.execute(
+            "INSERT INTO audit VALUES(1,?,?,?)",
+            (payload, "0" * 64, "f" * 64),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain" in item for item in result.blockers))
+
     def test_broken_audit_chain_is_blocked(self):
         self.db.execute(
             "INSERT INTO audit VALUES(1,'{}',?,?)",
