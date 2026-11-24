@@ -12,11 +12,66 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db = sqlite3.connect(":memory:")
         db.execute("PRAGMA foreign_keys=ON")
         db.executescript("""
-            CREATE TABLE markets(market_id TEXT PRIMARY KEY);
-            CREATE TABLE batches(batch_id TEXT PRIMARY KEY);
-            CREATE TABLE fills(fill_id TEXT PRIMARY KEY);
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL
+            );
+            CREATE TABLE batches(
+                batch_id TEXT PRIMARY KEY,
+                request_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                result_json TEXT
+            );
+            CREATE TABLE fills(
+                fill_id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL REFERENCES batches(batch_id),
+                market_id TEXT NOT NULL REFERENCES markets(market_id),
+                side TEXT NOT NULL,
+                quantity TEXT NOT NULL,
+                price TEXT NOT NULL,
+                fee_quote TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            );
         """)
         return db
+
+    def test_rejects_parent_table_without_referenced_primary_key(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT NOT NULL,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        self.assertIsNone(db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='reservations'"
+        ).fetchone())
+        db.rollback()
+        db.close()
+
+    def test_rejects_parent_table_with_unexpected_columns(self):
+        db = self.connection()
+        db.execute("DROP TABLE markets")
+        db.execute("""
+            CREATE TABLE markets(
+                market_id TEXT PRIMARY KEY,
+                base_asset TEXT NOT NULL,
+                quote_asset TEXT NOT NULL,
+                injected TEXT
+            )
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema mismatch for markets"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
 
     def test_requires_caller_owned_transaction(self):
         db = self.connection()
