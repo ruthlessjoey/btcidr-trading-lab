@@ -7,7 +7,7 @@ atomically. Never accept reservation state supplied by a strategy agent.
 """
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Mapping, Sequence
 
 
@@ -26,6 +26,9 @@ def _quantity(value: object, field: str) -> Decimal:
         ) from exc
     if not number.is_finite():
         raise ReservationAllocationError(f"{field} must be finite")
+    parts = number.as_tuple()
+    if len(parts.digits) > 38 or parts.exponent < -18 or number.adjusted() > 38:
+        raise ReservationAllocationError(f"{field} exceeds supported decimal precision")
     return number
 
 
@@ -99,60 +102,64 @@ def validate_sell_allocations(
     allocation_ids: set[str] = set()
     allocated_by_fill: dict[str, Decimal] = {}
     allocated_by_reservation: dict[str, Decimal] = {}
-    for raw in allocations:
-        if not isinstance(raw, Mapping):
-            raise ReservationAllocationError("each allocation must be a mapping")
-        allocation_id = _required_text(raw, "allocation_id")
-        if allocation_id in allocation_ids:
-            raise ReservationAllocationError("allocation IDs must be unique")
-        allocation_ids.add(allocation_id)
-        fill_id = _required_text(raw, "fill_id")
-        reservation_id = _required_text(raw, "reservation_id")
-        if fill_id not in fill_by_id:
-            raise ReservationAllocationError("allocation references unknown fill")
-        if reservation_id not in reservation_by_id:
-            raise ReservationAllocationError("allocation references unknown reservation")
-        fill = fill_by_id[fill_id]
-        reservation = reservation_by_id[reservation_id]
-        if fill["side"] != "SELL":
-            raise ReservationAllocationError("BUY fills cannot consume SELL reservations")
-        if reservation["account_id"] != account_id:
-            raise ReservationAllocationError("cross-account reservation allocation rejected")
-        if reservation["market_id"] != fill["market_id"]:
-            raise ReservationAllocationError("cross-market reservation allocation rejected")
-        version = raw.get("reservation_version")
-        if isinstance(version, bool) or not isinstance(version, int):
-            raise ReservationAllocationError("reservation_version must be an integer")
-        if version != reservation["version"]:
-            raise ReservationAllocationError("stale reservation version")
-        quantity = _quantity(raw.get("allocated_quantity"), "allocated_quantity")
-        if quantity <= 0:
-            raise ReservationAllocationError("allocated_quantity must be positive")
-        allocated_by_fill[fill_id] = allocated_by_fill.get(fill_id, Decimal("0")) + quantity
-        allocated_by_reservation[reservation_id] = (
-            allocated_by_reservation.get(reservation_id, Decimal("0")) + quantity
-        )
-        normalized.append({
-            "allocation_id": allocation_id,
-            "fill_id": fill_id,
-            "reservation_id": reservation_id,
-            "account_id": account_id,
-            "market_id": str(fill["market_id"]),
-            "allocated_quantity": format(quantity, "f"),
-            "reservation_version": version,
-        })
-
-    for fill_id, fill in fill_by_id.items():
-        allocated = allocated_by_fill.get(fill_id, Decimal("0"))
-        if fill["side"] == "SELL" and allocated != fill["quantity"]:
-            raise ReservationAllocationError(
-                "SELL allocations must equal each fill quantity exactly"
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        for raw in allocations:
+            if not isinstance(raw, Mapping):
+                raise ReservationAllocationError("each allocation must be a mapping")
+            allocation_id = _required_text(raw, "allocation_id")
+            if allocation_id in allocation_ids:
+                raise ReservationAllocationError("allocation IDs must be unique")
+            allocation_ids.add(allocation_id)
+            fill_id = _required_text(raw, "fill_id")
+            reservation_id = _required_text(raw, "reservation_id")
+            if fill_id not in fill_by_id:
+                raise ReservationAllocationError("allocation references unknown fill")
+            if reservation_id not in reservation_by_id:
+                raise ReservationAllocationError("allocation references unknown reservation")
+            fill = fill_by_id[fill_id]
+            reservation = reservation_by_id[reservation_id]
+            if fill["side"] != "SELL":
+                raise ReservationAllocationError("BUY fills cannot consume SELL reservations")
+            if reservation["account_id"] != account_id:
+                raise ReservationAllocationError("cross-account reservation allocation rejected")
+            if reservation["market_id"] != fill["market_id"]:
+                raise ReservationAllocationError("cross-market reservation allocation rejected")
+            version = raw.get("reservation_version")
+            if isinstance(version, bool) or not isinstance(version, int):
+                raise ReservationAllocationError("reservation_version must be an integer")
+            if version != reservation["version"]:
+                raise ReservationAllocationError("stale reservation version")
+            quantity = _quantity(raw.get("allocated_quantity"), "allocated_quantity")
+            if quantity <= 0:
+                raise ReservationAllocationError("allocated_quantity must be positive")
+            allocated_by_fill[fill_id] = allocated_by_fill.get(fill_id, Decimal("0")) + quantity
+            allocated_by_reservation[reservation_id] = (
+                allocated_by_reservation.get(reservation_id, Decimal("0")) + quantity
             )
-        if fill["side"] == "BUY" and allocated != 0:
-            raise ReservationAllocationError("BUY fills cannot have allocations")
+            normalized.append({
+                "allocation_id": allocation_id,
+                "fill_id": fill_id,
+                "reservation_id": reservation_id,
+                "account_id": account_id,
+                "market_id": str(fill["market_id"]),
+                "allocated_quantity": format(quantity, "f"),
+                "reservation_version": version,
+            })
 
-    for reservation_id, allocated in allocated_by_reservation.items():
-        if allocated > reservation_by_id[reservation_id]["remaining"]:
-            raise ReservationAllocationError("reservation over-consumption rejected")
+        with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        for fill_id, fill in fill_by_id.items():
+                allocated = allocated_by_fill.get(fill_id, Decimal("0"))
+                if fill["side"] == "SELL" and allocated != fill["quantity"]:
+                    raise ReservationAllocationError(
+                        "SELL allocations must equal each fill quantity exactly"
+                    )
+                if fill["side"] == "BUY" and allocated != 0:
+                    raise ReservationAllocationError("BUY fills cannot have allocations")
+
+            for reservation_id, allocated in allocated_by_reservation.items():
+                if allocated > reservation_by_id[reservation_id]["remaining"]:
+                    raise ReservationAllocationError("reservation over-consumption rejected")
 
     return sorted(normalized, key=lambda row: str(row["allocation_id"]))
