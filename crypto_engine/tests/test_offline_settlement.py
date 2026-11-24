@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from tmm_core.offline_portfolio import MarketSpec, SyntheticMark, SyntheticPortfolioLedger
+from tmm_core.offline_portfolio import MarketSpec, SyntheticFill, SyntheticMark, SyntheticPortfolioLedger
 from tmm_core.offline_settlement import (
     ExecutionRules, OfflineSettlementController, SyntheticBar,
 )
@@ -50,9 +50,10 @@ class OfflineSettlementTests(unittest.TestCase):
         self.assertEqual(result.filled_quantity, Decimal("0.500"))
         self.assertGreater(result.fill_price, Decimal("100"))
         self.assertGreater(result.fee_quote, 0)
-        self.assertEqual(self.ledger.snapshot_holdings("a")["BTC/USDT"], "0.500")
+        self.assertEqual(Decimal(self.ledger.snapshot_holdings("a")["BTC/USDT"]), Decimal("0.500"))
 
     def test_sell_partial_fill_releases_reservation(self):
+        self.ledger.apply_fill(SyntheticFill("seed", "BTC/USDT", "BUY", "2", "100", "0", 100))
         self.gateway.permitted = {"BTC/USDT": "-1"}
         result = self.controller.process(
             batch_id="case-2", proposals={"BTC/USDT": "-1"}, bars={"BTC/USDT": self.bar}, timestamp=101
