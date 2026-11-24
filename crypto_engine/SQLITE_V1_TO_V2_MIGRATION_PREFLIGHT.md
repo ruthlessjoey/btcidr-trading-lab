@@ -5,7 +5,7 @@ This component is a read-only eligibility gate, not a migration. It requires a c
 ## Fail-closed rules
 
 The preflight rejects:
-- Any schema other than the expected v1 table and column set.
+- Any schema other than the expected v1 table, column and exact normalized DDL definitions (including CHECK, primary-key and foreign-key constraints).
 - Any schema version other than exactly `1`.
 - Unexpected non-auto indexes or triggers.
 - Any historical SELL fill, because v1 does not prove which durable reservation authorized each fill.
@@ -37,4 +37,4 @@ The actual migration implementation is intentionally not part of this PR.
 
 ## Verification status
 
-Eleven focused tests are committed. They have not been executed against the exact PR head. Exact-head CI, Python 3.11, migration-copy/restore tests, crash injection and independent review remain pending.
+Thirteen focused tests are committed. They have not been executed against the exact PR head. Exact-head CI, Python 3.11, migration-copy/restore tests, crash injection and independent review remain pending.
