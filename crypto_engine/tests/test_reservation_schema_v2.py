@@ -20,7 +20,8 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             CREATE TABLE batches(
                 batch_id TEXT PRIMARY KEY,
                 request_hash TEXT NOT NULL,
-                status TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN
+                  ('PROCESSING','COMMITTED_PENDING_OUTBOX','COMPLETE','RECONCILIATION_REQUIRED')),
                 created_at INTEGER NOT NULL,
                 result_json TEXT
             );
@@ -28,7 +29,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
                 fill_id TEXT PRIMARY KEY,
                 batch_id TEXT NOT NULL REFERENCES batches(batch_id),
                 market_id TEXT NOT NULL REFERENCES markets(market_id),
-                side TEXT NOT NULL,
+                side TEXT NOT NULL CHECK(side IN ('BUY','SELL')),
                 quantity TEXT NOT NULL,
                 price TEXT NOT NULL,
                 fee_quote TEXT NOT NULL,
