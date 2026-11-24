@@ -56,6 +56,10 @@ class SessionLossGuard:
         self._reserved_sells: dict[str, Decimal] = {}
         self._events: list[dict[str, object]] = []
         self._head_hash = _ZERO_HASH
+        self._append("SESSION_STARTED", started_at, {
+            "opening_equity": str(equity),
+            "max_session_loss": None if limit is None else str(limit),
+        })
 
     @property
     def is_halted(self) -> bool:
@@ -118,7 +122,10 @@ class SessionLossGuard:
             self._timestamp(timestamp)
             if not isinstance(reason, str) or not reason.strip():
                 raise SessionRiskError("halt reason must be a non-empty string")
-            self._latch(timestamp=timestamp, reason=reason)
+            if self.halted:
+                self._append("HALT_REASSERTED", timestamp, {"reason": reason})
+            else:
+                self._latch(timestamp=timestamp, reason=reason)
             self.last_timestamp = timestamp
 
     def authorize_proposals(self, *, proposals: Mapping[str, object],
@@ -135,6 +142,8 @@ class SessionLossGuard:
                 raise SessionRiskError("proposals and holdings must be mappings")
             if not proposals or set(proposals) != set(holdings):
                 raise SessionRiskError("proposal and holding market sets must match and be non-empty")
+            if any(not isinstance(key, str) or not key for key in proposals):
+                raise SessionRiskError("market IDs must be non-empty strings")
             permitted: dict[str, Decimal] = {}
             rejected: dict[str, str] = {}
             normalized_holdings: dict[str, Decimal] = {}
@@ -295,6 +304,83 @@ class SessionLossGuard:
                 raise SessionRiskError("snapshot halt state is inconsistent")
             if state["head_hash"] != guard._head_hash:
                 raise SessionRiskError("snapshot head hash does not match audit journal")
+
+            # Reconstruct security-critical state from the verified journal so a
+            # modified snapshot flag cannot silently clear a recorded halt.
+            if not guard._events or guard._events[0]["event_type"] != "SESSION_STARTED":
+                raise SessionRiskError("audit journal has no valid session-start event")
+            first = guard._events[0]
+            first_payload = first["payload"]
+            if not isinstance(first_payload, Mapping):
+                raise SessionRiskError("session-start payload is malformed")
+            active_session = first["session_id"]
+            derived_opening = _d(first_payload["opening_equity"], "journal.opening_equity")
+            derived_limit_raw = first_payload["max_session_loss"]
+            derived_limit = None if derived_limit_raw is None else _d(derived_limit_raw, "journal.max_session_loss")
+            derived_started = first["timestamp"]
+            derived_halted = False
+            derived_halt_timestamp = None
+            derived_halt_reason = None
+            derived_last_equity = derived_opening
+            derived_reserved: dict[str, Decimal] = {}
+            previous_timestamp = derived_started
+            for event in guard._events[1:]:
+                event_type = event["event_type"]
+                event_timestamp = event["timestamp"]
+                payload = event["payload"]
+                if (isinstance(event_timestamp, bool) or not isinstance(event_timestamp, int)
+                        or event_timestamp < previous_timestamp or not isinstance(payload, Mapping)):
+                    raise SessionRiskError("audit event timestamp/payload is invalid")
+                previous_timestamp = event_timestamp
+                if event_type == "SESSION_RESET":
+                    if (not derived_halted or payload.get("previous_session_id") != active_session
+                            or event["session_id"] == active_session):
+                        raise SessionRiskError("session reset event is inconsistent with halt state")
+                    active_session = event["session_id"]
+                    derived_opening = _d(payload["opening_equity"], "journal.reset_equity")
+                    derived_started = event_timestamp
+                    derived_last_equity = derived_opening
+                    derived_halted = False
+                    derived_halt_timestamp = None
+                    derived_halt_reason = None
+                    derived_reserved = {}
+                    continue
+                if event["session_id"] != active_session:
+                    raise SessionRiskError("audit event session identity is inconsistent")
+                if event_type == "SESSION_HALT":
+                    if derived_halted:
+                        raise SessionRiskError("duplicate session halt event")
+                    derived_halted = True
+                    derived_halt_timestamp = event_timestamp
+                    derived_halt_reason = payload.get("reason")
+                elif event_type == "EQUITY_OBSERVED":
+                    derived_last_equity = _d(payload["equity"], "journal.equity")
+                elif event_type == "PROPOSALS_AUTHORIZED":
+                    raw_reserved = payload.get("reserved_sells")
+                    if not isinstance(raw_reserved, Mapping):
+                        raise SessionRiskError("proposal audit reservation data is malformed")
+                    derived_reserved = {k: _d(v, f"journal.reserved.{k}") for k, v in raw_reserved.items()}
+                elif event_type == "SELL_SETTLED":
+                    market = payload["market_id"]
+                    remaining = _d(payload["remaining_reserved"], "journal.remaining_reserved")
+                    if remaining > 0:
+                        derived_reserved[market] = remaining
+                    else:
+                        derived_reserved.pop(market, None)
+                elif event_type not in ("PROPOSALS_AUTHORIZED", "SELL_SETTLED", "HALT_REASSERTED"):
+                    raise SessionRiskError("unknown audit event type")
+            if (active_session != state["session_id"]
+                    or derived_opening != _d(state["opening_equity"], "snapshot.opening_equity")
+                    or derived_limit != (None if state["max_session_loss"] is None
+                                         else _d(state["max_session_loss"], "snapshot.max_session_loss"))
+                    or derived_started != state["started_at"]
+                    or previous_timestamp != state["last_timestamp"]
+                    or derived_last_equity != guard.last_equity
+                    or derived_halted != guard.halted
+                    or derived_halt_timestamp != guard.halt_timestamp
+                    or derived_halt_reason != guard.halt_reason
+                    or derived_reserved != guard._reserved_sells):
+                raise SessionRiskError("snapshot state does not match verified audit journal")
             if guard.last_timestamp < guard.started_at or guard.last_equity < 0:
                 raise SessionRiskError("snapshot timestamp/equity is invalid")
             return guard
