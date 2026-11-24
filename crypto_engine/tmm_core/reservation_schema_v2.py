@@ -109,6 +109,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         )
 
     targets = set(_SCHEMA)
+    settlement_trigger_targets = targets | required_parents
     existing_targets = targets & present
     if existing_targets and existing_targets != targets:
         raise ReservationSchemaError(
@@ -130,9 +131,10 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
 
     unexpected = db.execute(
         "SELECT type,name FROM sqlite_master "
-        "WHERE type IN ('index','trigger') "
-        "AND name NOT LIKE 'sqlite_autoindex_%' "
-        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox') "
+        "WHERE (type='index' AND name NOT LIKE 'sqlite_autoindex_%' "
+        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox')) "
+        "OR (type='trigger' AND lower(tbl_name) IN "
+        "('markets','batches','fills','reservations','reservation_allocations','reservation_outbox')) "
         "ORDER BY type,name"
     ).fetchall()
     if unexpected:
@@ -143,7 +145,8 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     unexpected_temp_triggers = db.execute(
         "SELECT type,name FROM temp.sqlite_master "
         "WHERE type='trigger' "
-        "AND lower(tbl_name) IN ('reservations','reservation_allocations','reservation_outbox') "
+        "AND lower(tbl_name) IN "
+        "('markets','batches','fills','reservations','reservation_allocations','reservation_outbox') "
         "ORDER BY name"
     ).fetchall()
     if unexpected_temp_triggers:
