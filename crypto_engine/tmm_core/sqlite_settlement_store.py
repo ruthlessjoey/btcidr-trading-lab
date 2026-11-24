@@ -83,7 +83,8 @@ class SQLiteSettlementStore:
             ).fetchone()
             if row != (account_id, currency):
                 raise SettlementStoreError("database account identity mismatch")
-            self._verify_chain(db)
+            if not self._verify_chain(db):
+                raise SettlementStoreError("audit chain verification failed; store locked")
 
     def register_market(self, market_id: str, base_asset: str, quote_asset: str) -> None:
         if not all(isinstance(v, str) and v.strip() for v in (market_id, base_asset, quote_asset)):
@@ -301,13 +302,16 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("receiver_receipt is required")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT batch_id,status FROM outbox WHERE idempotency_key=?",
+            row = db.execute("SELECT batch_id,status,receiver_receipt FROM outbox WHERE idempotency_key=?",
                              (idempotency_key,)).fetchone()
             if row is None:
                 db.rollback()
                 raise SettlementStoreError("unknown outbox key")
-            batch_id, status = row
+            batch_id, status, old_receipt = row
             if status == "ACKNOWLEDGED":
+                if old_receipt != receiver_receipt:
+                    db.rollback()
+                    raise SettlementStoreError("outbox acknowledgement receipt mismatch")
                 db.commit()
                 return
             db.execute("UPDATE outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
