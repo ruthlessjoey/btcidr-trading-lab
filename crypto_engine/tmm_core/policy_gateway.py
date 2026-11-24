@@ -137,24 +137,6 @@ class PolicyEnforcedRiskGateway:
         except (ExposurePolicyError, KeyError, TypeError, ValueError) as exc:
             raise RiskGatewayError("exposure policy rejected proposal; no authorization issued") from exc
 
-    def settle_sell(
-        self, *, market_id: str, authorized_quantity: object,
-        filled_quantity: object, timestamp: int,
-    ) -> None:
-        self.__gateway.settle_sell(
-            market_id=market_id, authorized_quantity=authorized_quantity,
-            filled_quantity=filled_quantity, timestamp=timestamp,
-        )
-
-    def reset(
-        self, *, new_session_id: str, opening_equity: object, timestamp: int,
-        actor: str, reason: str, approval_ref: str,
-    ) -> None:
-        self.__gateway.reset(
-            new_session_id=new_session_id, opening_equity=opening_equity,
-            timestamp=timestamp, actor=actor, reason=reason, approval_ref=approval_ref,
-        )
-
     @property
     def is_halted(self) -> bool:
         return self.__gateway.is_halted
