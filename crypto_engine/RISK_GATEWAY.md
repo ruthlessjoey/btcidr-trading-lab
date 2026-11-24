@@ -20,7 +20,8 @@ The repository deliberately does not invent or embed trust credentials or a remo
 1. An account-owned ledger that derives balances and equity from the authoritative paper-account journal, not agent inputs.
 2. An owner-controlled reset authorization service that authenticates the owner and verifies approval records.
 3. An independently operated audit anchor whose storage and credentials are outside the application host's writable boundary.
-4. A private durable path for `SQLiteRiskStateStore`; the SQLite snapshot is local transactional persistence, not the external anchor.
+4. An owner-controlled session-policy authorizer that approves the opening equity and mandatory non-null session-loss threshold before account initialization.
+5. A private durable path for `SQLiteRiskStateStore`; the SQLite snapshot is local transactional persistence, not the external anchor.
 
 Tests use synthetic in-memory implementations of the ledger, authorizer and anchor. These test doubles prove the facade's call contract only; they are not production trust services.
 
