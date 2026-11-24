@@ -103,3 +103,12 @@ PR #109 adds `tmm_core.offline_settlement.OfflineSettlementController`, a truste
 PR #110 adds a trusted `batch_id` to the offline settlement controller. Duplicate or previously attempted batch IDs are rejected before a second proposal-gateway call; fill IDs are derived from the batch ID. Bars and execution rules are prevalidated before the stateful risk call. Aggregate BUY cash and SELL inventory are preflighted before ledger mutation. A concrete undefined Decimal alias was corrected by importing the ledger's `D` alias.
 
 Replay protection is in-memory only and does not survive restart. Failed attempts burn their batch IDs; they require trusted reconciliation before a new batch. Ledger mutation and the SELL settlement callback are not one durable transaction: callback/process failure can leave partial state. This PR does not claim atomic batch execution or production-grade durable idempotency. Focused tests and exact-head full-suite/CI/independent review remain pending.
+
+
+## Follow-on milestone — durable offline batch journal (24 Nov 2026)
+
+PR #111 adds `SQLiteBatchJournal` and makes it mandatory for `OfflineSettlementController`. Batch claims and completed results are stored in SQLite using immediate transactions and FULL synchronous commits. Each batch ID is bound to a canonical hash of proposals, bars, timestamp and execution rules. Identical completed replays return the stored result without calling the proposal gateway again; ID reuse with different payload is rejected.
+
+The journal is bound to a runtime identity. A new process/runtime cannot automatically resume it: it fails closed and requires trusted reconciliation. An interrupted `PROCESSING` record also blocks replay. This is deliberate because the portfolio ledger remains in-memory; replaying a completed result into a fresh ledger would create inconsistent accounting. The journal and ledger/SELL callback are not one atomic transaction. Durable portfolio state, recovery tooling and atomic cross-component settlement remain outstanding.
+
+Local verification of the uploaded source snapshot after these changes: 103 crypto_engine tests passed; static boundary check passed for 17 modules; compileall passed. Runtime was Python 3.13.5. These results are local on the uploaded PR #110 archive with the PR #111 changes applied, not GitHub CI or exact branch checkout. Python 3.11 and independent review remain pending.
