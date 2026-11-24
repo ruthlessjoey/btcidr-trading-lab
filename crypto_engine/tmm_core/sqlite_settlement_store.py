@@ -366,8 +366,9 @@ class SQLiteSettlementStore:
     def _append_audit(self, db: sqlite3.Connection, event: Mapping[str, Any]) -> str:
         row = db.execute("SELECT event_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()
         previous = row[0] if row else "0" * 64
-        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"),
-                             ensure_ascii=False, allow_nan=False)
+        # Keep the stored canonical representation aligned with _event_hash,
+        # which uses json.dumps' default ensure_ascii=True behavior.
+        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"), allow_nan=False)
         event_bytes = len(encoded.encode("utf-8"))
         if event_bytes > _AUDIT_MAX_EVENT_BYTES:
             raise SettlementStoreError("audit event exceeds the 64 KiB resource limit")
