@@ -1,7 +1,10 @@
+import os
+import tempfile
 import unittest
 from decimal import Decimal
 
 from tmm_core.offline_portfolio import MarketSpec, SyntheticFill, SyntheticMark, SyntheticPortfolioLedger
+from tmm_core.offline_batch_journal import BatchJournalError, SQLiteBatchJournal
 from tmm_core.offline_settlement import (
     ExecutionRules, OfflineSettlementController, SyntheticBar,
 )
@@ -25,6 +28,9 @@ class Settlement:
 
 class OfflineSettlementTests(unittest.TestCase):
     def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.journal_path = os.path.join(self.tempdir.name, "batches.sqlite3")
+        self.journal = SQLiteBatchJournal(self.journal_path, runtime_id="runtime-test")
         self.ledger = SyntheticPortfolioLedger(
             account_id="a", account_currency="USDT", opening_cash="10000",
             markets={"BTC/USDT": MarketSpec("BTC/USDT", "BTC", "USDT")},
@@ -40,6 +46,7 @@ class OfflineSettlementTests(unittest.TestCase):
             rules={"BTC/USDT": ExecutionRules("0.001", "0.1", fee_bps="10",
                                                half_spread_bps="5", slippage_bps="5",
                                                max_volume_participation="0.05")},
+            batch_journal=self.journal,
         )
         self.bar = SyntheticBar("BTC/USDT", 101, "100", "105", "95", "102", "10")
 
@@ -94,14 +101,14 @@ class OfflineSettlementTests(unittest.TestCase):
         self.assertEqual(self.settlement.calls[0]["filled_quantity"], Decimal("0"))
 
 
-    def test_duplicate_batch_rejected_before_second_gateway_call(self):
+    def test_duplicate_completed_batch_returns_recorded_result_without_gateway_call(self):
         kwargs = {"batch_id": "stable-batch", "proposals": {"BTC/USDT": "1"},
                   "bars": {"BTC/USDT": self.bar}, "timestamp": 101}
         self.controller.process(**kwargs)
         calls = self.gateway.calls
         cash = self.ledger.snapshot_cash("a")
-        with self.assertRaisesRegex(ValueError, "duplicate"):
-            self.controller.process(**kwargs)
+        replay = self.controller.process(**kwargs)
+        self.assertEqual(replay, first)
         self.assertEqual(self.gateway.calls, calls)
         self.assertEqual(self.ledger.snapshot_cash("a"), cash)
 
@@ -119,9 +126,13 @@ class OfflineSettlementTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.controller.process(**kwargs)
         self.gateway.permitted = {"BTC/USDT": "1"}
-        with self.assertRaisesRegex(ValueError, "duplicate"):
+        with self.assertRaisesRegex(BatchJournalError, "unresolved"):
             self.controller.process(**kwargs)
         self.assertEqual(self.gateway.calls, 1)
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()
