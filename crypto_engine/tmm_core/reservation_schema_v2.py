@@ -51,7 +51,27 @@ _SCHEMA = {
 
 
 def _normalize(sql: str) -> str:
-    return "".join(sql.split()).casefold()
+    """Normalize SQL formatting without changing quoted literals/identifiers."""
+    output = []
+    quote = None
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        if quote is not None:
+            output.append(char)
+            if char == quote:
+                if index + 1 < len(sql) and sql[index + 1] == quote:
+                    output.append(sql[index + 1])
+                    index += 1
+                else:
+                    quote = None
+        elif char in ("'", '"', "`", "["):
+            quote = "]" if char == "[" else char
+            output.append(char)
+        elif not char.isspace():
+            output.append(char.casefold())
+        index += 1
+    return "".join(output)
 
 
 def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
