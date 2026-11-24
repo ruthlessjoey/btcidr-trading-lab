@@ -174,6 +174,44 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.rollback()
         db.close()
 
+    def test_rejects_trigger_on_fill_parent_that_can_mutate_reservations(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("""
+            CREATE TRIGGER injected_fill_reservation_trigger
+            AFTER INSERT ON fills
+            BEGIN
+                UPDATE reservations SET version=version+1
+                WHERE reservation_id='r1';
+            END
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "unapproved"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_rejects_temp_trigger_on_fill_parent_that_can_mutate_reservations(self):
+        db = self.connection()
+        db.execute("BEGIN")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.execute("""
+            CREATE TEMP TRIGGER injected_temp_fill_reservation_trigger
+            AFTER INSERT ON main.fills
+            BEGIN
+                UPDATE main.reservations SET version=version+1
+                WHERE reservation_id='r1';
+            END
+        """)
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(ReservationSchemaError, "TEMP reservation triggers"):
+            ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
     def test_rejects_unapproved_trigger(self):
         db = self.connection()
         db.execute("BEGIN")
