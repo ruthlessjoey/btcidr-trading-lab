@@ -59,6 +59,42 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertEqual(result.schema_class, "V2_CURRENT_EXACT")
 
+
+    def test_classifies_earlier_v2_schema_as_not_current(self):
+        self.db.executescript("""
+        CREATE TABLE reservations(
+          reservation_id TEXT PRIMARY KEY, account_id TEXT NOT NULL,
+          market_id TEXT NOT NULL REFERENCES markets(market_id),
+          base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL,
+          authorized_quantity TEXT NOT NULL, consumed_quantity TEXT NOT NULL,
+          created_at INTEGER NOT NULL, version INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('ACTIVE','RELEASED','CANCELLED','EXPIRED'))
+        );
+        CREATE TABLE reservation_allocations(
+          allocation_id TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(batch_id),
+          fill_id TEXT NOT NULL REFERENCES fills(fill_id),
+          reservation_id TEXT NOT NULL REFERENCES reservations(reservation_id),
+          account_id TEXT NOT NULL, market_id TEXT NOT NULL,
+          allocated_quantity TEXT NOT NULL, reservation_version INTEGER NOT NULL,
+          UNIQUE(fill_id,reservation_id)
+        );
+        CREATE TABLE reservation_outbox(
+          idempotency_key TEXT PRIMARY KEY,
+          allocation_id TEXT NOT NULL REFERENCES reservation_allocations(allocation_id),
+          batch_id TEXT NOT NULL REFERENCES batches(batch_id),
+          reservation_id TEXT NOT NULL REFERENCES reservations(reservation_id),
+          fill_id TEXT NOT NULL REFERENCES fills(fill_id),
+          account_id TEXT NOT NULL, market_id TEXT NOT NULL,
+          reservation_version INTEGER NOT NULL, allocated_quantity TEXT NOT NULL,
+          payload_sha256 TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('PENDING','ACKNOWLEDGED')),
+          receiver_receipt TEXT
+        );
+        """)
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertEqual(result.schema_class, "V2_EARLIER")
+
     def test_classifies_partial_v2_schema(self):
         self.db.execute("CREATE TABLE reservations(reservation_id TEXT PRIMARY KEY, account_id TEXT NOT NULL)")
         result = self.inspect()
