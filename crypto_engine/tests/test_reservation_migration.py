@@ -97,6 +97,10 @@ class ReservationMigrationCopyTests(unittest.TestCase):
                     "fill_id":"sell-without-reservation","market_id":"BTC/USDT",
                     "side":"SELL","quantity":"0.1","price":"110","fee_quote":"0",
                 }],
+                sell_settlements=[{
+                    "idempotency_key":"settle:blocked-sell","market_id":"BTC/USDT",
+                    "authorized_quantity":"0.1","filled_quantity":"0.1",
+                }],
                 timestamp=20,
             )
         with sqlite3.connect(self.output) as db:
