@@ -390,12 +390,18 @@ class SQLiteSettlementStore:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
         with self._connect() as db:
-            enabled = db.execute(
-                "SELECT COUNT(*) FROM main.sqlite_master WHERE type='table' "
-                "AND name IN ('reservations','reservation_allocations','reservation_outbox')"
-            ).fetchone()[0]
-            if enabled != 3:
+            objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if not objects:
                 return []
+            if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            db.execute("BEGIN")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
                 "market_id,reservation_version,allocated_quantity,payload_sha256 "
@@ -448,6 +454,16 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("receiver_receipt is required")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
+                db.rollback()
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
             row = db.execute(
                 "SELECT batch_id,status,receiver_receipt,allocation_id "
                 "FROM main.reservation_outbox WHERE idempotency_key=?",
