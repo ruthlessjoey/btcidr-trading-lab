@@ -184,6 +184,18 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             timestamp=10,
         )
 
+    def test_pending_outbox_rejects_unlogged_market_registry_entry(self):
+        self._create_pending_zero_quantity_outbox()
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
+                "VALUES('ETH/USDT','ETH','USDT')"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.pending_outbox()
+
     def test_pending_outbox_rejects_tampered_accounting_state(self):
         self._create_pending_zero_quantity_outbox()
         with _managed_connection(self.path) as db:
@@ -214,6 +226,18 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement(key="settle:reservation-cash-guard")],
             sell_allocations=[self.allocation()], timestamp=20,
         )
+
+    def test_pending_reservation_outbox_rejects_unlogged_market_registry_entry(self):
+        self._create_pending_reservation_outbox()
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
+                "VALUES('ETH/USDT','ETH','USDT')"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.pending_reservation_outbox()
 
     def test_pending_reservation_outbox_rejects_tampered_account_cash(self):
         self._create_pending_reservation_outbox()
@@ -924,6 +948,25 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SettlementStoreError, "market registry does not match audit events"
         ):
             self.store.register_market("BTC/USDT", "ETH", "USDT")
+
+    def test_register_market_rejects_unlogged_market_insertion(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
+                "VALUES('ETH/USDT','ETH','USDT')"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("SOL/USDT", "SOL", "USDT")
+
+    def test_register_market_rejects_unlogged_market_deletion(self):
+        with _managed_connection(self.path) as db:
+            db.execute("DELETE FROM main.markets WHERE market_id='BTC/USDT'")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("SOL/USDT", "SOL", "USDT")
 
     def test_register_market_rejects_removed_required_market_policy_marker(self):
         with _managed_connection(self.path) as db:
