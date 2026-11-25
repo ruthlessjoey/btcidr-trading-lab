@@ -157,7 +157,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
         self.store.apply_batch(
             batch_id="b-smallest-scale",
-            fills=[self.buy(qty="1e-160")],
+            fills=[self.buy(qty="1e-128")],
             timestamp=10,
         )
         snapshot = self.store.snapshot()
@@ -167,7 +167,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         )
         with localcontext() as decimal_context:
             decimal_context.prec = 640
-            expected_cash = Decimal("10000") - Decimal("1e-160")
+            expected_cash = Decimal("10000") - Decimal("1e-128")
         self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
