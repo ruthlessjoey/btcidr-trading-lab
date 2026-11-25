@@ -462,6 +462,60 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 expected_payload_sha256=expected_hash,
             )
 
+
+    def test_missing_reservation_outbox_blocks_delivery_and_batch_completion(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "DELETE FROM main.reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            status = db.execute(
+                "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
+            ).fetchone()[0]
+            legacy_status = db.execute(
+                "SELECT status FROM main.outbox WHERE idempotency_key='settle:reserved'"
+            ).fetchone()[0]
+        self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
+        self.assertEqual(legacy_status, "PENDING")
+
+    def test_duplicate_reservation_outbox_rows_block_delivery_and_completion(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "INSERT INTO main.reservation_outbox "
+                "SELECT 'duplicate-key',allocation_id,batch_id,reservation_id,fill_id,"
+                "account_id,market_id,reservation_version,allocated_quantity,payload_sha256,"
+                "status,receiver_receipt FROM main.reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            status = db.execute(
+                "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
+            ).fetchone()[0]
+        self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
+
     def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
