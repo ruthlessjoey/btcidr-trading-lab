@@ -870,3 +870,82 @@ Static review of the preferred #190 candidate found that holding-transition veri
 7. Keep MEME_INTEL separate until independently ready and explicitly approved.
 
 Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
+
+## 26 November — bounded inputs, precision-safe arithmetic and first-fill inventory baseline
+
+### PR #188 — bound market and batch inputs
+
+- Exact head: `2a6ca16d85d66a6c50496bbe0ee9bd166c40bdd0`; base PR #187.
+- Bounds market IDs to 128 characters, base/quote asset codes to 32, fill IDs and outbox idempotency keys to 256.
+- Caps fills and sell-settlement rows at 1,000 per batch, consistent with the existing allocation cap.
+- Adds over-limit regression tests.
+- Exact-head run [45676146711](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45676146711): Python 3.11.18 and 3.13.18 each passed 69 settlement-store + 16 receiver tests (85 per version), warning-as-error with no actual ResourceWarning output.
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #189 and PR #191 — decimal input bounds (superseded)
+
+- Both branches addressed unbounded Decimal text/exponent inputs.
+- Their functionality and regression coverage are included in PR #190, which is based on #188 and uses a stricter 80-digit precision bound plus explicit adjusted-magnitude limits.
+- Treat #189/#191 as superseded; do not count them as separate integration candidates.
+
+### PR #190 — bound decimal text, precision and exponent
+
+- Exact head: `a98ab09fdb55c1d41053b8e73b37d6b6a8cc9fcc`; base PR #188.
+- Bounds decimal text to 128 characters, significant precision to 80 digits, exponent to [-160, 128], and nonzero adjusted magnitude to [-128, 128].
+- Prevents short extreme-exponent inputs from causing enormous fixed-point expansion during canonicalization.
+- Tests huge positive/negative exponents, zero with an extreme negative exponent, overlong text and excessive precision; verifies invalid inputs do not mutate cash/batches.
+- Exact-head run [45676586575](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45676586575): Python 3.11.18 and 3.13.18 each passed 70 settlement-store + 16 receiver tests (86 per version), warning-as-error and no actual warnings.
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #192 — use consistent 80-digit settlement arithmetic
+
+- Exact head: `5e6c2b6034629c9d89594ff1bbfe20d9753a4989`; base PR #190.
+- Finding: account/fill verification used Decimal precision 80, while apply_batch cash/holdings and SELL/outbox quantity aggregation used Python's default precision 28. Tiny quote debits could round away and multi-fill totals could mismatch.
+- Wraps SELL fill/outbox aggregation and cash/holdings/notional/fee/proceeds arithmetic in precision-80 local contexts.
+- Adds a regression proving sub-default-precision BUY debits persist and snapshot reconciliation succeeds.
+- Exact-head run [45677361442](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45677361442): Python 3.11.18 and 3.13.18 each passed 71 settlement-store + 16 receiver tests (87 per version), warning-as-error and no actual warnings.
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #193 — first-fill zero-inventory baseline (superseded by #194)
+
+- Exact head: `5c950b5fcfd3dd2adba36eee9cd074b82f5407fd`; sibling of #192 based on #190.
+- Finding: the verifier checked holding transitions only after a market had appeared in previous_holdings. A forged first SELL could therefore claim a nonnegative post-fill holding without an opening-inventory event.
+- Fix: the pre-first-fill holding is exactly zero; every fill's holding transition is validated against previous holdings or zero.
+- Adds a synthetic internally rehashed first-SELL regression.
+- Exact-head run [45677302187](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45677302187): Python 3.11.18 and 3.13.18 each passed 71 settlement-store + 16 receiver tests.
+- Its code/test change is included in PR #194; treat #193 as superseded.
+
+### PR #194 — combine precision-safe arithmetic and zero-opening-inventory guard
+
+- Current exact head: `5a26bf621a497b47ce76f2c7dbd7089f0871fc0a`; base PR #192 head `5e6c2b6034629c9d89594ff1bbfe20d9753a4989`.
+- Includes the first-fill zero-inventory guard from #193 and the high-precision settlement arithmetic from #192.
+- Adds a synthetic rehashed first-SELL forgery regression.
+- Adds a multi-fill SELL aggregation regression with 38 significant digits and the existing reservation contract's maximum 18 decimal places. This proves the aggregate matches its settlement outbox under precision 80 while respecting reservation allocation limits.
+- Exact-head run [45678166979](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45678166979): Python 3.11.18 and 3.13.18 each passed 73 settlement-store + 16 receiver tests (89 per version), with ResourceWarning promoted to error and no actual warning output.
+- An earlier attempted SELL test used 1e-28 allocation quantity, outside reservation_allocations.py's supported 18-decimal-place contract; that test fixture was corrected to a valid 18-decimal/38-significant-digit case and passed on the exact head above.
+- PR remains open/draft/unmerged; independent review pending.
+
+### Updated strongest candidate chain and readiness
+
+- Strongest current candidate chain: #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #192 → #194.
+- #193 is superseded by #194. #189/#191 are superseded by #190.
+- #175 remains a sibling test-only branch; equivalent invalid-marker coverage is included in #184/#187.
+- #177 remains a sibling warning-clean branch; cleanup is included in #181 and descendants.
+- #178 is a duplicate cleanup branch; #183 superseded by #184; #185/#186 superseded by #187.
+- #179 remains a design-only external audit checkpoint proposal; no signer/storage/key-store implementation is selected.
+- These are isolated settlement-store/receiver suites, not full-repository acceptance. Independent adversarial review is still pending.
+- Protected main remains `0426e1ecd5bd01913a568272792c355c4b7059c7`; no PR merged.
+- Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
+
+### Next highest-priority work
+
+1. Independent adversarial review of #149/#150/#154/#155/#157/#164/#165/#167–#194 at immutable SHAs. Report PASS/FAIL/INCONCLUSIVE; CI success is not independent acceptance.
+2. Continue synthetic-only crash/restart, multiprocess races, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+3. Review PR #179's signer/storage trust model and decide maximum unanchored window, monotonic sequence enforcement and recovery authority before implementation.
+4. Reconcile #164/#165 copy-only migration candidates with historical inventory/expiry evidence. No existing user DB inspection/migration or inferred SELL authority.
+5. Keep remote receiver authentication/real external business effects unimplemented pending trust/transport/receipt review.
+6. Keep Tokocrypto BTCIDR .site blocked until owner resolves host/symbol compatibility.
+7. Begin preregistered multi-market profitability research with point-in-time data, realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
+8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
+
