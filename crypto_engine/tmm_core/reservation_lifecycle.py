@@ -62,9 +62,9 @@ def _integer(value: object, field: str) -> int:
 
 def _version(value: object) -> int:
     if (isinstance(value, bool) or not isinstance(value, int)
-            or value < 1 or value >= _MAX_SQLITE_INTEGER):
+            or value < 1 or value >= _MAX_SQLITE_INTEGER - 1):
         raise ReservationLifecycleError(
-            "expected_version must be a positive SQLite integer below the maximum"
+            "expected_version leaves room for a safe monotonic version increment"
         )
     return value
 
