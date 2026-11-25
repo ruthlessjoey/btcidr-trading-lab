@@ -111,7 +111,7 @@ class SellAllocationPreflightTests(unittest.TestCase):
                     self.validate()
 
     def test_excessive_decimal_precision_is_rejected(self):
-        self.allocations[0]["allocated_quantity"] = "0.0000000000000000001"
+        self.allocations[0]["allocated_quantity"] = "1e-161"
         with self.assertRaisesRegex(ReservationAllocationError, "precision"):
             self.validate()
 
