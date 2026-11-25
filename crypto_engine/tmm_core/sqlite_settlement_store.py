@@ -420,6 +420,33 @@ class SQLiteSettlementStore:
         if not self._verify_chain(db):
             raise SettlementStoreError("reservation audit chain verification failed")
 
+        initialization_events = []
+        audit_rows = db.execute(
+            "SELECT event_json FROM main.audit ORDER BY seq"
+        ).fetchall()
+        for (event_json,) in audit_rows:
+            event = json.loads(event_json)
+            if isinstance(event,dict) and event.get("kind") == "ACCOUNT_INITIALIZED":
+                initialization_events.append(event)
+        initial_cash: Decimal | None = None
+        if initialization_events:
+            first_event = json.loads(audit_rows[0][0]) if audit_rows else None
+            event = initialization_events[0]
+            expected_initial_keys = {"kind","account_id","currency","opening_cash"}
+            account_row = db.execute(
+                "SELECT account_id,currency,cash FROM main.account WHERE singleton=1"
+            ).fetchone()
+            if (len(initialization_events) != 1 or first_event != event
+                    or set(event) != expected_initial_keys
+                    or event.get("account_id") != self.account_id
+                    or event.get("currency") != self.currency
+                    or account_row is None
+                    or account_row[:2] != (self.account_id,self.currency)):
+                raise SettlementStoreError("initial account audit identity is invalid")
+            initial_cash = _decimal(event["opening_cash"],"initial audited cash")
+            if initial_cash <= 0:
+                raise SettlementStoreError("initial audited cash must be positive")
+
         # The hash chain proves ordering/integrity only relative to its stored hashes.
         # Reconcile every canonical fill row to exactly one immutable SYNTHETIC_FILL event.
         fill_rows = db.execute(
@@ -477,7 +504,7 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("synthetic fill ledger does not match audit events")
 
         # Reconcile event-to-event balance transitions and the current accounting rows.
-        previous_cash: Decimal | None = None
+        previous_cash: Decimal | None = initial_cash
         latest_cash: Decimal | None = None
         previous_holdings: dict[str,Decimal] = {}
         latest_holdings: dict[str,Decimal] = {}
@@ -511,7 +538,7 @@ class SQLiteSettlementStore:
                 previous_holdings[market_id] = holding_after
                 latest_holdings[market_id] = holding_after
 
-        if latest_cash is not None:
+        if latest_cash is not None or initial_cash is not None:
             stored_cash = _decimal(
                 db.execute("SELECT cash FROM main.account WHERE singleton=1").fetchone()[0],
                 "stored cash",
@@ -522,8 +549,14 @@ class SQLiteSettlementStore:
                     "SELECT market_id,quantity FROM main.holdings"
                 )
             }
-            if stored_cash != latest_cash:
-                raise SettlementStoreError("account cash does not match fill audit state")
+            expected_cash = latest_cash if latest_cash is not None else initial_cash
+            if stored_cash != expected_cash:
+                message = (
+                    "account cash does not match fill audit state"
+                    if latest_cash is not None else
+                    "account cash does not match initial account audit"
+                )
+                raise SettlementStoreError(message)
             if stored_holdings != latest_holdings:
                 raise SettlementStoreError("holdings do not match fill audit state")
 
@@ -1295,6 +1328,12 @@ class SQLiteSettlementStore:
             db.execute("INSERT INTO metadata VALUES('schema_version',?)", (str(self.SCHEMA_VERSION),))
             db.execute("INSERT INTO account VALUES(1,?,?,?)",
                        (self.account_id, self.currency, opening_cash))
+            self._append_audit(db, {
+                "kind":"ACCOUNT_INITIALIZED",
+                "account_id":self.account_id,
+                "currency":self.currency,
+                "opening_cash":opening_cash,
+            })
         elif version[0] != str(self.SCHEMA_VERSION):
             raise SettlementStoreError("unsupported schema version; explicit migration required")
 
