@@ -424,14 +424,18 @@ class SQLiteSettlementStore:
             if (group["account_id"] != account_id or group["market_id"] != market_id
                     or group["version"] != version):
                 raise SettlementStoreError("reservation allocation group identity/version mismatch")
-            group["quantity"] = group["quantity"] + quantity
-            totals_by_reservation[reservation_id] = (
-                totals_by_reservation.get(reservation_id,Decimal("0")) + quantity
-            )
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                group["quantity"] = group["quantity"] + quantity
+                totals_by_reservation[reservation_id] = (
+                    totals_by_reservation.get(reservation_id,Decimal("0")) + quantity
+                )
             max_version_by_reservation[reservation_id] = max(
                 max_version_by_reservation.get(reservation_id,0),version
             )
-            totals_by_fill[fill_id] = totals_by_fill.get(fill_id,Decimal("0")) + quantity
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                totals_by_fill[fill_id] = totals_by_fill.get(fill_id,Decimal("0")) + quantity
             identity = (batch_id,market_id)
             if fill_id in fill_identity and fill_identity[fill_id] != identity:
                 raise SettlementStoreError("SELL fill allocation identity mismatch")
@@ -508,8 +512,11 @@ class SQLiteSettlementStore:
             previous_consumed = _decimal(event["previous_consumed_quantity"],"previous consumed quantity")
             consumed = _decimal(event["consumed_quantity"],"consumed quantity")
             allocated = _decimal(event["allocated_quantity"],"audited allocated quantity")
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                expected_consumed = previous_consumed + allocated
             if (previous_consumed < 0 or allocated != group["quantity"]
-                    or consumed != previous_consumed + allocated):
+                    or consumed != expected_consumed):
                 raise SettlementStoreError("reservation consumption audit quantity mismatch")
 
         reservations = db.execute(
