@@ -925,38 +925,43 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
-    def test_apply_batch_rejects_unbounded_decimal_inputs(self):
-        huge_exponent = {
-            "fill_id": "huge-exp", "market_id": "BTC/USDT", "side": "BUY",
-            "quantity": "1e999999999", "price": "1", "fee_quote": "0",
-        }
-        with self.assertRaisesRegex(
-            SettlementStoreError, "quantity decimal exponent exceeds the supported range"
+    def test_apply_batch_rejects_unbounded_decimal_inputs_without_mutation(self):
+        for index, value in enumerate(
+            ("1e999999999", "1e-999999999", "0e-999999999")
         ):
-            self.store.apply_batch(
-                batch_id="huge-exp", fills=[huge_exponent], timestamp=1
-            )
+            with self.subTest(value=value):
+                fill = self.buy()
+                fill["quantity"] = value
+                with self.assertRaisesRegex(
+                    SettlementStoreError, "quantity decimal exponent exceeds the supported range"
+                ):
+                    self.store.apply_batch(
+                        batch_id=f"huge-exp-{index}", fills=[fill], timestamp=1
+                    )
+                self.assertEqual(self.store.snapshot()["cash"], "10000")
 
-        huge_text = {
-            "fill_id": "huge-text", "market_id": "BTC/USDT", "side": "BUY",
-            "quantity": "1" * 129, "price": "1", "fee_quote": "0",
-        }
+        huge_text = self.buy()
+        huge_text["price"] = "1" * 129
         with self.assertRaisesRegex(
-            SettlementStoreError, "quantity decimal text exceeds the 128-character limit"
+            SettlementStoreError, "price decimal text exceeds the 128-character limit"
         ):
             self.store.apply_batch(
                 batch_id="huge-text", fills=[huge_text], timestamp=1
             )
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
 
-        excessive_precision = {
-            "fill_id": "huge-precision", "market_id": "BTC/USDT", "side": "BUY",
-            "quantity": "1" * 81, "price": "1", "fee_quote": "0",
-        }
+        excessive_precision = self.buy()
+        excessive_precision["quantity"] = "1" * 81
         with self.assertRaisesRegex(
             SettlementStoreError, "quantity decimal precision exceeds 80 digits"
         ):
             self.store.apply_batch(
                 batch_id="huge-precision", fills=[excessive_precision], timestamp=1
+            )
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with _managed_connection(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM main.batches").fetchone()[0], 0
             )
 
     def test_register_market_rejects_oversized_identity_fields(self):
