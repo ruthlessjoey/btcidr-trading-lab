@@ -882,6 +882,25 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.register_market("BTC/USDT", "ETH", "USDT")
 
+    def test_register_market_rejects_unlogged_market_insertion(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
+                "VALUES('ETH/USDT','ETH','USDT')"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("SOL/USDT", "SOL", "USDT")
+
+    def test_register_market_rejects_unlogged_market_deletion(self):
+        with _managed_connection(self.path) as db:
+            db.execute("DELETE FROM main.markets WHERE market_id='BTC/USDT'")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("SOL/USDT", "SOL", "USDT")
+
     def test_register_market_rejects_removed_required_market_policy_marker(self):
         with _managed_connection(self.path) as db:
             db.execute(
