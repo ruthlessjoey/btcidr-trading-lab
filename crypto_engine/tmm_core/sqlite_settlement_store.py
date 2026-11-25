@@ -328,6 +328,7 @@ class SQLiteSettlementStore:
                         self._verify_reservation_audit_coverage(db)
                     else:
                         self._verify_fill_account_state(db)
+                    self._require_current_audit_baseline(db)
                     result = json.loads(result_json)
                     result["status"] = status
                     db.commit()
@@ -465,9 +466,14 @@ class SQLiteSettlementStore:
             }
             if normalized_reservation_allocations:
                 result["reservation_allocations"] = normalized_reservation_allocations
+            result_json = json.dumps(result, sort_keys=True, separators=(",", ":"))
             db.execute("UPDATE batches SET status=?,result_json=? WHERE batch_id=?",
-                       (result["status"], json.dumps(result, sort_keys=True, separators=(",", ":")),
-                        batch_id))
+                       (result["status"], result_json, batch_id))
+            self._append_batch_result_snapshot(
+                db, batch_id=batch_id, request_hash=request_hash,
+                status=result["status"], result_json=result_json,
+                previous_result_sha256=None,
+            )
             db.commit()
             return result
 
@@ -1199,12 +1205,28 @@ class SQLiteSettlementStore:
             ).fetchone()
             if result_row is None or result_row[0] is None:
                 raise SettlementStoreError("batch result missing during outbox completion")
+            self._verify_batch_result_integrity(db, batch_id=batch_id)
+            latest = self._verify_batch_result_integrity(db, batch_id=batch_id)
+            previous_digest = latest.get(batch_id)
+            if previous_digest is None:
+                raise SettlementStoreError("batch result audit is missing during outbox completion")
             result = json.loads(result_row[0])
             result["status"] = "COMPLETE"
-            db.execute(
+            result_json = json.dumps(result, sort_keys=True, separators=(",", ":"))
+            updated = db.execute(
                 "UPDATE main.batches SET status='COMPLETE',result_json=? "
                 "WHERE batch_id=? AND status='COMMITTED_PENDING_OUTBOX'",
-                (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id),
+                (result_json, batch_id),
+            )
+            if updated.rowcount != 1:
+                raise SettlementStoreError("batch status changed during outbox completion")
+            batch_row = db.execute(
+                "SELECT request_hash FROM main.batches WHERE batch_id=?", (batch_id,)
+            ).fetchone()
+            self._append_batch_result_snapshot(
+                db, batch_id=batch_id, request_hash=batch_row[0],
+                status="COMPLETE", result_json=result_json,
+                previous_result_sha256=previous_digest,
             )
 
     def acknowledge_reservation_outbox(
@@ -1347,6 +1369,110 @@ class SQLiteSettlementStore:
             raise SettlementStoreError(
                 "legacy database is read-only until an explicit audit baseline bootstrap"
             )
+        self._verify_batch_result_integrity(db)
+
+    def _append_batch_result_snapshot(
+        self, db: sqlite3.Connection, *, batch_id: str, request_hash: str,
+        status: str, result_json: str, previous_result_sha256: str | None,
+    ) -> str:
+        if not isinstance(result_json, str) or len(result_json) > 1_048_576:
+            raise SettlementStoreError("batch result JSON exceeds the supported size limit")
+        digest = hashlib.sha256(result_json.encode("utf-8")).hexdigest()
+        self._append_audit(db, {
+            "kind": "BATCH_RESULT_SNAPSHOT",
+            "batch_id": batch_id,
+            "request_hash": request_hash,
+            "status": status,
+            "result_sha256": digest,
+            "previous_result_sha256": previous_result_sha256,
+        })
+        return digest
+
+    def _verify_batch_result_integrity(
+        self, db: sqlite3.Connection, *, batch_id: str | None = None,
+    ) -> dict[str, str]:
+        batch_rows = {
+            row[0]: (row[1], row[2], row[3])
+            for row in db.execute(
+                "SELECT batch_id,request_hash,status,result_json FROM main.batches"
+            )
+        }
+        events_by_batch: dict[str, list[dict[str, object]]] = {}
+        for seq, event_json in db.execute(
+            "SELECT seq,event_json FROM main.audit ORDER BY seq"
+        ):
+            event = json.loads(event_json)
+            if not isinstance(event, dict) or event.get("kind") != "BATCH_RESULT_SNAPSHOT":
+                continue
+            expected_keys = {
+                "kind", "batch_id", "request_hash", "status",
+                "result_sha256", "previous_result_sha256",
+            }
+            event_batch_id = event.get("batch_id")
+            digest = event.get("result_sha256")
+            previous_digest = event.get("previous_result_sha256")
+            if (
+                set(event) != expected_keys
+                or not isinstance(event_batch_id, str) or event_batch_id not in batch_rows
+                or not isinstance(event.get("request_hash"), str)
+                or event.get("status") not in ("COMMITTED_PENDING_OUTBOX", "COMPLETE")
+                or not isinstance(digest, str) or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+                or (previous_digest is not None and (
+                    not isinstance(previous_digest, str) or len(previous_digest) != 64
+                    or any(char not in "0123456789abcdef" for char in previous_digest)
+                ))
+                or isinstance(seq, bool) or not isinstance(seq, int) or seq < 1
+            ):
+                raise SettlementStoreError("batch result audit event is invalid")
+            events_by_batch.setdefault(event_batch_id, []).append(event)
+
+        latest_digests: dict[str, str] = {}
+        for current_batch_id, (request_hash, status, result_json) in batch_rows.items():
+            events = events_by_batch.get(current_batch_id, [])
+            if batch_id is not None and current_batch_id != batch_id:
+                continue
+            if status not in ("COMMITTED_PENDING_OUTBOX", "COMPLETE"):
+                if events:
+                    raise SettlementStoreError("unresolved batch has an unexpected result audit")
+                continue
+            if not isinstance(result_json, str) or len(result_json) > 1_048_576:
+                raise SettlementStoreError("batch result JSON is missing or exceeds the supported size limit")
+            if not events or len(events) > 2:
+                raise SettlementStoreError("batch result audit coverage is incomplete")
+            for event in events:
+                if event["request_hash"] != request_hash:
+                    raise SettlementStoreError("batch result audit request hash mismatch")
+            if len(events) == 1:
+                if events[0]["status"] != status or events[0]["previous_result_sha256"] is not None:
+                    raise SettlementStoreError("batch result audit status transition mismatch")
+            else:
+                if (
+                    status != "COMPLETE"
+                    or events[0]["status"] != "COMMITTED_PENDING_OUTBOX"
+                    or events[0]["previous_result_sha256"] is not None
+                    or events[1]["status"] != "COMPLETE"
+                    or events[1]["previous_result_sha256"] != events[0]["result_sha256"]
+                ):
+                    raise SettlementStoreError("batch result audit status transition mismatch")
+            try:
+                result = json.loads(result_json)
+                canonical_result = json.dumps(result, sort_keys=True, separators=(",", ":"))
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise SettlementStoreError("batch result JSON is invalid") from exc
+            if (
+                not isinstance(result, dict)
+                or canonical_result != result_json
+                or result.get("batch_id") != current_batch_id
+                or result.get("request_hash") != request_hash
+                or result.get("status") != status
+            ):
+                raise SettlementStoreError("batch result JSON identity is invalid")
+            digest = hashlib.sha256(result_json.encode("utf-8")).hexdigest()
+            if digest != events[-1]["result_sha256"]:
+                raise SettlementStoreError("batch result JSON does not match its audit digest")
+            latest_digests[current_batch_id] = digest
+        return latest_digests
 
     def _verify_account_state(self, db: sqlite3.Connection) -> None:
         """Verify fill accounting and, when enabled, the complete reservation ledger."""
