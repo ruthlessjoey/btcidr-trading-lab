@@ -99,6 +99,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         quantity = "1234567890123456789012345678901234567890"
         fill = self.buy(qty=quantity)
         fill["price"] = "1e-40"
+        fill["fee_quote"] = "0"
         with localcontext() as decimal_context:
             decimal_context.prec = 640
             expected_cash = Decimal("10000") - Decimal(quantity) * Decimal("1e-40")
@@ -110,7 +111,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
         self.store.apply_batch(
             batch_id="b-smallest-scale",
-            fills=[self.buy(qty="1e-128")],
+            fills=[dict(self.buy(qty="1e-128"), price="100", fee_quote="0")],
             timestamp=10,
         )
         snapshot = self.store.snapshot()
