@@ -720,6 +720,37 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("reservation outbox payload hash mismatch")
         return receipt
 
+    def _verify_reservation_outbox_rows(
+        self, db: sqlite3.Connection, *, batch_id: str | None = None,
+    ) -> None:
+        """Revalidate every pending and acknowledged outbox row against its allocation."""
+        sql = (
+            "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
+            "account_id,market_id,reservation_version,allocated_quantity,payload_sha256,"
+            "status,receiver_receipt FROM main.reservation_outbox "
+        )
+        params: tuple[object, ...] = ()
+        if batch_id is not None:
+            sql += "WHERE batch_id=? "
+            params = (batch_id,)
+        sql += "ORDER BY idempotency_key"
+        fields = (
+            "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
+            "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
+        )
+        for values in db.execute(sql,params):
+            row = dict(zip(fields,values[:10]))
+            status,stored_receipt = values[10],values[11]
+            expected_receipt = self._verify_reservation_outbox_row(db,row)
+            if status == "PENDING":
+                if stored_receipt is not None:
+                    raise SettlementStoreError("pending reservation outbox has an unexpected receipt")
+            elif status == "ACKNOWLEDGED":
+                if stored_receipt != expected_receipt:
+                    raise SettlementStoreError("acknowledged reservation outbox receipt mismatch")
+            else:
+                raise SettlementStoreError("reservation outbox status is invalid")
+
     def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
@@ -738,6 +769,7 @@ class SQLiteSettlementStore:
             ensure_reservation_schema_v2(db)
             self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_cardinality(db)
+            self._verify_reservation_outbox_rows(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
                 "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
@@ -749,8 +781,6 @@ class SQLiteSettlementStore:
                 "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
             )
             result = [dict(zip(fields, row)) for row in rows]
-            for item in result:
-                self._verify_reservation_outbox_row(db, item)
             return result
 
     def _complete_batch_if_outboxes_acknowledged(
@@ -774,6 +804,7 @@ class SQLiteSettlementStore:
             ensure_reservation_schema_v2(db)
             self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_cardinality(db, batch_id=batch_id)
+            self._verify_reservation_outbox_rows(db, batch_id=batch_id)
             reservation_pending = db.execute(
                 "SELECT COUNT(*) FROM main.reservation_outbox "
                 "WHERE batch_id=? AND status!='ACKNOWLEDGED'", (batch_id,)
@@ -819,6 +850,7 @@ class SQLiteSettlementStore:
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
             self._verify_reservation_audit_coverage(db)
+            self._verify_reservation_outbox_rows(db)
             row = db.execute(
                 "SELECT batch_id,status,receiver_receipt,allocation_id,reservation_id,fill_id,"
                 "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
