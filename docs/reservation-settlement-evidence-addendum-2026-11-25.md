@@ -560,3 +560,18 @@ Static inspection of the candidate repository found two mismatches with the curr
 - Whole-project completion: UNRATED pending owner-approved scope, weights and evidence criteria.
 
 The 218 + 4 results are isolated offline engineering evidence. They do not establish endpoint response compatibility, full repository acceptance, profitable strategies, production deployment or trading authorization.
+## 25 November — final Tokocrypto URL hardening and legacy adapter containment
+
+This supersedes the earlier PR154 218-test count and records the final URL parser hardening.
+
+- PR #154 head: 81be796269bd473ee767335b16cf3bcab4974f4e; base PR #150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19; comparison 17 commits ahead / 0 behind.
+- The offline crypto_engine policy now permits only unauthenticated GET to the exact owner-approved https://www.tokocrypto.site/api/v3/klines BTCIDR candle endpoint; it rejects the 2meta host/path, Tokocrypto .com, wrong paths, authentication/custom headers, other symbols and malformed query requests.
+- URL validation now also rejects whitespace/control normalization, fragments (including empty fragments), non-ASCII URLs, URLs over 2,048 characters, too many query fields, duplicate keys, Unicode decimal digits and oversized timestamp/limit integers.
+- Legacy root Tokocrypto access is blocked at both entry points: providers.build('tokocrypto') raises; fetcher.Source rejects Tokocrypto identity or Tokocrypto hosts, including when renamed by callers. Root market-data-check workflow remains blocked.
+- Full unprotected crypto_engine suite exact-head run [45555538730](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45555538730): 219/219 on Python 3.11.18 and 219/219 on Python 3.13.18; SQLite 3.46.1.
+- Isolated legacy root adapter guard run [45555538736](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45555538736): 4/4 on Python 3.11.18 and 4/4 on Python 3.13.18.
+- Reviewer run 45555536008 was skipped, not passed. No Tokocrypto API request, DNS lookup, server-time, symbol-metadata request or live candle retrieval was performed.
+
+Current PR chain remains candidate-only: PR149 head 104756a8f4978f9e81bf40928902f419ab61b528; PR150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19; PR154 head 81be796269bd473ee767335b16cf3bcab4974f4e. All remain open/draft/unmerged.
+
+Readiness remains unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED / ABSENT; profitability/high-win-rate NOT ESTABLISHED; overall completion UNRATED. The 219 + 4 runs are isolated offline evidence, not production acceptance or proof of endpoint compatibility.
