@@ -22,7 +22,8 @@ _SCHEMA = {
         "base_asset TEXT NOT NULL,quote_asset TEXT NOT NULL,"
         "authorized_quantity TEXT NOT NULL,consumed_quantity TEXT NOT NULL,"
         "created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL "
-        "CHECK(expires_at > created_at),version INTEGER NOT NULL CHECK(version >= 1),"
+        "CHECK(expires_at > created_at),version INTEGER NOT NULL "
+        "CHECK(version >= 1 AND version < 9223372036854775807),"
         "status TEXT NOT NULL CHECK(status IN "
         "('PENDING','ACTIVE','RELEASED','CANCELLED','EXPIRED')))"
     ),
