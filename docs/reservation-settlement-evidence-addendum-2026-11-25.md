@@ -219,3 +219,48 @@ This correction makes the sender's projected record structurally match the recei
 ### Latest stacked implementation chain
 
 The active implementation chain is now #139 → #140 → #141 → #142 → #143 → #144 → #145 → #146 → #148 → #149 → #150 → #151. PR #147 is the separate documentation tracker branch, updated to record these follow-ups. All implementation PRs remain open/draft/unmerged and none is in `main`.
+
+
+## Exact-head CI milestone — PR #150 (25 November 2026)
+
+The other project build session advanced the #150 branch with the isolated CI workflow and then fixed both receiver-module test defects. The live branch and pull request were refreshed:
+
+- PR #150 remains **open / draft / unmerged**.
+- Exact passing head: `0bf6f044bd49a05226bdde33cb9641af11cbc68f`.
+- Exact-head GitHub Actions push run: [45550416851](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45550416851) — overall **success**.
+- Workflow job for Python 3.11.18 / SQLite 3.46.1: `test_sqlite_settlement_store.py` 22/22 passed; `test_reservation_outbox_receiver.py` 13/13 passed.
+- Workflow job for Python 3.13.18 / SQLite 3.46.1: settlement-store 22/22 passed; receiver 13/13 passed.
+- Both matrix jobs passed. This is 70 successful test executions across two Python interpreters.
+- The workflow used `contents: read`, pinned action SHAs, sparse checkout of the explicitly listed settlement files, no protected-path checkout, and did not dispatch the specialist review workflow.
+
+The passing receiver run includes two corrections made after earlier failures:
+1. The pending sender outbox query now selects and maps `account_id`, matching the delivery worker's canonical payload contract.
+2. The stored-receipt tampering test now modifies `reservation_inbox` in the receiver DB (not the sender settlement DB).
+
+Earlier runs on older exact commits failed; those runs remain in GitHub history. Only the final exact head above is a passing result. No broad test suite or independent acceptance was implied.
+
+## PR #151 disposition
+
+PR #151 (account identity in reservation outbox records) was closed as a duplicate after its two intended fixes were incorporated into the later #150 branch commits `db53e772e5cd36de74adbb37cee93fd4b3a08a38` and `0bf6f044bd49a05226bdde33cb9641af11cbc68f`. Its branch is retained; no branch was deleted and no PR was merged.
+
+## Revised readiness
+
+- Exact-head focused settlement/receiver CI on #150: **PASS** on Python 3.11.18 and 3.13.18 (70 test executions).
+- Full PR #139–#150 dependency suite: **PENDING**.
+- Python CI for earlier schema/lifecycle/allocation PRs #139–#146: **PENDING** except insofar as their source is exercised by the two #150 focused suites.
+- Independent adversarial acceptance: **PENDING**; the Workstream A immutable AI review trigger was skipped, not passed.
+- Crash/power-loss/multiprocess/backup-restore drills: **PENDING** beyond the focused receiver concurrency/restart unit tests.
+- Existing database v1→v2 migration/enablement: **NOT IMPLEMENTED**; legacy SELL is blocked by #150.
+- Remote receiver, authenticated network transport and production integration: **NOT IMPLEMENTED**.
+- Install readiness: **NOT READY**.
+- PAPER activation: **ON HOLD**; LIVE **DISABLED / ABSENT**.
+- Profitability/high win-rate: **NOT ESTABLISHED**. The separately revalidated 181/181 research prototype is synthetic harness evidence only.
+
+### Next engineering priorities
+
+1. Verify the #150 passing head and complete dependency graph in an isolated checkout. Extend the pinned sparse CI or add a separate approved matrix for #139–#146 only if their import closure is proven to exclude protected modules.
+2. Execute exact-SHA regression suites for schema DDL, parent triggers/indexes/foreign-key checks, lifecycle, atomic allocations and settlement-store integration on Python 3.11 and 3.13. Capture failures and logs; rerun after every code change.
+3. Commission independent security acceptance over main/TEMP/attached SQLite objects, schema tampering, transaction rollback, receipt binding, duplicate/replay races, resource exhaustion and malformed database state.
+4. Design—but do not run—v1→v2 data migration on disposable synthetic copies. Any real or existing local database migration requires separate explicit approval and an evidence-backed inventory/balance/audit reconciliation plan.
+5. Complete remote receiver threat model and transport design separately; no broker/network adapter may be connected to this offline prototype without new approval.
+6. Continue preregistered profitability research only after the approved BTC/IDR historical data blocker is resolved. Do not claim strategy profitability from synthetic 181/181 unit tests.
