@@ -245,6 +245,24 @@ class SQLiteSettlementStore:
                     db.rollback()
                     raise SettlementStoreError("batch_id reused with different request hash")
                 if status in ("COMMITTED_PENDING_OUTBOX", "COMPLETE"):
+                    replay_reservation_objects = db.execute(
+                        "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                        "('reservations','reservation_allocations','reservation_outbox')"
+                    ).fetchall()
+                    replay_expected = {"reservations","reservation_allocations","reservation_outbox"}
+                    replay_present = {
+                        name for kind,name in replay_reservation_objects if kind == "table"
+                    }
+                    if (any(kind != "table" for kind,_ in replay_reservation_objects)
+                            or (replay_present and replay_present != replay_expected)):
+                        db.rollback()
+                        raise SettlementStoreError(
+                            "reservation schema is partial or contains unexpected objects"
+                        )
+                    if replay_present == replay_expected:
+                        from .reservation_schema_v2 import ensure_reservation_schema_v2
+                        ensure_reservation_schema_v2(db)
+                        self._verify_reservation_audit_coverage(db)
                     result = json.loads(result_json)
                     result["status"] = status
                     db.commit()
