@@ -33,7 +33,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.store = SQLiteSettlementStore(
             self.path, account_id="paper-research", currency="USDT", opening_cash="10000"
         )
-        self.store.register_market("ETH/USDT", "ETH", "USDT")
+        self.store.register_market("BTC/USDT", "BTC", "USDT")
         self.hash = hashlib.sha256(b"request-one").hexdigest()
 
     def tearDown(self):
@@ -410,7 +410,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(
             SettlementStoreError, "legacy database is read-only"
         ):
-            self.store.register_market("BTC/USDT", "BTC", "USDT")
+            self.store.register_market("ETH/USDT", "ETH", "USDT")
         with self.assertRaisesRegex(
             SettlementStoreError, "legacy database is read-only"
         ):
