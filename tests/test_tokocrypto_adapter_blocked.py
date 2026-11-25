@@ -31,6 +31,24 @@ class TokocryptoLegacyAdapterGuardTests(unittest.TestCase):
                 base_url="https://www.tokocrypto.com",
             )
 
+    def test_tokocrypto_hosts_are_rejected_even_with_other_source_names(self):
+        blocked_urls = (
+            "https://www.tokocrypto.site",
+            "https://api.tokocrypto.site",
+            "https://www.tokocrypto.com",
+            "https://cloudme-toko.2meta.app",
+        )
+        for url in blocked_urls:
+            with self.subTest(url=url):
+                with self.assertRaisesRegex(
+                    ValueError, "legacy generic Tokocrypto Source is disabled"
+                ):
+                    fetcher.Source(
+                        name="renamed-provider",
+                        style="binance_style",
+                        base_url=url,
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()
