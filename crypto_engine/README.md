@@ -8,7 +8,7 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 
 - Spot-only and long-only accounting; no shorts, leverage, margin or derivatives.
 - Research/synthetic mode only. The package contains no network client or exchange connector.
-- The only represented data source is an offline policy validator for the specifically approved Tokocrypto NextMe BTCIDR kline URL. It does not perform HTTP requests.
+- The only represented data source is an offline policy validator for the exact owner-approved public candle URL `https://www.tokocrypto.site/api/v3/klines`, BTCIDR only. It does not perform HTTP requests.
 - The validator rejects all request headers and permits only unauthenticated GET to the exact approved host/path with BTCIDR candles.
 - No credentials, account access, wallet access, order placement, cancellation, deposits or withdrawals.
 - LIVE trading is not implemented and remains disabled.
