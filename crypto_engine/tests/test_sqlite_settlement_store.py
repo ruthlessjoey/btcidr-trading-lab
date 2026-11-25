@@ -423,6 +423,48 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )
 
 
+
+    def test_deleted_allocation_and_outbox_cannot_hide_sell_audit_event(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "DELETE FROM main.reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+            db.execute(
+                "DELETE FROM main.reservation_allocations WHERE allocation_id='a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            status = db.execute(
+                "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
+            ).fetchone()[0]
+        self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
+
+    def test_outbox_read_revalidates_audit_chain_after_store_initialization(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            rows = db.execute("SELECT seq,event_json FROM main.audit ORDER BY seq").fetchall()
+            target = next(seq for seq,event in rows if "RESERVATION_QUANTITY_CONSUMED" in event)
+            db.execute("UPDATE main.audit SET event_json='{}' WHERE seq=?", (target,))
+        with self.assertRaisesRegex(SettlementStoreError, "reservation audit chain verification failed"):
+            self.store.pending_reservation_outbox()
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
