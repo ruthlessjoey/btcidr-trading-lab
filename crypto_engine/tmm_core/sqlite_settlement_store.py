@@ -1205,7 +1205,6 @@ class SQLiteSettlementStore:
             ).fetchone()
             if result_row is None or result_row[0] is None:
                 raise SettlementStoreError("batch result missing during outbox completion")
-            self._verify_batch_result_integrity(db, batch_id=batch_id)
             latest = self._verify_batch_result_integrity(db, batch_id=batch_id)
             previous_digest = latest.get(batch_id)
             if previous_digest is None:
