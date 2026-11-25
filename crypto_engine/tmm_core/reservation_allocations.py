@@ -1,9 +1,10 @@
-"""Pure preflight validation for synthetic SELL reservation allocations.
+"""Preflight and transactional persistence for synthetic SELL allocations.
 
-This module is not an authorization boundary or a durable ledger. A trusted
-settlement transaction must reload reservations, revalidate versions and
-remaining quantities, persist allocations, and update reservation consumption
-atomically. Never accept reservation state supplied by a strategy agent.
+The pure validator is not an authorization boundary. The transactional helper
+reloads fills/reservations from the trusted SQLite database, validates versions
+and remaining quantities, updates consumption, persists allocation/outbox rows,
+and appends audit events without committing. Never accept reservation state
+supplied by a strategy agent.
 """
 from __future__ import annotations
 
@@ -297,7 +298,6 @@ def consume_sell_allocations(
                 "batch_id": batch_id, "timestamp": timestamp,
             })
 
-        outbox_keys = []
         for item in normalized:
             allocation_id = str(item["allocation_id"])
             idempotency_key = "reservation-allocation:" + allocation_id
@@ -332,7 +332,6 @@ def consume_sell_allocations(
                  item["fill_id"], account_id, item["market_id"],
                  item["reservation_version"], item["allocated_quantity"], payload_sha256),
             )
-            outbox_keys.append(idempotency_key)
 
     return [
         {**item, "idempotency_key": "reservation-allocation:" + str(item["allocation_id"])}
