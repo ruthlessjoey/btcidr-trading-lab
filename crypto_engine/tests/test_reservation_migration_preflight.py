@@ -369,6 +369,21 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
             inspect_v1_migration_eligibility(self.db)
         self.db.execute("PRAGMA query_only=OFF")
 
+
+    def test_temp_trigger_on_main_table_is_classified_malformed(self):
+        self.db.execute(
+            "CREATE TEMP TRIGGER injected_temp AFTER INSERT ON main.fills BEGIN SELECT 1; END"
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertEqual(result.schema_class, "MALFORMED_OR_UNKNOWN")
+
+    def test_temp_table_cannot_shadow_main_account(self):
+        self.db.execute("CREATE TEMP TABLE account(account_id TEXT, cash TEXT)")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertEqual(result.schema_class, "MALFORMED_OR_UNKNOWN")
+
     def test_unapproved_persistent_view_is_blocked(self):
         self.db.execute("CREATE VIEW injected_view AS SELECT 'shadow' AS value")
         result = self.inspect()
