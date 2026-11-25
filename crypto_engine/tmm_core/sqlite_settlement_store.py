@@ -392,6 +392,50 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
+    def _verify_reservation_outbox_row(
+        self, db: sqlite3.Connection, row: Mapping[str, object],
+    ) -> str:
+        """Bind a delivery row to its authoritative allocation before receiver I/O."""
+        if row.get("account_id") != self.account_id:
+            raise SettlementStoreError("reservation outbox account identity mismatch")
+        allocation = db.execute(
+            "SELECT batch_id,fill_id,reservation_id,account_id,market_id,"
+            "allocated_quantity,reservation_version "
+            "FROM main.reservation_allocations WHERE allocation_id=?",
+            (row.get("allocation_id"),),
+        ).fetchone()
+        if allocation is None:
+            raise SettlementStoreError("reservation outbox allocation record is missing")
+        expected = (
+            row.get("batch_id"), row.get("fill_id"), row.get("reservation_id"),
+            row.get("account_id"), row.get("market_id"), row.get("allocated_quantity"),
+            row.get("reservation_version"),
+        )
+        if allocation != expected:
+            raise SettlementStoreError("reservation outbox payload differs from its allocation record")
+        payload = {
+            "schema": 1,
+            "idempotency_key": row.get("idempotency_key"),
+            "allocation_id": row.get("allocation_id"),
+            "batch_id": row.get("batch_id"),
+            "fill_id": row.get("fill_id"),
+            "reservation_id": row.get("reservation_id"),
+            "account_id": row.get("account_id"),
+            "market_id": row.get("market_id"),
+            "reservation_version": row.get("reservation_version"),
+            "allocated_quantity": row.get("allocated_quantity"),
+        }
+        from .reservation_outbox_receiver import (
+            ReservationInboxError, _canonical_payload,
+        )
+        try:
+            _, digest, receipt = _canonical_payload(payload)
+        except (ReservationInboxError, TypeError, ValueError, UnicodeError) as exc:
+            raise SettlementStoreError("reservation outbox payload is invalid") from exc
+        if digest != row.get("payload_sha256"):
+            raise SettlementStoreError("reservation outbox payload hash mismatch")
+        return receipt
+
     def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
@@ -419,8 +463,8 @@ class SQLiteSettlementStore:
                 "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
             )
             result = [dict(zip(fields, row)) for row in rows]
-            if any(item["account_id"] != self.account_id for item in result):
-                raise SettlementStoreError("reservation outbox account identity mismatch")
+            for item in result:
+                self._verify_reservation_outbox_row(db, item)
             return result
 
     def _complete_batch_if_outboxes_acknowledged(
@@ -499,29 +543,24 @@ class SQLiteSettlementStore:
                 batch_id, status, old_receipt, allocation_id, reservation_id, fill_id,
                 account_id, market_id, reservation_version, allocated_quantity, stored_digest,
             ) = row
-            if account_id != self.account_id:
-                db.rollback()
-                raise SettlementStoreError("reservation outbox account identity mismatch")
-            payload = {
-                "schema": 1, "idempotency_key": idempotency_key,
-                "allocation_id": allocation_id, "batch_id": batch_id,
-                "fill_id": fill_id, "reservation_id": reservation_id,
-                "account_id": account_id, "market_id": market_id,
+            outbox_row = {
+                "idempotency_key": idempotency_key,
+                "allocation_id": allocation_id,
+                "batch_id": batch_id,
+                "fill_id": fill_id,
+                "reservation_id": reservation_id,
+                "account_id": account_id,
+                "market_id": market_id,
                 "reservation_version": reservation_version,
                 "allocated_quantity": allocated_quantity,
+                "payload_sha256": stored_digest,
             }
-            from .reservation_outbox_receiver import (
-                ReservationInboxError, _canonical_payload,
-            )
             try:
-                _, recalculated_digest, expected_receipt = _canonical_payload(payload)
-            except (ReservationInboxError, TypeError, ValueError, UnicodeError) as exc:
+                expected_receipt = self._verify_reservation_outbox_row(db, outbox_row)
+            except SettlementStoreError:
                 db.rollback()
-                raise SettlementStoreError("stored reservation outbox payload is invalid") from exc
-            if (
-                stored_digest != recalculated_digest
-                or stored_digest != expected_payload_sha256
-            ):
+                raise
+            if stored_digest != expected_payload_sha256:
                 db.rollback()
                 raise SettlementStoreError("reservation outbox payload changed during delivery")
             if receiver_receipt != expected_receipt:
