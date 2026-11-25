@@ -13,6 +13,8 @@ on:
       - "crypto_engine/tmm_core/reservation_lifecycle.py"
       - "crypto_engine/tmm_core/reservation_allocations.py"
       - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
       - "crypto_engine/tests/test_reservation_schema_v2.py"
@@ -73,6 +75,8 @@ jobs:
             /crypto_engine/tmm_core/reservation_lifecycle.py
             /crypto_engine/tmm_core/reservation_allocations.py
             /crypto_engine/tmm_core/reservation_outbox_receiver.py
+            /crypto_engine/tmm_core/reservation_migration_preflight.py
+            /crypto_engine/tests/test_reservation_migration_preflight.py
             /crypto_engine/tests/test_sqlite_settlement_store.py
             /crypto_engine/tests/test_reservation_outbox_receiver.py
             /crypto_engine/tests/test_reservation_schema_v2.py
@@ -122,3 +126,6 @@ jobs:
 
       - name: Run reservation receiver regression suite
         run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
+
+      - name: Run read-only migration preflight regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_migration_preflight.py' -v
