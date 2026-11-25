@@ -1,5 +1,7 @@
 name: Reservation Settlement Isolated Tests
 
+# All four reservation suites are safe in this isolated sparse-checkout import closure.
+
 on:
   push:
     branches:
