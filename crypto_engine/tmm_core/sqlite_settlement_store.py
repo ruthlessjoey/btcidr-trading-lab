@@ -504,10 +504,12 @@ class SQLiteSettlementStore:
                 "reservation_version": reservation_version,
                 "allocated_quantity": allocated_quantity,
             }
-            from .reservation_outbox_receiver import _canonical_payload
+            from .reservation_outbox_receiver import (
+                ReservationInboxError, _canonical_payload,
+            )
             try:
                 _, recalculated_digest, expected_receipt = _canonical_payload(payload)
-            except (TypeError, ValueError) as exc:
+            except (ReservationInboxError, TypeError, ValueError, UnicodeError) as exc:
                 db.rollback()
                 raise SettlementStoreError("stored reservation outbox payload is invalid") from exc
             if (
