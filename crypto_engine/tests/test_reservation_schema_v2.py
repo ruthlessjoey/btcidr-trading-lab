@@ -350,8 +350,12 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.commit()
         with self.assertRaises(sqlite3.IntegrityError):
             db.execute("""
-                INSERT INTO reservations VALUES(
-                    'r1','acct','UNKNOWN','BTC','USDT','1','0',1,1,'ACTIVE'
+                INSERT INTO reservations(
+                    reservation_id,account_id,market_id,base_asset,quote_asset,
+                    authorized_quantity,consumed_quantity,created_at,expires_at,
+                    version,status
+                ) VALUES(
+                    'r1','acct','UNKNOWN','BTC','USDT','1','0',1,2,1,'ACTIVE'
                 )
             """)
         db.close()
