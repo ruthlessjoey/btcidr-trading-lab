@@ -418,7 +418,10 @@ class SQLiteSettlementStore:
                 "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
                 "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
             )
-            return [dict(zip(fields, row)) for row in rows]
+            result = [dict(zip(fields, row)) for row in rows]
+            if any(item["account_id"] != self.account_id for item in result):
+                raise SettlementStoreError("reservation outbox account identity mismatch")
+            return result
 
     def _complete_batch_if_outboxes_acknowledged(
         self, db: sqlite3.Connection, batch_id: str,
@@ -496,6 +499,9 @@ class SQLiteSettlementStore:
                 batch_id, status, old_receipt, allocation_id, reservation_id, fill_id,
                 account_id, market_id, reservation_version, allocated_quantity, stored_digest,
             ) = row
+            if account_id != self.account_id:
+                db.rollback()
+                raise SettlementStoreError("reservation outbox account identity mismatch")
             payload = {
                 "schema": 1, "idempotency_key": idempotency_key,
                 "allocation_id": allocation_id, "batch_id": batch_id,
