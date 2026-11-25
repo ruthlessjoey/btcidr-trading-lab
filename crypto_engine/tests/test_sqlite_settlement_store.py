@@ -690,6 +690,18 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 timestamp=20,
             )
 
+
+    def test_fill_with_tampered_batch_timestamp_is_rejected(self):
+        self.store.apply_batch(
+            batch_id="b-legacy-buy", fills=[self.buy()], timestamp=10
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.batches SET created_at=11 WHERE batch_id='b-legacy-buy'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "fill row does not match its batch/market contract"):
+            self.store.snapshot()
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
