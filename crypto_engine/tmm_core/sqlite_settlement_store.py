@@ -530,6 +530,27 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("market registration audit event is invalid")
             market_events[market_id] = (base_asset, quote_asset)
         if market_policy == ("required-v1",) or market_events:
+            market_registration_sequences: dict[str, int] = {}
+            fill_market_sequences: list[tuple[int, str]] = []
+            for seq, event_json in db.execute(
+                "SELECT seq,event_json FROM main.audit ORDER BY seq"
+            ):
+                event = json.loads(event_json)
+                if not isinstance(event, dict):
+                    continue
+                if event.get("kind") == "MARKET_REGISTERED":
+                    market_registration_sequences[event["market_id"]] = seq
+                elif event.get("kind") == "SYNTHETIC_FILL":
+                    market_id = event.get("market_id")
+                    if not isinstance(market_id, str):
+                        raise SettlementStoreError("synthetic fill market identity is invalid")
+                    fill_market_sequences.append((seq, market_id))
+            for fill_seq, market_id in fill_market_sequences:
+                registration_seq = market_registration_sequences.get(market_id)
+                if registration_seq is None or registration_seq >= fill_seq:
+                    raise SettlementStoreError(
+                        "synthetic fill precedes market registration audit event"
+                    )
             actual_markets = {
                 market_id: (base_asset, quote_asset)
                 for market_id, base_asset, quote_asset in db.execute(
