@@ -973,15 +973,22 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.snapshot()
 
     def test_sell_fill_totals_use_high_precision_aggregation(self):
+        seed = self.buy(
+            fill_id="precision-seed-buy",
+            qty="12345678901234567891",
+        )
+        seed["price"] = "0.0000000000000001"
+        seed["fee_quote"] = "0"
         self.store.apply_batch(
             batch_id="precision-sell-seed",
-            fills=[self.buy(fill_id="precision-seed-buy", qty="1")],
+            fills=[seed],
             timestamp=1,
         )
-        self.enable_reservations(quantity="0.5")
-        first_qty = "0.1234567890123456789012345678"
-        second_qty = "0.0000000000000000000000000001"
-        total_qty = "0.1234567890123456789012345679"
+        authorized = "12345678901234567891"
+        self.enable_reservations(quantity=authorized)
+        first_qty = "12345678901234567890.123456789012345678"
+        second_qty = "0.000000000000000001"
+        total_qty = "12345678901234567890.123456789012345679"
         fills = [
             self.sell(fill_id="precision-sell-1", qty=first_qty),
             self.sell(fill_id="precision-sell-2", qty=second_qty),
@@ -989,7 +996,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         settlements = [
             self.sell_settlement(
                 key="settle:precision-sell",
-                authorized="0.5",
+                authorized=authorized,
                 filled=total_qty,
             )
         ]
@@ -1016,7 +1023,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         snapshot = self.store.snapshot()
         self.assertEqual(
             snapshot["holdings"]["BTC/USDT"],
-            "0.8765432109876543210987654321",
+            "0.876543210987654321",
         )
 
     def test_apply_batch_preserves_sub_precision_quote_debits(self):
