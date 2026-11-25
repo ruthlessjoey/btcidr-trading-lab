@@ -1,0 +1,72 @@
+name: Reservation Full Safe Suites
+
+on:
+  push:
+    branches:
+      - security/reservation-suite-acceptance-2026-11-26
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reservation-full-safe-suites-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reservation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    env:
+      PYTHONPATH: ${{ github.workspace }}/crypto_engine
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout approved files only
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /crypto_engine/tmm_core/__init__.py
+            /crypto_engine/tmm_core/sqlite_settlement_store.py
+            /crypto_engine/tmm_core/reservation_schema_v2.py
+            /crypto_engine/tmm_core/reservation_lifecycle.py
+            /crypto_engine/tmm_core/reservation_allocations.py
+            /crypto_engine/tmm_core/reservation_outbox_receiver.py
+            /crypto_engine/tests/test_sqlite_settlement_store.py
+            /crypto_engine/tests/test_reservation_outbox_receiver.py
+            /crypto_engine/tests/test_reservation_schema_v2.py
+            /crypto_engine/tests/test_reservation_lifecycle.py
+            /crypto_engine/tests/test_reservation_allocations.py
+            /crypto_engine/tests/test_reservation_atomic_allocations.py
+
+      - name: Set up supported Python version
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "${{ matrix.python-version }}"
+          check-latest: false
+
+      - name: Record exact Python and SQLite versions
+        run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
+
+      - name: Run reservation schema v2 regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_schema_v2.py' -v
+
+      - name: Run reservation lifecycle regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_lifecycle.py' -v
+
+      - name: Run reservation allocations regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_allocations.py' -v
+
+      - name: Run reservation atomic allocations regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
+
+      - name: Run settlement store regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
+
+      - name: Run reservation receiver regression suite
+        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
