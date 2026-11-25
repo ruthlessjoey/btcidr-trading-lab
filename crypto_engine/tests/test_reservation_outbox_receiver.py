@@ -141,7 +141,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         return receipt
 
     def test_receiver_accepts_sender_canonical_small_scale_quantity(self):
-        quantity = "0." + ("0" * 127) + "1"
+        quantity = "0." + ("0" * 17) + "1"
         self.receiver_db.execute("BEGIN IMMEDIATE")
         receipt = accept_reservation_outbox(
             self.receiver_db, self.payload(quantity=quantity)

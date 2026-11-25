@@ -51,7 +51,7 @@ def _canonical_payload(payload: Mapping[str, object]) -> tuple[str, str, str]:
     if isinstance(version, bool) or not isinstance(version, int) or not 1 <= version < 2**63 - 2:
         raise ReservationInboxError("reservation_version is outside the safe SQLite integer range")
     quantity_text = payload.get("allocated_quantity")
-    if not isinstance(quantity_text, str) or not quantity_text or len(quantity_text) > 256:
+    if not isinstance(quantity_text, str) or not quantity_text or len(quantity_text) > 128:
         raise ReservationInboxError("allocated_quantity must be a bounded decimal string")
     try:
         quantity = Decimal(quantity_text)
@@ -60,8 +60,7 @@ def _canonical_payload(payload: Mapping[str, object]) -> tuple[str, str, str]:
     if not quantity.is_finite() or quantity <= 0:
         raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")
     parts = quantity.as_tuple()
-    if (len(parts.digits) > 80 or parts.exponent < -160 or parts.exponent > 128
-            or (not quantity.is_zero() and abs(quantity.adjusted()) > 128)):
+    if len(parts.digits) > 38 or parts.exponent < -18 or parts.exponent > 128 or quantity.adjusted() > 38:
         raise ReservationInboxError("allocated_quantity exceeds supported decimal precision")
     if format(quantity, "f") != quantity_text:
         raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")

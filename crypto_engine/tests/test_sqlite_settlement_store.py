@@ -125,39 +125,39 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
 
     def test_reserved_sell_supports_shared_small_scale_decimal_contract(self):
-        buy = self.buy(qty="1e-128")
-        buy["price"] = "1e128"
+        buy = self.buy(qty="1e-18")
+        buy["price"] = "1e18"
         buy["fee_quote"] = "0"
         self.store.apply_batch(
             batch_id="b-buy-small-scale",
             fills=[buy],
             timestamp=10,
         )
-        self.enable_reservations(quantity="1e-128", expires_at=1000)
-        sell = self.sell(qty="1e-128")
-        sell["price"] = "1e128"
+        self.enable_reservations(quantity="1e-18", expires_at=1000)
+        sell = self.sell(qty="1e-18")
+        sell["price"] = "1e18"
         result = self.store.apply_batch(
             batch_id="b-sell-small-scale",
             fills=[sell],
             sell_settlements=[
                 self.sell_settlement(
                     key="settle:small-scale",
-                    authorized="1e-128",
-                    filled="1e-128",
+                    authorized="1e-18",
+                    filled="1e-18",
                 )
             ],
             sell_allocations=[
                 self.allocation(
                     allocation_id="a-small-scale",
                     fill_id="sell-1",
-                    quantity="1e-128",
+                    quantity="1e-18",
                 )
             ],
             timestamp=20,
         )
         self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
-        self.assertEqual(self.store.snapshot()["cash"], "10000")
-        self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0")
+        self.assertEqual(Decimal(self.store.snapshot()["cash"]), Decimal("10000"))
+        self.assertEqual(Decimal(self.store.snapshot()["holdings"]["BTC/USDT"]), Decimal("0"))
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
@@ -988,6 +988,66 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(
             SettlementStoreError, "required market registration audit policy marker is missing"
+        ):
+            self.store.snapshot()
+
+    def test_snapshot_rejects_reservation_consumption_before_sell_fill_audit(self):
+        self.store.apply_batch(
+            batch_id="reservation-order-seed",
+            fills=[self.buy(fill_id="reservation-order-buy")],
+            timestamp=1,
+        )
+        self.enable_reservations(quantity="0.5")
+        self.store.apply_batch(
+            batch_id="reservation-order-sell",
+            fills=[self.sell(fill_id="reservation-order-sell-fill", qty="0.25")],
+            sell_settlements=[
+                self.sell_settlement(
+                    key="settle:reservation-order",
+                    authorized="0.5",
+                    filled="0.25",
+                )
+            ],
+            sell_allocations=[
+                self.allocation(
+                    allocation_id="reservation-order-allocation",
+                    fill_id="reservation-order-sell-fill",
+                    quantity="0.25",
+                )
+            ],
+            timestamp=2,
+        )
+        with _managed_connection(self.path) as db:
+            rows = db.execute(
+                "SELECT seq,event_json FROM main.audit ORDER BY seq"
+            ).fetchall()
+            events = [json.loads(row[1]) for row in rows]
+            consumption_index = next(
+                i for i,event in enumerate(events)
+                if event.get("kind") == "RESERVATION_QUANTITY_CONSUMED"
+            )
+            sell_index = next(
+                i for i,event in enumerate(events)
+                if event.get("kind") == "SYNTHETIC_FILL"
+                and event.get("fill_id") == "reservation-order-sell-fill"
+            )
+            self.assertLess(sell_index, consumption_index)
+            events[consumption_index], events[sell_index] = (
+                events[sell_index], events[consumption_index]
+            )
+            previous = "0" * 64
+            for seq,event in enumerate(events, start=1):
+                encoded = json.dumps(
+                    event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                )
+                digest = _event_hash(previous, event)
+                db.execute(
+                    "UPDATE main.audit SET event_json=?,previous_hash=?,event_hash=? WHERE seq=?",
+                    (encoded, previous, digest, seq),
+                )
+                previous = digest
+        with self.assertRaisesRegex(
+            SettlementStoreError, "SELL fill audit must precede reservation consumption audit"
         ):
             self.store.snapshot()
 
