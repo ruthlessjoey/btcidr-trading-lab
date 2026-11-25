@@ -1,0 +1,65 @@
+name: Reservation Settlement Isolated Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/reservation-settlement-isolated-tests.yml"
+      - "crypto_engine/tmm_core/__init__.py"
+      - "crypto_engine/tmm_core/sqlite_settlement_store.py"
+      - "crypto_engine/tmm_core/reservation_schema_v2.py"
+      - "crypto_engine/tmm_core/reservation_lifecycle.py"
+      - "crypto_engine/tmm_core/reservation_allocations.py"
+      - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_sqlite_settlement_store.py"
+      - "crypto_engine/tests/test_reservation_outbox_receiver.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reservation-settlement-isolated-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  isolated-tests:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    env:
+      PYTHONPATH: ${{ github.workspace }}/crypto_engine
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout approved settlement files only
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /crypto_engine/tmm_core/__init__.py
+            /crypto_engine/tmm_core/sqlite_settlement_store.py
+            /crypto_engine/tmm_core/reservation_schema_v2.py
+            /crypto_engine/tmm_core/reservation_lifecycle.py
+            /crypto_engine/tmm_core/reservation_allocations.py
+            /crypto_engine/tmm_core/reservation_outbox_receiver.py
+            /crypto_engine/tests/test_sqlite_settlement_store.py
+            /crypto_engine/tests/test_reservation_outbox_receiver.py
+
+      - name: Set up supported Python version
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "${{ matrix.python-version }}"
+          check-latest: false
+
+      - name: Run settlement store regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
+
+      - name: Run reservation receiver regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
