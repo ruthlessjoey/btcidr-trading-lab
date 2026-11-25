@@ -42,7 +42,8 @@ def _canonical_payload(payload: Mapping[str, object]) -> tuple[str, str, str]:
     )
     for field in text_fields:
         value = payload.get(field)
-        if not isinstance(value, str) or not value.strip() or len(value) > 256:
+        limit = 280 if field == "idempotency_key" else 256
+        if not isinstance(value, str) or not value.strip() or len(value) > limit:
             raise ReservationInboxError(f"{field} must be nonempty and bounded")
     if payload["idempotency_key"] != "reservation-allocation:" + payload["allocation_id"]:
         raise ReservationInboxError("reservation outbox idempotency key does not match allocation ID")
@@ -56,11 +57,13 @@ def _canonical_payload(payload: Mapping[str, object]) -> tuple[str, str, str]:
         quantity = Decimal(quantity_text)
     except (InvalidOperation, ValueError) as exc:
         raise ReservationInboxError("allocated_quantity must be a finite positive decimal") from exc
-    if not quantity.is_finite() or quantity <= 0 or format(quantity, "f") != quantity_text:
+    if not quantity.is_finite() or quantity <= 0:
         raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")
     parts = quantity.as_tuple()
     if len(parts.digits) > 38 or parts.exponent < -18 or quantity.adjusted() > 38:
         raise ReservationInboxError("allocated_quantity exceeds supported decimal precision")
+    if format(quantity, "f") != quantity_text:
+        raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")
 
     canonical = json.dumps(
         dict(payload), sort_keys=True, separators=(",", ":"),
@@ -157,12 +160,12 @@ def deliver_pending_reservation_outbox(
             "reservation_version": row["reservation_version"],
             "allocated_quantity": row["allocated_quantity"],
         }
-        canonical, digest, _ = _canonical_payload(payload)
+        _, digest, expected_receipt = _canonical_payload(payload)
         if digest != row["payload_sha256"]:
             raise ReservationInboxError("stored reservation outbox payload hash mismatch")
         receipt = receiver(payload)
-        if not isinstance(receipt, str) or not receipt.strip() or len(receipt) > 128:
-            raise ReservationInboxError("receiver returned an invalid receipt")
+        if not isinstance(receipt, str) or receipt != expected_receipt:
+            raise ReservationInboxError("receiver returned a receipt not bound to this payload")
         store.acknowledge_reservation_outbox(
             row["idempotency_key"], receiver_receipt=receipt,
         )
