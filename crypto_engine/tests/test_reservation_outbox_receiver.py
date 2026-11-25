@@ -134,7 +134,13 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         self.assertRegex(rows[0]["payload_sha256"], r"^[0-9a-f]{64}$")
 
     def test_delivery_worker_acknowledges_and_batch_waits_for_both_outboxes(self):
-        delivered = deliver_pending_reservation_outbox(self.store, self.receive)
+        received_payload = {}
+        def receiver(payload):
+            received_payload.update(payload)
+            return self.receive(payload)
+
+        delivered = deliver_pending_reservation_outbox(self.store, receiver)
+        self.assertEqual(received_payload["account_id"], "paper-research")
         self.assertEqual(delivered, ["reservation-allocation:a-1"])
         self.assertEqual(self.store.pending_reservation_outbox(), [])
         with sqlite3.connect(self.store.path) as db:
