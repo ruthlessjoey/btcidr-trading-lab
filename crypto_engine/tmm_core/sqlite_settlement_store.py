@@ -466,7 +466,9 @@ class SQLiteSettlementStore:
                 continue
             kind = event.get("kind")
             reservation_id = event.get("reservation_id")
-            if isinstance(kind,str) and kind.startswith("RESERVATION_") and isinstance(reservation_id,str):
+            if isinstance(kind,str) and kind.startswith("RESERVATION_"):
+                if not isinstance(reservation_id,str) or not reservation_id:
+                    raise SettlementStoreError("reservation lifecycle audit identity is invalid")
                 history.setdefault(reservation_id,[]).append(event)
             if kind == "RESERVATION_QUANTITY_CONSUMED":
                 batch_id = event.get("batch_id")
