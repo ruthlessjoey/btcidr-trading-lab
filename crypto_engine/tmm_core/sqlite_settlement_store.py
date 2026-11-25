@@ -585,7 +585,7 @@ class SQLiteSettlementStore:
                 "kind": "RESERVATION_OUTBOX_ACKNOWLEDGED",
                 "account_id": self.account_id, "batch_id": batch_id,
                 "allocation_id": allocation_id, "idempotency_key": idempotency_key,
-                "payload_sha256": recalculated_digest,
+                "payload_sha256": stored_digest,
                 "receipt_sha256": receipt_digest,
             })
             self._complete_batch_if_outboxes_acknowledged(db, batch_id)
