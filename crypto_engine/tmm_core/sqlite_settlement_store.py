@@ -708,6 +708,7 @@ class SQLiteSettlementStore:
         max_version_by_reservation: dict[str, int] = {}
         totals_by_fill: dict[str, Decimal] = {}
         fill_identity: dict[str, tuple[str, str]] = {}
+        allocation_groups_by_fill: dict[str, set[tuple[str, str]]] = {}
         for allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,quantity_text,version in allocation_rows:
             if (account_id != self.account_id or not isinstance(reservation_id,str)
                     or not isinstance(batch_id,str) or not isinstance(fill_id,str)
@@ -718,6 +719,7 @@ class SQLiteSettlementStore:
             if quantity <= 0:
                 raise SettlementStoreError("reservation allocation quantity must be positive")
             key = (reservation_id,batch_id)
+            allocation_groups_by_fill.setdefault(fill_id, set()).add(key)
             group = groups.setdefault(key, {
                 "account_id":account_id,"market_id":market_id,
                 "version":version,"quantity":Decimal("0"),
@@ -763,9 +765,23 @@ class SQLiteSettlementStore:
         if set(totals_by_fill) != sell_fill_ids:
             raise SettlementStoreError("allocation ledger contains missing or non-SELL fill references")
 
+        sell_fill_sequences: dict[str, int] = {}
+        for seq, event_json in db.execute(
+            "SELECT seq,event_json FROM main.audit ORDER BY seq"
+        ):
+            event = json.loads(event_json)
+            if (isinstance(event, dict) and event.get("kind") == "SYNTHETIC_FILL"
+                    and event.get("side") == "SELL"):
+                fill_id = event.get("fill_id")
+                if isinstance(fill_id, str):
+                    sell_fill_sequences[fill_id] = seq
+
         history: dict[str,list[dict[str,object]]] = {}
         consumption_events: dict[tuple[str,str],dict[str,object]] = {}
-        for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
+        consumption_event_sequences: dict[tuple[str,str], int] = {}
+        for seq, event_json in db.execute(
+            "SELECT seq,event_json FROM main.audit ORDER BY seq"
+        ):
             event = json.loads(event_json)
             if not isinstance(event,dict):
                 continue
@@ -785,8 +801,20 @@ class SQLiteSettlementStore:
                 if key in consumption_events:
                     raise SettlementStoreError("duplicate reservation consumption audit event")
                 consumption_events[key] = event
+                consumption_event_sequences[key] = seq
         if set(groups) != set(consumption_events):
             raise SettlementStoreError("reservation allocation/audit coverage mismatch")
+
+        for fill_id in sell_fill_ids:
+            fill_seq = sell_fill_sequences.get(fill_id)
+            if fill_seq is None:
+                raise SettlementStoreError("SELL fill audit sequence is missing")
+            for group_key in allocation_groups_by_fill.get(fill_id, set()):
+                consumption_seq = consumption_event_sequences.get(group_key)
+                if consumption_seq is None or consumption_seq >= fill_seq:
+                    raise SettlementStoreError(
+                        "reservation consumption audit must precede SELL fill"
+                    )
 
         for (reservation_id,batch_id),group in groups.items():
             event = consumption_events[(reservation_id,batch_id)]

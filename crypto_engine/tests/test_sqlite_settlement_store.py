@@ -925,6 +925,66 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_snapshot_rejects_sell_fill_before_reservation_consumption_audit(self):
+        self.store.apply_batch(
+            batch_id="reservation-order-seed",
+            fills=[self.buy(fill_id="reservation-order-buy")],
+            timestamp=1,
+        )
+        self.enable_reservations(quantity="0.5")
+        self.store.apply_batch(
+            batch_id="reservation-order-sell",
+            fills=[self.sell(fill_id="reservation-order-sell-fill", qty="0.25")],
+            sell_settlements=[
+                self.sell_settlement(
+                    key="settle:reservation-order",
+                    authorized="0.5",
+                    filled="0.25",
+                )
+            ],
+            sell_allocations=[
+                self.allocation(
+                    allocation_id="reservation-order-allocation",
+                    fill_id="reservation-order-sell-fill",
+                    quantity="0.25",
+                )
+            ],
+            timestamp=2,
+        )
+        with _managed_connection(self.path) as db:
+            rows = db.execute(
+                "SELECT seq,event_json FROM main.audit ORDER BY seq"
+            ).fetchall()
+            events = [json.loads(row[1]) for row in rows]
+            consumption_index = next(
+                i for i,event in enumerate(events)
+                if event.get("kind") == "RESERVATION_QUANTITY_CONSUMED"
+            )
+            sell_index = next(
+                i for i,event in enumerate(events)
+                if event.get("kind") == "SYNTHETIC_FILL"
+                and event.get("fill_id") == "reservation-order-sell-fill"
+            )
+            self.assertLess(consumption_index, sell_index)
+            events[consumption_index], events[sell_index] = (
+                events[sell_index], events[consumption_index]
+            )
+            previous = "0" * 64
+            for seq,event in enumerate(events, start=1):
+                encoded = json.dumps(
+                    event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                )
+                digest = _event_hash(previous, event)
+                db.execute(
+                    "UPDATE main.audit SET event_json=?,previous_hash=?,event_hash=? WHERE seq=?",
+                    (encoded, previous, digest, seq),
+                )
+                previous = digest
+        with self.assertRaisesRegex(
+            SettlementStoreError, "reservation consumption audit must precede SELL fill"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_fill_audit_before_market_registration(self):
         self.store.apply_batch(
             batch_id="fill-before-market-registration",
