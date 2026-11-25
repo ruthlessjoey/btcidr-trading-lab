@@ -436,6 +436,57 @@ class SQLiteSettlementStore:
         if audit_fills != expected_fills:
             raise SettlementStoreError("synthetic fill ledger does not match audit events")
 
+        # Reconcile event-to-event balance transitions and the current accounting rows.
+        previous_cash: Decimal | None = None
+        latest_cash: Decimal | None = None
+        previous_holdings: dict[str,Decimal] = {}
+        latest_holdings: dict[str,Decimal] = {}
+        with localcontext() as decimal_context:
+            decimal_context.prec = 80
+            for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
+                event = json.loads(event_json)
+                if not isinstance(event,dict) or event.get("kind") != "SYNTHETIC_FILL":
+                    continue
+                quantity = _decimal(event["quantity"],"audited fill quantity")
+                price = _decimal(event["price"],"audited fill price")
+                fee = _decimal(event["fee_quote"],"audited fill fee")
+                cash_after = _decimal(event["cash_after"],"audited cash after")
+                holding_after = _decimal(event["holding_after"],"audited holding after")
+                market_id = event["market_id"]
+                if event["side"] == "BUY":
+                    cash_delta = -(quantity * price + fee)
+                    holding_delta = quantity
+                elif event["side"] == "SELL":
+                    cash_delta = quantity * price - fee
+                    holding_delta = -quantity
+                else:
+                    raise SettlementStoreError("synthetic fill audit side is invalid")
+                if previous_cash is not None and cash_after != previous_cash + cash_delta:
+                    raise SettlementStoreError("synthetic fill cash audit transition mismatch")
+                if market_id in previous_holdings and (
+                    holding_after != previous_holdings[market_id] + holding_delta
+                ):
+                    raise SettlementStoreError("synthetic fill holding audit transition mismatch")
+                previous_cash = latest_cash = cash_after
+                previous_holdings[market_id] = holding_after
+                latest_holdings[market_id] = holding_after
+
+        if latest_cash is not None:
+            stored_cash = _decimal(
+                db.execute("SELECT cash FROM main.account WHERE singleton=1").fetchone()[0],
+                "stored cash",
+            )
+            stored_holdings = {
+                market_id:_decimal(quantity,"stored holding")
+                for market_id,quantity in db.execute(
+                    "SELECT market_id,quantity FROM main.holdings"
+                )
+            }
+            if stored_cash != latest_cash:
+                raise SettlementStoreError("account cash does not match fill audit state")
+            if stored_holdings != latest_holdings:
+                raise SettlementStoreError("holdings do not match fill audit state")
+
         allocation_rows = db.execute(
             "SELECT allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,"
             "allocated_quantity,reservation_version "
