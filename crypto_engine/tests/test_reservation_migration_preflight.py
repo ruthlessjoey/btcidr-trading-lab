@@ -113,6 +113,60 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertEqual(result.unresolved_batch_count, 1)
 
+
+    def test_buy_only_ledger_reconciles_against_audit_holdings_and_cash(self):
+        import hashlib
+        import json
+        self.db.execute("INSERT INTO batches VALUES('b1','h','COMPLETE',10,'{}')")
+        self.db.execute("INSERT INTO fills VALUES('f1','b1','BTC/USDT','BUY','1','100','1',10)")
+        self.db.execute("INSERT INTO holdings VALUES('BTC/USDT','1')")
+        self.db.execute("UPDATE account SET cash='899' WHERE singleton=1")
+        event = {
+            "kind":"SYNTHETIC_FILL","account_id":"paper","batch_id":"b1",
+            "fill_id":"f1","market_id":"BTC/USDT","side":"BUY",
+            "quantity":"1","price":"100","fee_quote":"1",
+            "cash_after":"899","holding_after":"1","timestamp":10,
+        }
+        encoded = json.dumps(event,sort_keys=True,separators=(",",":"))
+        previous = "0" * 64
+        digest = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
+        self.db.execute("INSERT INTO audit VALUES(1,?,?,?)",(encoded,previous,digest))
+        result = self.inspect()
+        self.assertTrue(result.eligible, result.blockers)
+
+    def test_holdings_without_matching_buy_fills_are_blocked(self):
+        self.db.execute("INSERT INTO holdings VALUES('BTC/USDT','1')")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("accounting state" in item for item in result.blockers))
+
+    def test_nonfinite_account_cash_is_blocked(self):
+        self.db.execute("UPDATE account SET cash='NaN' WHERE singleton=1")
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("accounting state" in item for item in result.blockers))
+
+    def test_buy_fill_with_audit_event_mismatch_is_blocked(self):
+        import hashlib
+        import json
+        self.db.execute("INSERT INTO batches VALUES('b1','h','COMPLETE',10,'{}')")
+        self.db.execute("INSERT INTO fills VALUES('f1','b1','BTC/USDT','BUY','1','100','1',10)")
+        self.db.execute("INSERT INTO holdings VALUES('BTC/USDT','1')")
+        self.db.execute("UPDATE account SET cash='899' WHERE singleton=1")
+        event = {
+            "kind":"SYNTHETIC_FILL","account_id":"paper","batch_id":"b1",
+            "fill_id":"f1","market_id":"BTC/USDT","side":"BUY",
+            "quantity":"2","price":"100","fee_quote":"1",
+            "cash_after":"899","holding_after":"2","timestamp":10,
+        }
+        encoded = json.dumps(event,sort_keys=True,separators=(",",":"))
+        previous = "0" * 64
+        digest = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
+        self.db.execute("INSERT INTO audit VALUES(1,?,?,?)",(encoded,previous,digest))
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("accounting state" in item for item in result.blockers))
+
     def test_historical_sell_fill_is_blocked(self):
         self.db.execute(
             "INSERT INTO fills VALUES('s1','b1','BTC/USDT','SELL','1','10','0',1)"
