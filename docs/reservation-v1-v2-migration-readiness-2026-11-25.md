@@ -204,3 +204,28 @@ Strategy agents remain proposal-only and must never receive SQLite handles, rese
 - Overall whole-project completion: UNRATED.
 
 This document is a migration acceptance design, not a migration script, release authorization, production runbook or trading permission.
+
+
+## 25 November 2026 — latest reservation / settlement verification update
+
+This dated update supersedes the earlier 110-test candidate count in Section 10. The earlier count is retained as historical evidence.
+
+- PR #149 current head: `6a3c91ea9164e5cfcac39390aab2f54e4`; comparison against PR #148 head `ee6387fbb5f721a509a38b971dc3db35452b0c73`: 16 ahead / 0 behind.
+- PR #149 sender ACK now revalidates the complete persisted outbox payload, canonical hash and deterministic receipt under `BEGIN IMMEDIATE`; mutation during receiver callback fails closed and leaves the sender row pending.
+- PR #149 exact-head Actions run [45552657350](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45552657350): Python 3.11.18 / SQLite 3.46.1 passed 21 settlement-store + 14 receiver tests; Python 3.13.18 passed the same 35 tests.
+- PR #150 current head: `3bffd6bc32ff72072c24ec94ef2c642e5f7104e4`; stacked on PR #149 head `6a3c91ea9164e5cfcac39390aab2f54e4`: 24 ahead / 0 behind.
+- PR #150 exact-head Actions run [45552712044](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45552712044): each of Python 3.11.18 and 3.13.18 / SQLite 3.46.1 passed 25 schema + 21 lifecycle + 16 allocation preflight + 13 atomic allocation + 22 settlement-store + 14 receiver = 111/111.
+- Both PRs remain draft/open/unmerged. The independent reviewer workflow is skipped, not passed.
+- The six-suite CI remains limited to sparse-checked-out unprotected settlement modules/tests. It does not prove full repository compatibility, a completed migration, remote receiver delivery, process-level crash/restore behavior, profitability, or production readiness.
+
+### Updated disposition
+
+- Legacy v1 and earlier-v2 SELL remains blocked; BUY-only operation on exact v1 remains supported by the candidate gate.
+- v1 inventory bootstrap and earlier-v2 expiry/history-preserving migration are still unimplemented. Existing databases remain untouched.
+- Remote authenticated receiver and external business-effect integration are still unimplemented.
+- Independent adversarial acceptance and multiprocess crash/concurrency/backup/restore evidence remain pending.
+- Install readiness: **NOT READY**; trading readiness: **NOT READY**; PAPER activation: **ON HOLD**; LIVE: **DISABLED / ABSENT**.
+- Profitability / high-win-rate evidence: **NOT ESTABLISHED**.
+- Overall project completion: **UNRATED** pending owner-approved scope, weights and evidence criteria.
+
+This update records evidence only. It does not authorize migration, deployment, merges, PAPER activation or LIVE activity.
