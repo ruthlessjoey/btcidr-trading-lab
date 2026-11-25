@@ -359,6 +359,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
     def test_reservation_schema_enforces_expiry_and_positive_version(self):
         db = self.connection()
         db.execute("INSERT INTO markets VALUES('BTC/USDT','BTC','USDT')")
+        db.commit()
         db.execute("BEGIN IMMEDIATE")
         ensure_reservation_schema_v2(db)
         with self.assertRaises(sqlite3.IntegrityError):
