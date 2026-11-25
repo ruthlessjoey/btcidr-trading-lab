@@ -273,7 +273,7 @@ class SQLiteSettlementStore:
             nonzero_outbox = {key: value for key, value in outbox_totals.items() if value != 0}
             if sell_totals != nonzero_outbox:
                 raise SettlementStoreError("SELL outbox filled quantities must equal SELL fills per market")
-            with self._lock, self._connect() as db:
+        with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             existing = db.execute(
                 "SELECT request_hash,status,result_json FROM batches WHERE batch_id=?",
@@ -383,10 +383,10 @@ class SQLiteSettlementStore:
                     balances[fill["market_id"]] = current
                     staged.append((fill, current, cash))
     
-                for item in normalized_outbox:
-                if db.execute("SELECT 1 FROM markets WHERE market_id=?",
-                              (item["market_id"],)).fetchone() is None:
-                    raise SettlementStoreError("outbox market is not registered")
+            for item in normalized_outbox:
+            if db.execute("SELECT 1 FROM markets WHERE market_id=?",
+                          (item["market_id"],)).fetchone() is None:
+                raise SettlementStoreError("outbox market is not registered")
 
             # Persist final account state and all fill records in this same transaction.
             db.execute("UPDATE account SET cash=? WHERE singleton=1", (format(cash, "f"),))
