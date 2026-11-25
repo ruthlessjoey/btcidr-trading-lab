@@ -969,19 +969,18 @@ class SQLiteSettlementStore:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
         with self._connect() as db:
+            db.execute("BEGIN")
+            self._verify_account_state(db)
             objects = db.execute(
                 "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
                 "('reservations','reservation_allocations','reservation_outbox')"
             ).fetchall()
             expected = {"reservations","reservation_allocations","reservation_outbox"}
             if not objects:
+                db.rollback()
                 return []
             if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
-            db.execute("BEGIN")
-            from .reservation_schema_v2 import ensure_reservation_schema_v2
-            ensure_reservation_schema_v2(db)
-            self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_cardinality(db)
             self._verify_reservation_outbox_rows(db)
             rows = db.execute(
@@ -1053,6 +1052,7 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("expected_payload_sha256 must be a lowercase SHA-256 hex digest")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            self._verify_account_state(db)
             objects = db.execute(
                 "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
                 "('reservations','reservation_allocations','reservation_outbox')"
@@ -1061,9 +1061,6 @@ class SQLiteSettlementStore:
             if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
                 db.rollback()
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
-            from .reservation_schema_v2 import ensure_reservation_schema_v2
-            ensure_reservation_schema_v2(db)
-            self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_rows(db)
             row = db.execute(
                 "SELECT batch_id,status,receiver_receipt,allocation_id,reservation_id,fill_id,"

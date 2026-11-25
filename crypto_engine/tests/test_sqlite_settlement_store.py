@@ -188,6 +188,44 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.acknowledge_outbox("settle:guard", receiver_receipt="receipt")
 
+    def _create_pending_reservation_outbox(self):
+        self.store.apply_batch(
+            batch_id="b-reservation-outbox-cash-guard-buy",
+            fills=[self.buy()], timestamp=10,
+        )
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reservation-outbox-cash-guard-sell",
+            fills=[self.sell()],
+            sell_settlements=[self.sell_settlement(key="settle:reservation-cash-guard")],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+
+    def test_pending_reservation_outbox_rejects_tampered_account_cash(self):
+        self._create_pending_reservation_outbox()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.pending_reservation_outbox()
+
+    def test_reservation_outbox_ack_rejects_tampered_account_cash(self):
+        self._create_pending_reservation_outbox()
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1",
+                receiver_receipt=expected_receipt,
+                expected_payload_sha256=expected_hash,
+            )
+
     def test_settlement_outbox_methods_reject_tampered_reservation_state(self):
         self.store.apply_batch(
             batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10
