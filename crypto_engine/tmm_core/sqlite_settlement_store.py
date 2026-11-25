@@ -1083,8 +1083,15 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
             if present == expected:
                 from .reservation_schema_v2 import ensure_reservation_schema_v2
-                ensure_reservation_schema_v2(db)
-                self._verify_reservation_audit_coverage(db)
+                db.execute("BEGIN")
+                try:
+                    ensure_reservation_schema_v2(db)
+                    self._verify_reservation_audit_coverage(db)
+                except Exception:
+                    db.rollback()
+                    raise
+                else:
+                    db.rollback()
             account = db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()
             holdings = dict(db.execute("SELECT market_id,quantity FROM holdings"))
             return {"account_id": self.account_id, "currency": self.currency,
