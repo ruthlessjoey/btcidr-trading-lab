@@ -117,7 +117,7 @@ class TokocryptoRequestShapeAndCompatibilityGateTests(unittest.TestCase):
                 decode_kline_response(raw)
 
     def test_response_decoder_rejects_adversarially_deep_json(self):
-        raw = b"[" * 2000 + b"0" + b"]" * 2000
+        raw = b"[" * 10000 + b"0" + b"]" * 10000
         with self.assertRaises(IngestionError):
             decode_kline_response(raw)
 
