@@ -30,15 +30,29 @@ class SettlementStoreError(RuntimeError):
     """Unsafe, inconsistent, or unresolved durable settlement state."""
 
 
+_MAX_DECIMAL_TEXT_LENGTH = 128
+_MAX_DECIMAL_DIGITS = 128
+_MAX_DECIMAL_EXPONENT = 128
+
+
 def _decimal(value: object, field: str) -> Decimal:
     if isinstance(value, bool):
         raise SettlementStoreError(f"{field} must be a finite decimal")
+    text = str(value)
+    if len(text) > _MAX_DECIMAL_TEXT_LENGTH:
+        raise SettlementStoreError(f"{field} exceeds the decimal input length limit")
     try:
-        result = Decimal(str(value))
+        result = Decimal(text)
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise SettlementStoreError(f"{field} must be a finite decimal") from exc
     if not result.is_finite():
         raise SettlementStoreError(f"{field} must be finite")
+    parts = result.as_tuple()
+    if (len(parts.digits) > _MAX_DECIMAL_DIGITS
+            or not isinstance(parts.exponent, int)
+            or abs(parts.exponent) > _MAX_DECIMAL_EXPONENT
+            or result.adjusted() > _MAX_DECIMAL_EXPONENT):
+        raise SettlementStoreError(f"{field} exceeds the decimal precision or exponent limit")
     return result
 
 

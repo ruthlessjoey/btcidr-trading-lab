@@ -94,6 +94,30 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(digest, row["payload_sha256"])
         return digest, receipt
 
+    def test_apply_batch_rejects_extreme_decimal_exponents_without_mutation(self):
+        for field_value in ("1e999999999", "1e-999999999", "0e-999999999"):
+            with self.subTest(value=field_value):
+                fill = self.buy()
+                fill["quantity"] = field_value
+                with self.assertRaisesRegex(SettlementStoreError, "exponent limit"):
+                    self.store.apply_batch(
+                        batch_id="b-extreme-" + field_value,
+                        fills=[fill],
+                        timestamp=10,
+                    )
+                self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with _managed_connection(self.path) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
+
+    def test_apply_batch_rejects_overlong_decimal_input_without_mutation(self):
+        fill = self.buy()
+        fill["price"] = "1" * 129
+        with self.assertRaisesRegex(SettlementStoreError, "input length limit"):
+            self.store.apply_batch(batch_id="b-overlong", fills=[fill], timestamp=10)
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with _managed_connection(self.path) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
+
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
         result = self.store.apply_batch(batch_id="b-1",
                                         fills=[self.buy()], timestamp=10)
