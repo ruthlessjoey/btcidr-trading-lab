@@ -39,8 +39,10 @@ def decode_kline_response(raw_response: bytes) -> Any:
         text = raw_response.decode("utf-8", errors="strict")
         return json.loads(text, object_pairs_hook=_unique_object,
                           parse_constant=_reject_json_constant)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise IngestionError("response is not valid strict UTF-8 JSON") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise IngestionError("response is not valid bounded strict UTF-8 JSON") from exc
+    except (AttributeError, TypeError) as exc:
+        raise IngestionError("raw response must be bytes") from exc
 
 
 def validate_approved_kline_payload(*, method: str, url: str, raw_response: bytes,
