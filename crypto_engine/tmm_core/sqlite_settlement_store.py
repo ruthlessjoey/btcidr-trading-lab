@@ -643,9 +643,8 @@ class SQLiteSettlementStore:
                     raise SettlementStoreError("synthetic fill audit side is invalid")
                 if previous_cash is not None and cash_after != previous_cash + cash_delta:
                     raise SettlementStoreError("synthetic fill cash audit transition mismatch")
-                if market_id in previous_holdings and (
-                    holding_after != previous_holdings[market_id] + holding_delta
-                ):
+                prior_holding = previous_holdings.get(market_id, Decimal("0"))
+                if holding_after != prior_holding + holding_delta:
                     raise SettlementStoreError("synthetic fill holding audit transition mismatch")
                 previous_cash = latest_cash = cash_after
                 previous_holdings[market_id] = holding_after

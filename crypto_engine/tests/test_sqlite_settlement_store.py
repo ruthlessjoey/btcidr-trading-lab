@@ -925,6 +925,107 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_snapshot_rejects_first_sell_without_opening_inventory(self):
+        batch_id = "b-unauthorized-first-sell"
+        fill_id = "sell-without-opening-inventory"
+        event = {
+            "kind": "SYNTHETIC_FILL",
+            "account_id": "paper-research",
+            "batch_id": batch_id,
+            "fill_id": fill_id,
+            "market_id": "BTC/USDT",
+            "side": "SELL",
+            "quantity": "1",
+            "price": "110",
+            "fee_quote": "0",
+            "cash_after": "10110",
+            "holding_after": "5",
+            "timestamp": 10,
+        }
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.batches(batch_id,request_hash,status,created_at,result_json) "
+                "VALUES(?,?, 'COMPLETE', ?, ?)",
+                (batch_id, "a" * 64, 10, "{}"),
+            )
+            db.execute(
+                "INSERT INTO main.fills(fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (fill_id, batch_id, "BTC/USDT", "SELL", "1", "110", "0", 10),
+            )
+            db.execute("UPDATE main.account SET cash='10110' WHERE singleton=1")
+            db.execute(
+                "INSERT INTO main.holdings(market_id,quantity) VALUES('BTC/USDT','5')"
+            )
+            previous = db.execute(
+                "SELECT event_hash FROM main.audit ORDER BY seq DESC LIMIT 1"
+            ).fetchone()[0]
+            encoded = json.dumps(
+                event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+            db.execute(
+                "INSERT INTO main.audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+                (encoded, previous, _event_hash(previous, event)),
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "synthetic fill holding audit transition mismatch"
+        ):
+            self.store.snapshot()
+
+    def test_sell_fill_totals_use_high_precision_aggregation(self):
+        seed = self.buy(
+            fill_id="precision-seed-buy",
+            qty="12345678901234567891",
+        )
+        seed["price"] = "0.0000000000000001"
+        seed["fee_quote"] = "0"
+        self.store.apply_batch(
+            batch_id="precision-sell-seed",
+            fills=[seed],
+            timestamp=1,
+        )
+        authorized = "12345678901234567891"
+        self.enable_reservations(quantity=authorized)
+        first_qty = "12345678901234567890.123456789012345678"
+        second_qty = "0.000000000000000001"
+        total_qty = "12345678901234567890.123456789012345679"
+        fills = [
+            self.sell(fill_id="precision-sell-1", qty=first_qty),
+            self.sell(fill_id="precision-sell-2", qty=second_qty),
+        ]
+        settlements = [
+            self.sell_settlement(
+                key="settle:precision-sell",
+                authorized=authorized,
+                filled=total_qty,
+            )
+        ]
+        allocations = [
+            self.allocation(
+                allocation_id="precision-allocation-1",
+                fill_id="precision-sell-1",
+                quantity=first_qty,
+            ),
+            self.allocation(
+                allocation_id="precision-allocation-2",
+                fill_id="precision-sell-2",
+                quantity=second_qty,
+            ),
+        ]
+        result = self.store.apply_batch(
+            batch_id="precision-sell-batch",
+            fills=fills,
+            sell_settlements=settlements,
+            sell_allocations=allocations,
+            timestamp=2,
+        )
+        self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
+        snapshot = self.store.snapshot()
+        self.assertEqual(
+            snapshot["holdings"]["BTC/USDT"],
+            "0.876543210987654321",
+        )
+
     def test_apply_batch_preserves_sub_precision_quote_debits(self):
         first = self.buy()
         first["fill_id"] = "precision-buy-1"
