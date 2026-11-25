@@ -16,6 +16,8 @@ APPROVED_PATH = "/api/v3/klines"
 APPROVED_SYMBOL = "BTCIDR"
 APPROVED_INTERVALS = frozenset({"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"})
 ALLOWED_QUERY_KEYS = frozenset({"symbol", "interval", "startTime", "endTime", "limit"})
+MAX_REQUEST_URL_LENGTH = 2048
+MAX_SQLITE_INTEGER = 2**63 - 1
 
 
 class ProviderPolicyError(ValueError):
@@ -31,9 +33,20 @@ def validate_approved_kline_request(*, method: str, url: str,
         raise ProviderPolicyError("request headers are not approved; send no authentication or custom headers")
     if not isinstance(url, str) or not url:
         raise ProviderPolicyError("request URL is required")
+    if len(url) > MAX_REQUEST_URL_LENGTH:
+        raise ProviderPolicyError("request URL exceeds the 2048-character limit")
+    if (
+        not url.isascii()
+        or any(ord(char) <= 0x20 or ord(char) == 0x7f for char in url)
+        or "#" in url
+    ):
+        raise ProviderPolicyError("request URL contains non-ASCII, whitespace, control, or fragment characters")
     try:
         parsed = urlsplit(url)
-        pairs = parse_qsl(parsed.query, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            parsed.query, keep_blank_values=True, strict_parsing=True,
+            max_num_fields=len(ALLOWED_QUERY_KEYS),
+        )
     except ValueError as exc:
         raise ProviderPolicyError("request URL is malformed") from exc
     if (parsed.scheme != "https" or parsed.netloc != APPROVED_HOST
@@ -58,15 +71,21 @@ def validate_approved_kline_request(*, method: str, url: str,
         raise ProviderPolicyError("only the approved BTCIDR symbol is permitted")
     if params["interval"] not in APPROVED_INTERVALS:
         raise ProviderPolicyError("interval is not in Tokocrypto's documented kline interval set")
-    if "startTime" in params and not params["startTime"].isdecimal():
-        raise ProviderPolicyError("startTime must be integer milliseconds")
-    if "endTime" in params and not params["endTime"].isdecimal():
-        raise ProviderPolicyError("endTime must be integer milliseconds")
+    for key in ("startTime", "endTime"):
+        if key in params:
+            value = params[key]
+            if not value.isascii() or not value.isdigit() or len(value) > 19:
+                raise ProviderPolicyError(f"{key} must be bounded ASCII integer milliseconds")
+            if int(value) > MAX_SQLITE_INTEGER:
+                raise ProviderPolicyError(f"{key} exceeds the supported integer range")
     if "startTime" in params and "endTime" in params:
         if int(params["endTime"]) < int(params["startTime"]):
             raise ProviderPolicyError("endTime cannot be before startTime")
     if "limit" in params:
-        if not params["limit"].isdecimal() or not 1 <= int(params["limit"]) <= 1000:
+        value = params["limit"]
+        if not value.isascii() or not value.isdigit() or len(value) > 4:
+            raise ProviderPolicyError("limit must be a bounded ASCII integer")
+        if not 1 <= int(value) <= 1000:
             raise ProviderPolicyError("limit must be between 1 and 1000")
     return {
         "method": "GET",
