@@ -157,6 +157,60 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], audit_before)
 
+    def _create_pending_zero_quantity_outbox(self):
+        self.store.apply_batch(
+            batch_id="b-outbox-guard",
+            fills=[self.buy()],
+            sell_settlements=[{
+                "idempotency_key": "settle:guard",
+                "market_id": "BTC/USDT",
+                "authorized_quantity": "0",
+                "filled_quantity": "0",
+            }],
+            timestamp=10,
+        )
+
+    def test_pending_outbox_rejects_tampered_accounting_state(self):
+        self._create_pending_zero_quantity_outbox()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.pending_outbox()
+
+    def test_outbox_acknowledgement_rejects_tampered_accounting_state(self):
+        self._create_pending_zero_quantity_outbox()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.acknowledge_outbox("settle:guard", receiver_receipt="receipt")
+
+    def test_settlement_outbox_methods_reject_tampered_reservation_state(self):
+        self.store.apply_batch(
+            batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10
+        )
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservations SET expires_at=15 WHERE reservation_id='r-1'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "reservation creation audit does not match current record"
+        ):
+            self.store.pending_outbox()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "reservation creation audit does not match current record"
+        ):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="receipt")
+
     def test_outbox_requires_both_acknowledgements_before_batch_complete(self):
         self.enable_reservations()
         kwargs = {
