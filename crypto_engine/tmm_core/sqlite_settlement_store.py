@@ -107,6 +107,7 @@ class SQLiteSettlementStore:
     def apply_batch(self, *, batch_id: str,
                     fills: Sequence[Mapping[str, object]],
                     sell_settlements: Sequence[Mapping[str, object]] = (),
+                    sell_allocations: Sequence[Mapping[str, object]] = (),
                     timestamp: int) -> dict[str, Any]:
         """Atomically commit synthetic fills, balances, audit, batch result and outbox.
 
@@ -122,6 +123,10 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("fills must be a sequence")
         if not isinstance(sell_settlements, Sequence) or isinstance(sell_settlements, (str, bytes)):
             raise SettlementStoreError("sell_settlements must be a sequence")
+        if not isinstance(sell_allocations, Sequence) or isinstance(sell_allocations, (str, bytes)):
+            raise SettlementStoreError("sell_allocations must be a sequence")
+        if len(sell_allocations) > 1000:
+            raise SettlementStoreError("sell_allocations exceeds the 1000-row limit")
 
         normalized_fills = []
         seen_fill_ids = set()
@@ -169,11 +174,43 @@ class SQLiteSettlementStore:
                 "filled_quantity": format(filled, "f"),
             })
 
+        normalized_allocations = []
+        seen_allocation_ids = set()
+        for item in sell_allocations:
+            if not isinstance(item, Mapping):
+                raise SettlementStoreError("each SELL allocation must be a mapping")
+            allocation_id = item.get("allocation_id")
+            fill_id = item.get("fill_id")
+            reservation_id = item.get("reservation_id")
+            version = item.get("reservation_version")
+            quantity = _decimal(item.get("allocated_quantity"), "allocated_quantity")
+            if not isinstance(allocation_id, str) or not allocation_id.strip() or len(allocation_id) > 256:
+                raise SettlementStoreError("allocation_id is required")
+            if allocation_id in seen_allocation_ids:
+                raise SettlementStoreError("allocation IDs must be unique")
+            if not isinstance(fill_id, str) or not fill_id.strip():
+                raise SettlementStoreError("allocation fill_id is required")
+            if not isinstance(reservation_id, str) or not reservation_id.strip():
+                raise SettlementStoreError("allocation reservation_id is required")
+            if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+                raise SettlementStoreError("reservation_version must be a positive integer")
+            if quantity <= 0:
+                raise SettlementStoreError("allocated_quantity must be positive")
+            seen_allocation_ids.add(allocation_id)
+            normalized_allocations.append({
+                "allocation_id": allocation_id, "fill_id": fill_id,
+                "reservation_id": reservation_id, "reservation_version": version,
+                "allocated_quantity": format(quantity, "f"),
+            })
+        normalized_allocations.sort(key=lambda item: item["allocation_id"])
+
         request_envelope = {
             "schema": 1, "account_id": self.account_id, "currency": self.currency,
             "batch_id": batch_id, "timestamp": timestamp,
             "fills": normalized_fills, "sell_settlements": normalized_outbox,
         }
+        if normalized_allocations:
+            request_envelope["sell_allocations"] = normalized_allocations
         request_json = json.dumps(request_envelope, sort_keys=True, separators=(",", ":"),
                                   ensure_ascii=False, allow_nan=False)
         request_hash = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
@@ -207,6 +244,26 @@ class SQLiteSettlementStore:
                     return result
                 db.rollback()
                 raise SettlementStoreError("batch unresolved; trusted reconciliation required")
+
+            reservation_tables = {
+                "reservations", "reservation_allocations", "reservation_outbox"
+            }
+            present_reservation_tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM main.sqlite_master WHERE type='table' "
+                    "AND name IN ('reservations','reservation_allocations','reservation_outbox')"
+                )
+            }
+            if present_reservation_tables and present_reservation_tables != reservation_tables:
+                raise SettlementStoreError("partial reservation schema rejected")
+            reservations_enabled = present_reservation_tables == reservation_tables
+            if normalized_allocations and not reservations_enabled:
+                raise SettlementStoreError("SELL reservation schema must be enabled before allocations")
+            if reservations_enabled:
+                from .reservation_schema_v2 import ensure_reservation_schema_v2
+                ensure_reservation_schema_v2(db)
+                if sell_totals and not normalized_allocations:
+                    raise SettlementStoreError("SELL fills require reservation allocations when reservation schema is enabled")
 
             db.execute(
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
@@ -276,6 +333,19 @@ class SQLiteSettlementStore:
                     "holding_after": format(holding_after, "f"), "timestamp": timestamp,
                 }
                 head = self._append_audit(db, event)
+            normalized_reservation_allocations = []
+            if normalized_allocations:
+                try:
+                    from .reservation_allocations import consume_sell_allocations
+                    normalized_reservation_allocations = consume_sell_allocations(
+                        db, account_id=self.account_id, batch_id=batch_id,
+                        allocations=normalized_allocations, timestamp=timestamp,
+                    )
+                except Exception as exc:
+                    from .reservation_allocations import ReservationAllocationError
+                    if isinstance(exc, ReservationAllocationError):
+                        raise SettlementStoreError(str(exc)) from exc
+                    raise
             for item in normalized_outbox:
                 db.execute(
                     "INSERT INTO outbox(idempotency_key,batch_id,market_id,authorized_quantity,"
@@ -291,6 +361,8 @@ class SQLiteSettlementStore:
                 "fills": normalized_fills,
                 "outbox_keys": [item["idempotency_key"] for item in normalized_outbox],
             }
+            if normalized_reservation_allocations:
+                result["reservation_allocations"] = normalized_reservation_allocations
             db.execute("UPDATE batches SET status=?,result_json=? WHERE batch_id=?",
                        (result["status"], json.dumps(result, sort_keys=True, separators=(",", ":")),
                         batch_id))
