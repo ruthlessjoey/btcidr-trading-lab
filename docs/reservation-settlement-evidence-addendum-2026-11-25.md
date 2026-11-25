@@ -203,3 +203,19 @@ The separately uploaded `TwinMoneyMaker_ExternalResearch_2026-11-23_REVALIDATED.
 - No third-party dependency was installed and no network/provider call, account access, exchange action or order was performed.
 
 This independently revalidates only the separate standard-library prototype and its synthetic fixtures. It does not test any upstream trading platform, the GitHub repository's PR #139–#150 code, live market data, a strategy on BTC/IDR, or trading profitability. The prototype is not approved for exchange connection or installation into the main repository.
+
+
+### PR #151 — restore the sender/receiver payload projection
+
+- Branch head: `f52f391cde7298ceff2b50dfdb0c34f7b4098157`.
+- Static integration review found that `deliver_pending_reservation_outbox()` reads `account_id`, but `SQLiteSettlementStore.pending_reservation_outbox()` omitted it from the selected columns and returned dictionary. The initial delivery therefore raised `KeyError("account_id")` before invoking the receiver.
+- The sender query and field mapping now include the persisted `account_id`; the return type also reflects the integer reservation version.
+- Adds an explicit projection regression and strengthens the delivery test to assert that the trusted receiver callback gets the account ID from the persisted sender row.
+- PR #151 is open/draft/unmerged and is based on PR #150 head `8550fd6f222e16a698b6bdeaacde98fbc350f8fe`.
+- Exact-head Python execution, the full repository suite, Python 3.11 CI and independent review remain pending.
+
+This correction makes the sender's projected record structurally match the receiver's required payload; it does not add remote transport or authenticate an external receiver.
+
+### Latest stacked implementation chain
+
+The active implementation chain is now #139 → #140 → #141 → #142 → #143 → #144 → #145 → #146 → #148 → #149 → #150 → #151. PR #147 is the separate documentation tracker branch, updated to record these follow-ups. All implementation PRs remain open/draft/unmerged and none is in `main`.
