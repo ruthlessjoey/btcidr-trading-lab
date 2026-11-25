@@ -135,3 +135,14 @@ All PRs below were live-refreshed on 25 November 2026. They remain **open / draf
 - **User/project owner:** approvals for protected paths, merges, providers, migration, deployment and trading activation.
 
 This addendum is candidate engineering evidence only. It is not a full repository archive, installable product, trading authorization, or profitability claim.
+
+
+## 25 November — idempotent reservation inbox candidate (PR #148)
+
+- PR #148 is open/draft/unmerged, stacked on PR #146. Current head: `ee6387fbb5f721a509a38b971dc3db35452b0c73`.
+- Adds an offline SQLite inbox with exact DDL checks, canonical payload hashes, unique idempotency keys and deterministic payload-bound receipts.
+- Adds a bounded delivery coordinator that verifies the sender's stored payload hash, invokes an injected trusted receiver, verifies the exact deterministic receipt and then acknowledges the sender outbox.
+- Models ambiguous delivery: the receiver commits its inbox row but the response is lost; retrying the same key/payload returns the original receipt without duplicating the inbox row.
+- Nine focused receiver tests are authored; exact-head execution and Python 3.11 CI remain pending.
+- This is a local inbox/receipt contract, not a remote production receiver. It does not implement a real external business effect, authenticated network transport or remote service. Those remain separate work.
+- No exact-head tests or workflow dispatch are claimed. Empty status/workflow lookups are not passes. No network/provider/account/trading activity occurred.
