@@ -95,6 +95,7 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("market quote asset must equal account currency")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            self._verify_account_state(db)
             row = db.execute("SELECT base_asset,quote_asset FROM markets WHERE market_id=?",
                              (market_id,)).fetchone()
             if row is not None and row != (base_asset, quote_asset):
