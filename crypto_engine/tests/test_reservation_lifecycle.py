@@ -154,6 +154,16 @@ class ReservationLifecycleTests(unittest.TestCase):
             )
         self.db.rollback()
 
+    def test_authorize_rejects_timestamp_before_creation(self):
+        self.create()
+        self.begin()
+        with self.assertRaisesRegex(ReservationLifecycleError, "predates"):
+            authorize_reservation(
+                self.db, reservation_id="r-1", account_id="paper-research",
+                expected_version=1, now=99,
+            )
+        self.db.rollback()
+
     def test_authorize_rejects_at_expiry_boundary(self):
         self.create()
         self.begin()
