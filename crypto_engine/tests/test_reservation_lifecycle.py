@@ -104,10 +104,10 @@ class ReservationLifecycleTests(unittest.TestCase):
     def test_transition_rejects_version_outside_sqlite_integer_range(self):
         self.create()
         self.begin()
-        with self.assertRaisesRegex(ReservationLifecycleError, "SQLite integer"):
+        with self.assertRaisesRegex(ReservationLifecycleError, "safe monotonic version increment"):
             authorize_reservation(
                 self.db, reservation_id="r-1", account_id="paper-research",
-                expected_version=2**63, now=150,
+                expected_version=2**63 - 2, now=150,
             )
         self.db.rollback()
 
