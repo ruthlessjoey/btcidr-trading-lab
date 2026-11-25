@@ -627,3 +627,71 @@ This section supersedes the previous PR #172 test count and adds the current exa
 6. Keep strategy agents proposal-only, PAPER activation ON HOLD and LIVE disabled/absent.
 7. Refresh this tracker and the handoff ZIP after each major verified milestone.
 
+
+
+
+## 26 November — reservation outbox, market registry and warning-clean verification
+
+Protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`. The following are candidate branches only; no PR is merged.
+
+### PR #176 — verify account integrity before reservation outbox delivery
+
+- Exact head: `7430b466a119c3b5c934cd9a33cce860b72f4378`; base PR #174 head `d8033a68a8bcaa1896eabaf5978bd266fd45e6b1`.
+- Finding: reservation-specific outbox read/ack paths checked reservation state but did not first reconcile account cash/holdings to the fill audit.
+- Adds shared account-state validation before reservation-outbox reads and acknowledgements.
+- Exact-head run [45671378473](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45671378473): Python 3.11.18 and 3.13.18 each passed 53 settlement-store + 16 receiver tests (69 per version).
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #177 — close SQLite test connections and enforce ResourceWarning checks
+
+- Exact head: `69555d54f97c703b8f8f6a3a2ad77e60fdddc2ab`; based on PR #174.
+- Replaces sqlite3 transaction context usage in the settlement-store and receiver test modules with managed contexts that preserve commit/rollback and explicitly close each connection.
+- Adds `-W error::ResourceWarning` to both isolated test commands.
+- Exact-head run [45672004202](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45672004202): Python 3.11.18 and 3.13.18 each passed 51 settlement-store + 16 receiver tests. No actual `ResourceWarning:` or `Exception ignored` output remained in the final logs.
+- PR remains open/draft/unmerged.
+
+### PR #178 — duplicate SQLite connection cleanup
+
+- Exact head: `e27bb6ba286a32f083467a87e92b38faba95b980`; based on PR #177.
+- Its only diff repeats the final audit-count connection cleanup already present in PR #177 head `69555d54f97c703b8f8f6a3a2ad77e60fdddc2ab`.
+- No unique implementation delta or separate exact-head verification is established. Treat as redundant/superseded; do not count it as additional progress.
+
+### PR #179 — independent external audit checkpoint design proposal
+
+- Exact head: `9be33784ecfb9ac0da5e50d4c0153d7f10f287ff`; documentation-only, based directly on protected main.
+- Defines a signed, canonical external checkpoint record, independent signer/storage trust boundaries, durable local outbox/read-back protocol, rollback/fork handling, fail-closed behavior, backup/restore and required crash/adversarial tests.
+- Correctly states that a hash chain stored only in a writable SQLite database is not an external trust anchor.
+- This is a design proposal only. No signer, key storage, independent storage, network/cloud service or implementation is selected or added. Requires independent architecture/security review and owner decisions on storage, signing platform, checkpoint frequency and recovery authority.
+- No code-test evidence is claimed.
+
+### PR #180 — audit market registry identity
+
+- Corrected exact head: `a1f8da5fec61df06c2dcecfea49d9c7439c47cc0`; based on PR #176 head `7430b466a119c3b5c934cd9a33cce860b72f4378`.
+- Finding: fills were reconciled to registered market IDs, but the base/quote mapping behind a market ID was not independently reconciled. The public registration method rejected changes, but a direct SQLite row mutation could alter the mapping.
+- New databases now record a market-registration audit policy marker. New market registrations append an account/market/base/quote-bound `MARKET_REGISTERED` event. The verifier compares the full market registry to its audit events and rejects changed/missing/duplicate/unexpected mappings.
+- Existing pre-marker databases remain compatible and are not retroactively treated as if they had market-registration audit history.
+- First run [45672520898](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45672520898) failed on the earlier head because the synthetic tampering test closed without committing its update. The test fixture was corrected.
+- Corrected exact-head run [45672710073](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45672710073): Python 3.11.18 and 3.13.18 each passed 55 settlement-store + 16 receiver tests (71 per version).
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #181 — warning-clean tests on the market-audit/reservation-outbox stack
+
+- Exact head: `8a63d7c3d831344d9444abe4f188fc84fa7e587c`; based on corrected PR #180 head `a1f8da5fec61df06c2dcecfea49d9c7439c47cc0`.
+- Includes PR #176 reservation-outbox account checks and PR #180 market-registry audit.
+- Applies managed connection closure to all 58 settlement-store test contexts and 16 receiver test contexts, including the final audit-count connection.
+- Both isolated suites run with ResourceWarning promoted to an error.
+- Exact-head run [45672928121](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45672928121): Python 3.11.18 and 3.13.18 each passed 55 settlement-store + 16 receiver tests (71 per version). The logs contain no actual ResourceWarning or ignored-connection output.
+- PR remains open/draft/unmerged; independent review pending.
+
+### Current interpretation and next priorities
+
+- PR #173–#181 strengthen internal SQLite accounting, market identity, outbox and test resource handling. They are still candidate branches and have not been accepted into main.
+- PR #177 is the warning-clean branch based on #174; PR #181 is the warning-clean branch that also includes #176 and #180. Prefer reviewing the complete #181 ancestry rather than treating sibling branches as one integrated result.
+- PR #178 duplicates the final cleanup already in #177 and has no unique value.
+- PR #179 is a design proposal; an external checkpoint cannot be implemented safely until the independent storage medium, signer/key-store, maximum unanchored window and recovery authority are decided and reviewed.
+- The new market audit marker detects isolated market-row/event tampering while the marker or event history remains. It is not an external anchor against a coordinated rewrite of the entire SQLite database.
+- Continue independent adversarial review of PR #149/#150/#154/#155/#157/#164/#165/#167–#181. Verify exact SHAs and distinguish code CI from independent acceptance.
+- Continue crash/restore, concurrency, truncation, corruption and resource-exhaustion testing on synthetic disposable DBs only.
+- No existing user DB was inspected or migrated. No provider endpoint, DNS, account, wallet, PAPER or LIVE activity occurred.
+- Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
+
