@@ -822,6 +822,20 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "account cash does not match initial account audit"):
             self.store.snapshot()
 
+    def test_snapshot_rejects_removed_market_policy_marker_and_unlogged_market(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "DELETE FROM main.metadata WHERE key='market_registration_audit'"
+            )
+            db.execute(
+                "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
+                "VALUES('ETH/USDT','ETH','USDT')"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "required market registration audit policy marker is missing"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_tampered_market_asset_mapping(self):
         db = sqlite3.connect(self.path)
         try:
