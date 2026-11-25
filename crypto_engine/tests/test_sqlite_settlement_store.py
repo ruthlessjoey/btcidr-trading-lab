@@ -850,6 +850,26 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_register_market_rejects_tampered_market_mapping(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.markets SET base_asset='ETH' WHERE market_id='BTC/USDT'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("BTC/USDT", "ETH", "USDT")
+
+    def test_register_market_rejects_removed_required_market_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "DELETE FROM main.metadata WHERE key='market_registration_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "required market registration audit policy marker is missing"
+        ):
+            self.store.register_market("ETH/USDT", "ETH", "USDT")
+
     def test_market_registration_audit_is_not_duplicated_on_idempotent_register(self):
         db = sqlite3.connect(self.path)
         try:
