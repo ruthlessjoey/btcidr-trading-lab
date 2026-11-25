@@ -505,7 +505,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
             self.store.pending_reservation_outbox()
-        with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
+        with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
             self.store.acknowledge_reservation_outbox(
                 "reservation-allocation:a-1", receiver_receipt=expected_receipt,
                 expected_payload_sha256=expected_hash,
