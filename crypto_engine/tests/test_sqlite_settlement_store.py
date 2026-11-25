@@ -703,6 +703,14 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.snapshot()
 
 
+    def test_snapshot_rejects_deleted_initial_account_audit_event(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("DELETE FROM main.audit")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "required initial account audit event is missing"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_tampered_initial_cash_before_first_fill(self):
         with sqlite3.connect(self.path) as db:
             db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")

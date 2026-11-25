@@ -428,6 +428,14 @@ class SQLiteSettlementStore:
             event = json.loads(event_json)
             if isinstance(event,dict) and event.get("kind") == "ACCOUNT_INITIALIZED":
                 initialization_events.append(event)
+        baseline_policy = db.execute(
+            "SELECT value FROM main.metadata WHERE key='account_initialization_audit'"
+        ).fetchone()
+        if baseline_policy is not None and baseline_policy != ("required-v1",):
+            raise SettlementStoreError("initial account audit policy marker is invalid")
+        if baseline_policy == ("required-v1",) and not initialization_events:
+            raise SettlementStoreError("required initial account audit event is missing")
+
         initial_cash: Decimal | None = None
         if initialization_events:
             first_event = json.loads(audit_rows[0][0]) if audit_rows else None
@@ -1326,6 +1334,9 @@ class SQLiteSettlementStore:
             if not is_new_database:
                 raise SettlementStoreError("existing database is missing schema version; recovery required")
             db.execute("INSERT INTO metadata VALUES('schema_version',?)", (str(self.SCHEMA_VERSION),))
+            db.execute(
+                "INSERT INTO metadata VALUES('account_initialization_audit','required-v1')"
+            )
             db.execute("INSERT INTO account VALUES(1,?,?,?)",
                        (self.account_id, self.currency, opening_cash))
             self._append_audit(db, {
