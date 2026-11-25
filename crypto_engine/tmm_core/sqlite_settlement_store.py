@@ -455,11 +455,18 @@ class SQLiteSettlementStore:
 
     def acknowledge_reservation_outbox(
         self, idempotency_key: str, *, receiver_receipt: str,
+        expected_payload_sha256: str,
     ) -> None:
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
             raise SettlementStoreError("idempotency_key is required")
         if not isinstance(receiver_receipt, str) or not receiver_receipt.strip():
             raise SettlementStoreError("receiver_receipt is required")
+        if (
+            not isinstance(expected_payload_sha256, str)
+            or len(expected_payload_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in expected_payload_sha256)
+        ):
+            raise SettlementStoreError("expected_payload_sha256 must be a lowercase SHA-256 hex digest")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             objects = db.execute(
@@ -473,30 +480,63 @@ class SQLiteSettlementStore:
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
             row = db.execute(
-                "SELECT batch_id,status,receiver_receipt,allocation_id "
+                "SELECT batch_id,status,receiver_receipt,allocation_id,reservation_id,fill_id,"
+                "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
                 "FROM main.reservation_outbox WHERE idempotency_key=?",
                 (idempotency_key,),
             ).fetchone()
             if row is None:
                 db.rollback()
                 raise SettlementStoreError("unknown reservation outbox key")
-            batch_id, status, old_receipt, allocation_id = row
+            (
+                batch_id, status, old_receipt, allocation_id, reservation_id, fill_id,
+                account_id, market_id, reservation_version, allocated_quantity, stored_digest,
+            ) = row
+            payload = {
+                "schema": 1, "idempotency_key": idempotency_key,
+                "allocation_id": allocation_id, "batch_id": batch_id,
+                "fill_id": fill_id, "reservation_id": reservation_id,
+                "account_id": account_id, "market_id": market_id,
+                "reservation_version": reservation_version,
+                "allocated_quantity": allocated_quantity,
+            }
+            from .reservation_outbox_receiver import (
+                ReservationInboxError, _canonical_payload,
+            )
+            try:
+                _, recalculated_digest, expected_receipt = _canonical_payload(payload)
+            except (ReservationInboxError, TypeError, ValueError, UnicodeError) as exc:
+                db.rollback()
+                raise SettlementStoreError("stored reservation outbox payload is invalid") from exc
+            if (
+                stored_digest != recalculated_digest
+                or stored_digest != expected_payload_sha256
+            ):
+                db.rollback()
+                raise SettlementStoreError("reservation outbox payload changed during delivery")
+            if receiver_receipt != expected_receipt:
+                db.rollback()
+                raise SettlementStoreError("reservation outbox receipt does not match current payload")
             if status == "ACKNOWLEDGED":
                 if old_receipt != receiver_receipt:
                     db.rollback()
                     raise SettlementStoreError("reservation outbox acknowledgement receipt mismatch")
                 db.commit()
                 return
-            db.execute(
+            changed = db.execute(
                 "UPDATE main.reservation_outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
-                "WHERE idempotency_key=? AND status='PENDING'",
-                (receiver_receipt, idempotency_key),
-            )
+                "WHERE idempotency_key=? AND status='PENDING' AND payload_sha256=?",
+                (receiver_receipt, idempotency_key, expected_payload_sha256),
+            ).rowcount
+            if changed != 1:
+                db.rollback()
+                raise SettlementStoreError("reservation outbox changed before acknowledgement")
             receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
             self._append_audit(db, {
                 "kind": "RESERVATION_OUTBOX_ACKNOWLEDGED",
                 "account_id": self.account_id, "batch_id": batch_id,
                 "allocation_id": allocation_id, "idempotency_key": idempotency_key,
+                "payload_sha256": recalculated_digest,
                 "receipt_sha256": receipt_digest,
             })
             self._complete_batch_if_outboxes_acknowledged(db, batch_id)
