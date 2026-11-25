@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
@@ -82,6 +83,18 @@ def _reject_sidecars(path: Path) -> None:
     for suffix in ("-wal","-shm","-journal"):
         if Path(str(path) + suffix).exists():
             raise ReservationMigrationError("SQLite sidecar files exist; close/checkpoint the database first")
+
+
+def _file_identity(path: Path) -> tuple[int,int,int,int]:
+    info = os.stat(path,follow_symlinks=False)
+    if not stat.S_ISREG(info.st_mode):
+        raise ReservationMigrationError("source path changed to a non-regular file")
+    return info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns
+
+
+def _assert_file_identity(path: Path, expected: tuple[int,int,int,int]) -> None:
+    if _file_identity(path) != expected:
+        raise ReservationMigrationError("source file identity changed during copy-only migration")
 
 
 def _sha256_file(path: Path) -> str:
@@ -205,10 +218,12 @@ def create_v2_migrated_copy(
         raise ReservationMigrationError("backup path aliases source")
     _reject_sidecars(source)
 
+    source_identity = _file_identity(source)
     source_hash_before = _sha256_file(source)
     preflight,snapshot = _preflight_and_snapshot(source)
     if not preflight.eligible:
         raise ReservationMigrationBlocked(preflight.blockers)
+    _assert_file_identity(source,source_identity)
     if _sha256_file(source) != source_hash_before:
         raise ReservationMigrationError("source changed during read-only preflight")
 
@@ -218,6 +233,7 @@ def create_v2_migrated_copy(
         _copy_exclusive(source,backup,mode=0o600)
         backup_created = True
         backup_hash = _sha256_file(backup)
+        _assert_file_identity(source,source_identity)
         if backup_hash != source_hash_before or _sha256_file(source) != source_hash_before:
             raise ReservationMigrationError("source/backup byte hash mismatch")
 
@@ -253,6 +269,7 @@ def create_v2_migrated_copy(
             db.close()
 
         _verify_migrated_copy(output,snapshot)
+        _assert_file_identity(source,source_identity)
         if _sha256_file(source) != source_hash_before or _sha256_file(backup) != backup_hash:
             raise ReservationMigrationError("source or backup changed during schema enablement")
         os.chmod(backup,0o400)
