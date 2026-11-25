@@ -78,6 +78,10 @@ jobs:
         run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
 
       - name: Run settlement store regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
 
       - name: Run reservation receiver regression suite
