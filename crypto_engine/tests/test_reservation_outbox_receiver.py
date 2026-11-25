@@ -185,11 +185,12 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
 
     def test_existing_receipt_tampering_is_rejected_on_replay(self):
         self.receive(self.payload())
-        with sqlite3.connect(self.store.path) as db:
-            db.execute(
-                "UPDATE reservation_inbox SET receipt='tampered' "
-                "WHERE idempotency_key='reservation-allocation:a-1'"
-            )
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        self.receiver_db.execute(
+            "UPDATE reservation_inbox SET receipt='tampered' "
+            "WHERE idempotency_key='reservation-allocation:a-1'"
+        )
+        self.receiver_db.commit()
         self.receiver_db.execute("BEGIN IMMEDIATE")
         with self.assertRaisesRegex(
             ReservationInboxError, "stored reservation inbox receipt mismatch"
