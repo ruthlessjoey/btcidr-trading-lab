@@ -66,17 +66,17 @@ class AtomicReservationAllocationTests(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-    def prepare_batch(self, fills):
+    def prepare_batch(self, fills, *, timestamp=160):
         self.db.execute("BEGIN IMMEDIATE")
         self.db.execute(
             "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
-            "VALUES('b-1','hash','PROCESSING',160,NULL)"
+            "VALUES('b-1','hash','PROCESSING',?,NULL)", (timestamp,)
         )
         for fill_id, market_id, side, quantity in fills:
             self.db.execute(
                 "INSERT INTO fills(fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp) "
-                "VALUES(?, 'b-1', ?, ?, ?, '10', '0', 160)",
-                (fill_id, market_id, side, quantity),
+                "VALUES(?, 'b-1', ?, ?, ?, '10', '0', ?)",
+                (fill_id, market_id, side, quantity, timestamp),
             )
 
     def finish(self):
@@ -203,7 +203,10 @@ class AtomicReservationAllocationTests(unittest.TestCase):
         self.db.rollback()
 
     def test_expired_reservation_rejected(self):
-        self.prepare_batch([("sell-1", "BTC/USDT", "SELL", "0.4")])
+        # Batch and fill timestamps must match; the reservation expires at 300.
+        self.prepare_batch(
+            [("sell-1", "BTC/USDT", "SELL", "0.4")], timestamp=300
+        )
         with self.assertRaisesRegex(ReservationAllocationError, "expired"):
             consume_sell_allocations(
                 self.db, account_id="paper-research", batch_id="b-1",
@@ -225,7 +228,7 @@ class AtomicReservationAllocationTests(unittest.TestCase):
         with self.assertRaisesRegex(ReservationAllocationError, "BUY fills"):
             consume_sell_allocations(
                 self.db, account_id="paper-research", batch_id="b-1",
-                allocations=self.allocations(), timestamp=160,
+                allocations=self.allocations(fill_id="buy-1"), timestamp=160,
             )
         self.db.rollback()
 
