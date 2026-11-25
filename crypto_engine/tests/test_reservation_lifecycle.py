@@ -91,6 +91,26 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 1)
         self.assertTrue(self.audit_is_valid())
 
+    def test_create_rejects_timestamp_outside_sqlite_integer_range(self):
+        self.begin()
+        with self.assertRaisesRegex(ReservationLifecycleError, "SQLite integer"):
+            create_reservation(
+                self.db, reservation_id="r", account_id="paper-research",
+                market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+                authorized_quantity="1", created_at=2**63, expires_at=2**63,
+            )
+        self.db.rollback()
+
+    def test_transition_rejects_version_outside_sqlite_integer_range(self):
+        self.create()
+        self.begin()
+        with self.assertRaisesRegex(ReservationLifecycleError, "SQLite integer"):
+            authorize_reservation(
+                self.db, reservation_id="r-1", account_id="paper-research",
+                expected_version=2**63, now=150,
+            )
+        self.db.rollback()
+
     def test_create_rejects_expiry_not_after_creation(self):
         self.begin()
         with self.assertRaisesRegex(ReservationLifecycleError, "later than created_at"):
