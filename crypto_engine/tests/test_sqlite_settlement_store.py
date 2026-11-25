@@ -156,8 +156,8 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             timestamp=20,
         )
         self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
-        self.assertEqual(self.store.snapshot()["cash"], "10000")
-        self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0")
+        self.assertEqual(Decimal(self.store.snapshot()["cash"]), Decimal("10000"))
+        self.assertEqual(Decimal(self.store.snapshot()["holdings"]["BTC/USDT"]), Decimal("0"))
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
