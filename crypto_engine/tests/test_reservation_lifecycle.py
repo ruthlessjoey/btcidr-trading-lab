@@ -147,7 +147,7 @@ class ReservationLifecycleTests(unittest.TestCase):
             create_reservation(
                 self.db, reservation_id="r", account_id="paper-research",
                 market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
-                authorized_quantity="0.0000000000000000001",
+                authorized_quantity="1e-161",
                 created_at=100, expires_at=200,
             )
         self.db.rollback()
