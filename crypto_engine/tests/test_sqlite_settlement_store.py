@@ -466,6 +466,56 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.pending_reservation_outbox()
 
 
+
+    def test_acknowledged_outbox_requires_matching_audit_event(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
+        )
+        with sqlite3.connect(self.path) as db:
+            seq = db.execute(
+                "SELECT seq FROM main.audit WHERE event_json LIKE '%RESERVATION_OUTBOX_ACKNOWLEDGED%'"
+            ).fetchone()[0]
+            db.execute("DELETE FROM main.audit WHERE seq=?", (seq,))
+        with self.assertRaisesRegex(SettlementStoreError, "acknowledgement audit coverage mismatch"):
+            self.store.pending_reservation_outbox()
+
+    def test_duplicate_reservation_ack_audit_event_is_rejected_even_with_valid_chain(self):
+        import hashlib
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
+        )
+        with sqlite3.connect(self.path) as db:
+            self.store._append_audit(db, {
+                "kind":"RESERVATION_OUTBOX_ACKNOWLEDGED",
+                "account_id":"paper","batch_id":"b-reserved-sell",
+                "allocation_id":"a-1","idempotency_key":"reservation-allocation:a-1",
+                "payload_sha256":expected_hash,"receipt_sha256":"0" * 64,
+            })
+        with self.assertRaisesRegex(SettlementStoreError, "acknowledgement audit identity is invalid"):
+            self.store.pending_reservation_outbox()
+
     def test_acknowledged_reservation_receipt_tampering_blocks_delivery_and_completion(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
