@@ -113,6 +113,7 @@ def validate_sell_allocations(
 
     normalized: list[dict[str, object]] = []
     allocation_ids: set[str] = set()
+    allocation_pairs: set[tuple[str, str]] = set()
     allocated_by_fill: dict[str, Decimal] = {}
     allocated_by_reservation: dict[str, Decimal] = {}
     with localcontext() as decimal_context:
@@ -128,6 +129,10 @@ def validate_sell_allocations(
             reservation_id = _required_text(raw, "reservation_id")
             if fill_id not in fill_by_id:
                 raise ReservationAllocationError("allocation references unknown fill")
+            pair = (fill_id, reservation_id)
+            if pair in allocation_pairs:
+                raise ReservationAllocationError("duplicate fill/reservation allocation pair")
+            allocation_pairs.add(pair)
             if reservation_id not in reservation_by_id:
                 raise ReservationAllocationError("allocation references unknown reservation")
             fill = fill_by_id[fill_id]
@@ -232,7 +237,13 @@ def consume_sell_allocations(
     for raw in allocations:
         if not isinstance(raw, Mapping):
             raise ReservationAllocationError("each allocation must be a mapping")
+        allocation_id = _required_text(raw, "allocation_id")
+        fill_id = _required_text(raw, "fill_id")
         reservation_id = _required_text(raw, "reservation_id")
+        if len(allocation_id) > 256 or len(fill_id) > 256 or len(reservation_id) > 256:
+            raise ReservationAllocationError("allocation identifiers exceed the 256-character limit")
+        if len(str(raw.get("allocated_quantity"))) > 128:
+            raise ReservationAllocationError("allocated_quantity text exceeds the 128-character limit")
         reservation_ids.add(reservation_id)
     if len(reservation_ids) > 1000:
         raise ReservationAllocationError("reservation count exceeds the 1000-row limit")
@@ -279,6 +290,8 @@ def consume_sell_allocations(
 
         for reservation_id, amount in sorted(allocated_by_reservation.items()):
             row = reservation_rows[reservation_id]
+            if row[5] >= 2**63 - 2:
+                raise ReservationAllocationError("reservation version cannot be incremented safely")
             old_consumed = Decimal(str(row[4]))
             new_consumed = old_consumed + amount
             if new_consumed > Decimal(str(row[3])):

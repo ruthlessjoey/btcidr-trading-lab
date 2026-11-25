@@ -107,21 +107,29 @@ class SQLiteSettlementStore:
     def apply_batch(self, *, batch_id: str,
                     fills: Sequence[Mapping[str, object]],
                     sell_settlements: Sequence[Mapping[str, object]] = (),
+                    sell_allocations: Sequence[Mapping[str, object]] = (),
                     timestamp: int) -> dict[str, Any]:
         """Atomically commit synthetic fills, balances, audit, batch result and outbox.
 
         Identical completed batch replay returns the persisted result. Changed content
-        under an existing batch ID is rejected. This method does not deliver outbox
-        messages; delivery requires a separately trusted idempotent receiver.
+        under an existing batch ID is rejected. When reservation schema v2 is enabled,
+        every SELL fill requires exact per-fill sell_allocations consumed atomically.
+        This method does not deliver either outbox; delivery requires a separately
+        trusted idempotent receiver.
         """
         if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
             raise SettlementStoreError("batch_id is required")
-        if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp < 0:
-            raise SettlementStoreError("timestamp must be a nonnegative integer")
+        if (isinstance(timestamp, bool) or not isinstance(timestamp, int)
+                or timestamp < 0 or timestamp > 2**63 - 1):
+            raise SettlementStoreError("timestamp must be a nonnegative SQLite integer")
         if not isinstance(fills, Sequence) or isinstance(fills, (str, bytes)):
             raise SettlementStoreError("fills must be a sequence")
         if not isinstance(sell_settlements, Sequence) or isinstance(sell_settlements, (str, bytes)):
             raise SettlementStoreError("sell_settlements must be a sequence")
+        if not isinstance(sell_allocations, Sequence) or isinstance(sell_allocations, (str, bytes)):
+            raise SettlementStoreError("sell_allocations must be a sequence")
+        if len(sell_allocations) > 1000:
+            raise SettlementStoreError("sell_allocations exceeds the 1000-row limit")
 
         normalized_fills = []
         seen_fill_ids = set()
@@ -169,11 +177,47 @@ class SQLiteSettlementStore:
                 "filled_quantity": format(filled, "f"),
             })
 
+        normalized_allocations = []
+        seen_allocation_ids = set()
+        for item in sell_allocations:
+            if not isinstance(item, Mapping):
+                raise SettlementStoreError("each SELL allocation must be a mapping")
+            allocation_id = item.get("allocation_id")
+            fill_id = item.get("fill_id")
+            reservation_id = item.get("reservation_id")
+            version = item.get("reservation_version")
+            quantity_text = item.get("allocated_quantity")
+            if not isinstance(allocation_id, str) or not allocation_id.strip() or len(allocation_id) > 256:
+                raise SettlementStoreError("allocation_id is required")
+            if allocation_id in seen_allocation_ids:
+                raise SettlementStoreError("allocation IDs must be unique")
+            if not isinstance(fill_id, str) or not fill_id.strip() or len(fill_id) > 256:
+                raise SettlementStoreError("allocation fill_id is required and bounded")
+            if (not isinstance(reservation_id, str) or not reservation_id.strip()
+                    or len(reservation_id) > 256):
+                raise SettlementStoreError("allocation reservation_id is required and bounded")
+            if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+                raise SettlementStoreError("reservation_version must be a positive integer")
+            if len(str(quantity_text)) > 128:
+                raise SettlementStoreError("allocated_quantity text exceeds the 128-character limit")
+            quantity = _decimal(quantity_text, "allocated_quantity")
+            if quantity <= 0:
+                raise SettlementStoreError("allocated_quantity must be positive")
+            seen_allocation_ids.add(allocation_id)
+            normalized_allocations.append({
+                "allocation_id": allocation_id, "fill_id": fill_id,
+                "reservation_id": reservation_id, "reservation_version": version,
+                "allocated_quantity": format(quantity, "f"),
+            })
+        normalized_allocations.sort(key=lambda item: item["allocation_id"])
+
         request_envelope = {
             "schema": 1, "account_id": self.account_id, "currency": self.currency,
             "batch_id": batch_id, "timestamp": timestamp,
             "fills": normalized_fills, "sell_settlements": normalized_outbox,
         }
+        if normalized_allocations:
+            request_envelope["sell_allocations"] = normalized_allocations
         request_json = json.dumps(request_envelope, sort_keys=True, separators=(",", ":"),
                                   ensure_ascii=False, allow_nan=False)
         request_hash = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
@@ -207,6 +251,27 @@ class SQLiteSettlementStore:
                     return result
                 db.rollback()
                 raise SettlementStoreError("batch unresolved; trusted reconciliation required")
+
+            reservation_tables = {
+                "reservations", "reservation_allocations", "reservation_outbox"
+            }
+            reservation_objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            if any(kind != "table" for kind, _ in reservation_objects):
+                raise SettlementStoreError("unexpected reservation schema object type")
+            present_reservation_tables = {name for _, name in reservation_objects}
+            if present_reservation_tables and present_reservation_tables != reservation_tables:
+                raise SettlementStoreError("partial reservation schema rejected")
+            reservations_enabled = present_reservation_tables == reservation_tables
+            if normalized_allocations and not reservations_enabled:
+                raise SettlementStoreError("SELL reservation schema must be enabled before allocations")
+            if reservations_enabled:
+                from .reservation_schema_v2 import ensure_reservation_schema_v2
+                ensure_reservation_schema_v2(db)
+                if sell_totals and not normalized_allocations:
+                    raise SettlementStoreError("SELL fills require reservation allocations when reservation schema is enabled")
 
             db.execute(
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
@@ -276,6 +341,18 @@ class SQLiteSettlementStore:
                     "holding_after": format(holding_after, "f"), "timestamp": timestamp,
                 }
                 head = self._append_audit(db, event)
+            normalized_reservation_allocations = []
+            if normalized_allocations:
+                from .reservation_allocations import (
+                    ReservationAllocationError, consume_sell_allocations,
+                )
+                try:
+                    normalized_reservation_allocations = consume_sell_allocations(
+                        db, account_id=self.account_id, batch_id=batch_id,
+                        allocations=normalized_allocations, timestamp=timestamp,
+                    )
+                except ReservationAllocationError as exc:
+                    raise SettlementStoreError(str(exc)) from exc
             for item in normalized_outbox:
                 db.execute(
                     "INSERT INTO outbox(idempotency_key,batch_id,market_id,authorized_quantity,"
@@ -285,12 +362,15 @@ class SQLiteSettlementStore:
                 )
             result = {
                 "batch_id": batch_id, "request_hash": request_hash,
-                "status": "COMMITTED_PENDING_OUTBOX" if normalized_outbox else "COMPLETE",
+                "status": "COMMITTED_PENDING_OUTBOX"
+                if (normalized_outbox or normalized_reservation_allocations) else "COMPLETE",
                 "cash": format(cash, "f"),
                 "holdings": {key: format(value, "f") for key, value in sorted(balances.items())},
                 "fills": normalized_fills,
                 "outbox_keys": [item["idempotency_key"] for item in normalized_outbox],
             }
+            if normalized_reservation_allocations:
+                result["reservation_allocations"] = normalized_reservation_allocations
             db.execute("UPDATE batches SET status=?,result_json=? WHERE batch_id=?",
                        (result["status"], json.dumps(result, sort_keys=True, separators=(",", ":")),
                         batch_id))
@@ -307,6 +387,120 @@ class SQLiteSettlementStore:
             ).fetchall()
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
+
+    def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise SettlementStoreError("limit must be in [1, 1000]")
+        with self._connect() as db:
+            objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if not objects:
+                return []
+            if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            db.execute("BEGIN")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
+            rows = db.execute(
+                "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
+                "market_id,reservation_version,allocated_quantity,payload_sha256 "
+                "FROM main.reservation_outbox WHERE status='PENDING' "
+                "ORDER BY idempotency_key LIMIT ?", (limit,)
+            ).fetchall()
+            fields = (
+                "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
+                "market_id","reservation_version","allocated_quantity","payload_sha256",
+            )
+            return [dict(zip(fields, row)) for row in rows]
+
+    def _complete_batch_if_outboxes_acknowledged(
+        self, db: sqlite3.Connection, batch_id: str,
+    ) -> None:
+        legacy_pending = db.execute(
+            "SELECT COUNT(*) FROM main.outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
+            (batch_id,),
+        ).fetchone()[0]
+        reservation_objects = db.execute(
+            "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+            "('reservations','reservation_allocations','reservation_outbox')"
+        ).fetchall()
+        reservation_pending = 0
+        if reservation_objects:
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if (any(kind != "table" for kind, _ in reservation_objects)
+                    or {name for _, name in reservation_objects} != expected):
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
+            reservation_pending = db.execute(
+                "SELECT COUNT(*) FROM main.reservation_outbox "
+                "WHERE batch_id=? AND status!='ACKNOWLEDGED'", (batch_id,)
+            ).fetchone()[0]
+        if legacy_pending == 0 and reservation_pending == 0:
+            result_row = db.execute(
+                "SELECT result_json FROM main.batches WHERE batch_id=?", (batch_id,)
+            ).fetchone()
+            if result_row is None or result_row[0] is None:
+                raise SettlementStoreError("batch result missing during outbox completion")
+            result = json.loads(result_row[0])
+            result["status"] = "COMPLETE"
+            db.execute(
+                "UPDATE main.batches SET status='COMPLETE',result_json=? "
+                "WHERE batch_id=? AND status='COMMITTED_PENDING_OUTBOX'",
+                (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id),
+            )
+
+    def acknowledge_reservation_outbox(
+        self, idempotency_key: str, *, receiver_receipt: str,
+    ) -> None:
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise SettlementStoreError("idempotency_key is required")
+        if not isinstance(receiver_receipt, str) or not receiver_receipt.strip():
+            raise SettlementStoreError("receiver_receipt is required")
+        with self._lock, self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if any(kind != "table" for kind, _ in objects) or {name for _, name in objects} != expected:
+                db.rollback()
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
+            row = db.execute(
+                "SELECT batch_id,status,receiver_receipt,allocation_id "
+                "FROM main.reservation_outbox WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+            if row is None:
+                db.rollback()
+                raise SettlementStoreError("unknown reservation outbox key")
+            batch_id, status, old_receipt, allocation_id = row
+            if status == "ACKNOWLEDGED":
+                if old_receipt != receiver_receipt:
+                    db.rollback()
+                    raise SettlementStoreError("reservation outbox acknowledgement receipt mismatch")
+                db.commit()
+                return
+            db.execute(
+                "UPDATE main.reservation_outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
+                "WHERE idempotency_key=? AND status='PENDING'",
+                (receiver_receipt, idempotency_key),
+            )
+            receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
+            self._append_audit(db, {
+                "kind": "RESERVATION_OUTBOX_ACKNOWLEDGED",
+                "account_id": self.account_id, "batch_id": batch_id,
+                "allocation_id": allocation_id, "idempotency_key": idempotency_key,
+                "receipt_sha256": receipt_digest,
+            })
+            self._complete_batch_if_outboxes_acknowledged(db, batch_id)
+            db.commit()
 
     def acknowledge_outbox(self, idempotency_key: str, *, receiver_receipt: str) -> None:
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
@@ -329,25 +523,13 @@ class SQLiteSettlementStore:
                 return
             db.execute("UPDATE outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
                        "WHERE idempotency_key=?", (receiver_receipt, idempotency_key))
-            remaining = db.execute(
-                "SELECT COUNT(*) FROM outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
-                (batch_id,),
-            ).fetchone()[0]
             receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
             self._append_audit(db, {
                 "kind": "OUTBOX_ACKNOWLEDGED", "account_id": self.account_id,
                 "batch_id": batch_id, "idempotency_key": idempotency_key,
                 "receipt_sha256": receipt_digest,
             })
-            if remaining == 0:
-                db.execute("UPDATE batches SET status='COMPLETE' WHERE batch_id=? "
-                           "AND status='COMMITTED_PENDING_OUTBOX'", (batch_id,))
-                result_row = db.execute("SELECT result_json FROM batches WHERE batch_id=?",
-                                        (batch_id,)).fetchone()
-                result = json.loads(result_row[0])
-                result["status"] = "COMPLETE"
-                db.execute("UPDATE batches SET result_json=? WHERE batch_id=?",
-                           (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id))
+            self._complete_batch_if_outboxes_acknowledged(db, batch_id)
             db.commit()
 
     def snapshot(self) -> dict[str, Any]:
