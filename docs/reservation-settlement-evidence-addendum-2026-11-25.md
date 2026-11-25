@@ -822,3 +822,18 @@ Live repository refresh confirms protected `main` remains `0426e1ecd5bd01913a568
 3. Decide the independent checkpoint signer/storage trust model in #179 before implementation.
 4. Keep legacy database migration, remote transport, PAPER activation and LIVE disabled pending their separate gates.
 5. Continue preregistered multi-market profitability research with realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
+
+
+### Preferred Decimal-bound successor — PR #190 (26 November 2026)
+- Exact head: `a98ab09fdb55c1d41053b8e73b37d6b6a8cc9fcc`.
+- Base: PR #188 exact head `2a6ca16d85d66a6c50496bbe0ee9bd166c40bdd0`, which stacks on #187.
+- Exact-head Actions run: [45676586575](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45676586575), both Python matrix jobs successful.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed 70 settlement-store tests and 16 receiver tests (86 tests per interpreter).
+- No actual ResourceWarning or ignored-connection output. Workflow configured ResourceWarning as an error.
+- Uses a 128-character decimal-text bound, 80 significant-digit ceiling, exponent range -160 to +128, and magnitude bound 128. The 80-digit ceiling aligns with the settlement arithmetic context and is preferred over the 128-significant-digit limit in sibling PRs #189/#191.
+- Regression covers extreme positive, negative and zero exponents, oversized decimal text, excessive precision, and unchanged cash/batch rows after rejection.
+- PR #190 is preferred over #189 and #191; those sibling branches are marked superseded in their PR descriptions and remain open/draft for traceability.
+
+**Preferred current candidate chain:** #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190.
+
+All PRs remain open/draft/unmerged. Protected main is unchanged. Four reservation-specific workflow steps remain skipped on this workflow and are not considered verified. Independent adversarial review, full repository acceptance, migration/restore drills and profitability evidence remain outstanding.
