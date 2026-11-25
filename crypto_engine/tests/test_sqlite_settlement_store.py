@@ -398,6 +398,70 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "SELECT 1 FROM reservation_allocations WHERE batch_id='b-reserved-second'"
             ).fetchone())
 
+    def test_reservation_outbox_rejects_cross_account_tampering(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_outbox SET account_id='other-account' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "account identity mismatch"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "account identity mismatch"):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+                expected_payload_sha256=expected_hash,
+            )
+
+    def test_reservation_outbox_rejects_rehashed_payload_divergence(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_outbox "
+                "SET allocated_quantity='0.2' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+            row = db.execute(
+                "SELECT idempotency_key,allocation_id,batch_id,fill_id,reservation_id,"
+                "account_id,market_id,reservation_version,allocated_quantity "
+                "FROM main.reservation_outbox WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()
+            payload = dict(zip((
+                "idempotency_key","allocation_id","batch_id","fill_id","reservation_id",
+                "account_id","market_id","reservation_version","allocated_quantity",
+            ), row))
+            _, changed_digest, _ = _canonical_payload({"schema": 1, **payload})
+            db.execute(
+                "UPDATE main.reservation_outbox SET payload_sha256=? "
+                "WHERE idempotency_key='reservation-allocation:a-1'",
+                (changed_digest,),
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "differs from its allocation record"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "differs from its allocation record"):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+                expected_payload_sha256=expected_hash,
+            )
+
     def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()

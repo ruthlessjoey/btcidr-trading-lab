@@ -464,13 +464,12 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             return receipt
 
         with self.assertRaisesRegex(
-            SettlementStoreError, "payload changed during delivery"
+            SettlementStoreError, "differs from its allocation record"
         ):
             deliver_pending_reservation_outbox(
                 self.store, mutate_sender_after_receiver_accepts
             )
 
-        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
         with sqlite3.connect(self.store.path) as sender_db:
             status = sender_db.execute(
                 "SELECT status FROM reservation_outbox "
@@ -496,10 +495,15 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         def receiver(payload):
             called["value"] = True
             return "receipt"
-        with self.assertRaisesRegex(ReservationInboxError, "payload hash mismatch"):
+        with self.assertRaisesRegex(SettlementStoreError, "payload hash mismatch"):
             deliver_pending_reservation_outbox(self.store, receiver)
         self.assertFalse(called["value"])
-        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        with sqlite3.connect(self.store.path) as db:
+            status = db.execute(
+                "SELECT status FROM reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()[0]
+        self.assertEqual(status, "PENDING")
 
 
 if __name__ == "__main__":
