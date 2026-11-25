@@ -296,6 +296,7 @@ class ReservationLifecycleTests(unittest.TestCase):
 
     def test_missing_audit_schema_fails_before_reservation_write(self):
         self.db.execute("DROP TABLE audit")
+        self.db.commit()
         self.begin()
         with self.assertRaisesRegex(ReservationLifecycleError, "canonical settlement audit"):
             create_reservation(
