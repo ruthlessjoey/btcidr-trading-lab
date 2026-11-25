@@ -925,7 +925,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
-    def test_snapshot_rejects_sell_fill_before_reservation_consumption_audit(self):
+    def test_snapshot_rejects_reservation_consumption_before_sell_fill_audit(self):
         self.store.apply_batch(
             batch_id="reservation-order-seed",
             fills=[self.buy(fill_id="reservation-order-buy")],
@@ -965,7 +965,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 if event.get("kind") == "SYNTHETIC_FILL"
                 and event.get("fill_id") == "reservation-order-sell-fill"
             )
-            self.assertLess(consumption_index, sell_index)
+            self.assertLess(sell_index, consumption_index)
             events[consumption_index], events[sell_index] = (
                 events[sell_index], events[consumption_index]
             )
@@ -981,7 +981,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 )
                 previous = digest
         with self.assertRaisesRegex(
-            SettlementStoreError, "reservation consumption audit must precede SELL fill"
+            SettlementStoreError, "SELL fill audit must precede reservation consumption audit"
         ):
             self.store.snapshot()
 

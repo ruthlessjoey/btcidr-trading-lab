@@ -811,9 +811,9 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("SELL fill audit sequence is missing")
             for group_key in allocation_groups_by_fill.get(fill_id, set()):
                 consumption_seq = consumption_event_sequences.get(group_key)
-                if consumption_seq is None or consumption_seq >= fill_seq:
+                if consumption_seq is None or fill_seq >= consumption_seq:
                     raise SettlementStoreError(
-                        "reservation consumption audit must precede SELL fill"
+                        "SELL fill audit must precede reservation consumption audit"
                     )
 
         for (reservation_id,batch_id),group in groups.items():
