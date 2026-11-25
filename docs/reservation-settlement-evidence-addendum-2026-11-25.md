@@ -784,3 +784,41 @@ Protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`. The followi
 
 Protected main remains 0426e1ecd5bd01913a568272792c355c4b7059c7. No PR merged. Install/trading readiness NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
 
+
+
+## 26 November — bounded settlement input hardening (#188 and #191)
+
+Live repository refresh confirms protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`; no PR has been merged.
+
+### PR #188 — bound market identifiers and batch sizes
+- Exact head: `2a6ca16d85d66a6c50496bbe0ee9bd166c40bdd0`.
+- Exact-head Actions run: [45676146711](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45676146711), overall success.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed 69 settlement-store tests and 16 receiver tests (85 tests per interpreter).
+- Adds 128-character market-ID bound, 32-character asset-code bound, 256-character fill/outbox identifiers, and 1,000-row caps for fills and settlement outbox entries.
+- Four dedicated reservation schema/lifecycle/allocation jobs were skipped by the workflow's explicit path/branch conditions; their status is not a pass.
+- Draft/open/unmerged. This PR is the base of the combined successor below.
+
+### PR #191 — bound Decimal expansion and precision
+- Exact head: `dcf579254e942169e7c52ad793dec83605b051c3`.
+- Exact-head Actions run: [45676440547](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45676440547), both matrix jobs completed successfully.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed 71 settlement-store tests and 16 receiver tests (87 tests per interpreter).
+- `ResourceWarning` was configured as an error; logs contain no actual ResourceWarning or ignored-connection output.
+- Adds 128-character Decimal text limit, 128 significant-digit limit, exponent magnitude limit of 128, and adjusted-exponent limit of 128 before fixed-point formatting/arithmetic.
+- Regressions cover extreme positive/negative exponents, zero with an extreme exponent, oversized decimal input and no account/batch mutation after rejection.
+- Stacks on #188, which itself stacks on #187. Includes #187 market-policy/init-event consistency, market-registry audit regressions, and #188 identifier/batch bounds.
+- PR #189 is a sibling decimal-bound branch based directly on #187; #191 is the combined successor and should be treated as the candidate for continued review.
+
+### Scope and remaining gaps
+- These are isolated settlement-store and receiver suites only. The four reservation schema/lifecycle/allocation suites are skipped in this workflow, and full repository acceptance remains pending.
+- Independent adversarial review remains pending.
+- The decimal bounds are resource-safety bounds, not exchange tick/lot precision rules; market-specific filters and trusted risk validation remain required.
+- The SQLite audit chain and its policy markers remain in the same writable database. Coordinated rewrite/rollback is not prevented by these changes; PR #179 remains a design-only external checkpoint proposal.
+- No migration, remote receiver, real external effect, exchange connection, PAPER activation or LIVE execution is enabled.
+- Install/trading readiness remains NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
+### Next priorities
+1. Independently adversarial-review the full #149/#150/#154/#155/#157/#164/#165/#167–#191 dependency chain at immutable SHAs, including transaction, schema, TEMP/main, replay, outbox and migration behavior.
+2. Continue synthetic-only resource-exhaustion, malformed-input, concurrency, crash/restart, backup/restore, corruption, truncation and rollback tests.
+3. Decide the independent checkpoint signer/storage trust model in #179 before implementation.
+4. Keep legacy database migration, remote transport, PAPER activation and LIVE disabled pending their separate gates.
+5. Continue preregistered multi-market profitability research with realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
