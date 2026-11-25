@@ -190,6 +190,18 @@ class AtomicReservationAllocationTests(unittest.TestCase):
             "0",
         )
 
+    def test_version_without_increment_headroom_is_rejected(self):
+        self.db.execute("UPDATE reservations SET version=? WHERE reservation_id='r-1'",
+                        (2**63 - 2,))
+        self.db.commit()
+        self.prepare_batch([("sell-1", "BTC/USDT", "SELL", "0.4")])
+        with self.assertRaisesRegex(ReservationAllocationError, "cannot be incremented safely"):
+            consume_sell_allocations(
+                self.db, account_id="paper-research", batch_id="b-1",
+                allocations=self.allocations(version=2**63 - 2), timestamp=160,
+            )
+        self.db.rollback()
+
     def test_expired_reservation_rejected(self):
         self.prepare_batch([("sell-1", "BTC/USDT", "SELL", "0.4")])
         with self.assertRaisesRegex(ReservationAllocationError, "expired"):
