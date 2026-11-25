@@ -925,6 +925,40 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_apply_batch_rejects_unbounded_decimal_inputs(self):
+        huge_exponent = {
+            "fill_id": "huge-exp", "market_id": "BTC/USDT", "side": "BUY",
+            "quantity": "1e999999999", "price": "1", "fee_quote": "0",
+        }
+        with self.assertRaisesRegex(
+            SettlementStoreError, "quantity decimal exponent exceeds the supported range"
+        ):
+            self.store.apply_batch(
+                batch_id="huge-exp", fills=[huge_exponent], timestamp=1
+            )
+
+        huge_text = {
+            "fill_id": "huge-text", "market_id": "BTC/USDT", "side": "BUY",
+            "quantity": "1" * 129, "price": "1", "fee_quote": "0",
+        }
+        with self.assertRaisesRegex(
+            SettlementStoreError, "quantity decimal text exceeds the 128-character limit"
+        ):
+            self.store.apply_batch(
+                batch_id="huge-text", fills=[huge_text], timestamp=1
+            )
+
+        excessive_precision = {
+            "fill_id": "huge-precision", "market_id": "BTC/USDT", "side": "BUY",
+            "quantity": "1" * 81, "price": "1", "fee_quote": "0",
+        }
+        with self.assertRaisesRegex(
+            SettlementStoreError, "quantity decimal precision exceeds 80 digits"
+        ):
+            self.store.apply_batch(
+                batch_id="huge-precision", fills=[excessive_precision], timestamp=1
+            )
+
     def test_register_market_rejects_oversized_identity_fields(self):
         with self.assertRaisesRegex(
             SettlementStoreError, "market_id exceeds the 128-character limit"
