@@ -14,6 +14,10 @@ on:
       - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_reservation_schema_v2.py"
+      - "crypto_engine/tests/test_reservation_lifecycle.py"
+      - "crypto_engine/tests/test_reservation_allocations.py"
+      - "crypto_engine/tests/test_reservation_atomic_allocations.py"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -26,6 +30,10 @@ on:
       - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_reservation_schema_v2.py"
+      - "crypto_engine/tests/test_reservation_lifecycle.py"
+      - "crypto_engine/tests/test_reservation_allocations.py"
+      - "crypto_engine/tests/test_reservation_atomic_allocations.py"
 
 permissions:
   contents: read
@@ -66,6 +74,10 @@ jobs:
             /crypto_engine/tmm_core/reservation_outbox_receiver.py
             /crypto_engine/tests/test_sqlite_settlement_store.py
             /crypto_engine/tests/test_reservation_outbox_receiver.py
+            /crypto_engine/tests/test_reservation_schema_v2.py
+            /crypto_engine/tests/test_reservation_lifecycle.py
+            /crypto_engine/tests/test_reservation_allocations.py
+            /crypto_engine/tests/test_reservation_atomic_allocations.py
 
       - name: Set up supported Python version
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -75,6 +87,18 @@ jobs:
 
       - name: Record exact Python and SQLite versions
         run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
+
+      - name: Run reservation schema v2 regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_schema_v2.py' -v
+
+      - name: Run reservation lifecycle regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_lifecycle.py' -v
+
+      - name: Run reservation allocations regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_allocations.py' -v
+
+      - name: Run reservation atomic allocations regression suite
+        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
 
       - name: Run settlement store regression suite
         run: python -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
