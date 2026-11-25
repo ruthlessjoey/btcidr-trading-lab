@@ -87,6 +87,12 @@ class SellAllocationPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(ReservationAllocationError, "stale"):
             self.validate()
 
+    def test_duplicate_fill_reservation_pair_is_rejected(self):
+        duplicate = dict(self.allocations[0])
+        duplicate["allocation_id"] = "a-2"
+        with self.assertRaisesRegex(ReservationAllocationError, "duplicate fill/reservation"):
+            self.validate(allocations=self.allocations + [duplicate])
+
     def test_buy_fill_cannot_have_reservation_allocation(self):
         self.fills[0]["side"] = "BUY"
         with self.assertRaisesRegex(ReservationAllocationError, "BUY fills"):
