@@ -33,7 +33,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.store = SQLiteSettlementStore(
             self.path, account_id="paper-research", currency="USDT", opening_cash="10000"
         )
-        self.store.register_market("BTC/USDT", "BTC", "USDT")
+        self.store.register_market("ETH/USDT", "ETH", "USDT")
         self.hash = hashlib.sha256(b"request-one").hexdigest()
 
     def tearDown(self):
@@ -447,7 +447,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "SELECT 1 FROM main.batches WHERE batch_id='legacy-write-blocked'"
             ).fetchone())
             self.assertIsNone(db.execute(
-                "SELECT 1 FROM main.markets WHERE market_id='BTC/USDT'"
+                "SELECT 1 FROM main.markets WHERE market_id='ETH/USDT'"
             ).fetchone())
 
     def test_legacy_database_rejects_sell_until_reservation_schema_v2_is_enabled(self):
