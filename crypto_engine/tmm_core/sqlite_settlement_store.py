@@ -392,6 +392,29 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
+    def _verify_reservation_outbox_cardinality(
+        self, db: sqlite3.Connection, *, batch_id: str | None = None,
+    ) -> None:
+        """Require exactly one durable outbox row for every reservation allocation."""
+        sql = (
+            "SELECT a.allocation_id,COUNT(o.idempotency_key) "
+            "FROM main.reservation_allocations AS a "
+            "LEFT JOIN main.reservation_outbox AS o ON o.allocation_id=a.allocation_id "
+        )
+        params: tuple[object, ...] = ()
+        if batch_id is not None:
+            sql += "WHERE a.batch_id=? "
+            params = (batch_id,)
+        sql += (
+            "GROUP BY a.allocation_id "
+            "HAVING COUNT(o.idempotency_key)!=1 LIMIT 1"
+        )
+        invalid = db.execute(sql, params).fetchone()
+        if invalid is not None:
+            raise SettlementStoreError(
+                "reservation allocation must have exactly one outbox row"
+            )
+
     def _verify_reservation_outbox_row(
         self, db: sqlite3.Connection, row: Mapping[str, object],
     ) -> str:
@@ -452,6 +475,7 @@ class SQLiteSettlementStore:
             db.execute("BEGIN")
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
+            self._verify_reservation_outbox_cardinality(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
                 "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
@@ -486,6 +510,7 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
+            self._verify_reservation_outbox_cardinality(db, batch_id=batch_id)
             reservation_pending = db.execute(
                 "SELECT COUNT(*) FROM main.reservation_outbox "
                 "WHERE batch_id=? AND status!='ACKNOWLEDGED'", (batch_id,)
@@ -539,6 +564,12 @@ class SQLiteSettlementStore:
             if row is None:
                 db.rollback()
                 raise SettlementStoreError("unknown reservation outbox key")
+            batch_id = row[0]
+            try:
+                self._verify_reservation_outbox_cardinality(db, batch_id=batch_id)
+            except SettlementStoreError:
+                db.rollback()
+                raise
             (
                 batch_id, status, old_receipt, allocation_id, reservation_id, fill_id,
                 account_id, market_id, reservation_version, allocated_quantity, stored_digest,
