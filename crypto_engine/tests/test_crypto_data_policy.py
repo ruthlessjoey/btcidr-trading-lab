@@ -9,7 +9,7 @@ from tmm_core.provider_policy import (
 from tmm_core.tokocrypto_klines import KlinePayloadError, normalize_tokocrypto_klines
 
 
-class TokocryptoNextMePolicyTests(unittest.TestCase):
+class TokocryptoRequestShapeAndCompatibilityGateTests(unittest.TestCase):
     URL = "https://www.tokocrypto.site/api/v3/klines?symbol=BTCIDR&interval=1m&limit=100"
     OPEN_MS = 1_700_000_000_000
     CLOSE_MS = OPEN_MS + 59_999
