@@ -218,6 +218,16 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.assertEqual((row["status"], row["version"]), ("EXPIRED", 2))
         self.assertTrue(self.audit_is_valid())
 
+    def test_cancel_after_expiry_must_use_expiry_transition(self):
+        self.create()
+        self.begin()
+        with self.assertRaisesRegex(ReservationLifecycleError, "expiry transition"):
+            cancel_reservation(
+                self.db, reservation_id="r-1", account_id="paper-research",
+                expected_version=1, now=200,
+            )
+        self.db.rollback()
+
     def test_expire_before_boundary_rejected(self):
         self.create()
         self.begin()
