@@ -112,8 +112,10 @@ class SQLiteSettlementStore:
         """Atomically commit synthetic fills, balances, audit, batch result and outbox.
 
         Identical completed batch replay returns the persisted result. Changed content
-        under an existing batch ID is rejected. This method does not deliver outbox
-        messages; delivery requires a separately trusted idempotent receiver.
+        under an existing batch ID is rejected. When reservation schema v2 is enabled,
+        every SELL fill requires exact per-fill sell_allocations consumed atomically.
+        This method does not deliver either outbox; delivery requires a separately
+        trusted idempotent receiver.
         """
         if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
             raise SettlementStoreError("batch_id is required")
@@ -335,17 +337,16 @@ class SQLiteSettlementStore:
                 head = self._append_audit(db, event)
             normalized_reservation_allocations = []
             if normalized_allocations:
+                from .reservation_allocations import (
+                    ReservationAllocationError, consume_sell_allocations,
+                )
                 try:
-                    from .reservation_allocations import consume_sell_allocations
                     normalized_reservation_allocations = consume_sell_allocations(
                         db, account_id=self.account_id, batch_id=batch_id,
                         allocations=normalized_allocations, timestamp=timestamp,
                     )
-                except Exception as exc:
-                    from .reservation_allocations import ReservationAllocationError
-                    if isinstance(exc, ReservationAllocationError):
-                        raise SettlementStoreError(str(exc)) from exc
-                    raise
+                except ReservationAllocationError as exc:
+                    raise SettlementStoreError(str(exc)) from exc
             for item in normalized_outbox:
                 db.execute(
                     "INSERT INTO outbox(idempotency_key,batch_id,market_id,authorized_quantity,"
