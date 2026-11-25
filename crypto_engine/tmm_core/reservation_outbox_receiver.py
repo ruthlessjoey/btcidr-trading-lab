@@ -61,7 +61,7 @@ def _canonical_payload(payload: Mapping[str, object]) -> tuple[str, str, str]:
         raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")
     parts = quantity.as_tuple()
     if (len(parts.digits) > 80 or parts.exponent < -160 or parts.exponent > 128
-            or (not quantity.is_zero() and abs(quantity.adjusted()) > 128):
+            or (not quantity.is_zero() and abs(quantity.adjusted()) > 128)):
         raise ReservationInboxError("allocated_quantity exceeds supported decimal precision")
     if format(quantity, "f") != quantity_text:
         raise ReservationInboxError("allocated_quantity must be a canonical finite positive decimal")
