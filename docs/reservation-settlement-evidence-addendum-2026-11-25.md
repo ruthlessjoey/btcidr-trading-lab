@@ -296,3 +296,36 @@ This is now an exact-head pass for all six targeted reservation/settlement regre
 - PAPER activation, LIVE capability, profitability or high win rate.
 
 Overall project completion remains **UNRATED**; install/trading readiness remains **NOT READY**; PAPER is **ON HOLD** and LIVE is **DISABLED / ABSENT**.
+
+
+## Latest rebased full-stack CI — exact PR head PASS (25 November 2026)
+
+The child integration branch has been synchronized with the latest PR #149 head. This is the current authoritative focused CI result; the earlier #150 heads `83f9a789...` and `0bf6f044...` remain historical results only.
+
+- PR #149 current head: `8db0cd10649e169bb19e934d40f0e760c5b8b0be` (open/draft/unmerged).
+- PR #150 current base: `8db0cd10649e169bb19e934d40f0e760c5b8b0be`.
+- PR #150 current exact head: `8551e596fab6d3c649b00281a784d76cef546ae4` (open/draft/unmerged).
+- Exact-head pull-request run [#45551202442](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45551202442) — **success**.
+- Python 3.11.18 / SQLite 3.46.1: schema v2 25/25; lifecycle 21/21; allocation validation 16/16; atomic allocation 13/13; settlement store 22/22; receiver 13/13 = **110/110**.
+- Python 3.13.18 / SQLite 3.46.1: the same six suites = **110/110**.
+- Combined: **220/220 successful test executions** across the two interpreters. Both jobs and all 12 test steps passed on the exact current PR head.
+
+The earlier expanded run at #150 head `83f9a789eb0e7fc869de3a45041c2336c6b3595c` also passed, then the PR branch synchronized with the newest #149 base and inherited its sparse test workflow. The current result is stronger because it ran on the rebased PR head as a `pull_request` event, rather than relying solely on a push event.
+
+### Independent-review gate disposition
+
+The main-branch `Workstream A immutable AI review` workflow is not a valid reviewer for this reservation chain. Its trusted-base workflow is restricted to a fixed 25-file Workstream A allowlist and runs only when a non-draft PR targets `main` and carries the `workstream-a-review` label. PRs #149 and #150 are draft child-branch PRs, and reservation files are outside that allowlist. The skipped `pull_request_target` job is therefore **not** evidence of review; neither should it be forced to review these files.
+
+No approved independent reservation-stack reviewer has completed acceptance. The next acceptance gate must be a separately scoped, immutable review of exact head `8551e596...`, with an explicit allowlist of the reservation/settlement modules and their tests, no protected paths, no code execution, no secrets disclosure, and a review result anchored to the exact SHA. Until that is done, security acceptance remains PENDING.
+
+### Current branch disposition
+
+- PR #147 — tracker addendum, open/draft/unmerged, base `main`.
+- PR #149 — inbox TEMP-trigger/receipt-integrity hardening, open/draft/unmerged.
+- PR #150 — legacy SELL fail-closed gate plus integrated reservation settlement and full six-suite workflow, open/draft/unmerged; exact-head focused CI PASS.
+- PR #151 and #152 — closed as superseded duplicates; their branches remain, no deletion.
+- `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`. No PR merge or deployment occurred.
+
+### Readiness remains constrained
+
+The six-suite CI pass does not certify the full repository or production use. Still pending: exact-head independent adversarial review, crash/power-loss/restore and malformed database drills, v1→v2 migration design and synthetic-copy validation, remote receiver authentication/transport, external idempotent effect semantics, broader risk controls, PAPER activation approval, and cost-adjusted multi-market profitability evidence. Install readiness remains **NOT READY**; trading readiness remains **NOT READY**; PAPER **ON HOLD**; LIVE **DISABLED / ABSENT**; profitability **NOT ESTABLISHED**; overall project completion **UNRATED**.
