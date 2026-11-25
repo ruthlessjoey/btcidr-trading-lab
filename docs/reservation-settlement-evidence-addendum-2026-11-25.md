@@ -949,3 +949,37 @@ Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABL
 7. Begin preregistered multi-market profitability research with point-in-time data, realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
 8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
 
+
+
+## 26 November — market registration event ordering
+
+### PR #195 — require market registration audit before first fill
+
+- Exact head: `60626aa448306fbb14c2ef4c7dea22a1b1395a7d`; base PR #194 head `5a26bf621a497b47ce76f2c7dbd7089f0871fc0a`.
+- Finding: registry-to-audit set equality did not enforce sequence ordering. A synthetic audit chain could place a MARKET_REGISTERED event after a SYNTHETIC_FILL for the same market, recompute the local hash chain, and still satisfy set-based registry comparison.
+- Fix: track market registration sequence numbers and require every synthetic fill to have a matching earlier MARKET_REGISTERED event whenever the market audit policy is required or market registration events exist.
+- Adds a regression that reorders the market registration event after a fill and recomputes the local audit hashes. The snapshot verifier must reject based on event ordering, not merely hash mismatch.
+- Exact-head run [45679062064](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45679062064): Python 3.11.18 and 3.13.18 each passed 74 settlement-store + 16 receiver tests (90 per version). ResourceWarning is promoted to error; no actual warning/ignored-connection output.
+- PR remains open/draft/unmerged; independent adversarial review pending.
+
+### Updated strongest candidate chain and release posture
+
+- Strongest current candidate chain: #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #192 → #194 → #195.
+- #195 adds event-order verification to the #194 stack, which already includes first-fill zero-inventory checks, precision-80 settlement arithmetic, bounded input sizes, market-policy binding, outbox validation and warning-clean CI.
+- #189/#191 superseded by #190; #193 superseded by #194; #178 duplicate; #183 superseded by #184; #185/#186 superseded by #187.
+- #179 remains a design-only external checkpoint proposal. No signer/storage/key-store implementation is selected.
+- All tests remain isolated settlement-store/receiver suites; independent adversarial acceptance and full repository testing are still pending.
+- Protected main remains `0426e1ecd5bd01913a568272792c355c4b7059c7`; no PR merged.
+- Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
+
+### Next priorities
+
+1. Independent adversarial review of #149/#150/#154/#155/#157/#164/#165/#167–#195 at immutable SHAs. CI success is not independent acceptance.
+2. Synthetic-only crash/restart, multiprocess races, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+3. Review #179 external checkpoint trust model and decide signer policy, independent storage, monotonic sequence, maximum unanchored window and recovery authority.
+4. Reconcile #164/#165 copy-only migration candidates with historical inventory/expiry evidence. No existing user DB inspection/migration or inferred SELL authority.
+5. Keep remote receiver authentication and real external business effects unimplemented pending trust/transport/receipt review.
+6. Keep Tokocrypto BTCIDR .site blocked until owner resolves host/symbol compatibility.
+7. Begin preregistered multi-market profitability research with point-in-time data, realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
+8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
+
