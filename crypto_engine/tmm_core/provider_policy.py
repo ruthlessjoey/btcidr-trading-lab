@@ -1,7 +1,7 @@
 """Strict allowlist and provenance helpers for approved public candle requests.
 
-This module validates a proposed request; it never sends it. It permits only
-unauthenticated GET to the exact owner-approved Tokocrypto BTCIDR kline endpoint.
+This module validates request shape offline. The BTCIDR-to-MBX host mapping is
+unverified and the approved-request gate therefore fails closed.
 """
 from __future__ import annotations
 
