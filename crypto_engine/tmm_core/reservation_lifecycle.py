@@ -12,6 +12,7 @@ import sqlite3
 from decimal import Decimal, InvalidOperation
 
 from .sqlite_settlement_store import _event_hash
+from .reservation_schema_v2 import ensure_reservation_schema_v2
 
 
 class ReservationLifecycleError(RuntimeError):
@@ -23,6 +24,7 @@ def _require_transaction(db: sqlite3.Connection) -> None:
         raise ReservationLifecycleError("a trusted SQLite connection is required")
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
+    ensure_reservation_schema_v2(db)
 
 
 def _text(value: object, field: str, limit: int = 128) -> str:
@@ -201,7 +203,7 @@ def _transition(
         raise ReservationLifecycleError("stale reservation version")
     if require_expired and now < row[8]:
         raise ReservationLifecycleError("reservation has not reached expiry")
-    if not require_expired and target == "RELEASED" and now >= row[8]:
+    if not require_expired and now >= row[8]:
         raise ReservationLifecycleError("expired reservation must use expiry transition")
     changed = db.execute(
         "UPDATE main.reservations SET status=?,version=version+1 "
