@@ -1030,3 +1030,53 @@ Preferred candidate chain:
 8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
 
 Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
+
+## 26 November — all six safe reservation/settlement suites verified (#202)
+
+### Corrected reservation numeric contract
+A first full-suite attempt in PR #200 exposed that the existing lifecycle tests intentionally enforce a narrower reservation quantity contract: maximum 38 significant digits and 18 decimal places. The earlier PR #197/#198 experiment had widened lifecycle/allocation/receiver limits to 80 digits and -160 scale; that broke the lifecycle contract and was reverted.
+
+The preferred #198 code now keeps:
+- General settlement input contract: up to 80 significant digits, bounded exponent/magnitude.
+- Persisted/derived settlement values: separate wider bounded parser.
+- Reservation lifecycle/allocation/receiver quantity contract: 38 significant digits, 18 decimal places, with bounded text.
+- Decimal arithmetic context: 640 digits for bounded products, sums and reconciliation.
+This is deliberately fail-closed: a SELL requiring reservation quantity outside the reservation contract is rejected rather than silently accepted.
+
+### PR #198 preferred implementation candidate
+- Exact head: `80a63a406105e79d7f39c9585b2a169060d5005d`.
+- Its isolated workflow run 45680030407 passed 78 settlement-store + 17 receiver tests on Python 3.11.18 and 3.13.18.
+- Includes market-registration policy/init-event consistency, market-registration-before-first-fill, zero opening inventory on first fill, bounded identifiers/batch sizes, separated decimal input/stored bounds, exact arithmetic, and SELL-fill-before-reservation-consumption audit order.
+- All PRs remain open/draft/unmerged.
+
+### PR #202 — full safe-suite evidence
+- Exact head: `37317f4dc591b956be99a4eed8c8f2cdaa4638fd`.
+- Exact Actions run [45681469574](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45681469574), both matrix jobs successful.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed all six suites:
+  - Reservation schema v2: 25
+  - Reservation lifecycle: 21
+  - Reservation allocations: 16
+  - Reservation atomic allocations: 13
+  - Settlement store: 78
+  - Reservation receiver: 17
+  - **Total: 170 tests per interpreter.**
+- ResourceWarning promoted to error; no actual ResourceWarning or ignored-connection output.
+- Static import-closure review found only standard-library and unprotected reservation/settlement modules; protected risk/signal/validator/report/Workstream B modules were not imported.
+- PR #202 changes only a workflow comment to trigger the base-branch workflow. PR #198 is the implementation candidate; #202 supplies the missing four-suite evidence.
+- PR #200 earlier full-suite attempt failed because of the widened reservation quantity parser; that parser was restored to the tested 38-digit/18-scale contract. PR #202 is the corrected passing exact-head run.
+
+### Current preferred candidate chain
+#172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #192 → #194 → #195 → #197 → #198, with #202 providing the full safe-suite validation evidence.
+
+### Remaining priorities
+1. Independent adversarial review of #149/#150/#154/#155/#157/#164/#165/#167–#202 at immutable SHAs.
+2. Broader full repository tests only where import closure is verified safe; protected import closures remain prohibited.
+3. Synthetic-only crash/restart, multiprocess race, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion testing.
+4. Review PR #179 external checkpoint trust model and decide independent signer/storage, cadence, max unanchored window and recovery authority.
+5. Reconcile copy-only migration candidates with historical inventory/expiry evidence; no existing user DB migration or automatic SELL authority.
+6. Keep Tokocrypto BTCIDR blocked until owner resolves host/symbol conflict.
+7. Continue preregistered multi-market profitability research with point-in-time data, realistic costs, untouched chronological holdouts, multiple-testing controls and independent reproduction.
+8. Keep MEME_INTEL separate until independently ready and explicitly approved.
+
+Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
