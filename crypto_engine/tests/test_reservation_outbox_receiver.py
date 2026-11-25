@@ -97,6 +97,14 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             accept_reservation_outbox(self.receiver_db, self.payload(quantity="0.3"))
         self.receiver_db.rollback()
 
+    def test_extreme_decimal_exponent_is_rejected_without_expansion(self):
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        with self.assertRaisesRegex(ReservationInboxError, "precision"):
+            accept_reservation_outbox(
+                self.receiver_db, self.payload(quantity="1E+999999")
+            )
+        self.receiver_db.rollback()
+
     def test_invalid_payload_schema_is_rejected(self):
         bad = self.payload()
         bad["unexpected"] = "value"
@@ -154,6 +162,13 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             1,
         )
         self.assertEqual(self.store.pending_reservation_outbox(), [])
+
+    def test_worker_rejects_receiver_receipt_not_bound_to_payload(self):
+        def bad_receiver(payload):
+            return "unrelated-receipt"
+        with self.assertRaisesRegex(ReservationInboxError, "not bound to this payload"):
+            deliver_pending_reservation_outbox(self.store, bad_receiver)
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
 
     def test_worker_rejects_tampered_outbox_payload_hash_before_receiver(self):
         with sqlite3.connect(self.store.path) as db:
