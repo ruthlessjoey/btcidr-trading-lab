@@ -397,6 +397,45 @@ class SQLiteSettlementStore:
         if not self._verify_chain(db):
             raise SettlementStoreError("reservation audit chain verification failed")
 
+        # The hash chain proves ordering/integrity only relative to its stored hashes.
+        # Reconcile every canonical fill row to exactly one immutable SYNTHETIC_FILL event.
+        fill_rows = db.execute(
+            "SELECT fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp "
+            "FROM main.fills ORDER BY fill_id"
+        ).fetchall()
+        expected_fills = {
+            row[0]: {
+                "fill_id":row[0],"batch_id":row[1],"market_id":row[2],"side":row[3],
+                "quantity":row[4],"price":row[5],"fee_quote":row[6],"timestamp":row[7],
+            }
+            for row in fill_rows
+        }
+        audit_fills: dict[str,dict[str,object]] = {}
+        for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
+            event = json.loads(event_json)
+            if not isinstance(event,dict) or event.get("kind") != "SYNTHETIC_FILL":
+                continue
+            fill_id = event.get("fill_id")
+            if not isinstance(fill_id,str) or not fill_id or fill_id in audit_fills:
+                raise SettlementStoreError("synthetic fill audit identity is invalid")
+            expected_keys = {
+                "kind","account_id","batch_id","fill_id","market_id","side",
+                "quantity","price","fee_quote","cash_after","holding_after","timestamp",
+            }
+            if (set(event) != expected_keys or event.get("account_id") != self.account_id):
+                raise SettlementStoreError("synthetic fill audit schema/account mismatch")
+            for field in ("cash_after","holding_after"):
+                if _decimal(event[field],field) < 0:
+                    raise SettlementStoreError("synthetic fill audit balance is invalid")
+            audit_fills[fill_id] = {
+                key:event[key] for key in (
+                    "fill_id","batch_id","market_id","side","quantity",
+                    "price","fee_quote","timestamp",
+                )
+            }
+        if audit_fills != expected_fills:
+            raise SettlementStoreError("synthetic fill ledger does not match audit events")
+
         allocation_rows = db.execute(
             "SELECT allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,"
             "allocated_quantity,reservation_version "
