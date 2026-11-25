@@ -160,9 +160,21 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         first = self.store.apply_batch(**kwargs)
         second = self.store.apply_batch(**kwargs)
         self.assertEqual(first, second)
+        self.assertEqual(first["status"], "COMMITTED_PENDING_OUTBOX")
         self.assertEqual(first["reservation_allocations"][0]["idempotency_key"],
                          "reservation-allocation:a-1")
         self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0.75")
+        self.assertEqual(len(self.store.pending_outbox()), 1)
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
+                "COMMITTED_PENDING_OUTBOX",
+            )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt="reservation-receipt"
+        )
         with sqlite3.connect(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT consumed_quantity,version FROM reservations").fetchone(),
@@ -170,6 +182,12 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )
             self.assertEqual(db.execute("SELECT COUNT(*) FROM reservation_allocations").fetchone()[0], 1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM reservation_outbox").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
+                "COMPLETE",
+            )
+        replay = self.store.apply_batch(**kwargs)
+        self.assertEqual(replay["status"], "COMPLETE")
         self.assertTrue(self.store.verify_audit_chain())
 
     def test_reservation_enabled_sell_without_allocation_is_rejected(self):
@@ -231,6 +249,30 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM fills WHERE fill_id='sell-2'"
             ).fetchone())
+
+    def test_reservation_outbox_ack_waits_for_legacy_outbox(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        result = self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt="reservation-receipt"
+        )
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
+                "COMMITTED_PENDING_OUTBOX",
+            )
+        self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
+                "COMPLETE",
+            )
 
     def test_reservation_enabled_buy_batch_needs_no_sell_allocation(self):
         self.enable_reservations()
