@@ -925,6 +925,39 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_snapshot_rejects_fill_audit_before_market_registration(self):
+        self.store.apply_batch(
+            batch_id="fill-before-market-registration",
+            fills=[self.buy(fill_id="fill-before-market-registration")],
+            timestamp=10,
+        )
+        with _managed_connection(self.path) as db:
+            rows = db.execute(
+                "SELECT seq,event_json,event_hash FROM main.audit ORDER BY seq"
+            ).fetchall()
+            self.assertEqual([row[0] for row in rows], [1, 2, 3])
+            initial_hash = rows[0][2]
+            market_event = json.loads(rows[1][1])
+            fill_event = json.loads(rows[2][1])
+            fill_encoded = rows[2][1]
+            market_encoded = rows[1][1]
+            fill_hash = _event_hash(initial_hash, fill_event)
+            market_hash = _event_hash(fill_hash, market_event)
+            db.execute("DELETE FROM main.audit WHERE seq=2")
+            db.execute(
+                "UPDATE main.audit SET seq=2,previous_hash=?,event_hash=? WHERE seq=3",
+                (initial_hash, fill_hash),
+            )
+            db.execute(
+                "INSERT INTO main.audit(seq,event_json,previous_hash,event_hash) "
+                "VALUES(3,?,?,?)",
+                (market_encoded, fill_hash, market_hash),
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "synthetic fill precedes market registration audit event"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_first_sell_without_opening_inventory(self):
         batch_id = "b-unauthorized-first-sell"
         fill_id = "sell-without-opening-inventory"
