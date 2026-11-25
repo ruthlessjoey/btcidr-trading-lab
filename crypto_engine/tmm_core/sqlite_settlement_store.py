@@ -621,12 +621,21 @@ class SQLiteSettlementStore:
         }
         is_new_database = not existing_tables
         expected_tables = set(expected_columns)
-        if existing_tables and existing_tables != expected_tables:
+        reservation_tables = {
+            "reservations", "reservation_allocations", "reservation_outbox"
+        }
+        present_reservation_tables = existing_tables & reservation_tables
+        if existing_tables:
             missing = sorted(expected_tables - existing_tables)
-            unexpected = sorted(existing_tables - expected_tables)
-            raise SettlementStoreError(
-                f"database schema mismatch; missing={missing}, unexpected={unexpected}"
-            )
+            unexpected = sorted(existing_tables - expected_tables - reservation_tables)
+            if missing or unexpected:
+                raise SettlementStoreError(
+                    f"database schema mismatch; missing={missing}, unexpected={unexpected}"
+                )
+            if present_reservation_tables and present_reservation_tables != reservation_tables:
+                raise SettlementStoreError(
+                    "partial reservation schema rejected; recovery required"
+                )
 
         db.executescript("""
         CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -697,6 +706,24 @@ class SQLiteSettlementStore:
             raise SettlementStoreError(
                 f"database contains unapproved schema objects: {unexpected_objects}; recovery required"
             )
+
+        # A persisted current-v2 database is a valid settlement-store state,
+        # not an unexpected extension. Verify the complete v2 contract without
+        # creating or migrating anything. Partial and older-v2 schemas fail closed.
+        if present_reservation_tables == reservation_tables:
+            from .reservation_schema_v2 import (
+                ReservationSchemaError, ensure_reservation_schema_v2,
+            )
+            db.execute("BEGIN")
+            try:
+                ensure_reservation_schema_v2(db)
+            except ReservationSchemaError as exc:
+                db.rollback()
+                raise SettlementStoreError(
+                    "reservation schema verification failed; recovery required"
+                ) from exc
+            else:
+                db.rollback()
 
         version = db.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
         if version is None:
