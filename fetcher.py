@@ -45,10 +45,24 @@ class Source:
     base_url: str
 
     def __post_init__(self):
-        if self.name.casefold() == "tokocrypto":
+        if not isinstance(self.name, str) or not isinstance(self.base_url, str):
+            raise ValueError("source name and base_url must be text")
+        host = urllib.parse.urlsplit(self.base_url).hostname
+        tokocrypto_host = (
+            isinstance(host, str)
+            and (
+                host == "tokocrypto.site"
+                or host.endswith(".tokocrypto.site")
+                or host == "tokocrypto.com"
+                or host.endswith(".tokocrypto.com")
+                or host == "cloudme-toko.2meta.app"
+            )
+        )
+        if self.name.casefold() == "tokocrypto" or tokocrypto_host:
             raise ValueError(
-                "legacy Tokocrypto Source is disabled: it can access server-time "
-                "and symbol-metadata paths; use only a separately reviewed "
+                "legacy generic Tokocrypto Source is disabled for every source name: "
+                "its helper methods can access unapproved server-time and "
+                "symbol-metadata paths; use only a separately reviewed "
                 "unauthenticated BTCIDR candles-only adapter"
             )
         if self.style not in ("binance_style", "open_v1"):
