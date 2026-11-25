@@ -729,6 +729,78 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
 
+
+    def test_audit_coverage_supports_one_sell_fill_across_multiple_reservations(self):
+        self.store.apply_batch(
+            batch_id="b-reserve-buy", fills=[self.buy(qty="2")], timestamp=10
+        )
+        self.enable_reservations(quantity="0.5")
+        with sqlite3.connect(self.path) as db:
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("BEGIN IMMEDIATE")
+            create_reservation(
+                db, reservation_id="r-2", account_id="paper-research",
+                market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+                authorized_quantity="0.5", created_at=0, expires_at=1000,
+            )
+            authorize_reservation(
+                db, reservation_id="r-2", account_id="paper-research",
+                expected_version=1, now=1,
+            )
+            db.commit()
+        self.store.apply_batch(
+            batch_id="b-multi-reservation",
+            fills=[self.sell(qty="0.5")],
+            sell_settlements=[self.sell_settlement(
+                key="settle:multi", authorized="0.5", filled="0.5"
+            )],
+            sell_allocations=[
+                self.allocation(allocation_id="a-1", reservation_id="r-1", quantity="0.2"),
+                self.allocation(allocation_id="a-2", reservation_id="r-2", quantity="0.3"),
+            ],
+            timestamp=20,
+        )
+        pending = self.store.pending_reservation_outbox(limit=10)
+        self.assertEqual(
+            {item["allocation_id"] for item in pending}, {"a-1","a-2"}
+        )
+
+    def test_audit_coverage_supports_one_reservation_consumed_across_multiple_batches(self):
+        self.store.apply_batch(
+            batch_id="b-reserve-buy", fills=[self.buy(qty="2")], timestamp=10
+        )
+        self.enable_reservations(quantity="0.5")
+        self.store.apply_batch(
+            batch_id="b-sell-one", fills=[self.sell(fill_id="sell-one", qty="0.2")],
+            sell_settlements=[self.sell_settlement(
+                key="settle:one", authorized="0.2", filled="0.2"
+            )],
+            sell_allocations=[self.allocation(
+                allocation_id="a-one", fill_id="sell-one", version=2, quantity="0.2"
+            )],
+            timestamp=20,
+        )
+        self.store.apply_batch(
+            batch_id="b-sell-two", fills=[self.sell(fill_id="sell-two", qty="0.3")],
+            sell_settlements=[self.sell_settlement(
+                key="settle:two", authorized="0.3", filled="0.3"
+            )],
+            sell_allocations=[self.allocation(
+                allocation_id="a-two", fill_id="sell-two", version=3, quantity="0.3"
+            )],
+            timestamp=30,
+        )
+        pending = self.store.pending_reservation_outbox(limit=10)
+        self.assertEqual(
+            {item["allocation_id"] for item in pending}, {"a-one","a-two"}
+        )
+        with sqlite3.connect(self.path) as db:
+            reservation = db.execute(
+                "SELECT consumed_quantity,version,status FROM main.reservations "
+                "WHERE reservation_id='r-1'"
+            ).fetchone()
+        self.assertEqual(reservation, ("0.5",4,"ACTIVE"))
+
     def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
