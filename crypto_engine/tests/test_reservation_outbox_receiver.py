@@ -140,6 +140,21 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         self.receiver_db.commit()
         return receipt
 
+    def test_receiver_accepts_sender_canonical_small_scale_quantity(self):
+        quantity = "0." + ("0" * 159) + "1"
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        receipt = accept_reservation_outbox(
+            self.receiver_db, self.payload(quantity=quantity)
+        )
+        self.receiver_db.commit()
+        self.assertTrue(receipt)
+        self.assertEqual(
+            self.receiver_db.execute(
+                "SELECT payload_json FROM main.reservation_inbox"
+            ).fetchone()[0].count(quantity),
+            1,
+        )
+
     def test_receiver_acceptance_is_idempotent(self):
         first = self.receive(self.payload())
         second = self.receive(self.payload())
