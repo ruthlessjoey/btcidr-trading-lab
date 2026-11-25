@@ -94,6 +94,53 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(digest, row["payload_sha256"])
         return digest, receipt
 
+    def test_snapshot_rejects_first_sell_without_opening_inventory(self):
+        batch_id = "b-unauthorized-first-sell"
+        fill_id = "sell-without-opening-inventory"
+        event = {
+            "kind": "SYNTHETIC_FILL",
+            "account_id": "paper-research",
+            "batch_id": batch_id,
+            "fill_id": fill_id,
+            "market_id": "BTC/USDT",
+            "side": "SELL",
+            "quantity": "1",
+            "price": "110",
+            "fee_quote": "0",
+            "cash_after": "10110",
+            "holding_after": "5",
+            "timestamp": 10,
+        }
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "INSERT INTO main.batches(batch_id,request_hash,status,created_at,result_json) "
+                "VALUES(?,?, 'COMPLETE', ?, ?)",
+                (batch_id, "a" * 64, 10, "{}"),
+            )
+            db.execute(
+                "INSERT INTO main.fills(fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (fill_id, batch_id, "BTC/USDT", "SELL", "1", "110", "0", 10),
+            )
+            db.execute("UPDATE main.account SET cash='10110' WHERE singleton=1")
+            db.execute(
+                "INSERT INTO main.holdings(market_id,quantity) VALUES('BTC/USDT','5')"
+            )
+            previous = db.execute(
+                "SELECT event_hash FROM main.audit ORDER BY seq DESC LIMIT 1"
+            ).fetchone()[0]
+            encoded = json.dumps(
+                event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+            db.execute(
+                "INSERT INTO main.audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+                (encoded, previous, _event_hash(previous, event)),
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "synthetic fill holding audit transition mismatch"
+        ):
+            self.store.snapshot()
+
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
         result = self.store.apply_batch(batch_id="b-1",
                                         fills=[self.buy()], timestamp=10)
