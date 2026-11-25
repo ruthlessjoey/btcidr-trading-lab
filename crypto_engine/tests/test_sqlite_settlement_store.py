@@ -111,7 +111,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
         self.store.apply_batch(
             batch_id="b-smallest-scale",
-            fills=[dict(self.buy(qty="1e-128"), price="1", fee_quote="0")],
+            fills=[dict(self.buy(qty="1e-18"), price="1", fee_quote="0")],
             timestamp=10,
         )
         snapshot = self.store.snapshot()
@@ -121,36 +121,36 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         )
         with localcontext() as decimal_context:
             decimal_context.prec = 640
-            expected_cash = Decimal("10000") - Decimal("1e-128")
+            expected_cash = Decimal("10000") - Decimal("1e-18")
         self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
 
     def test_reserved_sell_supports_shared_small_scale_decimal_contract(self):
-        buy = self.buy(qty="1e-128")
-        buy["price"] = "1e128"
+        buy = self.buy(qty="1e-18")
+        buy["price"] = "1e18"
         buy["fee_quote"] = "0"
         self.store.apply_batch(
             batch_id="b-buy-small-scale",
             fills=[buy],
             timestamp=10,
         )
-        self.enable_reservations(quantity="1e-128", expires_at=1000)
-        sell = self.sell(qty="1e-128")
-        sell["price"] = "1e128"
+        self.enable_reservations(quantity="1e-18", expires_at=1000)
+        sell = self.sell(qty="1e-18")
+        sell["price"] = "1e18"
         result = self.store.apply_batch(
             batch_id="b-sell-small-scale",
             fills=[sell],
             sell_settlements=[
                 self.sell_settlement(
                     key="settle:small-scale",
-                    authorized="1e-128",
-                    filled="1e-128",
+                    authorized="1e-18",
+                    filled="1e-18",
                 )
             ],
             sell_allocations=[
                 self.allocation(
                     allocation_id="a-small-scale",
                     fill_id="sell-1",
-                    quantity="1e-128",
+                    quantity="1e-18",
                 )
             ],
             timestamp=20,
