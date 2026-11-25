@@ -180,6 +180,7 @@ def deliver_pending_reservation_outbox(
             raise ReservationInboxError("receiver returned a receipt not bound to this payload")
         store.acknowledge_reservation_outbox(
             row["idempotency_key"], receiver_receipt=receipt,
+            expected_payload_sha256=row["payload_sha256"],
         )
         acknowledged.append(row["idempotency_key"])
     return acknowledged
