@@ -329,3 +329,58 @@ No approved independent reservation-stack reviewer has completed acceptance. The
 ### Readiness remains constrained
 
 The six-suite CI pass does not certify the full repository or production use. Still pending: exact-head independent adversarial review, crash/power-loss/restore and malformed database drills, v1→v2 migration design and synthetic-copy validation, remote receiver authentication/transport, external idempotent effect semantics, broader risk controls, PAPER activation approval, and cost-adjusted multi-market profitability evidence. Install readiness remains **NOT READY**; trading readiness remains **NOT READY**; PAPER **ON HOLD**; LIVE **DISABLED / ABSENT**; profitability **NOT ESTABLISHED**; overall project completion **UNRATED**.
+
+
+## 25 November — receiver hardening and legacy SELL closure (PRs #149–#150)
+
+Live-refreshed state:
+- PR #149 head: `8db0cd10649e169bb19e934d40f0e760c5b8b0be`, stacked on PR #148 head `ee6387fbb5f721a509a38b971dc3db35452b0c73`.
+- PR #150 head: `8551e596fab6d3c649b00281a784d76cef546ae4`, stacked on PR #149 head `8db0cd10649e169bb19e934d40f0e760c5b8b0be`.
+- Both PRs remain draft/open/unmerged. The ancestry comparison for #150 is 15 commits ahead / 0 behind #149.
+
+### PR #149 — inbox and receipt hardening
+
+- Reject TEMP triggers attached to `main.reservation_inbox` by inspecting `temp.sqlite_master`.
+- On idempotent replay, verify the stored receipt against the deterministic receipt recomputed from canonical payload; changed stored receipts fail closed.
+- Include `account_id` in pending sender outbox rows so the trusted delivery worker can construct the canonical receiver payload.
+- Fix test coverage for receiver-database receipt tampering and exercise ambiguous response retry, durable receiver connection restart and two concurrent workers.
+
+Exact-head CI run [45550760669](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45550760669):
+- Python 3.11.18 / SQLite 3.46.1: 13/13 receiver tests passed.
+- Python 3.13.18 / SQLite 3.46.1: 13/13 receiver tests passed.
+- Reviewer job was skipped, not passed. No authenticated remote receiver or external network transport is implemented.
+
+### PR #150 — eliminate the legacy SELL bypass
+
+- Fail closed on every SELL when reservation schema v2 is missing or does not match the exact current schema.
+- Keep BUY-only batches available on legacy v1 settlement databases.
+- Require exact per-fill allocations when reservation v2 is enabled.
+- Keep batch status pending until both legacy settlement and reservation outboxes are acknowledged.
+- Correct regression fixtures so duplicate-ID, multi-reservation, BUY-allocation and expiry tests exercise their intended conditions.
+
+Exact tested tree: `7b067d48540eb860535b34c5f361301827b89ccc`. It is the tree of current PR #150 head `8551e596fab6d3c649b00281a784d76cef546ae4`; the isolated workflow run used its first-parent commit `cbced35c542eeae67fd74074b0deb720abd14c50` before the ancestry-sync merge commit, with identical tree contents.
+
+GitHub Actions run [45551184494](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45551184494):
+- Python 3.11.18 / SQLite 3.46.1: schema 25 + lifecycle 21 + allocation preflight 16 + atomic allocation 13 + settlement store 22 + receiver 13 = **110/110 passed**.
+- Python 3.13.18 / SQLite 3.46.1: **110/110 passed**.
+- The workflow used sparse checkout of only the named unprotected settlement source and test files. It did not test the whole repository.
+- Reviewer job remains skipped. Multiprocess crash/restore drills, independent adversarial acceptance, migration tests and remote receiver implementation remain pending.
+
+### PR #153 — migration acceptance plan
+
+- Documentation-only draft PR from main at `0426e1ecd5bd01913a568272792c355c4b7059c7`.
+- Defines exact v1, earlier-v2 and current-v2 source classifications, read-only preflight, historical row preservation, expiry evidence, v1 inventory bootstrap, backup/restore, reconciliation and independent acceptance.
+- No migration code or execution is included or authorized.
+
+### Current readiness disposition
+
+- Legacy v1 and earlier-v2 database SELLs remain intentionally blocked until migration/bootstrap is separately implemented, reviewed and approved.
+- No database was migrated or touched.
+- Install readiness: **NOT READY**.
+- Trading readiness: **NOT READY**.
+- PAPER activation: **ON HOLD**.
+- LIVE trading: **DISABLED / ABSENT**.
+- Profitability / high win-rate evidence: **NOT ESTABLISHED**.
+- Overall whole-project completion: **UNRATED** pending approved scope and evidence criteria.
+
+The six-suite result is meaningful evidence for the tested reservation/settlement modules only; it is not a whole-project acceptance result, profitability result or production trading authorization.
