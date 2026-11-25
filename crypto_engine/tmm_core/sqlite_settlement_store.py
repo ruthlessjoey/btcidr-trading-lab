@@ -265,6 +265,10 @@ class SQLiteSettlementStore:
             if present_reservation_tables and present_reservation_tables != reservation_tables:
                 raise SettlementStoreError("partial reservation schema rejected")
             reservations_enabled = present_reservation_tables == reservation_tables
+            if sell_totals and not reservations_enabled:
+                raise SettlementStoreError(
+                    "reservation schema v2 is required before any SELL fill"
+                )
             if normalized_allocations and not reservations_enabled:
                 raise SettlementStoreError("SELL reservation schema must be enabled before allocations")
             if reservations_enabled:
