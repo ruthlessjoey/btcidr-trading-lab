@@ -218,6 +218,8 @@ class AtomicReservationAllocationTests(unittest.TestCase):
         self.db.rollback()
 
     def test_market_mismatch_rejected(self):
+        self.db.execute("INSERT INTO markets VALUES('ETH/USDT','ETH','USDT')")
+        self.db.commit()
         self.prepare_batch([("sell-1", "ETH/USDT", "SELL", "0.4")])
         with self.assertRaisesRegex(ReservationAllocationError, "cross-market"):
             consume_sell_allocations(
