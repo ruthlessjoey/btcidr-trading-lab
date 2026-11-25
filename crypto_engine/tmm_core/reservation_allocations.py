@@ -285,6 +285,8 @@ def consume_sell_allocations(
 
         for reservation_id, amount in sorted(allocated_by_reservation.items()):
             row = reservation_rows[reservation_id]
+            if row[5] >= 2**63 - 2:
+                raise ReservationAllocationError("reservation version cannot be incremented safely")
             old_consumed = Decimal(str(row[4]))
             new_consumed = old_consumed + amount
             if new_consumed > Decimal(str(row[3])):
