@@ -470,6 +470,8 @@ class SQLiteSettlementStore:
                 continue
             kind = event.get("kind")
             reservation_id = event.get("reservation_id")
+            if kind == "RESERVATION_OUTBOX_ACKNOWLEDGED":
+                continue
             if isinstance(kind,str) and kind.startswith("RESERVATION_"):
                 if not isinstance(reservation_id,str) or not reservation_id:
                     raise SettlementStoreError("reservation lifecycle audit identity is invalid")
