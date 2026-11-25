@@ -12,7 +12,7 @@ import os
 import sqlite3
 import stat
 import threading
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -436,6 +436,68 @@ class SQLiteSettlementStore:
         )
         if allocation != expected:
             raise SettlementStoreError("reservation outbox payload differs from its allocation record")
+        fill = db.execute(
+            "SELECT batch_id,market_id,side,quantity,timestamp "
+            "FROM main.fills WHERE fill_id=?",
+            (row.get("fill_id"),),
+        ).fetchone()
+        if fill is None:
+            raise SettlementStoreError("reservation allocation fill record is missing")
+        fill_batch,fill_market,fill_side,fill_quantity,fill_timestamp = fill
+        if (fill_batch != row.get("batch_id") or fill_market != row.get("market_id")
+                or fill_side != "SELL"):
+            raise SettlementStoreError("reservation allocation differs from its SELL fill")
+        reservation = db.execute(
+            "SELECT account_id,market_id,base_asset,quote_asset,authorized_quantity,"
+            "consumed_quantity,created_at,expires_at,version "
+            "FROM main.reservations WHERE reservation_id=?",
+            (row.get("reservation_id"),),
+        ).fetchone()
+        if reservation is None:
+            raise SettlementStoreError("reservation allocation reservation record is missing")
+        (reservation_account,reservation_market,base_asset,quote_asset,authorized_text,
+         consumed_text,created_at,expires_at,current_version) = reservation
+        market = db.execute(
+            "SELECT base_asset,quote_asset FROM main.markets WHERE market_id=?",
+            (row.get("market_id"),),
+        ).fetchone()
+        if (reservation_account != self.account_id or reservation_market != row.get("market_id")
+                or market != (base_asset,quote_asset)):
+            raise SettlementStoreError("reservation allocation differs from its account or market")
+        if (isinstance(fill_timestamp,bool) or not isinstance(fill_timestamp,int)
+                or isinstance(created_at,bool) or not isinstance(created_at,int)
+                or isinstance(expires_at,bool) or not isinstance(expires_at,int)
+                or fill_timestamp < created_at or fill_timestamp >= expires_at
+                or isinstance(current_version,bool) or not isinstance(current_version,int)
+                or isinstance(row.get("reservation_version"),bool)
+                or not isinstance(row.get("reservation_version"),int)
+                or current_version <= row.get("reservation_version")):
+            raise SettlementStoreError("reservation allocation is outside its reservation version or expiry")
+        try:
+            allocated = _decimal(row.get("allocated_quantity"), "allocated_quantity")
+            fill_total = Decimal("0")
+            reservation_total = Decimal("0")
+            with localcontext() as context:
+                context.prec = 80
+                for (quantity_text,) in db.execute(
+                    "SELECT allocated_quantity FROM main.reservation_allocations WHERE fill_id=?",
+                    (row.get("fill_id"),),
+                ):
+                    fill_total += _decimal(quantity_text, "fill allocation quantity")
+                for (quantity_text,) in db.execute(
+                    "SELECT allocated_quantity FROM main.reservation_allocations WHERE reservation_id=?",
+                    (row.get("reservation_id"),),
+                ):
+                    reservation_total += _decimal(quantity_text, "reservation allocation quantity")
+            fill_quantity_decimal = _decimal(fill_quantity, "SELL fill quantity")
+            authorized = _decimal(authorized_text, "reservation authorized quantity")
+            consumed = _decimal(consumed_text, "reservation consumed quantity")
+            if (allocated <= 0 or fill_total != fill_quantity_decimal
+                    or reservation_total != consumed or consumed <= 0
+                    or consumed > authorized or authorized <= 0):
+                raise SettlementStoreError("reservation allocation totals do not reconcile")
+        except (InvalidOperation, TypeError, ValueError, ArithmeticError) as exc:
+            raise SettlementStoreError("reservation allocation quantities are invalid") from exc
         payload = {
             "schema": 1,
             "idempotency_key": row.get("idempotency_key"),
