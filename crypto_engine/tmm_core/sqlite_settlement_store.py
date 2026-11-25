@@ -185,20 +185,21 @@ class SQLiteSettlementStore:
             fill_id = item.get("fill_id")
             reservation_id = item.get("reservation_id")
             version = item.get("reservation_version")
-            quantity = _decimal(item.get("allocated_quantity"), "allocated_quantity")
+            quantity_text = item.get("allocated_quantity")
             if not isinstance(allocation_id, str) or not allocation_id.strip() or len(allocation_id) > 256:
                 raise SettlementStoreError("allocation_id is required")
             if allocation_id in seen_allocation_ids:
                 raise SettlementStoreError("allocation IDs must be unique")
-            if not isinstance(fill_id, str) or not fill_id.strip():
-                raise SettlementStoreError("allocation fill_id is required")
+            if not isinstance(fill_id, str) or not fill_id.strip() or len(fill_id) > 256:
+                raise SettlementStoreError("allocation fill_id is required and bounded")
             if (not isinstance(reservation_id, str) or not reservation_id.strip()
                     or len(reservation_id) > 256):
                 raise SettlementStoreError("allocation reservation_id is required and bounded")
             if isinstance(version, bool) or not isinstance(version, int) or version < 1:
                 raise SettlementStoreError("reservation_version must be a positive integer")
-            if len(str(item.get("allocated_quantity"))) > 128:
+            if len(str(quantity_text)) > 128:
                 raise SettlementStoreError("allocated_quantity text exceeds the 128-character limit")
+            quantity = _decimal(quantity_text, "allocated_quantity")
             if quantity <= 0:
                 raise SettlementStoreError("allocated_quantity must be positive")
             seen_allocation_ids.add(allocation_id)
