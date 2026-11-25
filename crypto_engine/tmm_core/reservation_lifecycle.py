@@ -22,12 +22,27 @@ class ReservationLifecycleError(RuntimeError):
     """Invalid reservation lifecycle transition or stale state."""
 
 
+def _validate_audit_schema(db: sqlite3.Connection) -> None:
+    audit_ddl = db.execute(
+        "SELECT sql FROM main.sqlite_master WHERE type='table' AND name='audit'"
+    ).fetchone()
+    expected = (
+        "CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, "
+        "previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL)"
+    )
+    if audit_ddl is None or "".join(audit_ddl[0].split()).casefold() != "".join(
+        expected.split()
+    ).casefold():
+        raise ReservationLifecycleError("canonical settlement audit schema is required")
+
+
 def _require_transaction(db: sqlite3.Connection) -> None:
     if not isinstance(db, sqlite3.Connection):
         raise ReservationLifecycleError("a trusted SQLite connection is required")
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
     ensure_reservation_schema_v2(db)
+    _validate_audit_schema(db)
 
 
 def _text(value: object, field: str, limit: int = 128) -> str:
@@ -72,17 +87,7 @@ def _quantity(value: object) -> str:
 
 
 def _audit(db: sqlite3.Connection, event: dict[str, object]) -> None:
-    audit_ddl = db.execute(
-        "SELECT sql FROM main.sqlite_master WHERE type='table' AND name='audit'"
-    ).fetchone()
-    expected_audit_ddl = (
-        "CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, "
-        "previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL)"
-    )
-    if audit_ddl is None or "".join(audit_ddl[0].split()).casefold() != "".join(
-        expected_audit_ddl.split()
-    ).casefold():
-        raise ReservationLifecycleError("canonical settlement audit schema is required")
+    _validate_audit_schema(db)
     row = db.execute(
         "SELECT event_hash FROM main.audit ORDER BY seq DESC LIMIT 1"
     ).fetchone()
