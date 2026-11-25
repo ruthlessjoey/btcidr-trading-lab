@@ -1,8 +1,7 @@
-import hashlib
 import json
 import unittest
 
-from tmm_core.ingest import IngestionError, validate_approved_kline_payload
+from tmm_core.ingest import IngestionError, decode_kline_response, validate_approved_kline_payload
 from tmm_core.provider_policy import (
     ProviderPolicyError, build_kline_provenance, validate_approved_kline_request,
     validate_kline_request_shape,
@@ -69,7 +68,7 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
         )
         for url in bad_urls:
             with self.subTest(url=url[:100]), self.assertRaises(ProviderPolicyError):
-                validate_approved_kline_request(method="GET", url=url)
+                validate_kline_request_shape(method="GET", url=url)
 
     def test_other_symbols_credentials_and_duplicate_parameters_are_rejected(self):
         for url in (self.URL.replace("BTCIDR", "BTCUSDT"),
@@ -107,13 +106,20 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
         with self.assertRaises(IngestionError):
             validate_approved_kline_payload(**args)
 
-    def test_ingestion_rejects_duplicate_json_keys_invalid_utf8_and_nonstandard_numbers(self):
-        base = dict(method="GET", url=self.URL, retrieved_at_ms=1_800_000_000_000,
-                    decision_time_ms=self.DECISION_MS, expected_symbol="BTCIDR",
-                    expected_interval="1m")
+    def test_response_decoder_rejects_duplicate_json_keys_invalid_utf8_and_nonstandard_numbers(self):
         for raw in (b'{"code":0,"code":0,"data":[]}', b"\xff", b'{"code":NaN,"data":[]}'):
             with self.subTest(raw=raw), self.assertRaises(IngestionError):
-                validate_approved_kline_payload(raw_response=raw, **base)
+                decode_kline_response(raw)
+
+    def test_response_decoder_rejects_oversized_and_empty_payloads(self):
+        for raw in (b"", b"x" * (4 * 1024 * 1024 + 1)):
+            with self.subTest(length=len(raw)), self.assertRaises(IngestionError):
+                decode_kline_response(raw)
+
+    def test_response_decoder_accepts_strict_json_fixture_without_source_claim(self):
+        decoded = decode_kline_response(self.raw())
+        self.assertEqual(decoded["code"], 0)
+        self.assertEqual(len(decoded["data"]), 1)
 
     def test_parser_rejects_still_open_and_malformed_candles(self):
         with self.assertRaises(KlinePayloadError):
