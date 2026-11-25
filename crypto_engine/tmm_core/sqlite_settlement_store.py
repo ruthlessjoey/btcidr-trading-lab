@@ -58,21 +58,19 @@ def _decimal(value: object, field: str, *, stored: bool = False) -> Decimal:
         raise SettlementStoreError(f"{field} must be finite")
     parts = result.as_tuple()
     if stored:
-        invalid = (
-            len(parts.digits) > _DECIMAL_STORED_DIGITS
-            or parts.exponent < _DECIMAL_STORED_MIN_EXPONENT
-            or parts.exponent > _DECIMAL_STORED_MAX_EXPONENT
-            or abs(result.adjusted()) > _DECIMAL_STORED_MAX_ADJUSTED
-        )
+        if (len(parts.digits) > _DECIMAL_STORED_DIGITS
+                or parts.exponent < _DECIMAL_STORED_MIN_EXPONENT
+                or parts.exponent > _DECIMAL_STORED_MAX_EXPONENT
+                or abs(result.adjusted()) > _DECIMAL_STORED_MAX_ADJUSTED):
+            raise SettlementStoreError(f"{field} exceeds the stored decimal bounds")
     else:
-        invalid = (
-            len(parts.digits) > _DECIMAL_INPUT_DIGITS
-            or parts.exponent < _DECIMAL_INPUT_MIN_EXPONENT
-            or parts.exponent > _DECIMAL_INPUT_MAX_EXPONENT
-            or (not result.is_zero() and abs(result.adjusted()) > _DECIMAL_INPUT_MAX_ADJUSTED)
-        )
-    if invalid:
-        raise SettlementStoreError(f"{field} exceeds the supported decimal precision or exponent range")
+        if len(parts.digits) > _DECIMAL_INPUT_DIGITS:
+            raise SettlementStoreError(f"{field} decimal precision exceeds 80 digits")
+        if (parts.exponent < _DECIMAL_INPUT_MIN_EXPONENT
+                or parts.exponent > _DECIMAL_INPUT_MAX_EXPONENT):
+            raise SettlementStoreError(f"{field} decimal exponent exceeds the supported range")
+        if not result.is_zero() and abs(result.adjusted()) > _DECIMAL_INPUT_MAX_ADJUSTED:
+            raise SettlementStoreError(f"{field} decimal magnitude exceeds the supported range")
     return result
 
 
