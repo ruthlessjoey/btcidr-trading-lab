@@ -983,3 +983,50 @@ Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABL
 7. Begin preregistered multi-market profitability research with point-in-time data, realistic costs, chronological untouched holdouts, multiple-testing controls and independent reproduction.
 8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
 
+
+
+## 26 November — unified decimal contract and SELL audit ordering (#197/#198)
+
+### Findings
+Adversarial review identified two additional integrity issues:
+1. Settlement inputs were converted to fixed-point strings, then parsed again using the same 128-character input limit. Valid values such as `1e-128` serialize to 130 characters and could fail their own later reconciliation. Reservation lifecycle/allocation/receiver parsers also used a narrower 38-digit / 18-scale contract than the settlement sender.
+2. Settlement cash/holding arithmetic used ambient Decimal precision (28) while verification/allocation code used 80. High-precision inputs could be rounded or tiny quote debits lost. The reservation verifier also needed an explicit audit-sequence invariant linking SELL fills and reservation-consumption events.
+
+### PR #197 — numeric contract candidate
+- Exact head `e92c044365728890a202e9988bd1483d975360bf`, run 45679837253 failed on test expectation/guard issues. It is superseded by #198; do not count as a pass.
+
+### PR #198 — preferred combined successor
+- Exact head: `76b8dcc3b2bbc7ffd1070d37e7e28edb724511cc`.
+- Base: PR #197 branch, which carries #192/#194/#195 protections.
+- Exact-head Actions run [45680030407](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45680030407): both Python 3.11.18 and 3.13.18 jobs passed.
+- Each interpreter passed 78 settlement-store tests + 17 receiver tests (95 total); SQLite 3.46.1.
+- ResourceWarning promoted to error; no actual ResourceWarning or ignored-connection output.
+- Four dedicated reservation schema v2, lifecycle, allocations and atomic allocations workflow steps were skipped by branch conditions; they are NOT passes.
+- External input decimals are bounded to 128 text chars, 80 significant digits, exponent -160..128 and adjusted magnitude <=128. Persisted/derived values use a separate 640-char/digit, exponent -320..256, adjusted magnitude <=260 bound.
+- Settlement, audit reconciliation and reservation allocation arithmetic use a 640-digit Decimal context to preserve bounded input products, aggregation and small quote debits.
+- Reservation lifecycle, allocation and receiver quantity contracts now align with sender fixed-point serialization.
+- Audit verifier requires each SELL fill event to precede the associated reservation-consumption event and rejects a local rehash that reorders them.
+- Regression tests cover high-precision arithmetic, tiny quote debits, fixed-point round-trip, reserved SELL/outbox delivery and reordered SELL/consumption audit events.
+
+### Candidate stack and dispositions
+Preferred candidate chain:
+#172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #192 → #194 → #195 → #197 → #198.
+
+- #192 current exact head `5e6c2b6034629c9d89594ff1bbfe20d9753a4989`, run 45677361442 passed 71 + 16 tests per interpreter; an earlier intermediate commit failed and was corrected before this exact head.
+- #194 exact head `5a26bf621a497b47ce76f2c7dbd7089f0871fc0a`, run 45678166979 passed 73 + 16 per interpreter.
+- #195 exact head `60626aa448306fbb14c2ef4c7dea22a1b1395a7d`, run 45679062064 passed 74 + 16 per interpreter; adds market-registration-before-first-fill audit ordering.
+- #196 exact head `ee2c64a0290660a0b440502a471dda8dbd772bc9`, run 45679714572 passed 75 + 16 per interpreter; adds SELL/consumption audit ordering. Its verifier logic and regression are included in #198.
+- #198 is the preferred combined branch. All remain draft/open/unmerged; protected main is unchanged.
+- #193 is a superseded sibling of #195 for the first-fill inventory invariant. #189/#191 are redundant decimal siblings of #190. #197 is a failed intermediate test head superseded by #198.
+
+### Remaining priorities
+1. Independent adversarial review of #149/#150/#154/#155/#157/#164/#165/#167–#198 at immutable SHAs.
+2. Obtain/execute the four reservation schema/lifecycle/allocation suites through an explicitly approved safe test path; do not treat skipped jobs as success.
+3. Synthetic-only crash/restart, multiprocess race, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion testing.
+4. Review PR #179 external checkpoint trust model and decide independent signer/storage, cadence, max unanchored window and recovery authority.
+5. Reconcile copy-only migration candidates with historical inventory/expiry evidence. No existing user DB migration or automatic SELL authority.
+6. Keep Tokocrypto BTCIDR blocked until owner resolves host/symbol conflict.
+7. Continue preregistered multi-market profitability research with point-in-time data, realistic costs, untouched chronological holdouts, multiple-testing controls and independent reproduction.
+8. Keep MEME_INTEL separate pending independent readiness and explicit integration approval.
+
+Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
