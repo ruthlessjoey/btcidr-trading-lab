@@ -422,6 +422,68 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 expected_payload_sha256=expected_hash,
             )
 
+
+    def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_allocations SET allocated_quantity='0.2' "
+                "WHERE allocation_id='a-1'"
+            )
+            db.execute(
+                "UPDATE main.reservations SET consumed_quantity='0.2' "
+                "WHERE reservation_id='r-1'"
+            )
+            db.execute(
+                "UPDATE main.reservation_outbox SET allocated_quantity='0.2' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+            row = db.execute(
+                "SELECT idempotency_key,allocation_id,batch_id,fill_id,reservation_id,"
+                "account_id,market_id,reservation_version,allocated_quantity "
+                "FROM main.reservation_outbox WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()
+            payload = dict(zip((
+                "idempotency_key","allocation_id","batch_id","fill_id","reservation_id",
+                "account_id","market_id","reservation_version","allocated_quantity",
+            ), row))
+            _, digest, _ = _canonical_payload({"schema": 1, **payload})
+            db.execute(
+                "UPDATE main.reservation_outbox SET payload_sha256=? "
+                "WHERE idempotency_key='reservation-allocation:a-1'", (digest,)
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+                expected_payload_sha256=expected_hash,
+            )
+
+    def test_reservation_outbox_rejects_fill_after_reservation_expiry(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservations SET expires_at=15 WHERE reservation_id='r-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "outside its reservation version or expiry"):
+            self.store.pending_reservation_outbox()
+
     def test_reservation_outbox_rejects_rehashed_payload_divergence(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
