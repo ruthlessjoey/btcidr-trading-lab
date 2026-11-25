@@ -1,4 +1,7 @@
+import hashlib
+import os
 import sqlite3
+import tempfile
 import unittest
 
 from tmm_core import reservation_migration_preflight as preflight_module
@@ -400,6 +403,32 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
             "foreign_key_check could not be completed" in item
             for item in result.blockers
         ))
+
+
+    def test_read_only_file_preflight_preserves_source_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "source.sqlite3")
+            writable = sqlite3.connect(path)
+            writable.executescript(DDL)
+            writable.execute("INSERT INTO metadata VALUES('schema_version','1')")
+            writable.execute("INSERT INTO account VALUES(1,'paper','USDT','1000')")
+            writable.execute("INSERT INTO markets VALUES('BTC/USDT','BTC','USDT')")
+            writable.commit()
+            writable.close()
+            with open(path, "rb") as source:
+                before = hashlib.sha256(source.read()).digest()
+            readonly = sqlite3.connect("file:" + path + "?mode=ro", uri=True)
+            try:
+                readonly.execute("PRAGMA query_only=ON")
+                readonly.execute("BEGIN")
+                result = inspect_v1_migration_eligibility(readonly)
+                readonly.rollback()
+            finally:
+                readonly.close()
+            with open(path, "rb") as source:
+                after = hashlib.sha256(source.read()).digest()
+            self.assertTrue(result.eligible, result.blockers)
+            self.assertEqual(before, after)
 
     def test_preflight_does_not_modify_database(self):
         before = self.db.execute(
