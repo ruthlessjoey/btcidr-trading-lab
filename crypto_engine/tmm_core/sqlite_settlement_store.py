@@ -467,10 +467,13 @@ class SQLiteSettlementStore:
         if (isinstance(fill_timestamp,bool) or not isinstance(fill_timestamp,int)
                 or isinstance(created_at,bool) or not isinstance(created_at,int)
                 or isinstance(expires_at,bool) or not isinstance(expires_at,int)
+                or fill_timestamp < 0 or created_at < 0 or expires_at <= created_at
                 or fill_timestamp < created_at or fill_timestamp >= expires_at
                 or isinstance(current_version,bool) or not isinstance(current_version,int)
+                or current_version < 1
                 or isinstance(row.get("reservation_version"),bool)
                 or not isinstance(row.get("reservation_version"),int)
+                or row.get("reservation_version") < 1
                 or current_version <= row.get("reservation_version")):
             raise SettlementStoreError("reservation allocation is outside its reservation version or expiry")
         try:
