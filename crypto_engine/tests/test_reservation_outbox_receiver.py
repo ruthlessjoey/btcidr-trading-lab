@@ -139,6 +139,24 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 "COMPLETE",
             )
 
+    def test_temp_trigger_on_main_inbox_is_rejected_before_acceptance(self):
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        self.receiver_db.execute(
+            "CREATE TEMP TRIGGER temp_inbox_mutator "
+            "AFTER INSERT ON main.reservation_inbox "
+            "BEGIN UPDATE reservation_inbox SET receipt='tampered' "
+            "WHERE idempotency_key=NEW.idempotency_key; END"
+        )
+        with self.assertRaisesRegex(
+            ReservationInboxError, "TEMP reservation inbox triggers"
+        ):
+            accept_reservation_outbox(self.receiver_db, self.payload())
+        self.receiver_db.rollback()
+        self.assertEqual(
+            self.receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+            0,
+        )
+
     def test_ambiguous_receiver_response_retries_without_duplicate_effect(self):
         calls = {"count": 0}
         def ambiguous(payload):
@@ -162,6 +180,20 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             1,
         )
         self.assertEqual(self.store.pending_reservation_outbox(), [])
+
+    def test_existing_receipt_tampering_is_rejected_on_replay(self):
+        self.receive(self.payload())
+        with sqlite3.connect(self.store.path) as db:
+            db.execute(
+                "UPDATE reservation_inbox SET receipt='tampered' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        with self.assertRaisesRegex(
+            ReservationInboxError, "stored reservation inbox receipt mismatch"
+        ):
+            accept_reservation_outbox(self.receiver_db, self.payload())
+        self.receiver_db.rollback()
 
     def test_worker_rejects_receiver_receipt_not_bound_to_payload(self):
         def bad_receiver(payload):
