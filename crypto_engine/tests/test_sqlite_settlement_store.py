@@ -146,9 +146,10 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ensure_reservation_schema_v2(db)
         db.commit()
         db.close()
-        audit_before = sqlite3.connect(self.path).execute(
-            "SELECT COUNT(*) FROM audit"
-        ).fetchone()[0]
+        with _managed_connection(self.path) as audit_db:
+            audit_before = audit_db.execute(
+                "SELECT COUNT(*) FROM audit"
+            ).fetchone()[0]
         invalid = {"fill_id": "bad", "market_id": "BTC/USDT", "side": "SELL",
                    "quantity": "1", "price": "100", "fee_quote": "0"}
         with self.assertRaisesRegex(SettlementStoreError, "inventory"):
