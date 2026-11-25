@@ -723,7 +723,7 @@ class SQLiteSettlementStore:
     def _verify_reservation_outbox_rows(
         self, db: sqlite3.Connection, *, batch_id: str | None = None,
     ) -> None:
-        """Revalidate every pending and acknowledged outbox row against its allocation."""
+        """Revalidate every outbox row and its matching acknowledgement audit event."""
         sql = (
             "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
             "account_id,market_id,reservation_version,allocated_quantity,payload_sha256,"
@@ -738,6 +738,7 @@ class SQLiteSettlementStore:
             "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
             "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
         )
+        expected_ack_events: dict[str,dict[str,str]] = {}
         for values in db.execute(sql,params):
             row = dict(zip(fields,values[:10]))
             status,stored_receipt = values[10],values[11]
@@ -748,8 +749,37 @@ class SQLiteSettlementStore:
             elif status == "ACKNOWLEDGED":
                 if stored_receipt != expected_receipt:
                     raise SettlementStoreError("acknowledged reservation outbox receipt mismatch")
+                expected_ack_events[row["idempotency_key"]] = {
+                    "kind":"RESERVATION_OUTBOX_ACKNOWLEDGED",
+                    "account_id":row["account_id"],
+                    "batch_id":row["batch_id"],
+                    "allocation_id":row["allocation_id"],
+                    "idempotency_key":row["idempotency_key"],
+                    "payload_sha256":row["payload_sha256"],
+                    "receipt_sha256":hashlib.sha256(stored_receipt.encode("utf-8")).hexdigest(),
+                }
             else:
                 raise SettlementStoreError("reservation outbox status is invalid")
+
+        actual_ack_events: dict[str,dict[str,object]] = {}
+        for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
+            event = json.loads(event_json)
+            if not isinstance(event,dict) or event.get("kind") != "RESERVATION_OUTBOX_ACKNOWLEDGED":
+                continue
+            key = event.get("idempotency_key")
+            if not isinstance(key,str) or not key or key in actual_ack_events:
+                raise SettlementStoreError("reservation outbox acknowledgement audit identity is invalid")
+            actual_ack_events[key] = event
+        if set(actual_ack_events) != set(expected_ack_events):
+            raise SettlementStoreError("reservation outbox acknowledgement audit coverage mismatch")
+        expected_keys = {
+            "kind","account_id","batch_id","allocation_id","idempotency_key",
+            "payload_sha256","receipt_sha256",
+        }
+        for key,expected in expected_ack_events.items():
+            actual = actual_ack_events[key]
+            if set(actual) != expected_keys or actual != expected:
+                raise SettlementStoreError("reservation outbox acknowledgement audit mismatch")
 
     def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
