@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
+from tmm_core.reservation_outbox_receiver import _canonical_payload
 from tmm_core.reservation_lifecycle import authorize_reservation, create_reservation
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
 
@@ -58,6 +59,27 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def buy(self, *, fill_id="f-1", qty="1"):
         return {"fill_id": fill_id, "market_id": "BTC/USDT", "side": "BUY",
                 "quantity": qty, "price": "100", "fee_quote": "1"}
+
+    def reservation_ack_evidence(self, idempotency_key):
+        row = next(
+            item for item in self.store.pending_reservation_outbox(limit=1000)
+            if item["idempotency_key"] == idempotency_key
+        )
+        payload = {
+            "schema": 1,
+            "idempotency_key": row["idempotency_key"],
+            "allocation_id": row["allocation_id"],
+            "batch_id": row["batch_id"],
+            "fill_id": row["fill_id"],
+            "reservation_id": row["reservation_id"],
+            "account_id": row["account_id"],
+            "market_id": row["market_id"],
+            "reservation_version": row["reservation_version"],
+            "allocated_quantity": row["allocated_quantity"],
+        }
+        _, digest, receipt = _canonical_payload(payload)
+        self.assertEqual(digest, row["payload_sha256"])
+        return digest, receipt
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
         result = self.store.apply_batch(batch_id="b-1",
@@ -172,8 +194,12 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
                 "COMMITTED_PENDING_OUTBOX",
             )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
         self.store.acknowledge_reservation_outbox(
-            "reservation-allocation:a-1", receiver_receipt="reservation-receipt"
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
         )
         with sqlite3.connect(self.path) as db:
             self.assertEqual(
@@ -258,15 +284,21 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        self.store.acknowledge_reservation_outbox(
-            "reservation-allocation:a-1", receiver_receipt="receipt-1"
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
         )
-        with self.assertRaisesRegex(SettlementStoreError, "receipt mismatch"):
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
+        )
+        with self.assertRaisesRegex(SettlementStoreError, "does not match current payload"):
             self.store.acknowledge_reservation_outbox(
-                "reservation-allocation:a-1", receiver_receipt="receipt-2"
+                "reservation-allocation:a-1", receiver_receipt="0" * 64,
+                expected_payload_sha256=expected_hash,
             )
         self.store.acknowledge_reservation_outbox(
-            "reservation-allocation:a-1", receiver_receipt="receipt-1"
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
         )
         self.assertTrue(self.store.verify_audit_chain())
 
@@ -279,8 +311,12 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_allocations=[self.allocation()], timestamp=20,
         )
         self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
         self.store.acknowledge_reservation_outbox(
-            "reservation-allocation:a-1", receiver_receipt="reservation-receipt"
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
         )
         with sqlite3.connect(self.path) as db:
             self.assertEqual(
