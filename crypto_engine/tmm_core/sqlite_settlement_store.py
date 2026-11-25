@@ -100,8 +100,23 @@ class SQLiteSettlementStore:
             if row is not None and row != (base_asset, quote_asset):
                 db.rollback()
                 raise SettlementStoreError("market registration is immutable")
-            db.execute("INSERT OR IGNORE INTO markets VALUES(?,?,?)",
-                       (market_id, base_asset, quote_asset))
+            policy = db.execute(
+                "SELECT value FROM main.metadata WHERE key='market_registration_audit'"
+            ).fetchone()
+            if policy is not None and policy != ("required-v1",):
+                db.rollback()
+                raise SettlementStoreError("market registration audit policy marker is invalid")
+            if row is None:
+                db.execute("INSERT INTO main.markets VALUES(?,?,?)",
+                           (market_id, base_asset, quote_asset))
+                if policy == ("required-v1",):
+                    self._append_audit(db, {
+                        "kind": "MARKET_REGISTERED",
+                        "account_id": self.account_id,
+                        "market_id": market_id,
+                        "base_asset": base_asset,
+                        "quote_asset": quote_asset,
+                    })
             db.commit()
 
     def apply_batch(self, *, batch_id: str,
@@ -443,6 +458,40 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("initial account audit policy marker is invalid")
         if baseline_policy == ("required-v1",) and not initialization_events:
             raise SettlementStoreError("required initial account audit event is missing")
+
+        market_policy = db.execute(
+            "SELECT value FROM main.metadata WHERE key='market_registration_audit'"
+        ).fetchone()
+        if market_policy is not None and market_policy != ("required-v1",):
+            raise SettlementStoreError("market registration audit policy marker is invalid")
+        market_events: dict[str, tuple[str, str]] = {}
+        for (event_json,) in audit_rows:
+            event = json.loads(event_json)
+            if not isinstance(event, dict) or event.get("kind") != "MARKET_REGISTERED":
+                continue
+            expected_market_keys = {
+                "kind", "account_id", "market_id", "base_asset", "quote_asset"
+            }
+            market_id = event.get("market_id")
+            base_asset = event.get("base_asset")
+            quote_asset = event.get("quote_asset")
+            if (set(event) != expected_market_keys
+                    or event.get("account_id") != self.account_id
+                    or not isinstance(market_id, str) or not market_id.strip()
+                    or not isinstance(base_asset, str) or not base_asset.strip()
+                    or not isinstance(quote_asset, str) or quote_asset != self.currency
+                    or market_id in market_events):
+                raise SettlementStoreError("market registration audit event is invalid")
+            market_events[market_id] = (base_asset, quote_asset)
+        if market_policy == ("required-v1",) or market_events:
+            actual_markets = {
+                market_id: (base_asset, quote_asset)
+                for market_id, base_asset, quote_asset in db.execute(
+                    "SELECT market_id,base_asset,quote_asset FROM main.markets"
+                )
+            }
+            if actual_markets != market_events:
+                raise SettlementStoreError("market registry does not match audit events")
 
         initial_cash: Decimal | None = None
         if initialization_events:
@@ -1350,6 +1399,9 @@ class SQLiteSettlementStore:
             db.execute("INSERT INTO metadata VALUES('schema_version',?)", (str(self.SCHEMA_VERSION),))
             db.execute(
                 "INSERT INTO metadata VALUES('account_initialization_audit','required-v1')"
+            )
+            db.execute(
+                "INSERT INTO metadata VALUES('market_registration_audit','required-v1')"
             )
             db.execute("INSERT INTO account VALUES(1,?,?,?)",
                        (self.account_id, self.currency, opening_cash))
