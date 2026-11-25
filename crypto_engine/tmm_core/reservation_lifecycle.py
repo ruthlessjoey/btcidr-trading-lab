@@ -15,6 +15,9 @@ from .sqlite_settlement_store import _event_hash
 from .reservation_schema_v2 import ensure_reservation_schema_v2
 
 
+_MAX_SQLITE_INTEGER = 2**63 - 1
+
+
 class ReservationLifecycleError(RuntimeError):
     """Invalid reservation lifecycle transition or stale state."""
 
@@ -34,14 +37,20 @@ def _text(value: object, field: str, limit: int = 128) -> str:
 
 
 def _integer(value: object, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ReservationLifecycleError(f"{field} must be a nonnegative integer")
+    if (isinstance(value, bool) or not isinstance(value, int)
+            or value < 0 or value > _MAX_SQLITE_INTEGER):
+        raise ReservationLifecycleError(
+            f"{field} must be a nonnegative SQLite integer"
+        )
     return value
 
 
 def _version(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise ReservationLifecycleError("expected_version must be a positive integer")
+    if (isinstance(value, bool) or not isinstance(value, int)
+            or value < 1 or value >= _MAX_SQLITE_INTEGER):
+        raise ReservationLifecycleError(
+            "expected_version must be a positive SQLite integer below the maximum"
+        )
     return value
 
 
