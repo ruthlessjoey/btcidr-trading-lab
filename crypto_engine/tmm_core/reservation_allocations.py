@@ -256,8 +256,8 @@ def consume_sell_allocations(
         reservation_id = _required_text(raw, "reservation_id")
         if len(allocation_id) > 256 or len(fill_id) > 256 or len(reservation_id) > 256:
             raise ReservationAllocationError("allocation identifiers exceed the 256-character limit")
-        if len(str(raw.get("allocated_quantity"))) > 128:
-            raise ReservationAllocationError("allocated_quantity text exceeds the 128-character limit")
+        if len(str(raw.get("allocated_quantity"))) > _QUANTITY_TEXT_LIMIT:
+            raise ReservationAllocationError("allocated_quantity text exceeds the supported limit")
         reservation_ids.add(reservation_id)
     if len(reservation_ids) > 1000:
         raise ReservationAllocationError("reservation count exceeds the 1000-row limit")
