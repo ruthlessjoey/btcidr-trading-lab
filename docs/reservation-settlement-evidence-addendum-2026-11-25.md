@@ -189,3 +189,17 @@ Fresh exact-head status/workflow lookups for #149 and #150 returned empty arrays
 5. Add deterministic crash/power-loss, multiprocess race, receiver restart, backup/restore, malformed DB, resource-exhaustion and partial-write tests.
 6. Keep any remote receiver, network transport, broker integration, strategy authority, PAPER activation and LIVE functionality disabled until their own security design, tests, approval and evidence gates pass.
 7. Continue preregistered, cost-adjusted multi-market profitability research. The 181/181 result belongs only to the separate research prototype; no BTC/IDR OOS profitability or high-win-rate evidence exists yet.
+
+
+## Independent research prototype revalidation — 25 November 2026
+
+The separately uploaded `TwinMoneyMaker_ExternalResearch_2026-11-23_REVALIDATED.zip` was freshly extracted to a disposable temporary directory and verified in this session.
+
+- Archive SHA-256 manifest: all listed files verified.
+- Environment: Python 3.13.5; the SQLite runtime used by the current environment is 3.46.1.
+- Command: `PYTHONNOUSERSITE=1 sh install.sh` from the archive's `prototype/` directory.
+- Result: **181/181 unit tests passed**.
+- Additional installer checks passed: `pip check`, the static boundary check across 18 modules, and `compileall`.
+- No third-party dependency was installed and no network/provider call, account access, exchange action or order was performed.
+
+This independently revalidates only the separate standard-library prototype and its synthetic fixtures. It does not test any upstream trading platform, the GitHub repository's PR #139–#150 code, live market data, a strategy on BTC/IDR, or trading profitability. The prototype is not approved for exchange connection or installation into the main repository.
