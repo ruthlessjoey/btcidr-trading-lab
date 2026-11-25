@@ -469,7 +469,10 @@ class SQLiteSettlementStore:
             if isinstance(kind,str) and kind.startswith("RESERVATION_") and isinstance(reservation_id,str):
                 history.setdefault(reservation_id,[]).append(event)
             if kind == "RESERVATION_QUANTITY_CONSUMED":
-                key = (reservation_id,event.get("batch_id"))
+                batch_id = event.get("batch_id")
+                if not isinstance(reservation_id,str) or not isinstance(batch_id,str):
+                    raise SettlementStoreError("reservation consumption audit identity is invalid")
+                key = (reservation_id,batch_id)
                 if key in consumption_events:
                     raise SettlementStoreError("duplicate reservation consumption audit event")
                 consumption_events[key] = event
