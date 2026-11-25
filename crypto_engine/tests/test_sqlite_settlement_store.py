@@ -128,16 +128,29 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(self.store.snapshot()["cash"], "10000")
 
     def test_failed_batch_rolls_back_claim_and_every_accounting_table(self):
+        self.enable_reservations(quantity="1")
+        with sqlite3.connect(self.path) as db:
+            audit_before = db.execute("SELECT COUNT(*) FROM audit").fetchone()[0]
         invalid = {"fill_id": "bad", "market_id": "BTC/USDT", "side": "SELL",
                    "quantity": "1", "price": "100", "fee_quote": "0"}
         with self.assertRaisesRegex(SettlementStoreError, "inventory"):
-            self.store.apply_batch(batch_id="b-4",
-                                   fills=[invalid], timestamp=10)
+            self.store.apply_batch(
+                batch_id="b-4",
+                fills=[invalid],
+                sell_settlements=[self.sell_settlement(
+                    key="settle:inventory", authorized="1", filled="1"
+                )],
+                sell_allocations=[self.allocation(
+                    allocation_id="a-inventory", fill_id="bad",
+                    version=2, quantity="1"
+                )],
+                timestamp=10,
+            )
         self.assertEqual(self.store.snapshot()["cash"], "10000")
         with sqlite3.connect(self.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], audit_before)
 
     def test_outbox_requires_ack_before_batch_complete(self):
         result = self.store.apply_batch(
@@ -258,22 +271,52 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement(key="settle:first")],
             sell_allocations=[self.allocation()], timestamp=20,
         )
+
+        # Use a distinct current reservation version so validation reaches the
+        # global duplicate allocation_id constraint rather than failing stale CAS.
+        db = sqlite3.connect(self.path)
+        try:
+            db.execute("PRAGMA foreign_keys=ON")
+            db.execute("BEGIN IMMEDIATE")
+            create_reservation(
+                db, reservation_id="r-2", account_id="paper-research",
+                market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+                authorized_quantity="0.25", created_at=0, expires_at=1000,
+            )
+            authorize_reservation(
+                db, reservation_id="r-2", account_id="paper-research",
+                expected_version=1, now=1,
+            )
+            db.commit()
+        finally:
+            db.close()
+
         with self.assertRaises(sqlite3.IntegrityError):
             self.store.apply_batch(
                 batch_id="b-reserved-second", fills=[self.sell(fill_id="sell-2")],
                 sell_settlements=[self.sell_settlement(key="settle:second")],
-                sell_allocations=[self.allocation(fill_id="sell-2")], timestamp=21,
+                sell_allocations=[self.allocation(
+                    fill_id="sell-2", reservation_id="r-2", version=2
+                )], timestamp=21,
             )
         with sqlite3.connect(self.path) as db:
-            self.assertEqual(
-                db.execute("SELECT consumed_quantity,version FROM reservations").fetchone(),
-                ("0.25", 3),
-            )
+            rows = {
+                reservation_id: (consumed, version, status)
+                for reservation_id, consumed, version, status in db.execute(
+                    "SELECT reservation_id,consumed_quantity,version,status "
+                    "FROM reservations ORDER BY reservation_id"
+                )
+            }
+            self.assertEqual(rows["r-1"], ("0.25", 3, "ACTIVE"))
+            self.assertEqual(rows["r-2"], ("0", 2, "ACTIVE"))
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM batches WHERE batch_id='b-reserved-second'"
             ).fetchone())
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM fills WHERE fill_id='sell-2'"
+            ).fetchone())
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM reservation_allocations WHERE batch_id='b-reserved-second'"
             ).fetchone())
 
     def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
