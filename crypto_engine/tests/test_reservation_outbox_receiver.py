@@ -125,6 +125,14 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             0,
         )
 
+    def test_pending_reservation_outbox_includes_account_id_for_canonical_payload(self):
+        rows = self.store.pending_reservation_outbox()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["account_id"], "paper-research")
+        self.assertEqual(rows[0]["market_id"], "BTC/USDT")
+        self.assertEqual(rows[0]["reservation_version"], 2)
+        self.assertEqual(rows[0]["payload_sha256"], rows[0]["payload_sha256"])
+
     def test_delivery_worker_acknowledges_and_batch_waits_for_both_outboxes(self):
         delivered = deliver_pending_reservation_outbox(self.store, self.receive)
         self.assertEqual(delivered, ["reservation-allocation:a-1"])
