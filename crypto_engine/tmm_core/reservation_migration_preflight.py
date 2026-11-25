@@ -141,7 +141,19 @@ def _matches_schema(db, tables, expected_tables, expected_sql, expected_columns)
         'SELECT type,name FROM main.sqlite_master WHERE type IN (\'index\',\'trigger\',\'view\') '
         'AND name NOT LIKE \'sqlite_autoindex_%\' ORDER BY type,name'
     ).fetchall()
-    return not unexpected
+    if unexpected:
+        return False
+    target_names = (
+        'metadata','account','markets','holdings','batches','fills','audit','outbox',
+        'reservations','reservation_allocations','reservation_outbox',
+    )
+    placeholders = ','.join('?' for _ in target_names)
+    temp_objects = db.execute(
+        'SELECT type,name,tbl_name FROM temp.sqlite_master '
+        f'WHERE lower(name) IN ({placeholders}) OR lower(tbl_name) IN ({placeholders})',
+        target_names + target_names,
+    ).fetchall()
+    return not temp_objects
 
 def classify_reservation_schema(db: sqlite3.Connection) -> str:
     '''Classify a consistent snapshot without creating or changing schema objects.'''
