@@ -1,6 +1,19 @@
 name: Reservation Settlement Isolated Tests
 
 on:
+  push:
+    branches:
+      - security/block-legacy-unreserved-sells-2026-11-25
+    paths:
+      - ".github/workflows/reservation-settlement-isolated-tests.yml"
+      - "crypto_engine/tmm_core/__init__.py"
+      - "crypto_engine/tmm_core/sqlite_settlement_store.py"
+      - "crypto_engine/tmm_core/reservation_schema_v2.py"
+      - "crypto_engine/tmm_core/reservation_lifecycle.py"
+      - "crypto_engine/tmm_core/reservation_allocations.py"
+      - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_sqlite_settlement_store.py"
+      - "crypto_engine/tests/test_reservation_outbox_receiver.py"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
