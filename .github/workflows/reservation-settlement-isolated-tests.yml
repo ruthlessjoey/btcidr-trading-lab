@@ -1,5 +1,7 @@
 name: Reservation Settlement Isolated Tests
 
+# Verify the pre-marker legacy read-only gate across all safe reservation suites.
+
 on:
   push:
     branches:
