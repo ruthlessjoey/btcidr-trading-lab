@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - security/block-legacy-unreserved-sells-2026-11-25
+      - fix/reservation-schema-fk-fixture-2026-11-25
     paths:
       - ".github/workflows/reservation-settlement-isolated-tests.yml"
       - "crypto_engine/tmm_core/__init__.py"
