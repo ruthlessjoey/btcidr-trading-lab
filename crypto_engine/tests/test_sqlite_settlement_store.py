@@ -829,7 +829,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             )
             db.execute(
                 "INSERT INTO main.markets(market_id,base_asset,quote_asset) "
-                "VALUES('BTC/USDT','BTC','USDT')"
+                "VALUES('ETH/USDT','ETH','USDT')"
             )
         with self.assertRaisesRegex(
             SettlementStoreError, "required market registration audit policy marker is missing"
