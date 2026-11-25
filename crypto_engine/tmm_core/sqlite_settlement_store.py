@@ -426,6 +426,23 @@ class SQLiteSettlementStore:
             "SELECT fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp "
             "FROM main.fills ORDER BY fill_id"
         ).fetchall()
+        batch_times = dict(db.execute(
+            "SELECT batch_id,created_at FROM main.batches"
+        ))
+        registered_markets = {
+            row[0] for row in db.execute("SELECT market_id FROM main.markets")
+        }
+        for fill_id,batch_id,market_id,side,quantity_text,price_text,fee_text,timestamp in fill_rows:
+            quantity = _decimal(quantity_text,"fill quantity")
+            price = _decimal(price_text,"fill price")
+            fee = _decimal(fee_text,"fill fee")
+            if (not isinstance(fill_id,str) or not fill_id
+                    or batch_times.get(batch_id) != timestamp
+                    or market_id not in registered_markets
+                    or side not in ("BUY","SELL")
+                    or isinstance(timestamp,bool) or not isinstance(timestamp,int) or timestamp < 0
+                    or quantity <= 0 or price <= 0 or fee < 0):
+                raise SettlementStoreError("fill row does not match its batch/market contract")
         expected_fills = {
             row[0]: {
                 "fill_id":row[0],"batch_id":row[1],"market_id":row[2],"side":row[3],
