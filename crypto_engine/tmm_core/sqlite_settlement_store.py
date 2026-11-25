@@ -464,6 +464,13 @@ class SQLiteSettlementStore:
         ).fetchone()
         if market_policy is not None and market_policy != ("required-v1",):
             raise SettlementStoreError("market registration audit policy marker is invalid")
+        initialization_policy = None
+        if initialization_events:
+            initialization_policy = initialization_events[0].get("market_registration_audit")
+        if initialization_policy is not None and initialization_policy != "required-v1":
+            raise SettlementStoreError("initial market registration audit policy is invalid")
+        if initialization_policy == "required-v1" and market_policy != ("required-v1",):
+            raise SettlementStoreError("required market registration audit policy marker is missing")
         market_events: dict[str, tuple[str, str]] = {}
         for (event_json,) in audit_rows:
             event = json.loads(event_json)
@@ -497,12 +504,14 @@ class SQLiteSettlementStore:
         if initialization_events:
             first_event = json.loads(audit_rows[0][0]) if audit_rows else None
             event = initialization_events[0]
-            expected_initial_keys = {"kind","account_id","currency","opening_cash"}
+            legacy_initial_keys = {"kind","account_id","currency","opening_cash"}
+            expected_initial_keys = legacy_initial_keys | {"market_registration_audit"}
+            valid_initial_keys = {frozenset(legacy_initial_keys), frozenset(expected_initial_keys)}
             account_row = db.execute(
                 "SELECT account_id,currency,cash FROM main.account WHERE singleton=1"
             ).fetchone()
             if (len(initialization_events) != 1 or first_event != event
-                    or set(event) != expected_initial_keys
+                    or frozenset(event) not in valid_initial_keys
                     or event.get("account_id") != self.account_id
                     or event.get("currency") != self.currency
                     or account_row is None
@@ -1410,6 +1419,7 @@ class SQLiteSettlementStore:
                 "account_id":self.account_id,
                 "currency":self.currency,
                 "opening_cash":opening_cash,
+                "market_registration_audit":"required-v1",
             })
         elif version[0] != str(self.SCHEMA_VERSION):
             raise SettlementStoreError("unsupported schema version; explicit migration required")
