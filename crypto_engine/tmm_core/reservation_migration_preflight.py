@@ -10,7 +10,7 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, DecimalException, InvalidOperation
 from typing import Tuple
 
 from .reservation_schema_v2 import _SCHEMA as _CURRENT_V2_SCHEMA
@@ -179,6 +179,20 @@ def classify_reservation_schema(db: sqlite3.Connection) -> str:
 
 
 
+def _bounded_decimal(value: object) -> Decimal:
+    """Parse a bounded finite decimal; pathological exponents fail closed."""
+    text = str(value)
+    if len(text) > 128:
+        raise InvalidOperation("decimal text exceeds preflight bound")
+    number = Decimal(text)
+    parts = number.as_tuple()
+    if (not number.is_finite() or len(parts.digits) > 38
+            or parts.exponent < -38 or number.adjusted() > 38
+            or number.adjusted() < -38):
+        raise InvalidOperation("decimal magnitude or precision exceeds preflight bound")
+    return number
+
+
 def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
     """Reconcile BUY-only v1 fills, audit events, holdings and ending cash."""
     account = db.execute(
@@ -188,7 +202,7 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
         return False
     account_id, cash_text = account
     try:
-        ending_cash = Decimal(str(cash_text))
+        ending_cash = _bounded_decimal(cash_text)
         if not account_id or not ending_cash.is_finite() or ending_cash < 0:
             return False
         markets = {row[0] for row in db.execute("SELECT market_id FROM main.markets")}
@@ -206,7 +220,7 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
             if (not fill_id or market_id not in markets or side != "BUY"
                     or isinstance(timestamp,bool) or not isinstance(timestamp,int) or timestamp < 0):
                 return False
-            quantity,price,fee = Decimal(str(quantity_text)),Decimal(str(price_text)),Decimal(str(fee_text))
+            quantity,price,fee = _bounded_decimal(quantity_text),_bounded_decimal(price_text),_bounded_decimal(fee_text)
             if (not quantity.is_finite() or not price.is_finite() or not fee.is_finite()
                     or quantity <= 0 or price <= 0 or fee < 0):
                 return False
@@ -224,8 +238,8 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
                     or event["fee_quote"] != fee_text or event["timestamp"] != timestamp):
                 return False
             totals[market_id] = totals.get(market_id,Decimal("0")) + quantity
-            event_holding = Decimal(str(event["holding_after"]))
-            event_cash = Decimal(str(event["cash_after"]))
+            event_holding = _bounded_decimal(event["holding_after"])
+            event_cash = _bounded_decimal(event["cash_after"])
             if (not event_holding.is_finite() or not event_cash.is_finite()
                     or event_cash < 0 or event_holding != totals[market_id]):
                 return False
@@ -241,7 +255,7 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
         for market_id, quantity_text in db.execute(
             "SELECT market_id,quantity FROM main.holdings"
         ):
-            quantity = Decimal(str(quantity_text))
+            quantity = _bounded_decimal(quantity_text)
             if not quantity.is_finite() or quantity < 0:
                 return False
             holdings[market_id] = quantity
@@ -249,7 +263,7 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
             if totals.get(market_id,Decimal("0")) != holdings.get(market_id,Decimal("0")):
                 return False
         return expected_cash is None or expected_cash == ending_cash
-    except (InvalidOperation, TypeError, ValueError, OverflowError, json.JSONDecodeError, RecursionError):
+    except (DecimalException, InvalidOperation, TypeError, ValueError, OverflowError, json.JSONDecodeError, RecursionError):
         return False
 
 
