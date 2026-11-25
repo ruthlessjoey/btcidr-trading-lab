@@ -26,7 +26,7 @@ If protected content appears in output accidentally, stop. Do not quote, summari
 
 - Spot crypto only; long-only. No shorting, leverage, margin, or derivatives.
 - No exchange credentials, secrets, private/authenticated endpoints, account login, balance synchronization, wallet access, order placement, cancellation, or withdrawals.
-- Tokocrypto is a user funding/custody venue, not a bot account. The only currently approved public market-data request is unauthenticated HTTPS GET candles from the exact endpoint `https://cloudme-toko.2meta.app/api/v1/klines`, for BTCIDR only. Do not use `www.tokocrypto.site`, `www.tokocrypto.com`, symbol metadata, other paths, other symbols, WebSockets, or other providers unless separately approved.
+- Tokocrypto is a user funding/custody venue, not a bot account. The only currently approved public market-data request is unauthenticated HTTPS GET BTCIDR candles from the exact endpoint `https://www.tokocrypto.site/api/v3/klines`. Do not use `cloudme-toko.2meta.app`, `www.tokocrypto.com`, server-time or symbol-metadata endpoints, other paths, other symbols, WebSockets, or other providers unless separately approved. No request is permitted merely because the endpoint appears in code or documentation.
 - The root legacy `config.json` and `run.py` have not been migrated to the currently approved endpoint. Do not execute the legacy root runner or workflows that invoke it until that migration is separately reviewed and verified.
 - `crypto_engine/` is an isolated offline research package. Its provider-policy code validates requests and payloads but does not perform network I/O.
 - `PAPER` is permitted only after its safeguards are separately approved. `LIVE` remains unavailable and must not be enabled.

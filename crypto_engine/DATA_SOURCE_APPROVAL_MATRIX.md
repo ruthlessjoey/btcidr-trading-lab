@@ -8,9 +8,9 @@
 
 The only currently approved market-data request remains unauthenticated HTTPS GET BTCIDR candles from:
 
-`https://cloudme-toko.2meta.app/api/v1/klines`
+`https://www.tokocrypto.site/api/v3/klines`
 
-No other provider, symbol, network, path, API, WebSocket, archive download or dataset is authorized for retrieval. This document does not expand that permission.
+No other provider, symbol, network, path, API, WebSocket, archive download or dataset is authorized for retrieval. In particular, `cloudme-toko.2meta.app/api/v1/klines`, Tokocrypto `.com`, server-time, and symbol-metadata endpoints are not approved. This document does not expand that permission.
 
 The approved BTCIDR feed was previously observed to end on 29 November 2025. It is stale for current signals and recent out-of-sample validation. Do not forward-fill or extrapolate it.
 

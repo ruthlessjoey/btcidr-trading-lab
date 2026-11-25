@@ -173,6 +173,9 @@ def build(name):
                             "https://data-api.binance.vision",
                             "https://developers.binance.com/docs/binance-spot-api-docs/faqs/market_data_only")
     if name == "tokocrypto":
-        return BinanceStyle("tokocrypto", "BTC/USDT", "USDT", "BTC_USDT",
-                            "https://www.tokocrypto.site", "https://www.tokocrypto.com/apidocs/")
+        raise ValueError(
+            "legacy Tokocrypto adapter is disabled: it requests server-time and "
+            "uses the BTCUSDT symbol; only the separately approved unauthenticated "
+            "BTCIDR candles endpoint may be used"
+        )
     raise ValueError(f"unknown provider {name!r}")

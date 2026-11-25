@@ -1,0 +1,59 @@
+name: Tokocrypto Legacy Adapter Guard
+
+on:
+  push:
+    branches:
+      - security/align-tokocrypto-approved-endpoint-pr150-2026-11-25
+    paths:
+      - ".github/workflows/tokocrypto-legacy-adapter-guard.yml"
+      - "fetcher.py"
+      - "providers.py"
+      - "tests/test_tokocrypto_adapter_blocked.py"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/tokocrypto-legacy-adapter-guard.yml"
+      - "fetcher.py"
+      - "providers.py"
+      - "tests/test_tokocrypto_adapter_blocked.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tokocrypto-legacy-adapter-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-guard:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - name: Sparse checkout exact legacy adapter guard scope
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /fetcher.py
+            /providers.py
+            /tests/test_tokocrypto_adapter_blocked.py
+
+      - name: Set up supported Python version
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "${{ matrix.python-version }}"
+          check-latest: false
+
+      - name: Run the isolated Tokocrypto adapter guard
+        run: python -m unittest discover -s tests -p 'test_tokocrypto_adapter_blocked.py' -v
