@@ -182,6 +182,48 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(replay["status"], "COMPLETE")
         self.assertTrue(self.store.verify_audit_chain())
 
+    def test_reopen_accepts_exact_current_reservation_v2_schema(self):
+        self.store.apply_batch(batch_id="b-reopen-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations(quantity="0.5")
+        before = self.store.snapshot()
+
+        reopened = SQLiteSettlementStore(
+            self.path, account_id="paper-research",
+            currency="USDT", opening_cash="10000",
+        )
+        self.assertEqual(reopened.snapshot(), before)
+        self.assertTrue(reopened.verify_audit_chain())
+        with sqlite3.connect(self.path) as db:
+            tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM main.sqlite_master WHERE type='table'"
+                )
+            }
+        self.assertTrue({
+            "reservations", "reservation_allocations", "reservation_outbox"
+        }.issubset(tables))
+
+    def test_reopen_rejects_partial_reservation_v2_without_recreating_table(self):
+        self.enable_reservations()
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TABLE reservation_outbox")
+
+        with self.assertRaisesRegex(SettlementStoreError, "partial reservation schema"):
+            SQLiteSettlementStore(
+                self.path, account_id="paper-research",
+                currency="USDT", opening_cash="10000",
+            )
+
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM main.sqlite_master "
+                "WHERE type='table' AND name='reservation_outbox'"
+            ).fetchone())
+            self.assertIsNotNone(db.execute(
+                "SELECT 1 FROM main.sqlite_master "
+                "WHERE type='table' AND name='reservations'"
+            ).fetchone())
+
     def test_reserved_sell_consumption_is_atomic_and_replay_safe(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
