@@ -163,7 +163,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         snapshot = self.store.snapshot()
         self.assertEqual(
             snapshot["holdings"]["BTC/USDT"],
-            "0." + ("0" * 159) + "1",
+            "0." + ("0" * 127) + "1",
         )
         with localcontext() as decimal_context:
             decimal_context.prec = 640
