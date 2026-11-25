@@ -132,6 +132,7 @@ class SQLiteSettlementStore:
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             self._verify_account_state(db)
+            self._require_current_audit_baseline(db)
             row = db.execute("SELECT base_asset,quote_asset FROM markets WHERE market_id=?",
                              (market_id,)).fetchone()
             if row is not None and row != (base_asset, quote_asset):
@@ -362,6 +363,7 @@ class SQLiteSettlementStore:
                 self._verify_reservation_audit_coverage(db)
             else:
                 self._verify_fill_account_state(db)
+            self._require_current_audit_baseline(db)
 
             db.execute(
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
@@ -476,6 +478,7 @@ class SQLiteSettlementStore:
             db.execute("BEGIN")
             try:
                 self._verify_account_state(db)
+                self._require_current_audit_baseline(db)
                 rows = db.execute(
                     "SELECT idempotency_key,batch_id,market_id,authorized_quantity,filled_quantity "
                     "FROM main.outbox WHERE status='PENDING' ORDER BY idempotency_key LIMIT ?", (limit,)
@@ -1138,6 +1141,7 @@ class SQLiteSettlementStore:
         with self._connect() as db:
             db.execute("BEGIN")
             self._verify_account_state(db)
+            self._require_current_audit_baseline(db)
             objects = db.execute(
                 "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
                 "('reservations','reservation_allocations','reservation_outbox')"
@@ -1220,6 +1224,7 @@ class SQLiteSettlementStore:
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             self._verify_account_state(db)
+            self._require_current_audit_baseline(db)
             objects = db.execute(
                 "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
                 "('reservations','reservation_allocations','reservation_outbox')"
@@ -1304,6 +1309,7 @@ class SQLiteSettlementStore:
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             self._verify_account_state(db)
+            self._require_current_audit_baseline(db)
             row = db.execute("SELECT batch_id,status,receiver_receipt FROM main.outbox WHERE idempotency_key=?",
                              (idempotency_key,)).fetchone()
             if row is None:
@@ -1326,6 +1332,21 @@ class SQLiteSettlementStore:
             })
             self._complete_batch_if_outboxes_acknowledged(db, batch_id)
             db.commit()
+
+    def _require_current_audit_baseline(self, db: sqlite3.Connection) -> None:
+        """Keep pre-marker legacy databases inspectable but read-only until approved bootstrap."""
+        markers = dict(db.execute(
+            "SELECT key,value FROM main.metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        ))
+        required = {
+            "account_initialization_audit": "required-v1",
+            "market_registration_audit": "required-v1",
+        }
+        if markers != required:
+            raise SettlementStoreError(
+                "legacy database is read-only until an explicit audit baseline bootstrap"
+            )
 
     def _verify_account_state(self, db: sqlite3.Connection) -> None:
         """Verify fill accounting and, when enabled, the complete reservation ledger."""

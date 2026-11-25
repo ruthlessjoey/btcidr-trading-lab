@@ -394,6 +394,62 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(replay["status"], "COMPLETE")
         self.assertTrue(self.store.verify_audit_chain())
 
+    def test_pre_marker_legacy_database_is_read_only_until_explicit_bootstrap(self):
+        with _managed_connection(self.path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "DELETE FROM main.metadata WHERE key IN "
+                "('account_initialization_audit','market_registration_audit')"
+            )
+            db.execute("DELETE FROM main.audit")
+            db.commit()
+
+        # Historical state remains inspectable, but every write/delivery entry
+        # point fails closed until an approved baseline bootstrap exists.
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.register_market("ETH/USDT", "ETH", "USDT")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.apply_batch(
+                batch_id="legacy-write-blocked",
+                fills=[self.buy()],
+                timestamp=10,
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.pending_outbox()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.acknowledge_outbox(
+                "missing-legacy-outbox", receiver_receipt="receipt"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            self.store.acknowledge_reservation_outbox(
+                "missing-legacy-reservation-outbox",
+                receiver_receipt="receipt",
+                expected_payload_sha256="0" * 64,
+            )
+
+        with _managed_connection(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM main.batches WHERE batch_id='legacy-write-blocked'"
+            ).fetchone())
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM main.markets WHERE market_id='ETH/USDT'"
+            ).fetchone())
+
     def test_legacy_database_rejects_sell_until_reservation_schema_v2_is_enabled(self):
         self.store.apply_batch(batch_id="b-legacy-buy", fills=[self.buy()], timestamp=10)
         before = self.store.snapshot()
