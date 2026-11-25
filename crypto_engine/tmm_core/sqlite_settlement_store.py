@@ -119,8 +119,9 @@ class SQLiteSettlementStore:
         """
         if not isinstance(batch_id, str) or not batch_id.strip() or len(batch_id) > 256:
             raise SettlementStoreError("batch_id is required")
-        if isinstance(timestamp, bool) or not isinstance(timestamp, int) or timestamp < 0:
-            raise SettlementStoreError("timestamp must be a nonnegative integer")
+        if (isinstance(timestamp, bool) or not isinstance(timestamp, int)
+                or timestamp < 0 or timestamp > 2**63 - 1):
+            raise SettlementStoreError("timestamp must be a nonnegative SQLite integer")
         if not isinstance(fills, Sequence) or isinstance(fills, (str, bytes)):
             raise SettlementStoreError("fills must be a sequence")
         if not isinstance(sell_settlements, Sequence) or isinstance(sell_settlements, (str, bytes)):
