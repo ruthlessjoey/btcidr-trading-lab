@@ -6,9 +6,11 @@
 
 ## Current authorization boundary
 
-The only currently approved market-data request remains unauthenticated HTTPS GET BTCIDR candles from:
+The only currently approved request *shape* is unauthenticated HTTPS GET to:
 
 `https://www.tokocrypto.site/api/v3/klines`
+
+**BTCIDR availability on this MBX host is UNVERIFIED / BLOCKED.** The official documentation examples associate MBX `.site/api/v3` with BTCUSDT/non-IDR, while the BTCIDR example belongs to the prohibited NextMe/2meta host. The request-shape validator is not market-availability evidence; ingestion and provenance generation must remain blocked. Do not silently change symbol or host.
 
 No other provider, symbol, network, path, API, WebSocket, archive download or dataset is authorized for retrieval. In particular, `cloudme-toko.2meta.app/api/v1/klines`, Tokocrypto `.com`, server-time, and symbol-metadata endpoints are not approved. This document does not expand that permission.
 
@@ -32,7 +34,7 @@ The approved BTCIDR feed was previously observed to end on 29 November 2025. It 
 
 ## Recommended path
 
-1. **Do not add another provider to runtime yet.** Keep the existing NextMe BTCIDR request-policy validator offline-only.
+1. **Do not add another provider to runtime yet.** Keep the `.site` request-shape validator offline-only and block BTCIDR ingestion until host/symbol compatibility is independently verified and explicitly approved.
 2. **For CEX historical research:** ask Kraken to confirm automated personal research/backtesting rights for its public OHLCVT archive. If not granted, ask CryptoDataDownload whether its paid personal commercial license expressly covers private AI training, model validation and retention.
 3. **For meme-coin history:** the pumpdata.fun sample is a technically rich one-day fixture, not a backtest corpus. Full history requires a separate license and payment, neither authorized. Ask the provider whether a no-payment research sample or academic tranche is available.
 4. **For DEX discovery:** DEX Screener may be useful for candidate-pair discovery only, subject to its API terms. Do not treat boosts, promotions or displayed volume as proof of organic demand.

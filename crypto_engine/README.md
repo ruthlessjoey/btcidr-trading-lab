@@ -8,8 +8,8 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 
 - Spot-only and long-only accounting; no shorts, leverage, margin or derivatives.
 - Research/synthetic mode only. The package contains no network client or exchange connector.
-- The only represented data source is an offline policy validator for the exact owner-approved public candle URL `https://www.tokocrypto.site/api/v3/klines`, BTCIDR only. It does not perform HTTP requests.
-- The validator rejects all request headers and permits only unauthenticated GET to the exact approved host/path with BTCIDR candles.
+- The only represented source policy is an offline request-shape validator for `https://www.tokocrypto.site/api/v3/klines`. **BTCIDR on this MBX host is UNVERIFIED / BLOCKED**: Tokocrypto documentation places the BTCIDR example on the prohibited NextMe/2meta host. Passing request-shape checks does not prove the market exists on the approved host. No HTTP request is performed.
+- The request-shape validator rejects request headers and checks unauthenticated GET syntax, but the provider-compatibility gate blocks BTCIDR ingestion/provenance until the owner-approved host-to-market mapping is independently verified. Do not switch to BTCUSDT or NextMe automatically.
 - No credentials, account access, wallet access, order placement, cancellation, deposits or withdrawals.
 - LIVE trading is not implemented and remains disabled.
 - MEME_INTEL is not imported or integrated; that project requires independent readiness and separate approval.

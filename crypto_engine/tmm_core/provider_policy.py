@@ -1,7 +1,7 @@
 """Strict allowlist and provenance helpers for approved public candle requests.
 
-This module validates a proposed request; it never sends it. It permits only
-unauthenticated GET to the exact owner-approved Tokocrypto BTCIDR kline endpoint.
+This module validates request shape offline. The BTCIDR-to-MBX host mapping is
+unverified and the approved-request gate therefore fails closed.
 """
 from __future__ import annotations
 
@@ -14,6 +14,13 @@ from urllib.parse import parse_qsl, urlsplit
 APPROVED_HOST = "www.tokocrypto.site"
 APPROVED_PATH = "/api/v3/klines"
 APPROVED_SYMBOL = "BTCIDR"
+# Static compatibility evidence does not establish that the approved MBX host serves BTCIDR.
+BTCIDR_HOST_MAPPING_STATUS = "UNVERIFIED_BLOCKED"
+BTCIDR_HOST_MAPPING_REASON = (
+    "Tokocrypto documentation associates the approved MBX .site API family with "
+    "BTCUSDT examples, while its BTCIDR example is on the prohibited NextMe/2meta "
+    "host. Owner approval does not resolve this instrument/host compatibility gap."
+)
 APPROVED_INTERVALS = frozenset({"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"})
 ALLOWED_QUERY_KEYS = frozenset({"symbol", "interval", "startTime", "endTime", "limit"})
 MAX_REQUEST_URL_LENGTH = 2048
@@ -24,9 +31,9 @@ class ProviderPolicyError(ValueError):
     """Raised when a data request violates the approved-source policy."""
 
 
-def validate_approved_kline_request(*, method: str, url: str,
+def validate_kline_request_shape(*, method: str, url: str,
                                     headers: Mapping[str, str] | None = None) -> dict[str, Any]:
-    """Validate and return a safe request descriptor; does not perform I/O."""
+    """Validate URL syntax and allowlist shape only; proves no market availability."""
     if not isinstance(method, str) or method.upper() != "GET":
         raise ProviderPolicyError("only unauthenticated GET is approved")
     if headers is not None and (not isinstance(headers, Mapping) or len(headers) != 0):
@@ -95,9 +102,23 @@ def validate_approved_kline_request(*, method: str, url: str,
         "parameters": dict(sorted(params.items())),
         "authentication": "NONE",
         "request_headers": "NONE",
-        "source_scope": "APPROVED_PUBLIC_KLINE_ONLY",
+        "source_scope": "REQUEST_SHAPE_ONLY_MARKET_MAPPING_UNVERIFIED",
         "network_action_performed": False,
     }
+
+ 
+def validate_approved_kline_request(*, method: str, url: str,
+                                    headers: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Validate a usable source request only after host/instrument compatibility is verified.
+
+    The current BTCIDR-to-MBX mapping is deliberately blocked. Passing the
+    request-shape validator is not evidence that the venue serves this market.
+    """
+    descriptor = validate_kline_request_shape(method=method, url=url, headers=headers)
+    if BTCIDR_HOST_MAPPING_STATUS != "VERIFIED":
+        raise ProviderPolicyError(BTCIDR_HOST_MAPPING_REASON)
+    descriptor["source_scope"] = "APPROVED_PUBLIC_KLINE_ONLY"
+    return descriptor
 
 
 def build_kline_provenance(*, method: str, url: str, raw_payload: bytes,

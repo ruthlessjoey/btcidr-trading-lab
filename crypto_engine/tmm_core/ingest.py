@@ -29,6 +29,22 @@ def _reject_json_constant(value: str) -> None:
     raise IngestionError(f"non-standard JSON constant is not allowed: {value}")
 
 
+def decode_kline_response(raw_response: bytes) -> Any:
+    """Validate bounded UTF-8 JSON response bytes without asserting source identity."""
+    if not isinstance(raw_response, bytes) or not raw_response:
+        raise IngestionError("raw response must be non-empty bytes")
+    if len(raw_response) > MAX_KLINE_RESPONSE_BYTES:
+        raise IngestionError("raw response exceeds the 4 MiB safety limit")
+    try:
+        text = raw_response.decode("utf-8", errors="strict")
+        return json.loads(text, object_pairs_hook=_unique_object,
+                          parse_constant=_reject_json_constant)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise IngestionError("response is not valid bounded strict UTF-8 JSON") from exc
+    except (AttributeError, TypeError) as exc:
+        raise IngestionError("raw response must be bytes") from exc
+
+
 def validate_approved_kline_payload(*, method: str, url: str, raw_response: bytes,
                                     retrieved_at_ms: int, decision_time_ms: int,
                                     expected_symbol: str, expected_interval: str,
@@ -52,14 +68,10 @@ def validate_approved_kline_payload(*, method: str, url: str, raw_response: byte
             raise IngestionError("requested symbol does not match expected symbol")
         if request_parameters.get("interval") != expected_interval:
             raise IngestionError("requested interval does not match expected interval")
-        text = raw_response.decode("utf-8", errors="strict")
-        response = json.loads(text, object_pairs_hook=_unique_object,
-                              parse_constant=_reject_json_constant)
+        response = decode_kline_response(raw_response)
         candles = normalize_tokocrypto_klines(response, decision_time_ms=decision_time_ms)
-    except (ProviderPolicyError, KlinePayloadError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (ProviderPolicyError, KlinePayloadError, IngestionError) as exc:
         raise IngestionError(str(exc)) from exc
-    except IngestionError:
-        raise
     except (TypeError, ValueError) as exc:
         raise IngestionError("response payload could not be validated") from exc
 
