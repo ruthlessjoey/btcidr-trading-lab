@@ -8,7 +8,7 @@
 
 The only currently approved market-data request remains unauthenticated HTTPS GET BTCIDR candles from:
 
-`https://cloudme-toko.2meta.app/api/v1/klines`
+`https://www.tokocrypto.site/api/v3/klines`
 
 No other provider, symbol, network, path, API, WebSocket, archive download or dataset is authorized for retrieval. This document does not expand that permission.
 
