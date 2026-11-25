@@ -409,10 +409,18 @@ class SQLiteSettlementStore:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
         with self._connect() as db:
-            rows = db.execute(
-                "SELECT idempotency_key,batch_id,market_id,authorized_quantity,filled_quantity "
-                "FROM outbox WHERE status='PENDING' ORDER BY idempotency_key LIMIT ?", (limit,)
-            ).fetchall()
+            db.execute("BEGIN")
+            try:
+                self._verify_account_state(db)
+                rows = db.execute(
+                    "SELECT idempotency_key,batch_id,market_id,authorized_quantity,filled_quantity "
+                    "FROM main.outbox WHERE status='PENDING' ORDER BY idempotency_key LIMIT ?", (limit,)
+                ).fetchall()
+            except Exception:
+                db.rollback()
+                raise
+            else:
+                db.rollback()
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
@@ -1131,7 +1139,8 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("receiver_receipt is required")
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT batch_id,status,receiver_receipt FROM outbox WHERE idempotency_key=?",
+            self._verify_account_state(db)
+            row = db.execute("SELECT batch_id,status,receiver_receipt FROM main.outbox WHERE idempotency_key=?",
                              (idempotency_key,)).fetchone()
             if row is None:
                 db.rollback()
@@ -1154,32 +1163,40 @@ class SQLiteSettlementStore:
             self._complete_batch_if_outboxes_acknowledged(db, batch_id)
             db.commit()
 
+    def _verify_account_state(self, db: sqlite3.Connection) -> None:
+        """Verify fill accounting and, when enabled, the complete reservation ledger."""
+        objects = db.execute(
+            "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+            "('reservations','reservation_allocations','reservation_outbox')"
+        ).fetchall()
+        expected = {"reservations","reservation_allocations","reservation_outbox"}
+        present = {name for kind,name in objects if kind == "table"}
+        if (any(kind != "table" for kind,_ in objects)
+                or (present and present != expected)):
+            raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+        if present == expected:
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
+            self._verify_reservation_audit_coverage(db)
+        else:
+            self._verify_fill_account_state(db)
+
     def snapshot(self) -> dict[str, Any]:
         with self._connect() as db:
-            reservation_objects = db.execute(
-                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
-                "('reservations','reservation_allocations','reservation_outbox')"
-            ).fetchall()
-            expected = {"reservations","reservation_allocations","reservation_outbox"}
-            present = {name for kind,name in reservation_objects if kind == "table"}
-            if (any(kind != "table" for kind,_ in reservation_objects)
-                    or (present and present != expected)):
-                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
             db.execute("BEGIN")
             try:
-                if present == expected:
-                    from .reservation_schema_v2 import ensure_reservation_schema_v2
-                    ensure_reservation_schema_v2(db)
-                    self._verify_reservation_audit_coverage(db)
-                else:
-                    self._verify_fill_account_state(db)
+                self._verify_account_state(db)
+                account = db.execute(
+                    "SELECT cash FROM main.account WHERE singleton=1"
+                ).fetchone()
+                holdings = dict(db.execute(
+                    "SELECT market_id,quantity FROM main.holdings"
+                ))
             except Exception:
                 db.rollback()
                 raise
             else:
                 db.rollback()
-            account = db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()
-            holdings = dict(db.execute("SELECT market_id,quantity FROM holdings"))
             return {"account_id": self.account_id, "currency": self.currency,
                     "cash": account[0], "holdings": holdings}
 

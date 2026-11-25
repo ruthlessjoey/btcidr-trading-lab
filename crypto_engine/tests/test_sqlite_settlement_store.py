@@ -157,6 +157,37 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], audit_before)
 
+    def _create_pending_zero_quantity_outbox(self):
+        self.store.apply_batch(
+            batch_id="b-outbox-guard",
+            fills=[self.buy()],
+            sell_settlements=[{
+                "idempotency_key": "settle:guard",
+                "market_id": "BTC/USDT",
+                "authorized_quantity": "0",
+                "filled_quantity": "0",
+            }],
+            timestamp=10,
+        )
+
+    def test_pending_outbox_rejects_tampered_accounting_state(self):
+        self._create_pending_zero_quantity_outbox()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.pending_outbox()
+
+    def test_outbox_acknowledgement_rejects_tampered_accounting_state(self):
+        self._create_pending_zero_quantity_outbox()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "account cash does not match fill audit state"
+        ):
+            self.store.acknowledge_outbox("settle:guard", receiver_receipt="receipt")
+
     def test_outbox_requires_both_acknowledgements_before_batch_complete(self):
         self.enable_reservations()
         kwargs = {
