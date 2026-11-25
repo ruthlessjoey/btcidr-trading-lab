@@ -255,3 +255,19 @@ This section supersedes the previous 111-test count in Section 10 and earlier in
 - This does not change migration gates: v1 bootstrap and earlier-v2 expiry/history-preserving migration remain unimplemented, existing databases remain untouched, and any future migration requires a separate owner-approved source hash and manifest.
 - Independent adversarial review, full repository compatibility review, backup/restore drills, authenticated receiver, profitability evidence and full product integration remain pending.
 - Install readiness and trading readiness remain NOT READY; PAPER activation ON HOLD; LIVE DISABLED / ABSENT; profitability/high-win-rate NOT ESTABLISHED; overall project completion UNRATED.
+## 25 November 2026 — final provider-policy and legacy adapter update
+
+This section supersedes the PR154 218-test count in the previous update.
+
+- PR #154 head: 81be796269bd473ee767335b16cf3bcab4974f4e; base PR #150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19; 17 commits ahead / 0 behind.
+- The offline Tokocrypto policy is aligned to the exact owner-approved unauthenticated BTCIDR candles endpoint https://www.tokocrypto.site/api/v3/klines. It rejects the earlier 2meta host/path, Tokocrypto .com, server-time, symbol metadata, wrong paths, other symbols, authentication and malformed/oversized URL inputs.
+- Legacy root Tokocrypto generic adapter is now disabled at both the provider factory and generic fetcher Source boundary. Tokocrypto hosts are blocked even when callers supply a renamed source; no legacy server-time, symbol metadata or BTCUSDT path may execute through that adapter.
+- PR154 full unprotected crypto_engine suite run 45555538730: Python 3.11.18 / SQLite 3.46.1 passed 219/219; Python 3.13.18 / SQLite 3.46.1 passed 219/219.
+- PR154 root legacy adapter guard run 45555538736: Python 3.11.18 passed 4/4; Python 3.13.18 passed 4/4.
+- Reviewer run 45555536008 was skipped, not passed. No API call, DNS lookup, response-schema test or real candle retrieval was performed.
+
+### Updated readiness note
+- Provider approval policy is statically aligned and offline-tested, but actual endpoint response compatibility remains unverified and no live integration is activated.
+- Existing database migration / bootstrap remains unimplemented and unauthorized. All earlier v1/v2 SELL restrictions stay in force.
+- Independent adversarial review, full repository compatibility, process-level backup/restore drills and authenticated receiver remain pending.
+- Install/trading readiness NOT READY; PAPER ON HOLD; LIVE DISABLED / ABSENT; profitability/high-win-rate NOT ESTABLISHED; overall project completion UNRATED.
