@@ -117,3 +117,34 @@ Tests must use synthetic temporary files and generated test keys only. They must
 - Who controls recovery and key rotation, and how is that authority separated from the trading process?
 
 Until these decisions are approved, this document is a design proposal and no external-anchor security claim may be made.
+
+
+## 11. Additional independent-signer validation requirement
+
+A signature over a caller-supplied digest is not sufficient to establish trustworthy ledger progression. A compromised database writer could rewrite the local database and pending checkpoint request before asking a hardware/OS key to sign the new head. A signer that blindly signs the request would anchor the fabricated state rather than detect it.
+
+Before implementation, the trust boundary must distinguish:
+
+- **Key custody:** the private signing key is outside SQLite and the trading process.
+- **Anti-rollback state:** the signer/independent verifier retains the last trusted ledger ID, account/currency identity, schema version, audit sequence, audit head, checkpoint digest, key ID and algorithm outside SQLite.
+- **Chain-extension verification:** a new checkpoint must extend the last trusted checkpoint. The verifier must independently recompute the event hash chain from the last anchored sequence through the proposed sequence, reject gaps/forks/duplicate sequences, and confirm the resulting head equals the proposed head. It must not trust only the database's pending row or supplied digest.
+- **Semantic verification:** before signing, an independent deterministic verifier should validate event schemas and the accounting invariants relevant to the checkpoint (account identity, market registration, fill ordering, cash/holdings reconciliation, reservation allocation/consumption and outbox consistency). If this cannot be done, the system must explicitly limit its claim to anchoring the byte-level audit prefix; it must not imply that the signer has authenticated the truth or authorization of the events.
+- **Monotonic commit:** the external store must reject a checkpoint whose ledger identity changes, whose previous-checkpoint digest does not equal the independently retained latest digest, whose sequence rolls back, or whose same-sequence content conflicts. Updating the external checkpoint and monotonic trusted state must itself be atomic or recoverable without accepting a fork.
+
+The verifier may obtain the appended event segment from a read-only SQLite snapshot or from a separately authenticated append-only event stream. In either case it must independently recompute the chain extension from the last trusted head. A signer that only provides a generic "sign bytes" operation is a key-custody component, not a ledger validator.
+
+### Revised assurance statement
+
+A checkpoint can make post-anchor database-only rewriting, truncation, rollback and fork detectable only if the signer/verifier retains independent monotonic state and verifies extension from the previous trusted head. It does not prove the economic truth of market data or fills. If the checkpoint is created after a malicious writer has already replaced the unanchored suffix and the signer blindly signs it, the fabricated suffix becomes anchored. The maximum unanchored window therefore remains a security-critical policy decision, not just an operational setting.
+
+### Additional required tests
+
+- Submit a fabricated but syntactically valid new audit head after altering the unanchored suffix; the independent verifier must reject it unless the suffix extends the last trusted checkpoint and passes semantic reconciliation.
+- Submit an old checkpoint with a valid signature after a newer checkpoint has been stored; reject rollback using independently retained monotonic state.
+- Submit a validly signed checkpoint with a different ledger ID/account identity; reject substitution.
+- Re-submit the same sequence with a different digest; reject fork/conflict.
+- Crash between external checkpoint append and monotonic-state update; recovery must deterministically discover whether the append committed and must never accept an alternate branch.
+- Restore the SQLite file and checkpoint file together from an older backup while the signer retains a newer trusted head; operation must remain blocked.
+- Demonstrate that a generic signing-only key service cannot, by itself, claim semantic verification.
+
+These are design requirements only. They do not authorize a signer, storage platform, network dependency, key management workflow, or operational deployment.
