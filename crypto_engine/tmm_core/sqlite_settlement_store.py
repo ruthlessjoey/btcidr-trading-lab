@@ -421,12 +421,18 @@ class SQLiteSettlementStore:
             "SELECT COUNT(*) FROM main.outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
             (batch_id,),
         ).fetchone()[0]
-        reservation_table = db.execute(
-            "SELECT 1 FROM main.sqlite_master WHERE type='table' "
-            "AND name='reservation_outbox'"
-        ).fetchone()
+        reservation_objects = db.execute(
+            "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+            "('reservations','reservation_allocations','reservation_outbox')"
+        ).fetchall()
         reservation_pending = 0
-        if reservation_table is not None:
+        if reservation_objects:
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            if (any(kind != "table" for kind, _ in reservation_objects)
+                    or {name for _, name in reservation_objects} != expected):
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            from .reservation_schema_v2 import ensure_reservation_schema_v2
+            ensure_reservation_schema_v2(db)
             reservation_pending = db.execute(
                 "SELECT COUNT(*) FROM main.reservation_outbox "
                 "WHERE batch_id=? AND status!='ACKNOWLEDGED'", (batch_id,)
