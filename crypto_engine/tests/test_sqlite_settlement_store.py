@@ -179,6 +179,33 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with _managed_connection(self.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 1)
 
+    def test_replay_rejects_tampered_batch_result_json(self):
+        fill = self.buy(fill_id="result-json-fill")
+        self.store.apply_batch(
+            batch_id="batch-result-integrity",
+            fills=[fill],
+            timestamp=10,
+        )
+        with _managed_connection(self.path) as db:
+            result_json = db.execute(
+                "SELECT result_json FROM main.batches WHERE batch_id='batch-result-integrity'"
+            ).fetchone()[0]
+            result = json.loads(result_json)
+            result["cash"] = "1"
+            db.execute(
+                "UPDATE main.batches SET result_json=? WHERE batch_id='batch-result-integrity'",
+                (json.dumps(result, sort_keys=True, separators=(",", ":")),),
+            )
+        self.assertTrue(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "batch result JSON does not match its audit digest"
+        ):
+            self.store.apply_batch(
+                batch_id="batch-result-integrity",
+                fills=[fill],
+                timestamp=10,
+            )
+
     def test_changed_payload_hash_is_rejected(self):
         self.store.apply_batch(batch_id="b-3",
                                fills=[self.buy()], timestamp=10)
