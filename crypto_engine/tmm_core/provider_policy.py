@@ -1,7 +1,7 @@
 """Strict allowlist and provenance helpers for approved public candle requests.
 
 This module validates a proposed request; it never sends it. It permits only
-unauthenticated GET to the specifically approved Tokocrypto NextMe BTCIDR kline endpoint.
+unauthenticated GET to the exact owner-approved Tokocrypto BTCIDR kline endpoint.
 """
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 
-APPROVED_HOST = "cloudme-toko.2meta.app"
-APPROVED_PATH = "/api/v1/klines"
+APPROVED_HOST = "www.tokocrypto.site"
+APPROVED_PATH = "/api/v3/klines"
 APPROVED_SYMBOL = "BTCIDR"
 APPROVED_INTERVALS = frozenset({"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"})
 ALLOWED_QUERY_KEYS = frozenset({"symbol", "interval", "startTime", "endTime", "limit"})
