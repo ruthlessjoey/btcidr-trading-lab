@@ -774,7 +774,7 @@ class SQLiteSettlementStore:
         for fill_id,batch_id,market_id,quantity_text,timestamp in sell_fills:
             sell_fill_ids.add(fill_id)
             if totals_by_fill.get(fill_id,Decimal("0")) != _decimal(
-                quantity_text,"SELL fill quantity"
+                quantity_text,"SELL fill quantity", stored=True
             ):
                 raise SettlementStoreError("SELL fill quantity does not match allocation ledger")
             if fill_identity.get(fill_id) != (batch_id,market_id):
