@@ -925,6 +925,26 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_apply_batch_preserves_sub_precision_quote_debits(self):
+        first = self.buy()
+        first["fill_id"] = "precision-buy-1"
+        first["quantity"] = "0.000000000000000000000000000123456789"
+        first["price"] = "1"
+        first["fee_quote"] = "0"
+        second = dict(first)
+        second["fill_id"] = "precision-buy-2"
+        second["quantity"] = "0.000000000000000000000000000234567891"
+
+        result = self.store.apply_batch(
+            batch_id="precision-buys", fills=[first, second], timestamp=10
+        )
+        expected_cash = "9999.999999999999999999999999999641975320"
+        expected_holding = "0.000000000000000000000000000358024680"
+        self.assertEqual(result["cash"], expected_cash)
+        snapshot = self.store.snapshot()
+        self.assertEqual(snapshot["cash"], expected_cash)
+        self.assertEqual(snapshot["holdings"]["BTC/USDT"], expected_holding)
+
     def test_apply_batch_rejects_unbounded_decimal_inputs_without_mutation(self):
         for index, value in enumerate(
             ("1e999999999", "1e-999999999", "0e-999999999")

@@ -259,19 +259,21 @@ class SQLiteSettlementStore:
         request_json = json.dumps(request_envelope, sort_keys=True, separators=(",", ":"),
                                   ensure_ascii=False, allow_nan=False)
         request_hash = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
-        sell_totals: dict[str, Decimal] = {}
-        outbox_totals: dict[str, Decimal] = {}
-        for fill in normalized_fills:
-            if fill["side"] == "SELL":
-                market_id = fill["market_id"]
-                sell_totals[market_id] = sell_totals.get(market_id, Decimal("0")) + _decimal(fill["quantity"], "SELL quantity")
-        for item in normalized_outbox:
-            market_id = item["market_id"]
-            outbox_totals[market_id] = outbox_totals.get(market_id, Decimal("0")) + _decimal(item["filled_quantity"], "outbox filled_quantity")
-        nonzero_outbox = {key: value for key, value in outbox_totals.items() if value != 0}
-        if sell_totals != nonzero_outbox:
-            raise SettlementStoreError("SELL outbox filled quantities must equal SELL fills per market")
-        with self._lock, self._connect() as db:
+        with localcontext() as decimal_context:
+            decimal_context.prec = 80
+            sell_totals: dict[str, Decimal] = {}
+            outbox_totals: dict[str, Decimal] = {}
+            for fill in normalized_fills:
+                if fill["side"] == "SELL":
+                    market_id = fill["market_id"]
+                    sell_totals[market_id] = sell_totals.get(market_id, Decimal("0")) + _decimal(fill["quantity"], "SELL quantity")
+            for item in normalized_outbox:
+                market_id = item["market_id"]
+                outbox_totals[market_id] = outbox_totals.get(market_id, Decimal("0")) + _decimal(item["filled_quantity"], "outbox filled_quantity")
+            nonzero_outbox = {key: value for key, value in outbox_totals.items() if value != 0}
+            if sell_totals != nonzero_outbox:
+                raise SettlementStoreError("SELL outbox filled quantities must equal SELL fills per market")
+            with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             existing = db.execute(
                 "SELECT request_hash,status,result_json FROM batches WHERE batch_id=?",
@@ -343,43 +345,45 @@ class SQLiteSettlementStore:
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
                 "VALUES(?,?, 'PROCESSING', ?, NULL)", (batch_id, request_hash, timestamp)
             )
-            cash = _decimal(db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()[0],
-                            "stored cash")
-            balances = {
-                row[0]: _decimal(row[1], "stored holding")
-                for row in db.execute("SELECT market_id,quantity FROM holdings")
-            }
-            staged = []
-            for fill in normalized_fills:
-                market = db.execute("SELECT 1 FROM markets WHERE market_id=?",
-                                    (fill["market_id"],)).fetchone()
-                if market is None:
-                    raise SettlementStoreError("fill market is not registered")
-                if db.execute("SELECT 1 FROM fills WHERE fill_id=?", (fill["fill_id"],)).fetchone():
-                    raise SettlementStoreError("fill ID already exists")
-                qty, price, fee = (_decimal(fill["quantity"], "quantity"),
-                                   _decimal(fill["price"], "price"),
-                                   _decimal(fill["fee_quote"], "fee_quote"))
-                current = balances.get(fill["market_id"], Decimal("0"))
-                notional = qty * price
-                if fill["side"] == "BUY":
-                    debit = notional + fee
-                    if debit > cash:
-                        raise SettlementStoreError("insufficient quote cash")
-                    cash -= debit
-                    current += qty
-                else:
-                    if qty > current:
-                        raise SettlementStoreError("SELL exceeds long inventory")
-                    proceeds = notional - fee
-                    if proceeds < 0:
-                        raise SettlementStoreError("SELL fee exceeds proceeds")
-                    cash += proceeds
-                    current -= qty
-                balances[fill["market_id"]] = current
-                staged.append((fill, current, cash))
-
-            for item in normalized_outbox:
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                cash = _decimal(db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()[0],
+                                "stored cash")
+                balances = {
+                    row[0]: _decimal(row[1], "stored holding")
+                    for row in db.execute("SELECT market_id,quantity FROM holdings")
+                }
+                staged = []
+                for fill in normalized_fills:
+                    market = db.execute("SELECT 1 FROM markets WHERE market_id=?",
+                                        (fill["market_id"],)).fetchone()
+                    if market is None:
+                        raise SettlementStoreError("fill market is not registered")
+                    if db.execute("SELECT 1 FROM fills WHERE fill_id=?", (fill["fill_id"],)).fetchone():
+                        raise SettlementStoreError("fill ID already exists")
+                    qty, price, fee = (_decimal(fill["quantity"], "quantity"),
+                                       _decimal(fill["price"], "price"),
+                                       _decimal(fill["fee_quote"], "fee_quote"))
+                    current = balances.get(fill["market_id"], Decimal("0"))
+                    notional = qty * price
+                    if fill["side"] == "BUY":
+                        debit = notional + fee
+                        if debit > cash:
+                            raise SettlementStoreError("insufficient quote cash")
+                        cash -= debit
+                        current += qty
+                    else:
+                        if qty > current:
+                            raise SettlementStoreError("SELL exceeds long inventory")
+                        proceeds = notional - fee
+                        if proceeds < 0:
+                            raise SettlementStoreError("SELL fee exceeds proceeds")
+                        cash += proceeds
+                        current -= qty
+                    balances[fill["market_id"]] = current
+                    staged.append((fill, current, cash))
+    
+                for item in normalized_outbox:
                 if db.execute("SELECT 1 FROM markets WHERE market_id=?",
                               (item["market_id"],)).fetchone() is None:
                     raise SettlementStoreError("outbox market is not registered")
