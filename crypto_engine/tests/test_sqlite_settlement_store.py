@@ -809,6 +809,39 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "account cash does not match initial account audit"):
             self.store.snapshot()
 
+    def test_snapshot_rejects_tampered_market_asset_mapping(self):
+        db = sqlite3.connect(self.path)
+        try:
+            db.execute(
+                "UPDATE main.markets SET base_asset='ETH' WHERE market_id='BTC/USDT'"
+            )
+            db.commit()
+        finally:
+            db.close()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.snapshot()
+
+    def test_market_registration_audit_is_not_duplicated_on_idempotent_register(self):
+        db = sqlite3.connect(self.path)
+        try:
+            before = db.execute(
+                "SELECT COUNT(*) FROM main.audit WHERE event_json LIKE '%MARKET_REGISTERED%'"
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.store.register_market("BTC/USDT", "BTC", "USDT")
+        db = sqlite3.connect(self.path)
+        try:
+            after = db.execute(
+                "SELECT COUNT(*) FROM main.audit WHERE event_json LIKE '%MARKET_REGISTERED%'"
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(before, 1)
+        self.assertEqual(after, 1)
+
     def test_first_batch_rejects_tampered_initial_cash_baseline(self):
         with sqlite3.connect(self.path) as db:
             db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
