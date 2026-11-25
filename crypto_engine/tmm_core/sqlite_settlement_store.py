@@ -392,7 +392,7 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
-    def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
+    def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str | int]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise SettlementStoreError("limit must be in [1, 1000]")
         with self._connect() as db:
@@ -410,13 +410,13 @@ class SQLiteSettlementStore:
             ensure_reservation_schema_v2(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
-                "market_id,reservation_version,allocated_quantity,payload_sha256 "
+                "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
                 "FROM main.reservation_outbox WHERE status='PENDING' "
                 "ORDER BY idempotency_key LIMIT ?", (limit,)
             ).fetchall()
             fields = (
                 "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
-                "market_id","reservation_version","allocated_quantity","payload_sha256",
+                "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
             )
             return [dict(zip(fields, row)) for row in rows]
 
