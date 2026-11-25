@@ -250,6 +250,26 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "SELECT 1 FROM fills WHERE fill_id='sell-2'"
             ).fetchone())
 
+    def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt="receipt-1"
+        )
+        with self.assertRaisesRegex(SettlementStoreError, "receipt mismatch"):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1", receiver_receipt="receipt-2"
+            )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt="receipt-1"
+        )
+        self.assertTrue(self.store.verify_audit_chain())
+
     def test_reservation_outbox_ack_waits_for_legacy_outbox(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
