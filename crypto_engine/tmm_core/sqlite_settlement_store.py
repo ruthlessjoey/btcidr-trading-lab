@@ -1295,6 +1295,12 @@ class SQLiteSettlementStore:
             db.execute("INSERT INTO metadata VALUES('schema_version',?)", (str(self.SCHEMA_VERSION),))
             db.execute("INSERT INTO account VALUES(1,?,?,?)",
                        (self.account_id, self.currency, opening_cash))
+            self._append_audit(db, {
+                "kind":"ACCOUNT_INITIALIZED",
+                "account_id":self.account_id,
+                "currency":self.currency,
+                "opening_cash":opening_cash,
+            })
         elif version[0] != str(self.SCHEMA_VERSION):
             raise SettlementStoreError("unsupported schema version; explicit migration required")
 
