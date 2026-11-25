@@ -305,8 +305,7 @@ def inspect_v1_migration_eligibility(
 
     if "batches" in usable_tables:
         unresolved_count = db.execute(
-            "SELECT COUNT(*) FROM main.batches WHERE status IN "
-            "('PROCESSING','RECONCILIATION_REQUIRED')"
+            "SELECT COUNT(*) FROM main.batches WHERE status!='COMPLETE'"
         ).fetchone()[0]
         if unresolved_count:
             blockers.append("unresolved or processing batches require reconciliation")
