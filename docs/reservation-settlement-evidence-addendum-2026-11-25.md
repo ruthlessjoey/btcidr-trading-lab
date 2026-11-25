@@ -575,3 +575,55 @@ This supersedes the earlier PR154 218-test count and records the final URL parse
 Current PR chain remains candidate-only: PR149 head 104756a8f4978f9e81bf40928902f419ab61b528; PR150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19; PR154 head 81be796269bd473ee767335b16cf3bcab4974f4e. All remain open/draft/unmerged.
 
 Readiness remains unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED / ABSENT; profitability/high-win-rate NOT ESTABLISHED; overall completion UNRATED. The 219 + 4 runs are isolated offline evidence, not production acceptance or proof of endpoint compatibility.
+
+
+## 26 November — account audit baseline and outbox delivery integrity follow-up
+
+This section supersedes the previous PR #172 test count and adds the current exact-head state. All items below remain draft candidates; no PR was merged and protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`.
+
+### PR #173 — require the initial account audit event
+
+- PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/173
+- Exact head: `e6eaccc917695c48fb70d02e5a5ce764b9d11498`; base PR #172 head `eefb9305f3749fa1214e7040776c300771399bff`.
+- Finding: PR #172 created an `ACCOUNT_INITIALIZED` audit event, but a database with its sole initial audit row deleted still had an empty hash chain that verified successfully. The opening-cash baseline could therefore disappear before the first fill.
+- Change: new databases persist an `account_initialization_audit=required-v1` metadata policy marker; the verifier rejects a missing initialization event or an altered marker value.
+- Exact-head Actions run [45669896171](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45669896171): Python 3.11.18 / SQLite 3.46.1 passed settlement-store 48/48 and receiver 16/16; Python 3.13.18 / SQLite 3.46.1 passed 48/48 and 16/16. Total 64 tests per Python version.
+- The workflow skipped the separate reservation schema/lifecycle/allocation suites because the changed paths were the settlement store and its tests; do not describe this as the complete crypto_engine suite.
+- PR remains open/draft/unmerged; independent adversarial review pending.
+
+### PR #175 — modified policy-marker regression
+
+- PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/175
+- Exact head: `706cff1fb013406517de541138872f72fee361be`; base PR #173 head `e6eaccc917695c48fb70d02e5a5ce764b9d11498`.
+- Test-only change: mutate the `account_initialization_audit` marker to an unknown value and assert that snapshot validation fails closed.
+- Exact-head Actions run [45670551948](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45670551948): Python 3.11.18 / SQLite 3.46.1 passed settlement-store 49/49 and receiver 16/16; Python 3.13.18 / SQLite 3.46.1 passed 49/49 and 16/16. Total 65 tests per Python version.
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #174 — verify account and reservation integrity before outbox operations
+
+- PR: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/174
+- Current head: `d8033a68a8bcaa1896eabaf5978bd266fd45e6b1`; base PR #173 head `e6eaccc917695c48fb70d02e5a5ce764b9d11498`.
+- Finding: `pending_outbox()` exposed pending settlement rows and `acknowledge_outbox()` accepted receipts without first reconciling the fill/account audit state. Snapshot and batch-creation checks did not cover these outbox paths.
+- Proposed correction: share one account/reservation verifier; run it in a consistent read transaction before returning pending settlement outbox rows; run it under `BEGIN IMMEDIATE` before accepting a settlement-outbox acknowledgement; reuse it in snapshot.
+- Added regressions for tampered account cash during pending-outbox read, tampered account cash during acknowledgement, and a tampered reservation expiry before either settlement-outbox operation.
+- **Verification status: NOT VERIFIED.** No Actions run or check-run was present for exact head `d8033a68a8bcaa1896eabaf5978bd266fd45e6b1` at the time of this tracker update. Do not infer a pass from adjacent PR runs.
+- PR remains open/draft/unmerged; exact-head CI and independent review pending.
+
+### Current security interpretation and limitations
+
+- The initialization policy marker detects deletion of the initial event while the marker remains present. It is not an external cryptographic anchor and does not protect against a party that deliberately rewrites both the audit table and its metadata marker. Do not describe SQLite's internal hash chain as tamper-proof against arbitrary database-file rewriting.
+- Existing databases predating the marker are not retrofitted with fabricated opening-cash evidence. Their historical initial cash baseline remains unavailable and must be reconciled using separate evidence.
+- No PR was merged, no protected path was accessed, no user database was inspected or migrated, and no network/provider/account/wallet/PAPER/LIVE activity occurred.
+- Tokocrypto BTCIDR on the approved `.site/api/v3/klines` host remains UNVERIFIED / BLOCKED because official support material maps that MBX host family to non-IDR examples and maps BTCIDR to the currently prohibited NextMe/2meta host. No endpoint or DNS request was made. Do not switch host or symbol automatically.
+- MEME_INTEL remains separate; integration still requires independent readiness and separate owner approval.
+
+### Next priority queue
+
+1. Obtain exact-head Python 3.11/3.13 CI for PR #174 and inspect all logs, test counts, warnings and failures. Keep the PR draft until verified.
+2. Independently adversarially review PRs #149–#175 at immutable SHAs, including SQLite schema/trigger trust, audit truncation, opening-cash baselines, all read/write/replay/outbox surfaces, sender/receiver receipt binding and transaction rollback. Record PASS / FAIL / INCONCLUSIVE; skipped jobs are not reviews.
+3. Continue synthetic-only crash/restart, lock-contention, backup/restore, corruption, truncation and resource-exhaustion tests. Do not touch existing user databases.
+4. Preserve the Tokocrypto host/symbol block until the owner resolves the compatibility conflict and approves a precise lawful source contract.
+5. Begin preregistered multi-market profitability research only with verified point-in-time rights/coverage, realistic fees/spread/slippage/impact/liquidity, untouched chronological holdouts, multiple-testing controls and independent reproduction.
+6. Keep strategy agents proposal-only, PAPER activation ON HOLD and LIVE disabled/absent.
+7. Refresh this tracker and the handoff ZIP after each major verified milestone.
+
