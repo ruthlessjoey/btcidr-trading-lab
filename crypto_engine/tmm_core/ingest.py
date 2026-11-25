@@ -31,6 +31,10 @@ def _reject_json_constant(value: str) -> None:
 
 def decode_kline_response(raw_response: bytes) -> Any:
     """Validate bounded UTF-8 JSON response bytes without asserting source identity."""
+    if not isinstance(raw_response, bytes) or not raw_response:
+        raise IngestionError("raw response must be non-empty bytes")
+    if len(raw_response) > MAX_KLINE_RESPONSE_BYTES:
+        raise IngestionError("raw response exceeds the 4 MiB safety limit")
     try:
         text = raw_response.decode("utf-8", errors="strict")
         return json.loads(text, object_pairs_hook=_unique_object,
@@ -66,8 +70,6 @@ def validate_approved_kline_payload(*, method: str, url: str, raw_response: byte
         candles = normalize_tokocrypto_klines(response, decision_time_ms=decision_time_ms)
     except (ProviderPolicyError, KlinePayloadError, IngestionError) as exc:
         raise IngestionError(str(exc)) from exc
-    except IngestionError:
-        raise
     except (TypeError, ValueError) as exc:
         raise IngestionError("response payload could not be validated") from exc
 
