@@ -503,7 +503,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "UPDATE main.reservation_outbox SET payload_sha256=? "
                 "WHERE idempotency_key='reservation-allocation:a-1'", (digest,)
             )
-        with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
+        with self.assertRaisesRegex(SettlementStoreError, "reservation consumption audit quantity mismatch"):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
             self.store.acknowledge_reservation_outbox(
@@ -523,7 +523,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             db.execute(
                 "UPDATE main.reservations SET expires_at=15 WHERE reservation_id='r-1'"
             )
-        with self.assertRaisesRegex(SettlementStoreError, "outside its reservation version or expiry"):
+        with self.assertRaisesRegex(SettlementStoreError, "reservation creation audit does not match current record"):
             self.store.pending_reservation_outbox()
 
     def test_reservation_outbox_rejects_rehashed_payload_divergence(self):
