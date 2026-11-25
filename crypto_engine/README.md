@@ -20,7 +20,7 @@ See [DATA_SOURCE_APPROVAL_MATRIX.md](DATA_SOURCE_APPROVAL_MATRIX.md) for the res
 
 - Fail-closed account risk gateway plus owner-authorized exposure-policy wrapper: strategy proposals cannot supply holdings/equity/marks/policy; the strategy-facing wrapper applies fresh-mark, liquidity, gross, per-market and asset-concentration controls before the session-loss gateway. SQLite state storage rejects shared/symlinked paths and enforces private local permissions. See [RISK_GATEWAY.md](RISK_GATEWAY.md) and [POLICY_GATEWAY.md](POLICY_GATEWAY.md). This is still an interface/test implementation only; no trusted production ledger, mark provider, owner authorization service, external anchor, agent sandbox or paper broker is supplied.
 
-- Exact-host/path/method/query validation for unauthenticated GET candles from `https://cloudme-toko.2meta.app/api/v1/klines`, BTCIDR only.
+- Exact-host/path/method/query validation for unauthenticated GET candles from `https://www.tokocrypto.site/api/v3/klines`, BTCIDR only. The prior `cloudme-toko.2meta.app/api/v1/klines` endpoint is not approved.
 - Raw payload size, UTF-8, duplicate-key, schema, closed-candle and SHA-256 provenance validation. Provenance does not independently authenticate the network peer.
 - Versioned point-in-time CEX spot / DEX pool instrument registry keyed by stable market and asset identifiers, not ticker symbols alone.
 - Market lifecycle gate for ACTIVE, HALTED, DELISTING_ANNOUNCED, DELISTED, MIGRATION_PENDING and UNKNOWN states. Stale metadata blocks both new entries and assumed exit availability; reactivation requires explicit confirmation.
