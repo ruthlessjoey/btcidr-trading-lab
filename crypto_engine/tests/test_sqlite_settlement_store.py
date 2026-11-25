@@ -111,7 +111,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
         self.store.apply_batch(
             batch_id="b-smallest-scale",
-            fills=[dict(self.buy(qty="1e-128"), price="100", fee_quote="0")],
+            fills=[dict(self.buy(qty="1e-128"), price="1", fee_quote="0")],
             timestamp=10,
         )
         snapshot = self.store.snapshot()
