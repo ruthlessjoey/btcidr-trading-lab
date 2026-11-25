@@ -192,10 +192,13 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("allocation IDs must be unique")
             if not isinstance(fill_id, str) or not fill_id.strip():
                 raise SettlementStoreError("allocation fill_id is required")
-            if not isinstance(reservation_id, str) or not reservation_id.strip():
-                raise SettlementStoreError("allocation reservation_id is required")
+            if (not isinstance(reservation_id, str) or not reservation_id.strip()
+                    or len(reservation_id) > 256):
+                raise SettlementStoreError("allocation reservation_id is required and bounded")
             if isinstance(version, bool) or not isinstance(version, int) or version < 1:
                 raise SettlementStoreError("reservation_version must be a positive integer")
+            if len(str(item.get("allocated_quantity"))) > 128:
+                raise SettlementStoreError("allocated_quantity text exceeds the 128-character limit")
             if quantity <= 0:
                 raise SettlementStoreError("allocated_quantity must be positive")
             seen_allocation_ids.add(allocation_id)
@@ -250,12 +253,13 @@ class SQLiteSettlementStore:
             reservation_tables = {
                 "reservations", "reservation_allocations", "reservation_outbox"
             }
-            present_reservation_tables = {
-                row[0] for row in db.execute(
-                    "SELECT name FROM main.sqlite_master WHERE type='table' "
-                    "AND name IN ('reservations','reservation_allocations','reservation_outbox')"
-                )
-            }
+            reservation_objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            if any(kind != "table" for kind, _ in reservation_objects):
+                raise SettlementStoreError("unexpected reservation schema object type")
+            present_reservation_tables = {name for _, name in reservation_objects}
             if present_reservation_tables and present_reservation_tables != reservation_tables:
                 raise SettlementStoreError("partial reservation schema rejected")
             reservations_enabled = present_reservation_tables == reservation_tables
