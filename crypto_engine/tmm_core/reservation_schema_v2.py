@@ -21,8 +21,10 @@ _SCHEMA = {
         "market_id TEXT NOT NULL REFERENCES markets(market_id),"
         "base_asset TEXT NOT NULL,quote_asset TEXT NOT NULL,"
         "authorized_quantity TEXT NOT NULL,consumed_quantity TEXT NOT NULL,"
-        "created_at INTEGER NOT NULL,version INTEGER NOT NULL,"
-        "status TEXT NOT NULL CHECK(status IN ('ACTIVE','RELEASED','CANCELLED','EXPIRED')))"
+        "created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL "
+        "CHECK(expires_at > created_at),version INTEGER NOT NULL CHECK(version >= 1),"
+        "status TEXT NOT NULL CHECK(status IN "
+        "('PENDING','ACTIVE','RELEASED','CANCELLED','EXPIRED')))"
     ),
     "reservation_allocations": (
         "CREATE TABLE reservation_allocations("
@@ -201,7 +203,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         "reservations": (
             "reservation_id", "account_id", "market_id", "base_asset",
             "quote_asset", "authorized_quantity", "consumed_quantity",
-            "created_at", "version", "status",
+            "created_at", "expires_at", "version", "status",
         ),
         "reservation_allocations": (
             "allocation_id", "batch_id", "fill_id", "reservation_id",
