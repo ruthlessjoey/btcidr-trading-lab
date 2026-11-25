@@ -204,16 +204,20 @@ def consume_sell_allocations(
         raise ReservationAllocationError("allocation count exceeds the 1000-row limit")
 
     batch = db.execute(
-        "SELECT status FROM main.batches WHERE batch_id=?", (batch_id,)
+        "SELECT status,created_at FROM main.batches WHERE batch_id=?", (batch_id,)
     ).fetchone()
     if batch is None or batch[0] != "PROCESSING":
         raise ReservationAllocationError("allocations require an existing PROCESSING batch")
+    if batch[1] != timestamp:
+        raise ReservationAllocationError("allocation timestamp must match the batch timestamp")
 
     raw_fills = db.execute(
-        "SELECT fill_id,market_id,side,quantity FROM main.fills "
+        "SELECT fill_id,market_id,side,quantity,timestamp FROM main.fills "
         "WHERE batch_id=? ORDER BY fill_id LIMIT 10001",
         (batch_id,),
     ).fetchall()
+    if any(row[4] != timestamp for row in raw_fills):
+        raise ReservationAllocationError("allocation timestamp must match every fill timestamp")
     if len(raw_fills) > 10000:
         raise ReservationAllocationError("batch fill count exceeds the 10000-row reservation limit")
     fills = [
