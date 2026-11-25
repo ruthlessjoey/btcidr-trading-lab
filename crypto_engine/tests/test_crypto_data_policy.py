@@ -10,7 +10,7 @@ from tmm_core.tokocrypto_klines import KlinePayloadError, normalize_tokocrypto_k
 
 
 class TokocryptoNextMePolicyTests(unittest.TestCase):
-    URL = "https://cloudme-toko.2meta.app/api/v1/klines?symbol=BTCIDR&interval=1m&limit=100"
+    URL = "https://www.tokocrypto.site/api/v3/klines?symbol=BTCIDR&interval=1m&limit=100"
     OPEN_MS = 1_700_000_000_000
     CLOSE_MS = OPEN_MS + 59_999
     DECISION_MS = CLOSE_MS + 1_000
@@ -27,21 +27,22 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
 
     def test_exact_approved_nextme_request_is_validated_without_io(self):
         result = validate_approved_kline_request(method="GET", url=self.URL)
-        self.assertEqual(result["host"], "cloudme-toko.2meta.app")
-        self.assertEqual(result["path"], "/api/v1/klines")
+        self.assertEqual(result["host"], "www.tokocrypto.site")
+        self.assertEqual(result["path"], "/api/v3/klines")
         self.assertEqual(result["parameters"]["symbol"], "BTCIDR")
         self.assertEqual(result["authentication"], "NONE")
         self.assertFalse(result["network_action_performed"])
 
     def test_legacy_and_unapproved_hosts_methods_and_paths_are_rejected(self):
         bad = (
-            self.URL.replace("cloudme-toko.2meta.app", "www.tokocrypto.site"),
-            self.URL.replace("cloudme-toko.2meta.app", "www.tokocrypto.com"),
-            self.URL.replace("cloudme-toko.2meta.app", "example.com"),
-            self.URL.replace("/api/v1/klines", "/api/v1/depth"),
+            self.URL.replace("www.tokocrypto.site", "cloudme-toko.2meta.app"),
+            self.URL.replace("www.tokocrypto.site", "www.tokocrypto.com"),
+            self.URL.replace("www.tokocrypto.site", "example.com"),
+            self.URL.replace("/api/v3/klines", "/api/v3/depth"),
+            self.URL.replace("/api/v3/klines", "/api/v1/klines"),
             self.URL.replace("https://", "http://"),
-            self.URL.replace("cloudme-toko.2meta.app", "cloudme-toko.2meta.app:443"),
-            self.URL.replace("cloudme-toko.2meta.app", "user@cloudme-toko.2meta.app"),
+            self.URL.replace("www.tokocrypto.site", "www.tokocrypto.site:443"),
+            self.URL.replace("www.tokocrypto.site", "user@www.tokocrypto.site"),
         )
         for url in bad:
             with self.subTest(url=url), self.assertRaises(ProviderPolicyError):
