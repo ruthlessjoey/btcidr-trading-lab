@@ -63,10 +63,17 @@ def _quantity(value: object) -> str:
 
 
 def _audit(db: sqlite3.Connection, event: dict[str, object]) -> None:
-    if db.execute(
-        "SELECT 1 FROM main.sqlite_master WHERE type='table' AND name='audit'"
-    ).fetchone() is None:
-        raise ReservationLifecycleError("settlement audit table is required")
+    audit_ddl = db.execute(
+        "SELECT sql FROM main.sqlite_master WHERE type='table' AND name='audit'"
+    ).fetchone()
+    expected_audit_ddl = (
+        "CREATE TABLE audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_json TEXT NOT NULL, "
+        "previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL)"
+    )
+    if audit_ddl is None or "".join(audit_ddl[0].split()).casefold() != "".join(
+        expected_audit_ddl.split()
+    ).casefold():
+        raise ReservationLifecycleError("canonical settlement audit schema is required")
     row = db.execute(
         "SELECT event_hash FROM main.audit ORDER BY seq DESC LIMIT 1"
     ).fetchone()
@@ -159,6 +166,8 @@ def authorize_reservation(
         raise ReservationLifecycleError("reservation not found for account")
     if row[10] != "PENDING":
         raise ReservationLifecycleError("only PENDING reservations can be authorized")
+    if now < row[7]:
+        raise ReservationLifecycleError("authorization timestamp predates reservation creation")
     if now >= row[8]:
         raise ReservationLifecycleError("expired reservation cannot be authorized")
     if row[9] != expected_version:
@@ -201,6 +210,8 @@ def _transition(
         raise ReservationLifecycleError(f"reservation status {row[10]} cannot transition to {target}")
     if row[9] != expected_version:
         raise ReservationLifecycleError("stale reservation version")
+    if now < row[7]:
+        raise ReservationLifecycleError("transition timestamp predates reservation creation")
     if require_expired and now < row[8]:
         raise ReservationLifecycleError("reservation has not reached expiry")
     if not require_expired and now >= row[8]:
