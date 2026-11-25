@@ -511,3 +511,52 @@ Exact-head Actions run [45552712044](https://github.com/ruthlessjoey/btcidr-trad
 - Overall full-project completion: **UNRATED** pending owner-approved scope, weights and evidence criteria.
 
 The 111-test result is scoped to the isolated candidate settlement/reservation modules. It is not evidence of a profitable strategy, complete product, production deployment or trading authorization.
+
+## 25 November — owner-approved Tokocrypto boundary correction (PR #154)
+
+This update supersedes the previous provider-policy count and earlier PR149/150 verification heads wherever the counts below supersede them.
+
+### Security findings
+
+Static inspection of the candidate repository found two mismatches with the current owner-approved market-data boundary:
+
+1. The crypto_engine provider-policy allowlist, test fixture, README, data-source approval matrix and root CLAUDE.md treated https://cloudme-toko.2meta.app/api/v1/klines as approved while denying https://www.tokocrypto.site/api/v3/klines.
+2. The legacy root providers.build('tokocrypto') constructed a generic Binance-style source that used BTCUSDT and could request server-time; the legacy probe.py diagnostic also requests symbol metadata. Both are outside the current approved unauthenticated BTCIDR candles-only scope.
+
+### PR #154 correction
+
+- PR #154: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/154.
+- Branch head: 78724489bc679e4b3ad5e6e613e4b2987fd516fc.
+- Base: PR #150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19.
+- Comparison: 15 commits ahead / 0 behind; 10 changed paths.
+- The offline crypto_engine policy now permits only the exact https://www.tokocrypto.site/api/v3/klines host/path, unauthenticated GET, BTCIDR symbol and approved request fields. The older 2meta host/path, Tokocrypto .com, wrong paths, server-time, metadata, unapproved symbols and authentication are rejected.
+- The legacy root Tokocrypto adapter is disabled at both entry points: providers.build('tokocrypto') refuses construction, and fetcher.Source rejects Tokocrypto identities and Tokocrypto hosts regardless of caller-supplied source name. This closes the simple renaming bypass.
+- Root market-data-check.yml remains blocked. No root runner, protected import closure, network request, DNS lookup, Tokocrypto endpoint or live market data was used.
+
+### Exact-head verification
+
+- Full unprotected crypto_engine/tests matrix: https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45555163021.
+  - Python 3.11.18 / SQLite 3.46.1: 218/218 passed.
+  - Python 3.13.18 / SQLite 3.46.1: 218/218 passed.
+  - Sparse checkout: 22 crypto_engine/tmm_core source files plus 18 crypto_engine/tests files. The suite is synthetic/offline; the Tokocrypto policy tests validate request structure only and do not submit a request.
+- Legacy root adapter containment: https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45555162962.
+  - Python 3.11.18: 4/4 passed.
+  - Python 3.13.18: 4/4 passed.
+  - Sparse checkout: fetcher.py, providers.py and one isolated root adapter guard test.
+- Both runs are exact-head evidence at 78724489bc679e4b3ad5e6e613e4b2987fd516fc. The advisory immutable-review workflow is skipped, not passed.
+
+### Latest reservation / settlement evidence remains
+
+- PR #149 head: 104756a8f4978f9e81bf40928902f419ab61b528; run 45553924899: Python 3.11.18 and 3.13.18 each passed 23 settlement-store + 16 receiver tests. Includes deterministic receipt, TEMP-trigger, sender ACK payload binding and v2 restart recovery.
+- PR #150 head: df6bcc41d97b5e5640ce1c20f10d88e4c0434e19, 28 ahead / 0 behind PR #149; run 45554067988: Python 3.11.18 and 3.13.18 each passed all six suites, 115/115.
+- PR #154 is stacked after PR #150 and remains open/draft/unmerged.
+
+### Current disposition
+
+- Tokocrypto public retrieval remains unperformed. The current allowed representation is the exact .site/api/v3/klines BTCIDR candle-only request; no server-time, symbol metadata, .com, 2meta or other host/path is authorized.
+- Legacy root Tokocrypto runner remains disabled; a dedicated candles-only live integration is not implemented or activated.
+- Install readiness: NOT READY; trading readiness: NOT READY; PAPER activation: ON HOLD; LIVE: DISABLED / ABSENT.
+- Profitability / high-win-rate evidence: NOT ESTABLISHED.
+- Whole-project completion: UNRATED pending owner-approved scope, weights and evidence criteria.
+
+The 218 + 4 results are isolated offline engineering evidence. They do not establish endpoint response compatibility, full repository acceptance, profitable strategies, production deployment or trading authorization.
