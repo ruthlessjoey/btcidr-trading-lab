@@ -49,7 +49,7 @@ class SellAllocationPreflightTests(unittest.TestCase):
             "market_id": "BTC/USDT", "version": 1,
             "authorized_quantity": "0.5", "consumed_quantity": "0",
         }]
-        allocations = self.allocations + [{
+        allocations = [dict(self.allocations[0], allocated_quantity="0.3")] + [{
             "allocation_id": "a-2", "fill_id": "sell-1",
             "reservation_id": "r-2", "reservation_version": 1,
             "allocated_quantity": "0.1",
