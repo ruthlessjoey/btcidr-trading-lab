@@ -154,7 +154,7 @@ def _preflight_and_snapshot(path: Path) -> tuple[MigrationPreflight,tuple[tuple[
             raise ReservationMigrationError("source SQLite journal mode must be DELETE")
         db.execute("BEGIN")
         result = inspect_v1_migration_eligibility(db)
-        snapshot = _snapshot_v1_tables(db)
+        snapshot = _snapshot_v1_tables(db) if result.eligible else ()
         db.rollback()
         return result,snapshot
     finally:
