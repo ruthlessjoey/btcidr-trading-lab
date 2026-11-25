@@ -1,5 +1,7 @@
 name: Reservation Settlement Isolated Tests
 
+# Re-run all safe suites for the corrected pre-marker legacy read-only fixture.
+
 on:
   push:
     branches:
