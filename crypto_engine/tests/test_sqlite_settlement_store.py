@@ -585,7 +585,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         )
         with sqlite3.connect(self.path) as db:
             db.execute(
-                "UPDATE main.fills SET quantity='999' WHERE fill_id='buy-1'"
+                "UPDATE main.fills SET quantity='999' WHERE fill_id='f-1'"
             )
         with self.assertRaisesRegex(SettlementStoreError, "synthetic fill ledger does not match audit events"):
             self.store.pending_reservation_outbox()
