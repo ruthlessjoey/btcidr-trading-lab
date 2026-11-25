@@ -91,6 +91,10 @@ class SQLiteSettlementStore:
     def register_market(self, market_id: str, base_asset: str, quote_asset: str) -> None:
         if not all(isinstance(v, str) and v.strip() for v in (market_id, base_asset, quote_asset)):
             raise SettlementStoreError("market identity fields are required")
+        if len(market_id) > 128:
+            raise SettlementStoreError("market_id exceeds the 128-character limit")
+        if len(base_asset) > 32 or len(quote_asset) > 32:
+            raise SettlementStoreError("asset code exceeds the 32-character limit")
         if quote_asset != self.currency:
             raise SettlementStoreError("market quote asset must equal account currency")
         with self._lock, self._connect() as db:
@@ -140,8 +144,12 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("timestamp must be a nonnegative SQLite integer")
         if not isinstance(fills, Sequence) or isinstance(fills, (str, bytes)):
             raise SettlementStoreError("fills must be a sequence")
+        if len(fills) > 1000:
+            raise SettlementStoreError("fills exceeds the 1000-row limit")
         if not isinstance(sell_settlements, Sequence) or isinstance(sell_settlements, (str, bytes)):
             raise SettlementStoreError("sell_settlements must be a sequence")
+        if len(sell_settlements) > 1000:
+            raise SettlementStoreError("sell_settlements exceeds the 1000-row limit")
         if not isinstance(sell_allocations, Sequence) or isinstance(sell_allocations, (str, bytes)):
             raise SettlementStoreError("sell_allocations must be a sequence")
         if len(sell_allocations) > 1000:
@@ -154,10 +162,12 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("each fill must be a mapping")
             fill_id, market_id = item.get("fill_id"), item.get("market_id")
             side = item.get("side")
-            if not isinstance(fill_id, str) or not fill_id.strip() or fill_id in seen_fill_ids:
-                raise SettlementStoreError("fill IDs must be nonempty and unique within batch")
-            if not isinstance(market_id, str) or not market_id.strip():
-                raise SettlementStoreError("fill market_id is required")
+            if (not isinstance(fill_id, str) or not fill_id.strip()
+                    or len(fill_id) > 256 or fill_id in seen_fill_ids):
+                raise SettlementStoreError("fill IDs must be nonempty, bounded and unique within batch")
+            if (not isinstance(market_id, str) or not market_id.strip()
+                    or len(market_id) > 128):
+                raise SettlementStoreError("fill market_id must be nonempty and bounded")
             if side not in ("BUY", "SELL"):
                 raise SettlementStoreError("only BUY and SELL fills are supported")
             qty = _decimal(item.get("quantity"), "quantity")
@@ -178,10 +188,12 @@ class SQLiteSettlementStore:
             if not isinstance(item, Mapping):
                 raise SettlementStoreError("each settlement outbox item must be a mapping")
             key, market_id = item.get("idempotency_key"), item.get("market_id")
-            if not isinstance(key, str) or not key.strip() or key in seen_keys:
-                raise SettlementStoreError("outbox idempotency keys must be nonempty and unique")
-            if not isinstance(market_id, str) or not market_id.strip():
-                raise SettlementStoreError("outbox market_id is required")
+            if (not isinstance(key, str) or not key.strip()
+                    or len(key) > 256 or key in seen_keys):
+                raise SettlementStoreError("outbox idempotency keys must be nonempty, bounded and unique")
+            if (not isinstance(market_id, str) or not market_id.strip()
+                    or len(market_id) > 128):
+                raise SettlementStoreError("outbox market_id must be nonempty and bounded")
             authorized = _decimal(item.get("authorized_quantity"), "authorized_quantity")
             filled = _decimal(item.get("filled_quantity"), "filled_quantity")
             if authorized < 0 or filled < 0 or filled > authorized:
@@ -495,8 +507,11 @@ class SQLiteSettlementStore:
             if (set(event) != expected_market_keys
                     or event.get("account_id") != self.account_id
                     or not isinstance(market_id, str) or not market_id.strip()
+                    or len(market_id) > 128
                     or not isinstance(base_asset, str) or not base_asset.strip()
+                    or len(base_asset) > 32
                     or not isinstance(quote_asset, str) or quote_asset != self.currency
+                    or len(quote_asset) > 32
                     or market_id in market_events):
                 raise SettlementStoreError("market registration audit event is invalid")
             market_events[market_id] = (base_asset, quote_asset)

@@ -925,6 +925,57 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_register_market_rejects_oversized_identity_fields(self):
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market_id exceeds the 128-character limit"
+        ):
+            self.store.register_market("M" * 129, "M", "USDT")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "asset code exceeds the 32-character limit"
+        ):
+            self.store.register_market("ETH/USDT", "E" * 33, "USDT")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "asset code exceeds the 32-character limit"
+        ):
+            self.store.register_market("ETH/USDT", "ETH", "U" * 33)
+
+    def test_apply_batch_rejects_oversized_fill_and_settlement_sequences(self):
+        with self.assertRaisesRegex(
+            SettlementStoreError, "fills exceeds the 1000-row limit"
+        ):
+            self.store.apply_batch(
+                batch_id="too-many-fills", fills=[{}] * 1001, timestamp=1
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "sell_settlements exceeds the 1000-row limit"
+        ):
+            self.store.apply_batch(
+                batch_id="too-many-settlements", fills=[],
+                sell_settlements=[{}] * 1001, timestamp=1,
+            )
+
+    def test_apply_batch_rejects_oversized_fill_and_outbox_identifiers(self):
+        base_fill = {
+            "fill_id": "f-1", "market_id": "BTC/USDT", "side": "BUY",
+            "quantity": "1", "price": "1", "fee_quote": "0",
+        }
+        too_long_fill = dict(base_fill, fill_id="F" * 257)
+        with self.assertRaisesRegex(SettlementStoreError, "fill IDs must be nonempty, bounded"):
+            self.store.apply_batch(batch_id="long-fill", fills=[too_long_fill], timestamp=1)
+        too_long_market = dict(base_fill, market_id="M" * 129)
+        with self.assertRaisesRegex(SettlementStoreError, "fill market_id must be nonempty and bounded"):
+            self.store.apply_batch(batch_id="long-market", fills=[too_long_market], timestamp=1)
+        too_long_outbox = {
+            "idempotency_key": "K" * 257, "market_id": "BTC/USDT",
+            "authorized_quantity": "0", "filled_quantity": "0",
+        }
+        with self.assertRaisesRegex(
+            SettlementStoreError, "outbox idempotency keys must be nonempty, bounded"
+        ):
+            self.store.apply_batch(
+                batch_id="long-outbox", fills=[], sell_settlements=[too_long_outbox], timestamp=1
+            )
+
     def test_snapshot_rejects_tampered_market_asset_mapping(self):
         db = sqlite3.connect(self.path)
         try:
