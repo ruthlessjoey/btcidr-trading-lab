@@ -116,6 +116,15 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
             with self.subTest(length=len(raw)), self.assertRaises(IngestionError):
                 decode_kline_response(raw)
 
+    def test_response_decoder_rejects_adversarially_deep_json(self):
+        raw = b"[" * 2000 + b"0" + b"]" * 2000
+        with self.assertRaises(IngestionError):
+            decode_kline_response(raw)
+
+    def test_response_decoder_rejects_non_bytes_input(self):
+        with self.assertRaises(IngestionError):
+            decode_kline_response("not bytes")
+
     def test_response_decoder_accepts_strict_json_fixture_without_source_claim(self):
         decoded = decode_kline_response(self.raw())
         self.assertEqual(decoded["code"], 0)
