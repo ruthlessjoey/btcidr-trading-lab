@@ -384,3 +384,58 @@ GitHub Actions run [45551184494](https://github.com/ruthlessjoey/btcidr-trading-
 - Overall whole-project completion: **UNRATED** pending approved scope and evidence criteria.
 
 The six-suite result is meaningful evidence for the tested reservation/settlement modules only; it is not a whole-project acceptance result, profitability result or production trading authorization.
+
+
+## Current latest candidate head — acknowledgment hardening and 222-test pass (25 November 2026)
+
+The previous 220-test result at #150 head 8551e596... has been superseded by later sender/receiver acknowledgement hardening. The current live #150 branch is:
+
+- PR #150 current head: 8b2cf3a7065c5603d0409d5ac6e42a40754d010b.
+- Base: current PR #149 head 8db0cd10649e169bb19e934d40f0e760c5b8b0be.
+- Exact pull-request run [#45551918569](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45551918569): **success**.
+- Python 3.11.18 / SQLite 3.46.1: schema 25/25, lifecycle 21/21, allocations 16/16, atomic allocations 13/13, settlement 22/22, receiver 14/14 = **111/111**.
+- Python 3.13.18 / SQLite 3.46.1: the same suite counts = **111/111**.
+- Total **222 successful test executions**. Both matrix jobs and all 12 test steps passed.
+
+### New current-head hardening
+Three new commits added:
+- revalidate the persisted reservation outbox row at acknowledgment time against the canonical recomputed payload and the hash observed before the receiver callback;
+- bind the acknowledgment update to the exact expected SHA-256 hash, rejecting sender state mutation during delivery;
+- reject malformed stored reservation payloads closed.
+
+The receiver test module now has 14 tests, including:
+- mutate the sender outbox market_id from BTC/USDT to ETH/USDT during the trusted receiver callback; receiver stores the original payload, but sender acknowledgment fails because persisted payload no longer matches the original hash; sender row stays PENDING for reconciliation/retry;
+- a tampered stored payload hash prevents the receiver callback from being invoked;
+- reject a receiver receipt not bound to the canonical payload.
+
+The immediately preceding head cf73a354... failed four settlement-store tests because they called the hardened acknowledgment API without its required expected_payload_sha256. Subsequent test commits corrected those calls and added tamper coverage. Preserve that failure as history; only the current exact head is passing.
+
+The pass remains focused on six settlement/reservation modules. It does not certify the entire repository, an independent security review, production external effect, real database migration, crash/power-loss/restore, installation/trading readiness or profitability.
+
+## Q0.8 specialist review — separate outstanding blocker
+
+PR #60 latest head remains e8674dbfe3efd2339ddb028484362f9466f7b058 (open/draft; base historical M6 cd451972e3a641ad6fa78e64abf3968655a4b82a). Offline Q0.8 security regression workflow run [#45055081357](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45055081357) passed at that head.
+
+The latest immutable 19-role review run [#45056820308](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45056820308) failed before any role review started:
+- syntax compilation passed;
+- synthetic policy smoke test passed;
+- immutable PR head validation and snapshot completed;
+- review stopped with `Scoped review diff exceeded limit: chars=230101 limit=224000`;
+- no checkpoint file existed; the artifact upload reported no files, and there is no valid checkpoint to resume;
+- the OpenRouter 429 quota/resume path was **not** reached; this is a diff-size blocker, not a rate-limit failure;
+- do not resume the old run 44337003905 or assume this failed run can resume.
+
+Next safe task: inspect the unprotected immutable reviewer and workflow to design an exact-SHA scoped/chunked diff review under a fixed resource ceiling. Do not inspect protected paths. Do not dispatch another workflow or change model/provider secrets without the user's separate operational approval. The offline regression pass and the 19-role review are separate gates.
+
+## Current state in brief
+
+- main: 0426e1ecd5bd01913a568272792c355c4b7059c7; no merge.
+- PR #149: 8db0cd10649e169bb19e934d40f0e760c5b8b0be, draft/open; receiver CI passed 13/13 per Python version.
+- PR #150: 8b2cf3a7065c5603d0409d5ac6e42a40754d010b, draft/open; latest full six-suite CI passed 111/111 per Python version.
+- PR #147: documentation tracker, draft/open; addendum updated to record this current state.
+- PR #151/#152: closed as duplicates/superseded; branches retained.
+- Independent reservation-stack security acceptance: **PENDING**.
+- Q0.8 19-role specialist review: **INCONCLUSIVE / BLOCKED BEFORE REVIEW**.
+- Install readiness: **NOT READY**; PAPER **ON HOLD**; LIVE **DISABLED / ABSENT**.
+- BTC/IDR profitability/high win rate: **NOT ESTABLISHED**.
+- Overall project completion: **UNRATED**.
