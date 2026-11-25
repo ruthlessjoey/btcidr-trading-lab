@@ -360,7 +360,8 @@ class SQLiteSettlementStore:
                 )
             result = {
                 "batch_id": batch_id, "request_hash": request_hash,
-                "status": "COMMITTED_PENDING_OUTBOX" if normalized_outbox else "COMPLETE",
+                "status": "COMMITTED_PENDING_OUTBOX"
+                if (normalized_outbox or normalized_reservation_allocations) else "COMPLETE",
                 "cash": format(cash, "f"),
                 "holdings": {key: format(value, "f") for key, value in sorted(balances.items())},
                 "fills": normalized_fills,
