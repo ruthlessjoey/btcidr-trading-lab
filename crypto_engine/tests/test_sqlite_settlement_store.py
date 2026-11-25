@@ -574,6 +574,29 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "reservation outbox payload hash mismatch"):
             self.store.pending_reservation_outbox()
 
+
+    def test_fill_ledger_tampering_is_detected_against_audit_events(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.fills SET quantity='999' WHERE fill_id='buy-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "synthetic fill ledger does not match audit events"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "synthetic fill ledger does not match audit events"):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            status = db.execute(
+                "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
+            ).fetchone()[0]
+        self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
