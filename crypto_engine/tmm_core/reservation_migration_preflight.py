@@ -10,6 +10,7 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Tuple
 
 from .reservation_schema_v2 import _SCHEMA as _CURRENT_V2_SCHEMA
@@ -165,6 +166,78 @@ def classify_reservation_schema(db: sqlite3.Connection) -> str:
     return 'MALFORMED_OR_UNKNOWN'
 
 
+
+def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
+    """Reconcile BUY-only v1 fills, audit events, holdings and ending cash."""
+    account = db.execute(
+        "SELECT account_id,cash FROM main.account WHERE singleton=1"
+    ).fetchone()
+    if account is None:
+        return False
+    account_id, cash_text = account
+    try:
+        ending_cash = Decimal(str(cash_text))
+        if not account_id or not ending_cash.is_finite() or ending_cash < 0:
+            return False
+        markets = {row[0] for row in db.execute("SELECT market_id FROM main.markets")}
+        fills = db.execute(
+            "SELECT fill_id,batch_id,market_id,side,quantity,price,fee_quote,timestamp "
+            "FROM main.fills ORDER BY rowid"
+        ).fetchall()
+        audit_rows = db.execute("SELECT event_json FROM main.audit ORDER BY seq").fetchall()
+        if len(audit_rows) != len(fills):
+            return False
+        totals = {}
+        expected_cash = None
+        for fill, audit_row in zip(fills, audit_rows):
+            fill_id,batch_id,market_id,side,quantity_text,price_text,fee_text,timestamp = fill
+            if (not fill_id or market_id not in markets or side != "BUY"
+                    or isinstance(timestamp,bool) or not isinstance(timestamp,int) or timestamp < 0):
+                return False
+            quantity,price,fee = Decimal(str(quantity_text)),Decimal(str(price_text)),Decimal(str(fee_text))
+            if (not quantity.is_finite() or not price.is_finite() or not fee.is_finite()
+                    or quantity <= 0 or price <= 0 or fee < 0):
+                return False
+            event = json.loads(audit_row[0])
+            expected_keys = {
+                "kind","account_id","batch_id","fill_id","market_id","side",
+                "quantity","price","fee_quote","cash_after","holding_after","timestamp",
+            }
+            if not isinstance(event,dict) or set(event) != expected_keys:
+                return False
+            if (event["kind"] != "SYNTHETIC_FILL" or event["account_id"] != account_id
+                    or event["batch_id"] != batch_id or event["fill_id"] != fill_id
+                    or event["market_id"] != market_id or event["side"] != side
+                    or event["quantity"] != quantity_text or event["price"] != price_text
+                    or event["fee_quote"] != fee_text or event["timestamp"] != timestamp):
+                return False
+            totals[market_id] = totals.get(market_id,Decimal("0")) + quantity
+            event_holding = Decimal(str(event["holding_after"]))
+            event_cash = Decimal(str(event["cash_after"]))
+            if (not event_holding.is_finite() or not event_cash.is_finite()
+                    or event_cash < 0 or event_holding != totals[market_id]):
+                return False
+            debit = quantity * price + fee
+            expected_cash = event_cash + debit if expected_cash is None else expected_cash - debit
+            if expected_cash != event_cash:
+                return False
+        holdings = {}
+        for market_id, quantity_text in db.execute(
+            "SELECT market_id,quantity FROM main.holdings"
+        ):
+            quantity = Decimal(str(quantity_text))
+            if not quantity.is_finite() or quantity < 0:
+                return False
+            holdings[market_id] = quantity
+        for market_id in set(totals) | set(holdings):
+            if totals.get(market_id,Decimal("0")) != holdings.get(market_id,Decimal("0")):
+                return False
+        return expected_cash is None or expected_cash == ending_cash
+    except (InvalidOperation, TypeError, ValueError, OverflowError, json.JSONDecodeError, RecursionError):
+        return False
+
+
+
 def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
     try:
         count, total_bytes, max_bytes = db.execute(
@@ -314,6 +387,9 @@ def inspect_v1_migration_eligibility(
         audit_ok, audit_count = _audit_is_valid(db)
         if not audit_ok:
             blockers.append("audit chain verification failed")
+        elif "account" in usable_tables and "fills" in usable_tables and "holdings" in usable_tables:
+            if not _accounting_state_is_consistent(db):
+                blockers.append("accounting state does not reconcile with BUY fills and audit events")
 
     # Malformed database metadata can make SQLite's PRAGMA checks raise
     # DatabaseError (for example, a foreign key referencing a missing table).
