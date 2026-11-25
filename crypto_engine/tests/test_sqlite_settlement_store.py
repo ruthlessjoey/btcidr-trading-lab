@@ -702,6 +702,25 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "fill row does not match its batch/market contract"):
             self.store.snapshot()
 
+
+    def test_snapshot_rejects_tampered_initial_cash_before_first_fill(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(SettlementStoreError, "account cash does not match initial account audit"):
+            self.store.snapshot()
+
+    def test_first_batch_rejects_tampered_initial_cash_baseline(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(SettlementStoreError, "account cash does not match initial account audit"):
+            self.store.apply_batch(
+                batch_id="b-first", fills=[self.buy()], timestamp=10
+            )
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM main.batches WHERE batch_id='b-first'"
+            ).fetchone())
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
