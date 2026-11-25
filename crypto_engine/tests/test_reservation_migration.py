@@ -78,6 +78,24 @@ class ReservationMigrationCopyTests(unittest.TestCase):
         self.assertFalse(self.backup.exists())
         self.assertFalse(self.output.exists())
 
+
+    def test_source_metadata_change_during_preflight_blocks_copy(self):
+        import tmm_core.reservation_migration as migration
+        original = migration._preflight_and_snapshot
+        def change_source(path):
+            result = original(path)
+            info = path.stat()
+            os.utime(path,ns=(info.st_atime_ns,info.st_mtime_ns + 1_000_000))
+            return result
+        with mock.patch(
+            "tmm_core.reservation_migration._preflight_and_snapshot",
+            side_effect=change_source,
+        ):
+            with self.assertRaisesRegex(ReservationMigrationError,"source file identity changed"):
+                create_v2_migrated_copy(self.source,self.backup,self.output)
+        self.assertFalse(self.backup.exists())
+        self.assertFalse(self.output.exists())
+
     def test_existing_destination_is_never_overwritten(self):
         self.backup.write_bytes(b"owner-data")
         with self.assertRaisesRegex(ReservationMigrationError,"must not already exist"):
