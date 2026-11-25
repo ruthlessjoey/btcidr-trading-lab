@@ -113,6 +113,7 @@ def validate_sell_allocations(
 
     normalized: list[dict[str, object]] = []
     allocation_ids: set[str] = set()
+    allocation_pairs: set[tuple[str, str]] = set()
     allocated_by_fill: dict[str, Decimal] = {}
     allocated_by_reservation: dict[str, Decimal] = {}
     with localcontext() as decimal_context:
@@ -128,6 +129,10 @@ def validate_sell_allocations(
             reservation_id = _required_text(raw, "reservation_id")
             if fill_id not in fill_by_id:
                 raise ReservationAllocationError("allocation references unknown fill")
+            pair = (fill_id, reservation_id)
+            if pair in allocation_pairs:
+                raise ReservationAllocationError("duplicate fill/reservation allocation pair")
+            allocation_pairs.add(pair)
             if reservation_id not in reservation_by_id:
                 raise ReservationAllocationError("allocation references unknown reservation")
             fill = fill_by_id[fill_id]
