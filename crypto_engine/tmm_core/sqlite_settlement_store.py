@@ -1224,6 +1224,7 @@ class SQLiteSettlementStore:
         with self._lock, self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             self._verify_account_state(db)
+            self._require_current_audit_baseline(db)
             objects = db.execute(
                 "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
                 "('reservations','reservation_allocations','reservation_outbox')"
