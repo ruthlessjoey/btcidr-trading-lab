@@ -816,6 +816,28 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_snapshot_rejects_modified_initial_account_audit_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.metadata SET value='unknown' "
+                "WHERE key='account_initialization_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "initial account audit policy marker is invalid"
+        ):
+            self.store.snapshot()
+
+    def test_snapshot_rejects_modified_market_registration_audit_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.metadata SET value='unknown' "
+                "WHERE key='market_registration_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registration audit policy marker is invalid"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_tampered_initial_cash_before_first_fill(self):
         with _managed_connection(self.path) as db:
             db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
@@ -849,6 +871,26 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SettlementStoreError, "market registry does not match audit events"
         ):
             self.store.snapshot()
+
+    def test_register_market_rejects_tampered_market_mapping(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.markets SET base_asset='ETH' WHERE market_id='BTC/USDT'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registry does not match audit events"
+        ):
+            self.store.register_market("BTC/USDT", "ETH", "USDT")
+
+    def test_register_market_rejects_removed_required_market_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "DELETE FROM main.metadata WHERE key='market_registration_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "required market registration audit policy marker is missing"
+        ):
+            self.store.register_market("ETH/USDT", "ETH", "USDT")
 
     def test_market_registration_audit_is_not_duplicated_on_idempotent_register(self):
         db = sqlite3.connect(self.path)
