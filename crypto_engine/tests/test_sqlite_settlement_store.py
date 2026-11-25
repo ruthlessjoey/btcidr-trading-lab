@@ -816,6 +816,28 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_snapshot_rejects_modified_initial_account_audit_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.metadata SET value='unknown' "
+                "WHERE key='account_initialization_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "initial account audit policy marker is invalid"
+        ):
+            self.store.snapshot()
+
+    def test_snapshot_rejects_modified_market_registration_audit_policy_marker(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.metadata SET value='unknown' "
+                "WHERE key='market_registration_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "market registration audit policy marker is invalid"
+        ):
+            self.store.snapshot()
+
     def test_snapshot_rejects_tampered_initial_cash_before_first_fill(self):
         with _managed_connection(self.path) as db:
             db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
