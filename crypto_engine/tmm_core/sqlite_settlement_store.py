@@ -738,7 +738,7 @@ class SQLiteSettlementStore:
             "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
             "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
         )
-        expected_ack_events: dict[str,dict[str,str]] = {}
+        expected_ack_events: dict[str,dict[str,object]] = {}
         for values in db.execute(sql,params):
             row = dict(zip(fields,values[:10]))
             status,stored_receipt = values[10],values[11]
