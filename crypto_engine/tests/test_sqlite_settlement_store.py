@@ -106,46 +106,92 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(self.store.snapshot()["cash"], "10000")
 
     def test_failed_batch_rolls_back_claim_and_every_accounting_table(self):
+        db = sqlite3.connect(self.path)
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("BEGIN IMMEDIATE")
+        ensure_reservation_schema_v2(db)
+        db.commit()
+        db.close()
+        audit_before = sqlite3.connect(self.path).execute(
+            "SELECT COUNT(*) FROM audit"
+        ).fetchone()[0]
         invalid = {"fill_id": "bad", "market_id": "BTC/USDT", "side": "SELL",
                    "quantity": "1", "price": "100", "fee_quote": "0"}
         with self.assertRaisesRegex(SettlementStoreError, "inventory"):
-            self.store.apply_batch(batch_id="b-4",
-                                   fills=[invalid], timestamp=10)
+            self.store.apply_batch(
+                batch_id="b-4", fills=[invalid],
+                sell_settlements=[self.sell_settlement(
+                    key="settle:inventory", authorized="1", filled="1"
+                )],
+                sell_allocations=[self.allocation(
+                    allocation_id="a-inventory", fill_id="bad",
+                    version=1, quantity="1"
+                )],
+                timestamp=10,
+            )
         self.assertEqual(self.store.snapshot()["cash"], "10000")
         with sqlite3.connect(self.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], audit_before)
 
-    def test_outbox_requires_ack_before_batch_complete(self):
-        result = self.store.apply_batch(
-            batch_id="b-5", fills=[self.buy(), {
+    def test_outbox_requires_both_acknowledgements_before_batch_complete(self):
+        self.enable_reservations()
+        kwargs = {
+            "batch_id": "b-5",
+            "fills": [self.buy(), {
                 "fill_id": "sell-1", "market_id": "BTC/USDT", "side": "SELL",
                 "quantity": "0.25", "price": "110", "fee_quote": "0.1"
             }],
-            sell_settlements=[{"idempotency_key": "settle:b-5:BTC", "market_id": "BTC/USDT",
-                               "authorized_quantity": "0.5", "filled_quantity": "0.25"}],
-            timestamp=10,
-        )
+            "sell_settlements": [{
+                "idempotency_key": "settle:b-5:BTC", "market_id": "BTC/USDT",
+                "authorized_quantity": "0.5", "filled_quantity": "0.25"
+            }],
+            "sell_allocations": [self.allocation()],
+            "timestamp": 10,
+        }
+        result = self.store.apply_batch(**kwargs)
         self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
-        pending = self.store.pending_outbox()
-        self.assertEqual(len(pending), 1)
+        self.assertEqual(len(self.store.pending_outbox()), 1)
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+
         self.store.acknowledge_outbox("settle:b-5:BTC", receiver_receipt="receipt-1")
+        with sqlite3.connect(self.path) as db:
+            status = db.execute("SELECT status FROM batches WHERE batch_id='b-5'").fetchone()[0]
+        self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
+
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt="reservation-receipt-1"
+        )
         with sqlite3.connect(self.path) as db:
             status = db.execute("SELECT status FROM batches WHERE batch_id='b-5'").fetchone()[0]
         self.assertEqual(status, "COMPLETE")
         self.assertEqual(self.store.pending_outbox(), [])
-        replay = self.store.apply_batch(
-            batch_id="b-5", fills=[self.buy(), {
-                "fill_id": "sell-1", "market_id": "BTC/USDT", "side": "SELL",
-                "quantity": "0.25", "price": "110", "fee_quote": "0.1"
-            }],
-            sell_settlements=[{"idempotency_key": "settle:b-5:BTC", "market_id": "BTC/USDT",
-                               "authorized_quantity": "0.5", "filled_quantity": "0.25"}],
-            timestamp=10,
-        )
+        self.assertEqual(self.store.pending_reservation_outbox(), [])
+        replay = self.store.apply_batch(**kwargs)
         self.assertEqual(replay["status"], "COMPLETE")
         self.assertTrue(self.store.verify_audit_chain())
+
+    def test_legacy_database_rejects_sell_until_reservation_schema_v2_is_enabled(self):
+        self.store.apply_batch(batch_id="b-legacy-buy", fills=[self.buy()], timestamp=10)
+        before = self.store.snapshot()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "reservation schema v2 is required"
+        ):
+            self.store.apply_batch(
+                batch_id="b-legacy-sell",
+                fills=[self.sell()],
+                sell_settlements=[self.sell_settlement()],
+                timestamp=20,
+            )
+        self.assertEqual(self.store.snapshot(), before)
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM batches WHERE batch_id='b-legacy-sell'"
+            ).fetchone())
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM fills WHERE fill_id='sell-1'"
+            ).fetchone())
 
     def test_reserved_sell_consumption_is_atomic_and_replay_safe(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
