@@ -3,6 +3,7 @@ name: Reservation Settlement Isolated Tests
 on:
   push:
     branches:
+      - security/reservation-inbox-temp-trigger-receipt-integrity-2026-11-25
       - security/block-legacy-unreserved-sells-2026-11-25
     paths:
       - ".github/workflows/reservation-settlement-isolated-tests.yml"
@@ -39,7 +40,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: reservation-settlement-isolated-tests-${{ github.event.pull_request.number }}
+  group: reservation-settlement-isolated-tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -89,18 +90,38 @@ jobs:
         run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
 
       - name: Run reservation schema v2 regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_schema_v2.py' -v
 
       - name: Run reservation lifecycle regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_lifecycle.py' -v
 
       - name: Run reservation allocations regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_allocations.py' -v
 
       - name: Run reservation atomic allocations regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
 
       - name: Run settlement store regression suite
+        if: >-
+          github.ref == 'refs/heads/security/block-legacy-unreserved-sells-2026-11-25' ||
+          (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'security/block-legacy-unreserved-sells-2026-11-25')
         run: python -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
 
       - name: Run reservation receiver regression suite
