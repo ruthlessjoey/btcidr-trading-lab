@@ -439,3 +439,75 @@ Next safe task: inspect the unprotected immutable reviewer and workflow to desig
 - Install readiness: **NOT READY**; PAPER **ON HOLD**; LIVE **DISABLED / ABSENT**.
 - BTC/IDR profitability/high win rate: **NOT ESTABLISHED**.
 - Overall project completion: **UNRATED**.
+
+
+## 25 November — final sender acknowledgement binding and exact-head CI refresh
+
+This supersedes the earlier PR149/150 verification counts above; those earlier counts are retained as historical test runs.
+
+### PR #149 — final receiver/sender acknowledgement hardening
+
+- Current branch head: `6a3c91ea9164e5cfcac39390aab2f54e4a5ac185`.
+- Stacked on PR #148 head `ee6387fbb5f721a509a38b971dc3db35452b0c73`: 16 commits ahead / 0 behind.
+- Receiver inbox rejects TEMP triggers attached to the main inbox; idempotent replay validates the deterministic receipt.
+- Sender pending-row query includes the account identity required to reconstruct the canonical receiver payload.
+- The sender ACK boundary now reloads the full outbox record inside `BEGIN IMMEDIATE`, recomputes the canonical payload hash and deterministic receipt, checks both against the delivered payload evidence, and conditionally acknowledges only the unchanged pending row.
+- A callback-time sender-row mutation regression proves a changed sender payload stays pending instead of being acknowledged.
+
+Exact-head Actions run [45552657350](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45552657350):
+- Python 3.11.18 / SQLite 3.46.1: 21/21 settlement-store and 14/14 receiver tests passed.
+- Python 3.13.18 / SQLite 3.46.1: 21/21 settlement-store and 14/14 receiver tests passed.
+- The workflow uses sparse checkout of only the named unprotected settlement/receiver source and test files.
+- Reviewer job is skipped, not passed.
+
+### PR #150 — legacy SELL bypass and integrated settlement closure
+
+- Current branch head: `3bffd6bc32ff72072c24ec94ef2c642e5f7104e4`.
+- Current PR #149 base: `6a3c91ea9164e5cfcac39390aab2f54e4a5ac185`.
+- Ancestry comparison: 24 commits ahead / 0 behind.
+- Legacy v1 databases remain BUY-only; every SELL requires the full verified current reservation schema v2 and exact per-fill allocation.
+- Earlier-v2 schemas without the current expiry/lifecycle DDL fail closed.
+- Dual-outbox completion requires both settlement and reservation acknowledgements.
+- The sender ACK payload binding from PR149 is included in the current candidate tree.
+- The workflow now runs one settlement-store suite (no duplicate invocation) plus schema, lifecycle, allocation, atomic-allocation and receiver suites.
+
+Exact-head Actions run [45552712044](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45552712044):
+- Python 3.11.18 / SQLite 3.46.1: schema 25 + lifecycle 21 + allocation preflight 16 + atomic allocations 13 + settlement store 22 + receiver 14 = **111/111 passed**.
+- Python 3.13.18 / SQLite 3.46.1: the same six suites = **111/111 passed**.
+- Sparse checkout contains only named unprotected reservation/settlement source and test files; workflow permissions are contents:read and checkout credentials are not persisted.
+- Reviewer job is skipped, not passed. These tests are not full-repository acceptance, migration verification, remote receiver verification, or crash/restore acceptance.
+
+### Next release blockers and readiness
+
+1. Obtain an independent adversarial review of PRs #139–#150 against exact current heads and retain a signed/reproducible evidence packet.
+2. Design and test a read-only preflight for v1 / earlier-v2 / current-v2 databases on disposable copies.
+3. Implement a separately reviewed, non-destructive migration and explicit v1 inventory bootstrap. Do not invent expiry timestamps or auto-authorize holdings.
+4. Run process-level concurrency, crash injection, backup/restore, corrupted DB, outbox replay and resource-exhaustion drills.
+5. Implement a separately reviewed authenticated remote receiver only after defining its real business effect and trust boundary.
+6. Keep strategy agents proposal-only and the settlement DB/receiver callback private to the trusted composition root.
+7. Begin preregistered profitability research only after point-in-time data rights/coverage, realistic fees/spread/slippage/impact/liquidity, holdouts and multiple-testing controls are independently accepted.
+
+### Team roles for handoff
+
+- **Commander / coordinator:** workstream sequencing, evidence register, safety guardrails, release gates and handoff accuracy.
+- **Architecture specialist:** multi-market boundaries, interfaces, state transitions, transaction sequencing and system integration.
+- **SQLite persistence specialist:** exact DDL, transactions, indexes, locking, schema migration, audit and outbox durability.
+- **Security reviewer:** adversarial schema/data review, TEMP/main shadowing, TOCTOU, malformed payloads, replay, identity and privilege boundaries.
+- **Reliability specialist:** Python-version CI, multiprocess concurrency, crash/restart, backup/restore, resource bounds and recovery drills.
+- **Ledger/accounting specialist:** fill/reservation/inventory reconciliation, long-only constraints, fees, balances, settlement and historical preservation.
+- **Quant research specialist:** preregistered strategies, realistic cost modeling, out-of-sample net profitability and high-win-rate measurement.
+- **Independent acceptance reviewer:** separate pass/fail/inconclusive decision on immutable heads and evidence, not author-provided assertion.
+- **Project owner:** approves protected access, data/provider scope, historical inventory bootstrap, migration manifest, PR merges, PAPER activation and any later LIVE decision.
+
+### Current disposition
+
+- PRs #149 and #150 remain open/draft/unmerged. PR #153 remains documentation-only/open/draft.
+- No existing database was inspected, migrated or modified.
+- Install readiness: **NOT READY**.
+- Trading readiness: **NOT READY**.
+- PAPER activation: **ON HOLD**.
+- LIVE trading: **DISABLED / ABSENT**.
+- Profitability / high-win-rate evidence: **NOT ESTABLISHED**.
+- Overall full-project completion: **UNRATED** pending owner-approved scope, weights and evidence criteria.
+
+The 111-test result is scoped to the isolated candidate settlement/reservation modules. It is not evidence of a profitable strategy, complete product, production deployment or trading authorization.
