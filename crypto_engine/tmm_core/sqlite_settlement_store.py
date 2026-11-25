@@ -263,6 +263,8 @@ class SQLiteSettlementStore:
                         from .reservation_schema_v2 import ensure_reservation_schema_v2
                         ensure_reservation_schema_v2(db)
                         self._verify_reservation_audit_coverage(db)
+                    else:
+                        self._verify_fill_account_state(db)
                     result = json.loads(result_json)
                     result["status"] = status
                     db.commit()
@@ -296,6 +298,8 @@ class SQLiteSettlementStore:
                     raise SettlementStoreError("SELL fills require reservation allocations when reservation schema is enabled")
                 # Never derive a new settlement from unaudited persisted balances.
                 self._verify_reservation_audit_coverage(db)
+            else:
+                self._verify_fill_account_state(db)
 
             db.execute(
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
@@ -412,8 +416,7 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
-    def _verify_reservation_audit_coverage(self, db: sqlite3.Connection) -> None:
-        """Reconcile SELL fills, allocation rows, reservation state and audit events."""
+    def _verify_fill_account_state(self, db: sqlite3.Connection) -> None:
         if not self._verify_chain(db):
             raise SettlementStoreError("reservation audit chain verification failed")
 
@@ -506,6 +509,11 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("account cash does not match fill audit state")
             if stored_holdings != latest_holdings:
                 raise SettlementStoreError("holdings do not match fill audit state")
+
+
+    def _verify_reservation_audit_coverage(self, db: sqlite3.Connection) -> None:
+        """Reconcile reservation state against fill, allocation and audit records."""
+        self._verify_fill_account_state(db)
 
         allocation_rows = db.execute(
             "SELECT allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,"
@@ -1099,17 +1107,19 @@ class SQLiteSettlementStore:
             if (any(kind != "table" for kind,_ in reservation_objects)
                     or (present and present != expected)):
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
-            if present == expected:
-                from .reservation_schema_v2 import ensure_reservation_schema_v2
-                db.execute("BEGIN")
-                try:
+            db.execute("BEGIN")
+            try:
+                if present == expected:
+                    from .reservation_schema_v2 import ensure_reservation_schema_v2
                     ensure_reservation_schema_v2(db)
                     self._verify_reservation_audit_coverage(db)
-                except Exception:
-                    db.rollback()
-                    raise
                 else:
-                    db.rollback()
+                    self._verify_fill_account_state(db)
+            except Exception:
+                db.rollback()
+                raise
+            else:
+                db.rollback()
             account = db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()
             holdings = dict(db.execute("SELECT market_id,quantity FROM holdings"))
             return {"account_id": self.account_id, "currency": self.currency,
