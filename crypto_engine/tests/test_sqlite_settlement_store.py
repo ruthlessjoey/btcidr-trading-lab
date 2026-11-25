@@ -142,6 +142,41 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_reserved_sell_supports_shared_small_scale_decimal_contract(self):
+        buy = self.buy(qty="1e-128")
+        buy["price"] = "1e128"
+        self.store.apply_batch(
+            batch_id="b-buy-small-scale",
+            fills=[buy],
+            timestamp=10,
+        )
+        self.enable_reservations(quantity="1e-128", expires_at=1000)
+        sell = self.sell(qty="1e-128")
+        sell["price"] = "1e128"
+        result = self.store.apply_batch(
+            batch_id="b-sell-small-scale",
+            fills=[sell],
+            sell_settlements=[
+                self.sell_settlement(
+                    key="settle:small-scale",
+                    authorized="1e-128",
+                    filled="1e-128",
+                )
+            ],
+            sell_allocations=[
+                self.allocation(
+                    allocation_id="a-small-scale",
+                    fill_id="sell-1",
+                    quantity="1e-128",
+                )
+            ],
+            timestamp=20,
+        )
+        self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0")
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+
     def test_apply_batch_preserves_precision_beyond_default_decimal_context(self):
         quantity = "1234567890123456789012345678901234567890"
         fill = self.buy(qty=quantity)
