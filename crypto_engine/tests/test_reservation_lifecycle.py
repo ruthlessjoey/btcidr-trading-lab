@@ -294,6 +294,20 @@ class ReservationLifecycleTests(unittest.TestCase):
         ))
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 0)
 
+    def test_missing_audit_schema_fails_before_reservation_write(self):
+        self.db.execute("DROP TABLE audit")
+        self.begin()
+        with self.assertRaisesRegex(ReservationLifecycleError, "canonical settlement audit"):
+            create_reservation(
+                self.db, reservation_id="no-audit", account_id="paper-research",
+                market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+                authorized_quantity="1", created_at=100, expires_at=200,
+            )
+        self.assertIsNone(self.db.execute(
+            "SELECT 1 FROM reservations WHERE reservation_id='no-audit'"
+        ).fetchone())
+        self.db.rollback()
+
     def test_duplicate_reservation_id_is_rejected(self):
         self.create()
         self.begin()
