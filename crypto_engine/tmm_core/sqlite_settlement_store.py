@@ -386,6 +386,98 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
+    def pending_reservation_outbox(self, *, limit: int = 100) -> list[dict[str, str]]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise SettlementStoreError("limit must be in [1, 1000]")
+        with self._connect() as db:
+            enabled = db.execute(
+                "SELECT COUNT(*) FROM main.sqlite_master WHERE type='table' "
+                "AND name IN ('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchone()[0]
+            if enabled != 3:
+                return []
+            rows = db.execute(
+                "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
+                "market_id,reservation_version,allocated_quantity,payload_sha256 "
+                "FROM main.reservation_outbox WHERE status='PENDING' "
+                "ORDER BY idempotency_key LIMIT ?", (limit,)
+            ).fetchall()
+            fields = (
+                "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
+                "market_id","reservation_version","allocated_quantity","payload_sha256",
+            )
+            return [dict(zip(fields, row)) for row in rows]
+
+    def _complete_batch_if_outboxes_acknowledged(
+        self, db: sqlite3.Connection, batch_id: str,
+    ) -> None:
+        legacy_pending = db.execute(
+            "SELECT COUNT(*) FROM main.outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
+            (batch_id,),
+        ).fetchone()[0]
+        reservation_table = db.execute(
+            "SELECT 1 FROM main.sqlite_master WHERE type='table' "
+            "AND name='reservation_outbox'"
+        ).fetchone()
+        reservation_pending = 0
+        if reservation_table is not None:
+            reservation_pending = db.execute(
+                "SELECT COUNT(*) FROM main.reservation_outbox "
+                "WHERE batch_id=? AND status!='ACKNOWLEDGED'", (batch_id,)
+            ).fetchone()[0]
+        if legacy_pending == 0 and reservation_pending == 0:
+            result_row = db.execute(
+                "SELECT result_json FROM main.batches WHERE batch_id=?", (batch_id,)
+            ).fetchone()
+            if result_row is None or result_row[0] is None:
+                raise SettlementStoreError("batch result missing during outbox completion")
+            result = json.loads(result_row[0])
+            result["status"] = "COMPLETE"
+            db.execute(
+                "UPDATE main.batches SET status='COMPLETE',result_json=? "
+                "WHERE batch_id=? AND status='COMMITTED_PENDING_OUTBOX'",
+                (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id),
+            )
+
+    def acknowledge_reservation_outbox(
+        self, idempotency_key: str, *, receiver_receipt: str,
+    ) -> None:
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise SettlementStoreError("idempotency_key is required")
+        if not isinstance(receiver_receipt, str) or not receiver_receipt.strip():
+            raise SettlementStoreError("receiver_receipt is required")
+        with self._lock, self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT batch_id,status,receiver_receipt,allocation_id "
+                "FROM main.reservation_outbox WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+            if row is None:
+                db.rollback()
+                raise SettlementStoreError("unknown reservation outbox key")
+            batch_id, status, old_receipt, allocation_id = row
+            if status == "ACKNOWLEDGED":
+                if old_receipt != receiver_receipt:
+                    db.rollback()
+                    raise SettlementStoreError("reservation outbox acknowledgement receipt mismatch")
+                db.commit()
+                return
+            db.execute(
+                "UPDATE main.reservation_outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
+                "WHERE idempotency_key=? AND status='PENDING'",
+                (receiver_receipt, idempotency_key),
+            )
+            receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
+            self._append_audit(db, {
+                "kind": "RESERVATION_OUTBOX_ACKNOWLEDGED",
+                "account_id": self.account_id, "batch_id": batch_id,
+                "allocation_id": allocation_id, "idempotency_key": idempotency_key,
+                "receipt_sha256": receipt_digest,
+            })
+            self._complete_batch_if_outboxes_acknowledged(db, batch_id)
+            db.commit()
+
     def acknowledge_outbox(self, idempotency_key: str, *, receiver_receipt: str) -> None:
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
             raise SettlementStoreError("idempotency_key is required")
@@ -407,25 +499,13 @@ class SQLiteSettlementStore:
                 return
             db.execute("UPDATE outbox SET status='ACKNOWLEDGED',receiver_receipt=? "
                        "WHERE idempotency_key=?", (receiver_receipt, idempotency_key))
-            remaining = db.execute(
-                "SELECT COUNT(*) FROM outbox WHERE batch_id=? AND status!='ACKNOWLEDGED'",
-                (batch_id,),
-            ).fetchone()[0]
             receipt_digest = hashlib.sha256(receiver_receipt.encode("utf-8")).hexdigest()
             self._append_audit(db, {
                 "kind": "OUTBOX_ACKNOWLEDGED", "account_id": self.account_id,
                 "batch_id": batch_id, "idempotency_key": idempotency_key,
                 "receipt_sha256": receipt_digest,
             })
-            if remaining == 0:
-                db.execute("UPDATE batches SET status='COMPLETE' WHERE batch_id=? "
-                           "AND status='COMMITTED_PENDING_OUTBOX'", (batch_id,))
-                result_row = db.execute("SELECT result_json FROM batches WHERE batch_id=?",
-                                        (batch_id,)).fetchone()
-                result = json.loads(result_row[0])
-                result["status"] = "COMPLETE"
-                db.execute("UPDATE batches SET result_json=? WHERE batch_id=?",
-                           (json.dumps(result, sort_keys=True, separators=(",", ":")), batch_id))
+            self._complete_batch_if_outboxes_acknowledged(db, batch_id)
             db.commit()
 
     def snapshot(self) -> dict[str, Any]:
