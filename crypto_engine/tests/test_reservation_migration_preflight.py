@@ -137,6 +137,16 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         result = self.inspect()
         self.assertTrue(result.eligible, result.blockers)
 
+
+    def test_pathological_decimal_exponent_and_text_length_are_blocked(self):
+        for value in ("1e999999999", "9" * 129):
+            with self.subTest(value_prefix=value[:20]):
+                self.db.execute("UPDATE account SET cash=? WHERE singleton=1", (value,))
+                result = self.inspect()
+                self.assertFalse(result.eligible)
+                self.assertTrue(any("accounting state" in item for item in result.blockers))
+                self.db.execute("UPDATE account SET cash='1000' WHERE singleton=1")
+
     def test_holdings_without_matching_buy_fills_are_blocked(self):
         self.db.execute("INSERT INTO holdings VALUES('BTC/USDT','1')")
         result = self.inspect()
