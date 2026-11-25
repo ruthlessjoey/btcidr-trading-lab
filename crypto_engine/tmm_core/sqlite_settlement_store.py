@@ -30,12 +30,26 @@ class SettlementStoreError(RuntimeError):
     """Unsafe, inconsistent, or unresolved durable settlement state."""
 
 
-def _decimal(value: object, field: str) -> Decimal:
+_DECIMAL_INPUT_TEXT_LIMIT = 128
+_DECIMAL_INPUT_DIGITS = 80
+_DECIMAL_INPUT_MIN_EXPONENT = -160
+_DECIMAL_INPUT_MAX_EXPONENT = 128
+_DECIMAL_INPUT_MAX_ADJUSTED = 128
+_DECIMAL_STORED_TEXT_LIMIT = 640
+_DECIMAL_STORED_DIGITS = 200
+_DECIMAL_STORED_MIN_EXPONENT = -320
+_DECIMAL_STORED_MAX_EXPONENT = 256
+_DECIMAL_STORED_MAX_ADJUSTED = 260
+_DECIMAL_ARITHMETIC_PRECISION = 640
+
+
+def _decimal(value: object, field: str, *, stored: bool = False) -> Decimal:
     if isinstance(value, bool):
         raise SettlementStoreError(f"{field} must be a finite decimal")
     raw = str(value)
-    if len(raw) > 128:
-        raise SettlementStoreError(f"{field} decimal text exceeds the 128-character limit")
+    text_limit = _DECIMAL_STORED_TEXT_LIMIT if stored else _DECIMAL_INPUT_TEXT_LIMIT
+    if len(raw) > text_limit:
+        raise SettlementStoreError(f"{field} decimal text exceeds the {text_limit}-character limit")
     try:
         result = Decimal(raw)
     except (InvalidOperation, TypeError, ValueError) as exc:
@@ -43,12 +57,22 @@ def _decimal(value: object, field: str) -> Decimal:
     if not result.is_finite():
         raise SettlementStoreError(f"{field} must be finite")
     parts = result.as_tuple()
-    if len(parts.digits) > 80:
-        raise SettlementStoreError(f"{field} decimal precision exceeds 80 digits")
-    if parts.exponent < -160 or parts.exponent > 128:
-        raise SettlementStoreError(f"{field} decimal exponent exceeds the supported range")
-    if not result.is_zero() and abs(result.adjusted()) > 128:
-        raise SettlementStoreError(f"{field} decimal magnitude exceeds the supported range")
+    if stored:
+        invalid = (
+            len(parts.digits) > _DECIMAL_STORED_DIGITS
+            or parts.exponent < _DECIMAL_STORED_MIN_EXPONENT
+            or parts.exponent > _DECIMAL_STORED_MAX_EXPONENT
+            or abs(result.adjusted()) > _DECIMAL_STORED_MAX_ADJUSTED
+        )
+    else:
+        invalid = (
+            len(parts.digits) > _DECIMAL_INPUT_DIGITS
+            or parts.exponent < _DECIMAL_INPUT_MIN_EXPONENT
+            or parts.exponent > _DECIMAL_INPUT_MAX_EXPONENT
+            or (not result.is_zero() and abs(result.adjusted()) > _DECIMAL_INPUT_MAX_ADJUSTED)
+        )
+    if invalid:
+        raise SettlementStoreError(f"{field} exceeds the supported decimal precision or exponent range")
     return result
 
 
@@ -261,13 +285,15 @@ class SQLiteSettlementStore:
         request_hash = hashlib.sha256(request_json.encode("utf-8")).hexdigest()
         sell_totals: dict[str, Decimal] = {}
         outbox_totals: dict[str, Decimal] = {}
-        for fill in normalized_fills:
-            if fill["side"] == "SELL":
-                market_id = fill["market_id"]
-                sell_totals[market_id] = sell_totals.get(market_id, Decimal("0")) + _decimal(fill["quantity"], "SELL quantity")
-        for item in normalized_outbox:
-            market_id = item["market_id"]
-            outbox_totals[market_id] = outbox_totals.get(market_id, Decimal("0")) + _decimal(item["filled_quantity"], "outbox filled_quantity")
+        with localcontext() as decimal_context:
+            decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
+            for fill in normalized_fills:
+                if fill["side"] == "SELL":
+                    market_id = fill["market_id"]
+                    sell_totals[market_id] = sell_totals.get(market_id, Decimal("0")) + _decimal(fill["quantity"], "SELL quantity", stored=True)
+            for item in normalized_outbox:
+                market_id = item["market_id"]
+                outbox_totals[market_id] = outbox_totals.get(market_id, Decimal("0")) + _decimal(item["filled_quantity"], "outbox filled_quantity", stored=True)
         nonzero_outbox = {key: value for key, value in outbox_totals.items() if value != 0}
         if sell_totals != nonzero_outbox:
             raise SettlementStoreError("SELL outbox filled quantities must equal SELL fills per market")
@@ -343,41 +369,43 @@ class SQLiteSettlementStore:
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
                 "VALUES(?,?, 'PROCESSING', ?, NULL)", (batch_id, request_hash, timestamp)
             )
-            cash = _decimal(db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()[0],
-                            "stored cash")
-            balances = {
-                row[0]: _decimal(row[1], "stored holding")
-                for row in db.execute("SELECT market_id,quantity FROM holdings")
-            }
-            staged = []
-            for fill in normalized_fills:
-                market = db.execute("SELECT 1 FROM markets WHERE market_id=?",
-                                    (fill["market_id"],)).fetchone()
-                if market is None:
-                    raise SettlementStoreError("fill market is not registered")
-                if db.execute("SELECT 1 FROM fills WHERE fill_id=?", (fill["fill_id"],)).fetchone():
-                    raise SettlementStoreError("fill ID already exists")
-                qty, price, fee = (_decimal(fill["quantity"], "quantity"),
-                                   _decimal(fill["price"], "price"),
-                                   _decimal(fill["fee_quote"], "fee_quote"))
-                current = balances.get(fill["market_id"], Decimal("0"))
-                notional = qty * price
-                if fill["side"] == "BUY":
-                    debit = notional + fee
-                    if debit > cash:
-                        raise SettlementStoreError("insufficient quote cash")
-                    cash -= debit
-                    current += qty
-                else:
-                    if qty > current:
-                        raise SettlementStoreError("SELL exceeds long inventory")
-                    proceeds = notional - fee
-                    if proceeds < 0:
-                        raise SettlementStoreError("SELL fee exceeds proceeds")
-                    cash += proceeds
-                    current -= qty
-                balances[fill["market_id"]] = current
-                staged.append((fill, current, cash))
+            with localcontext() as decimal_context:
+                decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
+                cash = _decimal(db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()[0],
+                                "stored cash", stored=True)
+                balances = {
+                    row[0]: _decimal(row[1], "stored holding", stored=True)
+                    for row in db.execute("SELECT market_id,quantity FROM holdings")
+                }
+                staged = []
+                for fill in normalized_fills:
+                    market = db.execute("SELECT 1 FROM markets WHERE market_id=?",
+                                        (fill["market_id"],)).fetchone()
+                    if market is None:
+                        raise SettlementStoreError("fill market is not registered")
+                    if db.execute("SELECT 1 FROM fills WHERE fill_id=?", (fill["fill_id"],)).fetchone():
+                        raise SettlementStoreError("fill ID already exists")
+                    qty, price, fee = (_decimal(fill["quantity"], "quantity", stored=True),
+                                       _decimal(fill["price"], "price", stored=True),
+                                       _decimal(fill["fee_quote"], "fee_quote", stored=True))
+                    current = balances.get(fill["market_id"], Decimal("0"))
+                    notional = qty * price
+                    if fill["side"] == "BUY":
+                        debit = notional + fee
+                        if debit > cash:
+                            raise SettlementStoreError("insufficient quote cash")
+                        cash -= debit
+                        current += qty
+                    else:
+                        if qty > current:
+                            raise SettlementStoreError("SELL exceeds long inventory")
+                        proceeds = notional - fee
+                        if proceeds < 0:
+                            raise SettlementStoreError("SELL fee exceeds proceeds")
+                        cash += proceeds
+                        current -= qty
+                    balances[fill["market_id"]] = current
+                    staged.append((fill, current, cash))
 
             for item in normalized_outbox:
                 if db.execute("SELECT 1 FROM markets WHERE market_id=?",
@@ -552,7 +580,7 @@ class SQLiteSettlementStore:
                     or account_row is None
                     or account_row[:2] != (self.account_id,self.currency)):
                 raise SettlementStoreError("initial account audit identity is invalid")
-            initial_cash = _decimal(event["opening_cash"],"initial audited cash")
+            initial_cash = _decimal(event["opening_cash"],"initial audited cash", stored=True)
             if initial_cash <= 0:
                 raise SettlementStoreError("initial audited cash must be positive")
 
@@ -569,9 +597,9 @@ class SQLiteSettlementStore:
             row[0] for row in db.execute("SELECT market_id FROM main.markets")
         }
         for fill_id,batch_id,market_id,side,quantity_text,price_text,fee_text,timestamp in fill_rows:
-            quantity = _decimal(quantity_text,"fill quantity")
-            price = _decimal(price_text,"fill price")
-            fee = _decimal(fee_text,"fill fee")
+            quantity = _decimal(quantity_text,"fill quantity", stored=True)
+            price = _decimal(price_text,"fill price", stored=True)
+            fee = _decimal(fee_text,"fill fee", stored=True)
             if (not isinstance(fill_id,str) or not fill_id
                     or batch_times.get(batch_id) != timestamp
                     or market_id not in registered_markets
@@ -601,7 +629,7 @@ class SQLiteSettlementStore:
             if (set(event) != expected_keys or event.get("account_id") != self.account_id):
                 raise SettlementStoreError("synthetic fill audit schema/account mismatch")
             for field in ("cash_after","holding_after"):
-                if _decimal(event[field],field) < 0:
+                if _decimal(event[field],field, stored=True) < 0:
                     raise SettlementStoreError("synthetic fill audit balance is invalid")
             audit_fills[fill_id] = {
                 key:event[key] for key in (
@@ -618,16 +646,16 @@ class SQLiteSettlementStore:
         previous_holdings: dict[str,Decimal] = {}
         latest_holdings: dict[str,Decimal] = {}
         with localcontext() as decimal_context:
-            decimal_context.prec = 80
+            decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
             for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
                 event = json.loads(event_json)
                 if not isinstance(event,dict) or event.get("kind") != "SYNTHETIC_FILL":
                     continue
-                quantity = _decimal(event["quantity"],"audited fill quantity")
-                price = _decimal(event["price"],"audited fill price")
-                fee = _decimal(event["fee_quote"],"audited fill fee")
-                cash_after = _decimal(event["cash_after"],"audited cash after")
-                holding_after = _decimal(event["holding_after"],"audited holding after")
+                quantity = _decimal(event["quantity"],"audited fill quantity", stored=True)
+                price = _decimal(event["price"],"audited fill price", stored=True)
+                fee = _decimal(event["fee_quote"],"audited fill fee", stored=True)
+                cash_after = _decimal(event["cash_after"],"audited cash after", stored=True)
+                holding_after = _decimal(event["holding_after"],"audited holding after", stored=True)
                 market_id = event["market_id"]
                 if event["side"] == "BUY":
                     cash_delta = -(quantity * price + fee)
@@ -649,10 +677,10 @@ class SQLiteSettlementStore:
         if latest_cash is not None or initial_cash is not None:
             stored_cash = _decimal(
                 db.execute("SELECT cash FROM main.account WHERE singleton=1").fetchone()[0],
-                "stored cash",
+                "stored cash", stored=True,
             )
             stored_holdings = {
-                market_id:_decimal(quantity,"stored holding")
+                market_id:_decimal(quantity,"stored holding", stored=True)
                 for market_id,quantity in db.execute(
                     "SELECT market_id,quantity FROM main.holdings"
                 )
@@ -689,7 +717,7 @@ class SQLiteSettlementStore:
                     or not isinstance(market_id,str) or isinstance(version,bool)
                     or not isinstance(version,int) or version < 1):
                 raise SettlementStoreError("reservation allocation identity is invalid")
-            quantity = _decimal(quantity_text, "allocation quantity")
+            quantity = _decimal(quantity_text, "allocation quantity", stored=True)
             if quantity <= 0:
                 raise SettlementStoreError("reservation allocation quantity must be positive")
             key = (reservation_id,batch_id)
@@ -701,7 +729,7 @@ class SQLiteSettlementStore:
                     or group["version"] != version):
                 raise SettlementStoreError("reservation allocation group identity/version mismatch")
             with localcontext() as decimal_context:
-                decimal_context.prec = 80
+                decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
                 group["quantity"] = group["quantity"] + quantity
                 totals_by_reservation[reservation_id] = (
                     totals_by_reservation.get(reservation_id,Decimal("0")) + quantity
@@ -710,7 +738,7 @@ class SQLiteSettlementStore:
                 max_version_by_reservation.get(reservation_id,0),version
             )
             with localcontext() as decimal_context:
-                decimal_context.prec = 80
+                decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
                 totals_by_fill[fill_id] = totals_by_fill.get(fill_id,Decimal("0")) + quantity
             identity = (batch_id,market_id)
             if fill_id in fill_identity and fill_identity[fill_id] != identity:
@@ -787,11 +815,11 @@ class SQLiteSettlementStore:
                     or isinstance(timestamp,bool) or not isinstance(timestamp,int)
                     or batch is None or timestamp != batch[0]):
                 raise SettlementStoreError("reservation consumption audit identity/version mismatch")
-            previous_consumed = _decimal(event["previous_consumed_quantity"],"previous consumed quantity")
-            consumed = _decimal(event["consumed_quantity"],"consumed quantity")
-            allocated = _decimal(event["allocated_quantity"],"audited allocated quantity")
+            previous_consumed = _decimal(event["previous_consumed_quantity"],"previous consumed quantity", stored=True)
+            consumed = _decimal(event["consumed_quantity"],"consumed quantity", stored=True)
+            allocated = _decimal(event["allocated_quantity"],"audited allocated quantity", stored=True)
             with localcontext() as decimal_context:
-                decimal_context.prec = 80
+                decimal_context.prec = _DECIMAL_ARITHMETIC_PRECISION
                 expected_consumed = previous_consumed + allocated
             if (previous_consumed < 0 or allocated != group["quantity"]
                     or consumed != expected_consumed):
@@ -852,8 +880,8 @@ class SQLiteSettlementStore:
                 else:
                     raise SettlementStoreError("unknown reservation lifecycle audit event")
                 audit_version = version
-            authorized = _decimal(authorized_text,"authorized reservation quantity")
-            consumed = _decimal(consumed_text,"consumed reservation quantity")
+            authorized = _decimal(authorized_text,"authorized reservation quantity", stored=True)
+            consumed = _decimal(consumed_text,"consumed reservation quantity", stored=True)
             total = totals_by_reservation.get(reservation_id,Decimal("0"))
             max_allocation_version = max_version_by_reservation.get(reservation_id,0)
             if (account_id != self.account_id or authorized <= 0 or consumed < 0
@@ -949,24 +977,24 @@ class SQLiteSettlementStore:
                 or current_version <= row.get("reservation_version")):
             raise SettlementStoreError("reservation allocation is outside its reservation version or expiry")
         try:
-            allocated = _decimal(row.get("allocated_quantity"), "allocated_quantity")
+            allocated = _decimal(row.get("allocated_quantity"), "allocated_quantity", stored=True)
             fill_total = Decimal("0")
             reservation_total = Decimal("0")
             with localcontext() as context:
-                context.prec = 80
+                context.prec = _DECIMAL_ARITHMETIC_PRECISION
                 for (quantity_text,) in db.execute(
                     "SELECT allocated_quantity FROM main.reservation_allocations WHERE fill_id=?",
                     (row.get("fill_id"),),
                 ):
-                    fill_total += _decimal(quantity_text, "fill allocation quantity")
+                    fill_total += _decimal(quantity_text, "fill allocation quantity", stored=True)
                 for (quantity_text,) in db.execute(
                     "SELECT allocated_quantity FROM main.reservation_allocations WHERE reservation_id=?",
                     (row.get("reservation_id"),),
                 ):
-                    reservation_total += _decimal(quantity_text, "reservation allocation quantity")
-            fill_quantity_decimal = _decimal(fill_quantity, "SELL fill quantity")
-            authorized = _decimal(authorized_text, "reservation authorized quantity")
-            consumed = _decimal(consumed_text, "reservation consumed quantity")
+                    reservation_total += _decimal(quantity_text, "reservation allocation quantity", stored=True)
+            fill_quantity_decimal = _decimal(fill_quantity, "SELL fill quantity", stored=True)
+            authorized = _decimal(authorized_text, "reservation authorized quantity", stored=True)
+            consumed = _decimal(consumed_text, "reservation consumed quantity", stored=True)
             if (allocated <= 0 or fill_total != fill_quantity_decimal
                     or reservation_total != consumed or consumed <= 0
                     or consumed > authorized or authorized <= 0):
