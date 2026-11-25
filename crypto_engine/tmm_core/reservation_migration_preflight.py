@@ -218,9 +218,13 @@ def _accounting_state_is_consistent(db: sqlite3.Connection) -> bool:
                     or event_cash < 0 or event_holding != totals[market_id]):
                 return False
             debit = quantity * price + fee
-            expected_cash = event_cash + debit if expected_cash is None else expected_cash - debit
-            if expected_cash != event_cash:
-                return False
+            if expected_cash is None:
+                expected_cash = event_cash + debit
+            else:
+                expected_cash -= debit
+                if expected_cash != event_cash:
+                    return False
+            expected_cash = event_cash
         holdings = {}
         for market_id, quantity_text in db.execute(
             "SELECT market_id,quantity FROM main.holdings"
