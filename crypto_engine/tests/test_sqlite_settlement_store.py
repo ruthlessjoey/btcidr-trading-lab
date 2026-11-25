@@ -398,6 +398,30 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "SELECT 1 FROM reservation_allocations WHERE batch_id='b-reserved-second'"
             ).fetchone())
 
+    def test_reservation_outbox_rejects_cross_account_tampering(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_outbox SET account_id='other-account' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "account identity mismatch"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "account identity mismatch"):
+            self.store.acknowledge_reservation_outbox(
+                "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+                expected_payload_sha256=expected_hash,
+            )
+
     def test_reservation_outbox_acknowledgement_is_receipt_idempotent(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
