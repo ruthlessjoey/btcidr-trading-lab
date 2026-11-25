@@ -13,7 +13,7 @@ from tmm_core.reservation_outbox_receiver import (
     ensure_reservation_inbox_schema,
 )
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
-from tmm_core.sqlite_settlement_store import SQLiteSettlementStore
+from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
 
 
 class ReservationOutboxReceiverTests(unittest.TestCase):
@@ -288,6 +288,39 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         with self.assertRaisesRegex(ReservationInboxError, "not bound to this payload"):
             deliver_pending_reservation_outbox(self.store, bad_receiver)
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+
+    def test_sender_payload_mutation_during_receiver_call_blocks_acknowledgement(self):
+        def mutate_sender_after_receiver_accepts(payload):
+            receipt = self.receive(payload)
+            with sqlite3.connect(self.store.path) as sender_db:
+                sender_db.execute(
+                    "UPDATE reservation_outbox SET market_id='ETH/USDT' "
+                    "WHERE idempotency_key=?",
+                    (payload["idempotency_key"],),
+                )
+            return receipt
+
+        with self.assertRaisesRegex(
+            SettlementStoreError, "payload changed during delivery"
+        ):
+            deliver_pending_reservation_outbox(
+                self.store, mutate_sender_after_receiver_accepts
+            )
+
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        with sqlite3.connect(self.store.path) as sender_db:
+            status = sender_db.execute(
+                "SELECT status FROM reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()[0]
+            self.assertEqual(status, "PENDING")
+        self.assertEqual(
+            self.receiver_db.execute(
+                "SELECT COUNT(*) FROM reservation_inbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()[0],
+            1,
+        )
 
     def test_worker_rejects_tampered_outbox_payload_hash_before_receiver(self):
         with sqlite3.connect(self.store.path) as db:
