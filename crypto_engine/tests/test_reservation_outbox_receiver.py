@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import sqlite3
 import tempfile
+from contextlib import contextmanager
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +16,17 @@ from tmm_core.reservation_outbox_receiver import (
 )
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
 from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
+
+@contextmanager
+def _managed_connection(*args, **kwargs):
+    """Preserve sqlite3 transaction semantics and always close the connection."""
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
 
 
 def _file_receiver_accept(receiver_path, payload):
@@ -174,13 +186,13 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         delivered = deliver_pending_reservation_outbox(self.store, self.receive)
         self.assertEqual(delivered, ["reservation-allocation:a-1"])
         self.assertEqual(self.store.pending_reservation_outbox(), [])
-        with sqlite3.connect(self.store.path) as db:
+        with _managed_connection(self.store.path) as db:
             self.assertEqual(
                 db.execute("SELECT status FROM batches WHERE batch_id='b-sell'").fetchone()[0],
                 "COMMITTED_PENDING_OUTBOX",
             )
         self.store.acknowledge_outbox("settle:sell", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.store.path) as db:
+        with _managed_connection(self.store.path) as db:
             self.assertEqual(
                 db.execute("SELECT status FROM batches WHERE batch_id='b-sell'").fetchone()[0],
                 "COMPLETE",
@@ -271,7 +283,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         with self.assertRaisesRegex(TimeoutError, "durable receiver commit"):
             deliver_pending_reservation_outbox(self.store, durable_receiver)
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
@@ -280,7 +292,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         delivered = deliver_pending_reservation_outbox(self.store, durable_receiver)
         self.assertEqual(delivered, ["reservation-allocation:a-1"])
         self.assertEqual(self.store.pending_reservation_outbox(), [])
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
@@ -321,7 +333,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             [["reservation-allocation:a-1"], ["reservation-allocation:a-1"]],
         )
         self.assertEqual(self.store.pending_reservation_outbox(), [])
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
@@ -350,7 +362,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         self.assertEqual(process.exitcode, 73)
 
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
@@ -362,7 +374,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         )
         self.assertEqual(delivered, ["reservation-allocation:a-1"])
         self.assertEqual(self.store.pending_reservation_outbox(), [])
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
@@ -372,7 +384,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 self.receive(self.payload()),
             )
 
-        with sqlite3.connect(self.store.path) as sender_db:
+        with _managed_connection(self.store.path) as sender_db:
             self.assertEqual(
                 sender_db.execute(
                     "SELECT status FROM batches WHERE batch_id='b-sell'"
@@ -380,7 +392,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 "COMMITTED_PENDING_OUTBOX",
             )
         self.store.acknowledge_outbox("settle:sell", receiver_receipt="settlement-receipt")
-        with sqlite3.connect(self.store.path) as sender_db:
+        with _managed_connection(self.store.path) as sender_db:
             self.assertEqual(
                 sender_db.execute(
                     "SELECT status FROM batches WHERE batch_id='b-sell'"
@@ -423,13 +435,13 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
             {"delivered": ["reservation-allocation:a-1"]},
         ])
         self.assertEqual(self.store.pending_reservation_outbox(), [])
-        with sqlite3.connect(receiver_path) as receiver_db:
+        with _managed_connection(receiver_path) as receiver_db:
             self.assertEqual(
                 receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
                 1,
             )
 
-        with sqlite3.connect(self.store.path) as sender_db:
+        with _managed_connection(self.store.path) as sender_db:
             self.assertEqual(
                 sender_db.execute(
                     "SELECT status FROM batches WHERE batch_id='b-sell'"
@@ -437,7 +449,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 "COMMITTED_PENDING_OUTBOX",
             )
         self.store.acknowledge_outbox("settle:sell", receiver_receipt="settlement-receipt")
-        with sqlite3.connect(self.store.path) as sender_db:
+        with _managed_connection(self.store.path) as sender_db:
             self.assertEqual(
                 sender_db.execute(
                     "SELECT status FROM batches WHERE batch_id='b-sell'"
@@ -455,7 +467,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
     def test_sender_payload_mutation_during_receiver_call_blocks_acknowledgement(self):
         def mutate_sender_after_receiver_accepts(payload):
             receipt = self.receive(payload)
-            with sqlite3.connect(self.store.path) as sender_db:
+            with _managed_connection(self.store.path) as sender_db:
                 sender_db.execute(
                     "UPDATE reservation_outbox SET market_id='ETH/USDT' "
                     "WHERE idempotency_key=?",
@@ -470,7 +482,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 self.store, mutate_sender_after_receiver_accepts
             )
 
-        with sqlite3.connect(self.store.path) as sender_db:
+        with _managed_connection(self.store.path) as sender_db:
             status = sender_db.execute(
                 "SELECT status FROM reservation_outbox "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
@@ -485,7 +497,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         )
 
     def test_worker_rejects_tampered_outbox_payload_hash_before_receiver(self):
-        with sqlite3.connect(self.store.path) as db:
+        with _managed_connection(self.store.path) as db:
             db.execute(
                 "UPDATE reservation_outbox SET payload_sha256=? "
                 "WHERE idempotency_key='reservation-allocation:a-1'",
@@ -498,7 +510,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "payload hash mismatch"):
             deliver_pending_reservation_outbox(self.store, receiver)
         self.assertFalse(called["value"])
-        with sqlite3.connect(self.store.path) as db:
+        with _managed_connection(self.store.path) as db:
             status = db.execute(
                 "SELECT status FROM reservation_outbox "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
