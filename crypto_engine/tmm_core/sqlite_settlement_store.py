@@ -276,6 +276,8 @@ class SQLiteSettlementStore:
                 ensure_reservation_schema_v2(db)
                 if sell_totals and not normalized_allocations:
                     raise SettlementStoreError("SELL fills require reservation allocations when reservation schema is enabled")
+                # Never derive a new settlement from unaudited persisted balances.
+                self._verify_reservation_audit_coverage(db)
 
             db.execute(
                 "INSERT INTO batches(batch_id,request_hash,status,created_at,result_json) "
@@ -1070,6 +1072,26 @@ class SQLiteSettlementStore:
 
     def snapshot(self) -> dict[str, Any]:
         with self._connect() as db:
+            reservation_objects = db.execute(
+                "SELECT type,name FROM main.sqlite_master WHERE lower(name) IN "
+                "('reservations','reservation_allocations','reservation_outbox')"
+            ).fetchall()
+            expected = {"reservations","reservation_allocations","reservation_outbox"}
+            present = {name for kind,name in reservation_objects if kind == "table"}
+            if (any(kind != "table" for kind,_ in reservation_objects)
+                    or (present and present != expected)):
+                raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
+            if present == expected:
+                from .reservation_schema_v2 import ensure_reservation_schema_v2
+                db.execute("BEGIN")
+                try:
+                    ensure_reservation_schema_v2(db)
+                    self._verify_reservation_audit_coverage(db)
+                except Exception:
+                    db.rollback()
+                    raise
+                else:
+                    db.rollback()
             account = db.execute("SELECT cash FROM account WHERE singleton=1").fetchone()
             holdings = dict(db.execute("SELECT market_id,quantity FROM holdings"))
             return {"account_id": self.account_id, "currency": self.currency,

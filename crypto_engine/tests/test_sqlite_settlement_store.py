@@ -626,6 +626,32 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "holdings do not match fill audit state"):
             self.store.pending_reservation_outbox()
 
+
+    def test_snapshot_rejects_tampered_account_state(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(SettlementStoreError, "account cash does not match fill audit state"):
+            self.store.snapshot()
+
+    def test_new_batch_rejects_tampered_holdings_before_using_them(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.holdings SET quantity='999' WHERE market_id='BTC/USDT'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "holdings do not match fill audit state"):
+            self.store.apply_batch(
+                batch_id="b-after-tamper", fills=[self.buy(fill_id="f-new")],
+                timestamp=20,
+            )
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM main.batches WHERE batch_id='b-after-tamper'"
+            ).fetchone())
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
