@@ -465,6 +465,65 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementStoreError, "reservation audit chain verification failed"):
             self.store.pending_reservation_outbox()
 
+
+    def test_acknowledged_reservation_receipt_tampering_blocks_delivery_and_completion(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_outbox SET receiver_receipt='forged-receipt' "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "acknowledged reservation outbox receipt mismatch"):
+            self.store.pending_reservation_outbox()
+        with self.assertRaisesRegex(SettlementStoreError, "acknowledged reservation outbox receipt mismatch"):
+            self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
+        with sqlite3.connect(self.path) as db:
+            batch_status = db.execute(
+                "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
+            ).fetchone()[0]
+            legacy_status = db.execute(
+                "SELECT status FROM main.outbox WHERE idempotency_key='settle:reserved'"
+            ).fetchone()[0]
+        self.assertEqual(batch_status, "COMMITTED_PENDING_OUTBOX")
+        self.assertEqual(legacy_status, "PENDING")
+
+    def test_acknowledged_reservation_payload_hash_tampering_blocks_delivery(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-sell", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement()],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        expected_hash, expected_receipt = self.reservation_ack_evidence(
+            "reservation-allocation:a-1"
+        )
+        self.store.acknowledge_reservation_outbox(
+            "reservation-allocation:a-1", receiver_receipt=expected_receipt,
+            expected_payload_sha256=expected_hash,
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE main.reservation_outbox SET payload_sha256=? "
+                "WHERE idempotency_key='reservation-allocation:a-1'",
+                ("0" * 64,),
+            )
+        with self.assertRaisesRegex(SettlementStoreError, "reservation outbox payload hash mismatch"):
+            self.store.pending_reservation_outbox()
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
