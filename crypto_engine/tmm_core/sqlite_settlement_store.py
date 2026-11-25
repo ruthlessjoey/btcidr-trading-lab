@@ -392,6 +392,202 @@ class SQLiteSettlementStore:
             return [dict(zip(("idempotency_key","batch_id","market_id",
                               "authorized_quantity","filled_quantity"), row)) for row in rows]
 
+    def _verify_reservation_audit_coverage(self, db: sqlite3.Connection) -> None:
+        """Reconcile SELL fills, allocation rows, reservation state and audit events."""
+        if not self._verify_chain(db):
+            raise SettlementStoreError("reservation audit chain verification failed")
+
+        allocation_rows = db.execute(
+            "SELECT allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,"
+            "allocated_quantity,reservation_version "
+            "FROM main.reservation_allocations ORDER BY batch_id,reservation_id,allocation_id"
+        ).fetchall()
+        groups: dict[tuple[str, str], dict[str, object]] = {}
+        totals_by_reservation: dict[str, Decimal] = {}
+        max_version_by_reservation: dict[str, int] = {}
+        totals_by_fill: dict[str, Decimal] = {}
+        fill_identity: dict[str, tuple[str, str]] = {}
+        for allocation_id,batch_id,fill_id,reservation_id,account_id,market_id,quantity_text,version in allocation_rows:
+            if (account_id != self.account_id or not isinstance(reservation_id,str)
+                    or not isinstance(batch_id,str) or not isinstance(fill_id,str)
+                    or not isinstance(market_id,str) or isinstance(version,bool)
+                    or not isinstance(version,int) or version < 1):
+                raise SettlementStoreError("reservation allocation identity is invalid")
+            quantity = _decimal(quantity_text, "allocation quantity")
+            if quantity <= 0:
+                raise SettlementStoreError("reservation allocation quantity must be positive")
+            key = (reservation_id,batch_id)
+            group = groups.setdefault(key, {
+                "account_id":account_id,"market_id":market_id,
+                "version":version,"quantity":Decimal("0"),
+            })
+            if (group["account_id"] != account_id or group["market_id"] != market_id
+                    or group["version"] != version):
+                raise SettlementStoreError("reservation allocation group identity/version mismatch")
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                group["quantity"] = group["quantity"] + quantity
+                totals_by_reservation[reservation_id] = (
+                    totals_by_reservation.get(reservation_id,Decimal("0")) + quantity
+                )
+            max_version_by_reservation[reservation_id] = max(
+                max_version_by_reservation.get(reservation_id,0),version
+            )
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                totals_by_fill[fill_id] = totals_by_fill.get(fill_id,Decimal("0")) + quantity
+            identity = (batch_id,market_id)
+            if fill_id in fill_identity and fill_identity[fill_id] != identity:
+                raise SettlementStoreError("SELL fill allocation identity mismatch")
+            fill_identity[fill_id] = identity
+
+        sell_fills = db.execute(
+            "SELECT fill_id,batch_id,market_id,quantity,timestamp "
+            "FROM main.fills WHERE side='SELL'"
+        ).fetchall()
+        sell_fill_ids = set()
+        for fill_id,batch_id,market_id,quantity_text,timestamp in sell_fills:
+            sell_fill_ids.add(fill_id)
+            if totals_by_fill.get(fill_id,Decimal("0")) != _decimal(
+                quantity_text,"SELL fill quantity"
+            ):
+                raise SettlementStoreError("SELL fill quantity does not match allocation ledger")
+            if fill_identity.get(fill_id) != (batch_id,market_id):
+                raise SettlementStoreError("SELL fill batch/market does not match allocation ledger")
+            batch = db.execute(
+                "SELECT created_at FROM main.batches WHERE batch_id=?", (batch_id,)
+            ).fetchone()
+            if batch is None or batch[0] != timestamp:
+                raise SettlementStoreError("SELL fill timestamp does not match its batch")
+        if set(totals_by_fill) != sell_fill_ids:
+            raise SettlementStoreError("allocation ledger contains missing or non-SELL fill references")
+
+        history: dict[str,list[dict[str,object]]] = {}
+        consumption_events: dict[tuple[str,str],dict[str,object]] = {}
+        for (event_json,) in db.execute("SELECT event_json FROM main.audit ORDER BY seq"):
+            event = json.loads(event_json)
+            if not isinstance(event,dict):
+                continue
+            kind = event.get("kind")
+            reservation_id = event.get("reservation_id")
+            if kind == "RESERVATION_OUTBOX_ACKNOWLEDGED":
+                continue
+            if isinstance(kind,str) and kind.startswith("RESERVATION_"):
+                if not isinstance(reservation_id,str) or not reservation_id:
+                    raise SettlementStoreError("reservation lifecycle audit identity is invalid")
+                history.setdefault(reservation_id,[]).append(event)
+            if kind == "RESERVATION_QUANTITY_CONSUMED":
+                batch_id = event.get("batch_id")
+                if not isinstance(reservation_id,str) or not isinstance(batch_id,str):
+                    raise SettlementStoreError("reservation consumption audit identity is invalid")
+                key = (reservation_id,batch_id)
+                if key in consumption_events:
+                    raise SettlementStoreError("duplicate reservation consumption audit event")
+                consumption_events[key] = event
+        if set(groups) != set(consumption_events):
+            raise SettlementStoreError("reservation allocation/audit coverage mismatch")
+
+        for (reservation_id,batch_id),group in groups.items():
+            event = consumption_events[(reservation_id,batch_id)]
+            expected_keys = {
+                "kind","reservation_id","account_id","market_id",
+                "previous_consumed_quantity","consumed_quantity","allocated_quantity",
+                "previous_version","version","batch_id","timestamp",
+            }
+            if set(event) != expected_keys:
+                raise SettlementStoreError("reservation consumption audit event schema mismatch")
+            batch = db.execute(
+                "SELECT created_at FROM main.batches WHERE batch_id=?", (batch_id,)
+            ).fetchone()
+            previous_version,version,timestamp = (
+                event["previous_version"],event["version"],event["timestamp"]
+            )
+            if (event["account_id"] != self.account_id
+                    or event["market_id"] != group["market_id"]
+                    or isinstance(previous_version,bool) or not isinstance(previous_version,int)
+                    or previous_version != group["version"]
+                    or isinstance(version,bool) or not isinstance(version,int)
+                    or version != previous_version + 1
+                    or isinstance(timestamp,bool) or not isinstance(timestamp,int)
+                    or batch is None or timestamp != batch[0]):
+                raise SettlementStoreError("reservation consumption audit identity/version mismatch")
+            previous_consumed = _decimal(event["previous_consumed_quantity"],"previous consumed quantity")
+            consumed = _decimal(event["consumed_quantity"],"consumed quantity")
+            allocated = _decimal(event["allocated_quantity"],"audited allocated quantity")
+            with localcontext() as decimal_context:
+                decimal_context.prec = 80
+                expected_consumed = previous_consumed + allocated
+            if (previous_consumed < 0 or allocated != group["quantity"]
+                    or consumed != expected_consumed):
+                raise SettlementStoreError("reservation consumption audit quantity mismatch")
+
+        reservations = db.execute(
+            "SELECT reservation_id,account_id,market_id,base_asset,quote_asset,"
+            "authorized_quantity,consumed_quantity,created_at,expires_at,version,status "
+            "FROM main.reservations"
+        ).fetchall()
+        if {row[0] for row in reservations} != set(history):
+            raise SettlementStoreError("reservation rows do not match lifecycle audit history")
+        for (reservation_id,account_id,market_id,base_asset,quote_asset,authorized_text,
+             consumed_text,created_at,expires_at,current_version,current_status) in reservations:
+            events = history[reservation_id]
+            if not events or events[0].get("kind") != "RESERVATION_CREATED":
+                raise SettlementStoreError("reservation creation audit event is missing")
+            created = events[0]
+            created_keys = {
+                "kind","reservation_id","account_id","market_id","base_asset","quote_asset",
+                "authorized_quantity","created_at","expires_at","version","status",
+            }
+            if (set(created) != created_keys or created.get("version") != 1
+                    or created.get("status") != "PENDING"
+                    or created.get("account_id") != account_id
+                    or created.get("market_id") != market_id
+                    or created.get("base_asset") != base_asset
+                    or created.get("quote_asset") != quote_asset
+                    or created.get("authorized_quantity") != authorized_text
+                    or created.get("created_at") != created_at
+                    or created.get("expires_at") != expires_at):
+                raise SettlementStoreError("reservation creation audit does not match current record")
+            audit_version = 1
+            audit_status = "PENDING"
+            for event in events[1:]:
+                kind = event.get("kind")
+                previous_version = event.get("previous_version")
+                version = event.get("version")
+                if (isinstance(previous_version,bool) or not isinstance(previous_version,int)
+                        or isinstance(version,bool) or not isinstance(version,int)
+                        or previous_version != audit_version or version != audit_version + 1
+                        or event.get("account_id") != account_id
+                        or event.get("market_id") != market_id):
+                    raise SettlementStoreError("reservation lifecycle audit version chain is invalid")
+                if kind == "RESERVATION_AUTHORIZED":
+                    if audit_status != "PENDING" or event.get("status") != "ACTIVE":
+                        raise SettlementStoreError("reservation authorization audit transition is invalid")
+                    audit_status = "ACTIVE"
+                elif kind == "RESERVATION_QUANTITY_CONSUMED":
+                    if audit_status != "ACTIVE":
+                        raise SettlementStoreError("reservation consumption audit requires ACTIVE state")
+                elif kind in ("RESERVATION_RELEASED","RESERVATION_CANCELLED","RESERVATION_EXPIRED"):
+                    target = kind.removeprefix("RESERVATION_")
+                    if (event.get("previous_status") != audit_status
+                            or event.get("status") != target):
+                        raise SettlementStoreError("reservation terminal audit transition is invalid")
+                    audit_status = target
+                else:
+                    raise SettlementStoreError("unknown reservation lifecycle audit event")
+                audit_version = version
+            authorized = _decimal(authorized_text,"authorized reservation quantity")
+            consumed = _decimal(consumed_text,"consumed reservation quantity")
+            total = totals_by_reservation.get(reservation_id,Decimal("0"))
+            max_allocation_version = max_version_by_reservation.get(reservation_id,0)
+            if (account_id != self.account_id or authorized <= 0 or consumed < 0
+                    or consumed > authorized or consumed != total
+                    or isinstance(current_version,bool) or not isinstance(current_version,int)
+                    or current_version != audit_version or current_status != audit_status
+                    or current_version < max_allocation_version + (1 if max_allocation_version else 0)):
+                raise SettlementStoreError("reservation state does not match allocation and lifecycle audit")
+
+
     def _verify_reservation_outbox_cardinality(
         self, db: sqlite3.Connection, *, batch_id: str | None = None,
     ) -> None:
@@ -540,6 +736,7 @@ class SQLiteSettlementStore:
             db.execute("BEGIN")
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
+            self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_cardinality(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
@@ -575,6 +772,7 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
+            self._verify_reservation_audit_coverage(db)
             self._verify_reservation_outbox_cardinality(db, batch_id=batch_id)
             reservation_pending = db.execute(
                 "SELECT COUNT(*) FROM main.reservation_outbox "
@@ -620,6 +818,7 @@ class SQLiteSettlementStore:
                 raise SettlementStoreError("reservation schema is partial or contains unexpected objects")
             from .reservation_schema_v2 import ensure_reservation_schema_v2
             ensure_reservation_schema_v2(db)
+            self._verify_reservation_audit_coverage(db)
             row = db.execute(
                 "SELECT batch_id,status,receiver_receipt,allocation_id,reservation_id,fill_id,"
                 "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
