@@ -406,13 +406,13 @@ class SQLiteSettlementStore:
             ensure_reservation_schema_v2(db)
             rows = db.execute(
                 "SELECT idempotency_key,allocation_id,batch_id,reservation_id,fill_id,"
-                "market_id,reservation_version,allocated_quantity,payload_sha256 "
+                "account_id,market_id,reservation_version,allocated_quantity,payload_sha256 "
                 "FROM main.reservation_outbox WHERE status='PENDING' "
                 "ORDER BY idempotency_key LIMIT ?", (limit,)
             ).fetchall()
             fields = (
                 "idempotency_key","allocation_id","batch_id","reservation_id","fill_id",
-                "market_id","reservation_version","allocated_quantity","payload_sha256",
+                "account_id","market_id","reservation_version","allocated_quantity","payload_sha256",
             )
             return [dict(zip(fields, row)) for row in rows]
 
