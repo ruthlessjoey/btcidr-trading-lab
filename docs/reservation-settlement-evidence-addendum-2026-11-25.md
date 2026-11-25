@@ -695,3 +695,49 @@ Protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`. The followi
 - No existing user DB was inspected or migrated. No provider endpoint, DNS, account, wallet, PAPER or LIVE activity occurred.
 - Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
 
+
+
+
+## 26 November — anchored market policy and registration fail-closed correction
+
+### PR #182 — bind market policy to immutable initialization evidence
+
+- Exact head: `2ac4984000106193681a8e7cf13c7a335830b68a`; base PR #181 head `8a63d7c3d831344d9444abe4f188fc84fa7e587c`.
+- Finding: PR #180's market-registration metadata marker could be deleted, after which an unlogged market row could be inserted and the verifier could misclassify the new database as legacy.
+- Fix: include `market_registration_audit=required-v1` in the initial ACCOUNT_INITIALIZED audit event; verify the initial-event policy and metadata marker agree; preserve compatibility for legacy initialization events that predate this policy.
+- Adds regression deleting the marker and inserting an unlogged market.
+- Exact-head run [45673574959](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45673574959): Python 3.11.18 and 3.13.18 each passed 56 settlement-store + 16 receiver tests (72 per version).
+- PR remains open/draft/unmerged; independent review pending.
+
+### PR #183 — registration-boundary verification (superseded)
+
+- Exact head: `3f0f906a292a97d43daeab50c3c96507ace9d7e4`; base PR #181.
+- Added shared account/market/reservation verification before register_market reads/writes.
+- Exact-head run [45673775102](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45673775102): Python 3.11.18 and 3.13.18 each passed 56 settlement-store + 16 receiver tests.
+- This branch did not include PR #182's stronger binding of the market policy to the initialization audit event. Its registration-verification changes and tests are included in PR #184. Treat #183 as superseded and do not count it as a separate integration candidate.
+
+### PR #184 — combine policy anchoring and registration verification
+
+- Current exact head: `bd16e0ffecb85acf825673aa92fafb251827fa2e`; base PR #182 head `2ac4984000106193681a8e7cf13c7a335830b68a`.
+- Runs the shared account/market/reservation verifier inside `BEGIN IMMEDIATE` before register_market reads or writes.
+- Adds tests proving registration rejects a tampered market mapping and a removed required market-policy marker.
+- Also adds regressions for invalid account-initialization and market-registration policy marker values.
+- Exact-head run [45674267447](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45674267447): Python 3.11.18 and 3.13.18 each passed 60 settlement-store + 16 receiver tests (76 per version). No actual ResourceWarning or ignored-connection output.
+- PR #184 includes the PR #181 warning-clean test setup, PR #180 market registry audit, PR #176 reservation outbox account verification, and the prior account/fill reconciliation chain.
+- PR remains open/draft/unmerged; independent adversarial review pending.
+
+### Duplicate and design-only PR disposition
+
+- PR #178 repeats the final audit-count connection cleanup already present in PR #177 and #181. It has no unique implementation delta and is marked superseded in its body.
+- PR #179 remains a separate documentation-only proposal for signed external audit checkpoints. It is not implemented. Signer/key-store, independent storage medium, checkpoint frequency and recovery authority remain undecided and require independent review and owner approval.
+
+### Updated readiness and next priorities
+
+- The #184 exact-head tests validate selected settlement-store and receiver modules only; they are not full repository acceptance.
+- The market-policy marker is bound to the initial account audit event, which detects isolated marker deletion. It remains an in-database control, not an external trust anchor against coordinated rewriting of the entire SQLite database.
+- Independent adversarial acceptance across PRs #149/#150/#154/#155/#157/#164/#165/#167–#184 remains pending.
+- Continue synthetic-only crash/restart, concurrency, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+- Review PR #179's external checkpoint design before any signer/storage implementation.
+- No existing user database was inspected or migrated; no provider/DNS/account/wallet/PAPER/LIVE activity occurred.
+- Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
+
