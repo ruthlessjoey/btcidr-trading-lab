@@ -49,9 +49,9 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ProviderPolicyError):
                 validate_kline_request_shape(method="GET", url=url)
         with self.assertRaises(ProviderPolicyError):
-            validate_approved_kline_request(method="POST", url=self.URL)
+            validate_kline_request_shape(method="POST", url=self.URL)
         with self.assertRaises(ProviderPolicyError):
-            validate_approved_kline_request(method="GET", url=self.URL,
+            validate_kline_request_shape(method="GET", url=self.URL,
                                             headers={"Authorization": "Bearer forbidden"})
 
     def test_request_url_normalization_and_resource_bounds_fail_closed(self):
@@ -75,7 +75,7 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
                     self.URL + "&apiKey=x", self.URL + "&signature=x",
                     self.URL + "&symbol=BTCIDR", self.URL.replace("1m", "1s")):
             with self.subTest(url=url), self.assertRaises(ProviderPolicyError):
-                validate_approved_kline_request(method="GET", url=url)
+                validate_kline_request_shape(method="GET", url=url)
 
     def test_btcidr_market_mapping_is_blocked_even_when_request_shape_matches(self):
         with self.assertRaisesRegex(ProviderPolicyError, "BTCIDR.*prohibited NextMe/2meta"):
@@ -94,7 +94,7 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
                 expected_symbol="BTCIDR", expected_interval="1m",
             )
 
-    def test_ingestion_rejects_symbol_mismatch_and_oversized_response(self):
+    def test_ingestion_blocks_unverified_mapping_and_enforces_response_size(self):
         args = dict(method="GET", url=self.URL, raw_response=self.raw(),
                     retrieved_at_ms=1_800_000_000_000, decision_time_ms=self.DECISION_MS,
                     expected_symbol="BTCUSDT", expected_interval="1m")
