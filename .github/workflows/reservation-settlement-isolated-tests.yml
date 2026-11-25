@@ -24,7 +24,7 @@ on:
       - "crypto_engine/tmm_core/reservation_schema_v2.py"
       - "crypto_engine/tmm_core/reservation_lifecycle.py"
       - "crypto_engine/tmm_core/reservation_allocations.py"
-      - "crypto_engine/tmm_core/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
 
