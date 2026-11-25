@@ -131,7 +131,7 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         self.assertEqual(rows[0]["account_id"], "paper-research")
         self.assertEqual(rows[0]["market_id"], "BTC/USDT")
         self.assertEqual(rows[0]["reservation_version"], 2)
-        self.assertEqual(rows[0]["payload_sha256"], rows[0]["payload_sha256"])
+        self.assertRegex(rows[0]["payload_sha256"], r"^[0-9a-f]{64}$")
 
     def test_delivery_worker_acknowledges_and_batch_waits_for_both_outboxes(self):
         delivered = deliver_pending_reservation_outbox(self.store, self.receive)
