@@ -1,5 +1,7 @@
 name: Reservation Settlement Isolated Tests
 
+# Full safe reservation-suite matrix for exact-head candidate acceptance.
+
 on:
   push:
     branches:
