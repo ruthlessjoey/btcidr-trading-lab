@@ -1,11 +1,12 @@
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
 from contextlib import contextmanager
 import unittest
 
-from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
+from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore, _event_hash
 from tmm_core.reservation_outbox_receiver import _canonical_payload
 from tmm_core.reservation_lifecycle import authorize_reservation, create_reservation
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
@@ -842,6 +843,48 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         with _managed_connection(self.path) as db:
             db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
         with self.assertRaisesRegex(SettlementStoreError, "account cash does not match initial account audit"):
+            self.store.snapshot()
+
+    def test_snapshot_rejects_market_policy_marker_without_initialization_event(self):
+        with _managed_connection(self.path) as db:
+            db.execute("DELETE FROM main.audit")
+            db.execute("DELETE FROM main.markets")
+            db.execute(
+                "DELETE FROM main.metadata WHERE key='account_initialization_audit'"
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError,
+            "required market registration initialization event is missing",
+        ):
+            self.store.snapshot()
+
+    def test_snapshot_rejects_initialization_event_missing_required_market_policy(self):
+        with _managed_connection(self.path) as db:
+            rows = db.execute(
+                "SELECT seq,event_json FROM main.audit ORDER BY seq"
+            ).fetchall()
+            self.assertEqual([row[0] for row in rows], [1, 2])
+            initial = json.loads(rows[0][1])
+            initial.pop("market_registration_audit")
+            encoded = json.dumps(
+                initial, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+            previous = "0" * 64
+            digest = _event_hash(previous, initial)
+            db.execute(
+                "UPDATE main.audit SET event_json=?,previous_hash=?,event_hash=? WHERE seq=1",
+                (encoded, previous, digest),
+            )
+            market_event = json.loads(rows[1][1])
+            market_digest = _event_hash(digest, market_event)
+            db.execute(
+                "UPDATE main.audit SET previous_hash=?,event_hash=? WHERE seq=2",
+                (digest, market_digest),
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError,
+            "required market registration policy is missing from initialization event",
+        ):
             self.store.snapshot()
 
     def test_snapshot_rejects_removed_market_policy_marker_and_unlogged_market(self):

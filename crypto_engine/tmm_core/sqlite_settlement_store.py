@@ -472,6 +472,15 @@ class SQLiteSettlementStore:
             raise SettlementStoreError("initial market registration audit policy is invalid")
         if initialization_policy == "required-v1" and market_policy != ("required-v1",):
             raise SettlementStoreError("required market registration audit policy marker is missing")
+        if market_policy == ("required-v1",):
+            if not initialization_events:
+                raise SettlementStoreError(
+                    "required market registration initialization event is missing"
+                )
+            if initialization_policy != "required-v1":
+                raise SettlementStoreError(
+                    "required market registration policy is missing from initialization event"
+                )
         market_events: dict[str, tuple[str, str]] = {}
         for (event_json,) in audit_rows:
             event = json.loads(event_json)
