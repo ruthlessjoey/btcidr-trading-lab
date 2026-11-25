@@ -27,12 +27,25 @@ CREATE TABLE outbox(idempotency_key TEXT PRIMARY KEY, batch_id TEXT NOT NULL REF
 
 
 def create_clean_v1(path: Path) -> None:
+    import json
     db = sqlite3.connect(path)
     db.executescript(DDL)
     db.execute("INSERT INTO metadata VALUES('schema_version','1')")
-    db.execute("INSERT INTO account VALUES(1,'paper-research','USDT','1000')")
+    db.execute("INSERT INTO account VALUES(1,'paper-research','USDT','899')")
     db.execute("INSERT INTO markets VALUES('BTC/USDT','BTC','USDT')")
     db.execute("INSERT INTO batches VALUES('b-complete','request-hash','COMPLETE',10,'{}')")
+    db.execute("INSERT INTO fills VALUES('f1','b-complete','BTC/USDT','BUY','1','100','1',10)")
+    db.execute("INSERT INTO holdings VALUES('BTC/USDT','1')")
+    event = {
+        "kind":"SYNTHETIC_FILL","account_id":"paper-research","batch_id":"b-complete",
+        "fill_id":"f1","market_id":"BTC/USDT","side":"BUY","quantity":"1",
+        "price":"100","fee_quote":"1","cash_after":"899","holding_after":"1",
+        "timestamp":10,
+    }
+    encoded = json.dumps(event,sort_keys=True,separators=(",",":"))
+    previous = "0" * 64
+    digest = hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
+    db.execute("INSERT INTO audit VALUES(1,?,?,?)",(encoded,previous,digest))
     db.commit()
     db.close()
 
@@ -65,6 +78,33 @@ class ReservationMigrationCopyTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.backup.stat().st_mode),0o400)
         self.assertEqual(stat.S_IMODE(self.output.stat().st_mode),0o600)
         self.assertEqual(len(result.original_table_sha256),8)
+
+
+    def test_migrated_copy_opens_in_settlement_store_but_does_not_authorize_sell(self):
+        from tmm_core.sqlite_settlement_store import (
+            SQLiteSettlementStore, SettlementStoreError,
+        )
+        create_v2_migrated_copy(self.source,self.backup,self.output)
+        store = SQLiteSettlementStore(
+            self.output,account_id="paper-research",currency="USDT",opening_cash="1000"
+        )
+        with self.assertRaisesRegex(
+            SettlementStoreError,"SELL fills require reservation allocations"
+        ):
+            store.apply_batch(
+                batch_id="b-sell-without-reservation",
+                fills=[{
+                    "fill_id":"sell-without-reservation","market_id":"BTC/USDT",
+                    "side":"SELL","quantity":"0.1","price":"110","fee_quote":"0",
+                }],
+                timestamp=20,
+            )
+        with sqlite3.connect(self.output) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.fills").fetchone(),(1,))
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.batches").fetchone(),(1,))
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.reservations").fetchone(),(0,))
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.reservation_allocations").fetchone(),(0,))
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.reservation_outbox").fetchone(),(0,))
 
     def test_unresolved_source_is_blocked_before_any_copy_is_created(self):
         with sqlite3.connect(self.source) as db:
