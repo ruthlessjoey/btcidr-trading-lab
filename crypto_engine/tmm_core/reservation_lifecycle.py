@@ -84,8 +84,8 @@ def _quantity(value: object) -> str:
     if not number.is_finite() or number <= 0:
         raise ReservationLifecycleError("authorized_quantity must be a finite positive decimal")
     parts = number.as_tuple()
-    if (len(parts.digits) > 80 or parts.exponent < -160 or parts.exponent > 128
-            or abs(number.adjusted()) > 128):
+    if (len(parts.digits) > 38 or parts.exponent < -18 or parts.exponent > 128
+            or number.adjusted() > 38):
         raise ReservationLifecycleError("authorized_quantity exceeds supported decimal precision")
     return format(number, "f")
 
