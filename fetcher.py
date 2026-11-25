@@ -45,6 +45,12 @@ class Source:
     base_url: str
 
     def __post_init__(self):
+        if self.name.casefold() == "tokocrypto":
+            raise ValueError(
+                "legacy Tokocrypto Source is disabled: it can access server-time "
+                "and symbol-metadata paths; use only a separately reviewed "
+                "unauthenticated BTCIDR candles-only adapter"
+            )
         if self.style not in ("binance_style", "open_v1"):
             raise ValueError(f"unknown source style {self.style!r}")
 
