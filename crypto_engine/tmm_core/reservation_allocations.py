@@ -25,11 +25,22 @@ class ReservationAllocationError(ValueError):
     """Invalid or inconsistent SELL reservation allocation input."""
 
 
+_QUANTITY_TEXT_LIMIT = 256
+_QUANTITY_DIGITS_LIMIT = 80
+_QUANTITY_MIN_EXPONENT = -160
+_QUANTITY_MAX_EXPONENT = 128
+_QUANTITY_MAX_ADJUSTED = 128
+_QUANTITY_ARITHMETIC_PRECISION = 640
+
+
 def _quantity(value: object, field: str) -> Decimal:
     if isinstance(value, bool):
         raise ReservationAllocationError(f"{field} must be a finite decimal")
+    raw = str(value)
+    if len(raw) > _QUANTITY_TEXT_LIMIT:
+        raise ReservationAllocationError(f"{field} exceeds supported decimal text length")
     try:
-        number = Decimal(str(value))
+        number = Decimal(raw)
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ReservationAllocationError(
             f"{field} must be a finite decimal"
@@ -37,7 +48,10 @@ def _quantity(value: object, field: str) -> Decimal:
     if not number.is_finite():
         raise ReservationAllocationError(f"{field} must be finite")
     parts = number.as_tuple()
-    if len(parts.digits) > 38 or parts.exponent < -18 or number.adjusted() > 38:
+    if (len(parts.digits) > _QUANTITY_DIGITS_LIMIT
+            or parts.exponent < _QUANTITY_MIN_EXPONENT
+            or parts.exponent > _QUANTITY_MAX_EXPONENT
+            or (not number.is_zero() and abs(number.adjusted()) > _QUANTITY_MAX_ADJUSTED)):
         raise ReservationAllocationError(f"{field} exceeds supported decimal precision")
     return number
 
@@ -104,7 +118,7 @@ def validate_sell_allocations(
         if authorized <= 0 or consumed < 0 or consumed > authorized:
             raise ReservationAllocationError("invalid reservation quantity state")
         with localcontext() as decimal_context:
-            decimal_context.prec = 80
+            decimal_context.prec = _QUANTITY_ARITHMETIC_PRECISION
             remaining = authorized - consumed
         reservation_by_id[reservation_id] = {
             "account_id": owner, "market_id": market_id, "version": version,
@@ -117,7 +131,7 @@ def validate_sell_allocations(
     allocated_by_fill: dict[str, Decimal] = {}
     allocated_by_reservation: dict[str, Decimal] = {}
     with localcontext() as decimal_context:
-        decimal_context.prec = 80
+        decimal_context.prec = _QUANTITY_ARITHMETIC_PRECISION
         for raw in allocations:
             if not isinstance(raw, Mapping):
                 raise ReservationAllocationError("each allocation must be a mapping")
@@ -242,8 +256,8 @@ def consume_sell_allocations(
         reservation_id = _required_text(raw, "reservation_id")
         if len(allocation_id) > 256 or len(fill_id) > 256 or len(reservation_id) > 256:
             raise ReservationAllocationError("allocation identifiers exceed the 256-character limit")
-        if len(str(raw.get("allocated_quantity"))) > 128:
-            raise ReservationAllocationError("allocated_quantity text exceeds the 128-character limit")
+        if len(str(raw.get("allocated_quantity"))) > _QUANTITY_TEXT_LIMIT:
+            raise ReservationAllocationError("allocated_quantity text exceeds the supported limit")
         reservation_ids.add(reservation_id)
     if len(reservation_ids) > 1000:
         raise ReservationAllocationError("reservation count exceeds the 1000-row limit")
@@ -280,7 +294,7 @@ def consume_sell_allocations(
     )
     allocated_by_reservation: dict[str, Decimal] = {}
     with localcontext() as decimal_context:
-        decimal_context.prec = 80
+        decimal_context.prec = _QUANTITY_ARITHMETIC_PRECISION
         for item in normalized:
             reservation_id = str(item["reservation_id"])
             amount = Decimal(str(item["allocated_quantity"]))

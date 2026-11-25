@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 from contextlib import contextmanager
 import unittest
+from decimal import Decimal, localcontext
 
 from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore, _event_hash
 from tmm_core.reservation_outbox_receiver import _canonical_payload
@@ -93,6 +94,71 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         _, digest, receipt = _canonical_payload(payload)
         self.assertEqual(digest, row["payload_sha256"])
         return digest, receipt
+
+    def test_apply_batch_preserves_precision_beyond_default_decimal_context(self):
+        quantity = "1234567890123456789012345678901234567890"
+        fill = self.buy(qty=quantity)
+        fill["price"] = "1e-40"
+        fill["fee_quote"] = "0"
+        with localcontext() as decimal_context:
+            decimal_context.prec = 640
+            expected_cash = Decimal("10000") - Decimal(quantity) * Decimal("1e-40")
+        self.store.apply_batch(batch_id="b-high-precision", fills=[fill], timestamp=10)
+        snapshot = self.store.snapshot()
+        self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
+        self.assertEqual(snapshot["holdings"]["BTC/USDT"], quantity)
+
+    def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
+        self.store.apply_batch(
+            batch_id="b-smallest-scale",
+            fills=[dict(self.buy(qty="1e-128"), price="1", fee_quote="0")],
+            timestamp=10,
+        )
+        snapshot = self.store.snapshot()
+        self.assertEqual(
+            snapshot["holdings"]["BTC/USDT"],
+            "0." + ("0" * 127) + "1",
+        )
+        with localcontext() as decimal_context:
+            decimal_context.prec = 640
+            expected_cash = Decimal("10000") - Decimal("1e-128")
+        self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
+
+    def test_reserved_sell_supports_shared_small_scale_decimal_contract(self):
+        buy = self.buy(qty="1e-128")
+        buy["price"] = "1e128"
+        buy["fee_quote"] = "0"
+        self.store.apply_batch(
+            batch_id="b-buy-small-scale",
+            fills=[buy],
+            timestamp=10,
+        )
+        self.enable_reservations(quantity="1e-128", expires_at=1000)
+        sell = self.sell(qty="1e-128")
+        sell["price"] = "1e128"
+        result = self.store.apply_batch(
+            batch_id="b-sell-small-scale",
+            fills=[sell],
+            sell_settlements=[
+                self.sell_settlement(
+                    key="settle:small-scale",
+                    authorized="1e-128",
+                    filled="1e-128",
+                )
+            ],
+            sell_allocations=[
+                self.allocation(
+                    allocation_id="a-small-scale",
+                    fill_id="sell-1",
+                    quantity="1e-128",
+                )
+            ],
+            timestamp=20,
+        )
+        self.assertEqual(result["status"], "COMMITTED_PENDING_OUTBOX")
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0")
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
         result = self.store.apply_batch(batch_id="b-1",
