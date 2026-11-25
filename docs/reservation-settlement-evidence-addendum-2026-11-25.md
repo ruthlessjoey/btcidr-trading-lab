@@ -146,3 +146,46 @@ This addendum is candidate engineering evidence only. It is not a full repositor
 - Nine focused receiver tests are authored; exact-head execution and Python 3.11 CI remain pending.
 - This is a local inbox/receipt contract, not a remote production receiver. It does not implement a real external business effect, authenticated network transport or remote service. Those remain separate work.
 - No exact-head tests or workflow dispatch are claimed. Empty status/workflow lookups are not passes. No network/provider/account/trading activity occurred.
+
+
+
+## Superseding progress — PRs #149 and #150 (25 November 2026)
+
+The following two security corrections are stacked on PR #148 and supersede the corresponding open gaps above. They remain draft candidates and are not mainline integration or independent acceptance.
+
+### PR #149 — inbox TEMP-trigger and receipt-integrity correction
+
+- Branch head: `55afaf28a89a04566ad1c07d2bbe9ad75580e634`.
+- Adds verification of `temp.sqlite_master` for TEMP triggers attached to `main.reservation_inbox`. The prior verifier checked only `main.sqlite_master`; SQLite permits a TEMP trigger to attach to a main-database table.
+- Replayed inbox records must now match the deterministic receipt recomputed from the canonical payload. A modified stored receipt is rejected instead of returned as valid.
+- Adds four focused regressions/reliability tests: TEMP-trigger rejection, corrupted receipt rejection, retry after receiver connection restart, and two concurrent delivery workers sharing one durable receipt.
+- Targeted Python 3.13.5 / SQLite 3.46.1 execution against the updated receiver implementation passed those cases plus valid deterministic replay. The full repository test module, Python 3.11 CI, multiprocess crash/restore drills and independent review remain pending.
+- PR #149 is open/draft/unmerged and is based on PR #148 head `ee6387fbb5f721a509a38b971dc3db35452b0c73`.
+
+### PR #150 — close legacy unreserved SELL bypass
+
+- Branch head: `8550fd6f222e16a698b6bdeaacde98fbc350f8fe`.
+- `SQLiteSettlementStore.apply_batch` now rejects SELL fills if reservation schema v2 is absent, not merely if schema v2 is present but allocations are missing.
+- BUY-only batches remain available on v1 databases.
+- The regression suite now covers legacy v1 SELL rejection and verifies the batch remains pending until both the legacy and reservation outboxes are acknowledged.
+- This intentionally means legacy databases cannot SELL until a separately reviewed rollout/migration establishes valid schema-v2 reservation state. No existing database is migrated, rewritten, or automatically seeded.
+- Static inspection confirms the gate occurs before batch writes inside the caller-owned transaction. Exact-head Python execution, the full `crypto_engine/tests` suite, Python 3.11 CI and independent review remain pending.
+- PR #150 is open/draft/unmerged and is based on PR #149 head `55afaf28a89a04566ad1c07d2bbe9ad75580e634`.
+
+### Updated dependency and readiness disposition
+
+The candidate dependency chain is now #139 → #140 → #141 → #142 → #143 → #144 → #145 → #146 → #148 → #149 → #150. PR #147 is the separate documentation tracker. All implementation PRs in this chain remain draft/open/unmerged; no change has been accepted into `main`.
+
+The #150 fail-closed gate closes the code-level legacy SELL bypass in its branch, but does **not** migrate existing databases, seed reservations, validate historical balances, or make old databases SELL-capable. The receiver is still a local SQLite contract, not a production remote service or authenticated transport adapter.
+
+Fresh exact-head status/workflow lookups for #149 and #150 returned empty arrays; this does not prove that CI passed or that workflows do not exist. Neither PR has independent acceptance. No install/trading readiness is claimed.
+
+### Revised next priorities
+
+1. Obtain an isolated checkout and run exact-SHA tests for the complete #139–#150 stack, recording the tested SHA, Python/SQLite versions, exact commands, logs and all results. Repeat on Python 3.11 CI. No tests may import protected paths.
+2. Fix every failure on a new immutable head and rerun the complete required suite; do not promote any earlier test result to a later commit.
+3. Commission adversarial review of the complete stack, especially SQLite schema trust, attached/TEMP objects, transaction boundaries, outbox receipt authenticity, idempotent replay, cross-account/market use and rollback semantics.
+4. Design v1→v2 enablement only on disposable verified copies. Preserve existing holdings, legacy SELL history, outbox state and audit-chain continuity; no live database migration or seeding without separate approval.
+5. Add deterministic crash/power-loss, multiprocess race, receiver restart, backup/restore, malformed DB, resource-exhaustion and partial-write tests.
+6. Keep any remote receiver, network transport, broker integration, strategy authority, PAPER activation and LIVE functionality disabled until their own security design, tests, approval and evidence gates pass.
+7. Continue preregistered, cost-adjusted multi-market profitability research. The 181/181 result belongs only to the separate research prototype; no BTC/IDR OOS profitability or high-win-rate evidence exists yet.
