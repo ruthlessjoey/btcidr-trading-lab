@@ -503,7 +503,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "UPDATE main.reservation_outbox SET payload_sha256=? "
                 "WHERE idempotency_key='reservation-allocation:a-1'", (digest,)
             )
-        with self.assertRaisesRegex(SettlementStoreError, "reservation consumption audit quantity mismatch"):
+        with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "totals do not reconcile"):
             self.store.acknowledge_reservation_outbox(
