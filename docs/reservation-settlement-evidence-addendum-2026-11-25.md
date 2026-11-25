@@ -741,3 +741,46 @@ Protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`. The followi
 - No existing user database was inspected or migrated; no provider/DNS/account/wallet/PAPER/LIVE activity occurred.
 - Install/trading readiness: **NOT READY**. PAPER: **ON HOLD**. LIVE: **DISABLED / ABSENT**. Profitability/high win rate: **NOT ESTABLISHED**. Overall completion: **UNRATED**.
 
+
+
+## 26 November — initialization-policy symmetry and market tamper coverage
+
+### PR #185 and PR #186 — additional market-registry regressions (superseded)
+
+- PR #185 exact head 7ecabbe4430d5c8d72faed6f15b659a1e291f64c added regressions for unlogged market insertion/deletion before register_market.
+- PR #186 exact head da0ef0c05fedf34e7d54a93c1c07159858b14250 added regressions proving pending legacy and reservation outbox readers reject an unlogged market registry entry.
+- Their exact-head Actions runs [45674318246](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45674318246) and [45674611575](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45674611575) completed successfully on Python 3.11.18 and 3.13.18.
+- All four test cases are incorporated into PR #187. Mark #185/#186 as superseded; do not count them as separate integration candidates.
+
+### PR #187 — require bidirectional market-policy binding
+
+- Current exact head: 483d8ada0568c3c693968c596fcb9b238d1a1cb0; base PR #184 head bd16e0ffecb85acf825673aa92fafb251827fa2e.
+- Finding: policy validation previously required the initialization event to require the metadata marker, but did not symmetrically require a metadata marker to have the matching initialization event/field. An empty registry could therefore pass if the marker remained while the initialization event and account marker were removed, or if the event's policy field was removed and the internal hash chain was recomputed.
+- Fix: a required market-policy marker now requires exactly one initialization event with the matching policy field. Missing event or missing event field fails closed.
+- Adds synthetic tests for both cases. One test recomputes the local audit chain after removing the event field, proving rejection is caused by the policy invariant and not merely hash mismatch.
+- Also incorporates #185/#186 regressions for unlogged market insert/delete before registration and unaudited market rows before both outbox readers.
+- Exact-head run [45675237565](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45675237565): Python 3.11.18 and 3.13.18 each passed 66 settlement-store + 16 receiver tests (82 per version). ResourceWarning is promoted to an error; no actual warning/ignored-connection output.
+- PR remains open/draft/unmerged; independent adversarial review pending.
+
+### Updated candidate chain and supersession
+
+- Strongest current candidate chain: #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187.
+- PR #175 is a sibling test-only branch from #173; its invalid-marker coverage is also present in the #184/#187 stack.
+- PR #177 is a sibling warning-clean branch from #174; its cleanup is present in #181 and later descendants.
+- PR #178 duplicates cleanup already present in #177/#181.
+- PR #183 is superseded by #184.
+- PR #185/#186 are superseded by #187.
+- PR #179 remains a design-only proposal for external signed audit checkpoints. No signer, independent storage, key store or implementation is selected.
+
+### Remaining high-priority work
+
+1. Independent adversarial acceptance of #149/#150/#154/#155/#157/#164/#165/#167–#187 at immutable SHAs; report PASS/FAIL/INCONCLUSIVE. CI success is not independent acceptance.
+2. Review #179's trust model. A signed checkpoint anchors a digest, not semantic correctness of trade events. Signer must enforce monotonic ledger identity/sequence/previous-checkpoint linkage and define response to a compromised process requesting a new signature over fabricated current state.
+3. Continue synthetic-only crash/restart, multiprocess race, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+4. Reconcile #164/#165 copy-only migration candidates with historical inventory/expiry evidence. No existing user DB inspection/migration or inferred SELL authority.
+5. Keep remote receiver authentication and real external business effects unimplemented pending trust/transport/receipt review.
+6. Keep Tokocrypto BTCIDR .site blocked until owner resolves host/symbol compatibility.
+7. Begin preregistered multi-market profitability research with point-in-time data, realistic costs, chronological holdouts, multiple-testing controls and independent reproduction.
+
+Protected main remains 0426e1ecd5bd01913a568272792c355c4b7059c7. No PR merged. Install/trading readiness NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
