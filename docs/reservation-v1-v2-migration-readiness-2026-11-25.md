@@ -229,3 +229,29 @@ This dated update supersedes the earlier 110-test candidate count in Section 10.
 - Overall project completion: **UNRATED** pending owner-approved scope, weights and evidence criteria.
 
 This update records evidence only. It does not authorize migration, deployment, merges, PAPER activation or LIVE activity.
+
+## 25 November 2026 — final process-recovery and provider-boundary updates
+
+This section supersedes the previous 111-test count in Section 10 and earlier interim counts in the preceding update.
+
+### Reservation / settlement process reliability
+- PR #149 current head: 104756a8f4978f9e81bf40928902f419ab61b528; run 45553924899. Python 3.11.18 and 3.13.18 each passed 23 settlement-store + 16 receiver tests.
+- PR #150 current head: df6bcc41d97b5e5640ce1c20f10d88e4c0434e19; stacked on PR149 with 28 commits ahead / 0 behind; run 45554067988. Python 3.11.18 and 3.13.18 each passed 115/115 across the six isolated suites.
+- The store initializer now accepts only exact legacy v1 or the exact complete current reservation v2 extension. It verifies v2 in a read transaction and rejects partial, malformed or earlier-v2 schema without creating or migrating tables.
+- Process-level tests use separate spawned workers and file-backed SQLite. One terminates immediately after receiver commit but before sender acknowledgement; retry recovers the deterministic receipt without duplicate inbox insertion. A second test runs two delivery processes against the same outbox row and requires a single durable inbox effect.
+- Sender acknowledgement revalidates the persisted canonical payload hash and deterministic receipt inside BEGIN IMMEDIATE; callback-time sender-row mutation remains unacknowledged.
+
+### Tokocrypto endpoint approval correction
+- PR #154: https://github.com/ruthlessjoey/btcidr-trading-lab/pull/154; current head 78724489bc679e4b3ad5e6e613e4b2987fd516fc, base PR150 head df6bcc41d97b5e5640ce1c20f10d88e4c0434e19, 15 commits ahead / 0 behind.
+- Static review found the offline crypto_engine provider-policy validator and its documentation/test fixture had treated cloudme-toko.2meta.app/api/v1/klines as approved and denied the actual owner-approved https://www.tokocrypto.site/api/v3/klines BTCIDR candle boundary. The policy/test/docs are now aligned to the exact `.site/api/v3/klines` endpoint and reject the old host/path, Tokocrypto .com, metadata/server-time paths, and unapproved symbols.
+- Static review also found the legacy root provider factory could create a generic Tokocrypto adapter capable of server-time and BTCUSDT candle requests; its probe diagnostic requested symbol metadata too. The legacy providers.build('tokocrypto') path is now disabled, and fetcher.Source rejects Tokocrypto hosts even if a caller supplies a different source name.
+- PR154 full unprotected crypto_engine suite run 45555163021: Python 3.11.18 / SQLite 3.46.1 218/218 passed; Python 3.13.18 / SQLite 3.46.1 218/218 passed.
+- PR154 root adapter guard run 45555162962: Python 3.11.18 4/4 passed; Python 3.13.18 4/4 passed.
+- These are offline policy and adapter-construction tests. No API request, DNS lookup, server-time, symbol metadata or real candle retrieval was performed. The root live diagnostics workflow remains blocked.
+
+### Readiness disposition
+- Exact approved Tokocrypto candle endpoint is documented and policy-validated but not called. Real response schema compatibility remains unverified.
+- Legacy root Tokocrypto adapter stays disabled; a dedicated live candles-only integration is not implemented or activated.
+- This does not change migration gates: v1 bootstrap and earlier-v2 expiry/history-preserving migration remain unimplemented, existing databases remain untouched, and any future migration requires a separate owner-approved source hash and manifest.
+- Independent adversarial review, full repository compatibility review, backup/restore drills, authenticated receiver, profitability evidence and full product integration remain pending.
+- Install readiness and trading readiness remain NOT READY; PAPER activation ON HOLD; LIVE DISABLED / ABSENT; profitability/high-win-rate NOT ESTABLISHED; overall project completion UNRATED.
