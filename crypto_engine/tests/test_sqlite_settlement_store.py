@@ -5,6 +5,8 @@ import tempfile
 import unittest
 
 from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
+from tmm_core.reservation_lifecycle import authorize_reservation, create_reservation
+from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
 
 
 class SQLiteSettlementStoreTests(unittest.TestCase):
@@ -21,6 +23,37 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def enable_reservations(self, *, quantity="0.5", expires_at=1000):
+        db = sqlite3.connect(self.path)
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("BEGIN IMMEDIATE")
+        ensure_reservation_schema_v2(db)
+        create_reservation(
+            db, reservation_id="r-1", account_id="paper-research",
+            market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+            authorized_quantity=quantity, created_at=0, expires_at=expires_at,
+        )
+        authorize_reservation(
+            db, reservation_id="r-1", account_id="paper-research",
+            expected_version=1, now=1,
+        )
+        db.commit()
+        db.close()
+
+    def sell(self, *, fill_id="sell-1", qty="0.25"):
+        return {"fill_id": fill_id, "market_id": "BTC/USDT", "side": "SELL",
+                "quantity": qty, "price": "110", "fee_quote": "0"}
+
+    def sell_settlement(self, *, key="settle:reserved", authorized="0.5", filled="0.25"):
+        return {"idempotency_key": key, "market_id": "BTC/USDT",
+                "authorized_quantity": authorized, "filled_quantity": filled}
+
+    def allocation(self, *, allocation_id="a-1", fill_id="sell-1",
+                   reservation_id="r-1", version=2, quantity="0.25"):
+        return {"allocation_id": allocation_id, "fill_id": fill_id,
+                "reservation_id": reservation_id, "reservation_version": version,
+                "allocated_quantity": quantity}
 
     def buy(self, *, fill_id="f-1", qty="1"):
         return {"fill_id": fill_id, "market_id": "BTC/USDT", "side": "BUY",
@@ -113,6 +146,99 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         )
         self.assertEqual(replay["status"], "COMPLETE")
         self.assertTrue(self.store.verify_audit_chain())
+
+    def test_reserved_sell_consumption_is_atomic_and_replay_safe(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        kwargs = {
+            "batch_id": "b-reserved-sell",
+            "fills": [self.sell()],
+            "sell_settlements": [self.sell_settlement()],
+            "sell_allocations": [self.allocation()],
+            "timestamp": 20,
+        }
+        first = self.store.apply_batch(**kwargs)
+        second = self.store.apply_batch(**kwargs)
+        self.assertEqual(first, second)
+        self.assertEqual(first["reservation_allocations"][0]["idempotency_key"],
+                         "reservation-allocation:a-1")
+        self.assertEqual(self.store.snapshot()["holdings"]["BTC/USDT"], "0.75")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT consumed_quantity,version FROM reservations").fetchone(),
+                ("0.25", 3),
+            )
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM reservation_allocations").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM reservation_outbox").fetchone()[0], 1)
+        self.assertTrue(self.store.verify_audit_chain())
+
+    def test_reservation_enabled_sell_without_allocation_is_rejected(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        before = self.store.snapshot()
+        with self.assertRaisesRegex(SettlementStoreError, "require reservation allocations"):
+            self.store.apply_batch(
+                batch_id="b-no-allocation", fills=[self.sell()],
+                sell_settlements=[self.sell_settlement()], timestamp=20,
+            )
+        self.assertEqual(self.store.snapshot(), before)
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM batches WHERE batch_id='b-no-allocation'"
+            ).fetchone())
+
+    def test_stale_reservation_allocation_rolls_back_entire_batch(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        before = self.store.snapshot()
+        with self.assertRaisesRegex(SettlementStoreError, "stale reservation version"):
+            self.store.apply_batch(
+                batch_id="b-stale-allocation", fills=[self.sell()],
+                sell_settlements=[self.sell_settlement()],
+                sell_allocations=[self.allocation(version=1)], timestamp=20,
+            )
+        self.assertEqual(self.store.snapshot(), before)
+        with sqlite3.connect(self.path) as db:
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM batches WHERE batch_id='b-stale-allocation'"
+            ).fetchone())
+            self.assertEqual(db.execute(
+                "SELECT consumed_quantity FROM reservations"
+            ).fetchone()[0], "0")
+
+    def test_duplicate_allocation_id_rolls_back_consumption_and_fill(self):
+        self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
+        self.enable_reservations()
+        self.store.apply_batch(
+            batch_id="b-reserved-first", fills=[self.sell()],
+            sell_settlements=[self.sell_settlement(key="settle:first")],
+            sell_allocations=[self.allocation()], timestamp=20,
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.apply_batch(
+                batch_id="b-reserved-second", fills=[self.sell(fill_id="sell-2")],
+                sell_settlements=[self.sell_settlement(key="settle:second")],
+                sell_allocations=[self.allocation(fill_id="sell-2")], timestamp=21,
+            )
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT consumed_quantity,version FROM reservations").fetchone(),
+                ("0.25", 3),
+            )
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM batches WHERE batch_id='b-reserved-second'"
+            ).fetchone())
+            self.assertIsNone(db.execute(
+                "SELECT 1 FROM fills WHERE fill_id='sell-2'"
+            ).fetchone())
+
+    def test_reservation_enabled_buy_batch_needs_no_sell_allocation(self):
+        self.enable_reservations()
+        result = self.store.apply_batch(
+            batch_id="b-buy-with-reservations", fills=[self.buy()], timestamp=10
+        )
+        self.assertEqual(result["status"], "COMPLETE")
+        self.assertNotIn("reservation_allocations", result)
 
     def test_duplicate_fill_id_rejected_and_rolls_back(self):
         self.store.apply_batch(batch_id="b-6",
