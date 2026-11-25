@@ -356,6 +356,24 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             """)
         db.close()
 
+    def test_reservation_schema_enforces_expiry_and_positive_version(self):
+        db = self.connection()
+        db.execute("INSERT INTO markets VALUES('BTC/USDT','BTC','USDT')")
+        db.execute("BEGIN IMMEDIATE")
+        ensure_reservation_schema_v2(db)
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute(
+                "INSERT INTO reservations VALUES("
+                "'r1','acct','BTC/USDT','BTC','USDT','1','0',100,100,1,'PENDING')"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute(
+                "INSERT INTO reservations VALUES("
+                "'r2','acct','BTC/USDT','BTC','USDT','1','0',100,200,0,'PENDING')"
+            )
+        db.rollback()
+        db.close()
+
     def test_schema_creation_rolls_back_with_callers_transaction(self):
         db = self.connection()
         db.execute("BEGIN")
