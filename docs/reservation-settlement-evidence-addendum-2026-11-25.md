@@ -264,3 +264,35 @@ PR #151 (account identity in reservation outbox records) was closed as a duplica
 4. Design—but do not run—v1→v2 data migration on disposable synthetic copies. Any real or existing local database migration requires separate explicit approval and an evidence-backed inventory/balance/audit reconciliation plan.
 5. Complete remote receiver threat model and transport design separately; no broker/network adapter may be connected to this offline prototype without new approval.
 6. Continue preregistered profitability research only after the approved BTC/IDR historical data blocker is resolved. Do not claim strategy profitability from synthetic 181/181 unit tests.
+
+
+## Superseding full-stack verification — 25 November 2026
+
+PR #150 has now expanded from the earlier 2-module matrix to the complete six-module reservation/settlement regression matrix. The previous 2-module result remains historical; the following is the stronger latest result:
+
+- PR #150 current exact head: `83f9a789eb0e7fc869de3a45041c2336c6b3595c`.
+- Exact-head GitHub Actions push run: [45551031050](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45551031050), completed **success**.
+- Python 3.11.18 + SQLite 3.46.1: reservation schema v2 25/25; lifecycle 21/21; allocation validator 16/16; atomic allocations 13/13; settlement store 22/22; receiver 13/13. Total **110/110**.
+- Python 3.13.18 + SQLite 3.46.1: the same six suites **110/110**.
+- Total: **220 successful test executions**. Both matrix jobs and all 12 test steps passed.
+
+The expanded run follows CI-discovered test fixture corrections: the foreign-key regression now supplies all 11 reservation fields using an explicit column list, and the multi-reservation allocation fixture sums exactly to the SELL fill quantity. Failed earlier runs apply only to earlier SHAs.
+
+### PR branch updates and disposition
+
+- PR #149 current head: `8db0cd10649e169bb19e934d40f0e760c5b8b0be`; open/draft/unmerged. Its exact-head PR and push runs #45550760669 and #45550753144 passed the receiver suite 13/13 on Python 3.11.18 and 3.13.18. The other suites are gated to the child integration branch and were skipped on #149.
+- PR #150 current head: `83f9a789eb0e7fc869de3a45041c2336c6b3595c`; open/draft/unmerged. Full six-suite exact-head CI passed on run #45551031050.
+- PR #151 and PR #152 were closed as superseded/duplicate; their branches were retained and not deleted. PR #151's account_id projection correction and receiver test database-target correction were incorporated into the later #150 branch commits. PR #152's duplicate FK fixture correction was overtaken by the same change on #150 before its branch could be integrated.
+- `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`; no merge has occurred.
+
+### Current evidence boundary
+
+This is now an exact-head pass for all six targeted reservation/settlement regression modules on the #150 candidate branch. It still does **not** establish:
+- the complete repository test suite or all upstream PR #139–#148 exact heads individually;
+- independent adversarial acceptance (the Workstream A immutable AI review trigger was skipped, not passed);
+- production receiver authentication/transport or an external business effect;
+- crash/power-loss, process-kill, restore, malformed-file, or resource-exhaustion certification;
+- v1→v2 migration safety for any existing database;
+- PAPER activation, LIVE capability, profitability or high win rate.
+
+Overall project completion remains **UNRATED**; install/trading readiness remains **NOT READY**; PAPER is **ON HOLD** and LIVE is **DISABLED / ABSENT**.
