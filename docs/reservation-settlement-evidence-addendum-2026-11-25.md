@@ -837,3 +837,36 @@ Live repository refresh confirms protected `main` remains `0426e1ecd5bd01913a568
 **Preferred current candidate chain:** #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190.
 
 All PRs remain open/draft/unmerged. Protected main is unchanged. Four reservation-specific workflow steps remain skipped on this workflow and are not considered verified. Independent adversarial review, full repository acceptance, migration/restore drills and profitability evidence remain outstanding.
+
+
+## 26 November — first-fill inventory baseline verification (#193)
+
+### Adversarial finding
+Static review of the preferred #190 candidate found that holding-transition verification only ran when a market already existed in the in-memory previous-holdings map. The first fill for a market therefore lacked an explicit zero-opening-inventory baseline. A synthetic internally rehashed record could represent a first SELL with a fabricated nonnegative post-fill holding and pass the prior cross-row checks.
+
+### PR #193 correction
+- PR #193 exact head: `5c950b5fcfd3dd2adba36eee9cd074b82f5407fd`.
+- Base: PR #190 exact head `a98ab09fdb55c1d41053b8e73b37d6b6a8cc9fcc`.
+- The verifier now treats the pre-first-fill holding as exactly zero for each market and validates every fill transition.
+- New synthetic regression constructs batch/fill/account/holding/audit rows for an unsupported first SELL, recomputes the local audit hash, and asserts snapshot verification rejects it.
+- Exact-head run [45677302187](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45677302187): Python 3.11.18 and 3.13.18 each passed 71 settlement-store + 16 receiver tests (87 per interpreter), SQLite 3.46.1, ResourceWarning-as-error, no actual ResourceWarning or ignored-connection output.
+- This is isolated suite evidence, not independent acceptance or full repository verification. Four reservation schema/lifecycle/allocation steps remain skipped.
+
+### Parallel branch disposition
+- PR #192 attempted to alter the Decimal arithmetic context but exact-head run 45677288333 failed; its diff contains inconsistent indentation in the settlement transaction/outbox loop. It is marked failed/superseded and must not be used.
+- PR #189 and #191 are redundant decimal-bound siblings; PR #190 is preferred.
+- PR #193 is the preferred current candidate after #190. All remain open/draft/unmerged.
+
+### Updated preferred candidate chain
+#172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #193.
+
+### Remaining priorities
+1. Independent adversarial review of #149/#150/#154/#155/#157/#164/#165/#167–#193 at immutable SHAs.
+2. Review #179 external checkpoint threat model; decide independent signer/storage, checkpoint cadence, max unanchored window and recovery authority.
+3. Continue synthetic-only crash/restart, multiprocess race, lock contention, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+4. Reconcile copy-only migration candidates with historical inventory/expiry evidence; no existing user DB migration or automatic SELL authority.
+5. Keep Tokocrypto BTCIDR blocked until the host/symbol conflict is resolved by the owner.
+6. Continue preregistered multi-market profitability research with point-in-time data, realistic costs, untouched chronological holdouts, multiple-testing controls and independent reproduction.
+7. Keep MEME_INTEL separate until independently ready and explicitly approved.
+
+Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
