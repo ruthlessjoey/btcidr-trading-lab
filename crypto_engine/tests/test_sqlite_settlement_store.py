@@ -925,6 +925,45 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_apply_batch_rejects_unbounded_decimal_inputs_without_mutation(self):
+        for index, value in enumerate(
+            ("1e999999999", "1e-999999999", "0e-999999999")
+        ):
+            with self.subTest(value=value):
+                fill = self.buy()
+                fill["quantity"] = value
+                with self.assertRaisesRegex(
+                    SettlementStoreError, "quantity decimal exponent exceeds the supported range"
+                ):
+                    self.store.apply_batch(
+                        batch_id=f"huge-exp-{index}", fills=[fill], timestamp=1
+                    )
+                self.assertEqual(self.store.snapshot()["cash"], "10000")
+
+        huge_text = self.buy()
+        huge_text["price"] = "1" * 129
+        with self.assertRaisesRegex(
+            SettlementStoreError, "price decimal text exceeds the 128-character limit"
+        ):
+            self.store.apply_batch(
+                batch_id="huge-text", fills=[huge_text], timestamp=1
+            )
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+
+        excessive_precision = self.buy()
+        excessive_precision["quantity"] = "1" * 81
+        with self.assertRaisesRegex(
+            SettlementStoreError, "quantity decimal precision exceeds 80 digits"
+        ):
+            self.store.apply_batch(
+                batch_id="huge-precision", fills=[excessive_precision], timestamp=1
+            )
+        self.assertEqual(self.store.snapshot()["cash"], "10000")
+        with _managed_connection(self.path) as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM main.batches").fetchone()[0], 0
+            )
+
     def test_register_market_rejects_oversized_identity_fields(self):
         with self.assertRaisesRegex(
             SettlementStoreError, "market_id exceeds the 128-character limit"

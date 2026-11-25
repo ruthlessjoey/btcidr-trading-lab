@@ -33,12 +33,22 @@ class SettlementStoreError(RuntimeError):
 def _decimal(value: object, field: str) -> Decimal:
     if isinstance(value, bool):
         raise SettlementStoreError(f"{field} must be a finite decimal")
+    raw = str(value)
+    if len(raw) > 128:
+        raise SettlementStoreError(f"{field} decimal text exceeds the 128-character limit")
     try:
-        result = Decimal(str(value))
+        result = Decimal(raw)
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise SettlementStoreError(f"{field} must be a finite decimal") from exc
     if not result.is_finite():
         raise SettlementStoreError(f"{field} must be finite")
+    parts = result.as_tuple()
+    if len(parts.digits) > 80:
+        raise SettlementStoreError(f"{field} decimal precision exceeds 80 digits")
+    if parts.exponent < -160 or parts.exponent > 128:
+        raise SettlementStoreError(f"{field} decimal exponent exceeds the supported range")
+    if not result.is_zero() and abs(result.adjusted()) > 128:
+        raise SettlementStoreError(f"{field} decimal magnitude exceeds the supported range")
     return result
 
 
