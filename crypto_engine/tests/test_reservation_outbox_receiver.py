@@ -1,7 +1,10 @@
+import multiprocessing
 import os
 import sqlite3
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 from tmm_core.reservation_lifecycle import authorize_reservation, create_reservation
 from tmm_core.reservation_outbox_receiver import (
@@ -11,7 +14,51 @@ from tmm_core.reservation_outbox_receiver import (
     ensure_reservation_inbox_schema,
 )
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
-from tmm_core.sqlite_settlement_store import SQLiteSettlementStore
+from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
+
+
+def _file_receiver_accept(receiver_path, payload):
+    db = sqlite3.connect(receiver_path, timeout=30)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        receipt = accept_reservation_outbox(db, payload)
+        db.commit()
+        return receipt
+    finally:
+        db.close()
+
+
+def _crash_after_receiver_commit_worker(store_path, receiver_path):
+    store = SQLiteSettlementStore(
+        store_path, account_id="paper-research", currency="USDT", opening_cash="10000"
+    )
+
+    def crash_after_commit(payload):
+        _file_receiver_accept(receiver_path, payload)
+        os._exit(73)
+
+    deliver_pending_reservation_outbox(store, crash_after_commit)
+    os._exit(74)
+
+
+def _concurrent_delivery_process(store_path, receiver_path, barrier, results):
+    store = SQLiteSettlementStore(
+        store_path, account_id="paper-research", currency="USDT", opening_cash="10000"
+    )
+    prefetched = store.pending_reservation_outbox(limit=10)
+    if len(prefetched) != 1:
+        results.put({"error": "unexpected pending-row count", "count": len(prefetched)})
+        return
+
+    # Both processes use the same row snapshot to force a real duplicate delivery race.
+    barrier.wait(timeout=20)
+    store.pending_reservation_outbox = lambda limit=100: prefetched
+
+    def receiver(payload):
+        return _file_receiver_accept(receiver_path, payload)
+
+    delivered = deliver_pending_reservation_outbox(store, receiver)
+    results.put({"delivered": delivered})
 
 
 class ReservationOutboxReceiverTests(unittest.TestCase):
@@ -139,6 +186,24 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
                 "COMPLETE",
             )
 
+    def test_temp_trigger_on_main_inbox_is_rejected_before_acceptance(self):
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        self.receiver_db.execute(
+            "CREATE TEMP TRIGGER temp_inbox_mutator "
+            "AFTER INSERT ON main.reservation_inbox "
+            "BEGIN UPDATE reservation_inbox SET receipt='tampered' "
+            "WHERE idempotency_key=NEW.idempotency_key; END"
+        )
+        with self.assertRaisesRegex(
+            ReservationInboxError, "TEMP reservation inbox triggers"
+        ):
+            accept_reservation_outbox(self.receiver_db, self.payload())
+        self.receiver_db.rollback()
+        self.assertEqual(
+            self.receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+            0,
+        )
+
     def test_ambiguous_receiver_response_retries_without_duplicate_effect(self):
         calls = {"count": 0}
         def ambiguous(payload):
@@ -163,12 +228,262 @@ class ReservationOutboxReceiverTests(unittest.TestCase):
         )
         self.assertEqual(self.store.pending_reservation_outbox(), [])
 
+    def test_existing_receipt_tampering_is_rejected_on_replay(self):
+        self.receive(self.payload())
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        self.receiver_db.execute(
+            "UPDATE reservation_inbox SET receipt='tampered' "
+            "WHERE idempotency_key='reservation-allocation:a-1'"
+        )
+        self.receiver_db.commit()
+        self.receiver_db.execute("BEGIN IMMEDIATE")
+        with self.assertRaisesRegex(
+            ReservationInboxError, "stored reservation inbox receipt mismatch"
+        ):
+            accept_reservation_outbox(self.receiver_db, self.payload())
+        self.receiver_db.rollback()
+
+    def test_ambiguous_response_survives_receiver_connection_restart(self):
+        receiver_path = os.path.join(self.tmp.name, "durable-receiver.sqlite3")
+        db = sqlite3.connect(receiver_path)
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            ensure_reservation_inbox_schema(db)
+            db.commit()
+        finally:
+            db.close()
+
+        calls = {"count": 0}
+
+        def durable_receiver(payload):
+            receiver_db = sqlite3.connect(receiver_path)
+            try:
+                receiver_db.execute("BEGIN IMMEDIATE")
+                receipt = accept_reservation_outbox(receiver_db, payload)
+                receiver_db.commit()
+            finally:
+                receiver_db.close()
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise TimeoutError("simulated lost response after durable receiver commit")
+            return receipt
+
+        with self.assertRaisesRegex(TimeoutError, "durable receiver commit"):
+            deliver_pending_reservation_outbox(self.store, durable_receiver)
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+
+        delivered = deliver_pending_reservation_outbox(self.store, durable_receiver)
+        self.assertEqual(delivered, ["reservation-allocation:a-1"])
+        self.assertEqual(self.store.pending_reservation_outbox(), [])
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+
+    def test_concurrent_delivery_workers_share_one_durable_receipt(self):
+        receiver_path = os.path.join(self.tmp.name, "concurrent-receiver.sqlite3")
+        db = sqlite3.connect(receiver_path)
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            ensure_reservation_inbox_schema(db)
+            db.commit()
+        finally:
+            db.close()
+
+        ready = threading.Barrier(2)
+
+        def concurrent_receiver(payload):
+            ready.wait(timeout=10)
+            receiver_db = sqlite3.connect(receiver_path)
+            try:
+                receiver_db.execute("BEGIN IMMEDIATE")
+                receipt = accept_reservation_outbox(receiver_db, payload)
+                receiver_db.commit()
+                return receipt
+            finally:
+                receiver_db.close()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(deliver_pending_reservation_outbox, self.store, concurrent_receiver)
+                for _ in range(2)
+            ]
+            results = [future.result(timeout=20) for future in futures]
+
+        self.assertEqual(
+            results,
+            [["reservation-allocation:a-1"], ["reservation-allocation:a-1"]],
+        )
+        self.assertEqual(self.store.pending_reservation_outbox(), [])
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+
+    def test_process_crash_after_receiver_commit_retries_without_duplicate(self):
+        receiver_path = os.path.join(self.tmp.name, "crash-receiver.sqlite3")
+        receiver_db = sqlite3.connect(receiver_path)
+        try:
+            receiver_db.execute("BEGIN IMMEDIATE")
+            ensure_reservation_inbox_schema(receiver_db)
+            receiver_db.commit()
+        finally:
+            receiver_db.close()
+
+        ctx = multiprocessing.get_context("spawn")
+        process = ctx.Process(
+            target=_crash_after_receiver_commit_worker,
+            args=(self.store.path, receiver_path),
+        )
+        process.start()
+        process.join(timeout=30)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+        self.assertEqual(process.exitcode, 73)
+
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+
+        delivered = deliver_pending_reservation_outbox(
+            self.store,
+            lambda payload: _file_receiver_accept(receiver_path, payload),
+        )
+        self.assertEqual(delivered, ["reservation-allocation:a-1"])
+        self.assertEqual(self.store.pending_reservation_outbox(), [])
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                receiver_db.execute("SELECT receipt FROM reservation_inbox").fetchone()[0],
+                self.receive(self.payload()),
+            )
+
+        with sqlite3.connect(self.store.path) as sender_db:
+            self.assertEqual(
+                sender_db.execute(
+                    "SELECT status FROM batches WHERE batch_id='b-sell'"
+                ).fetchone()[0],
+                "COMMITTED_PENDING_OUTBOX",
+            )
+        self.store.acknowledge_outbox("settle:sell", receiver_receipt="settlement-receipt")
+        with sqlite3.connect(self.store.path) as sender_db:
+            self.assertEqual(
+                sender_db.execute(
+                    "SELECT status FROM batches WHERE batch_id='b-sell'"
+                ).fetchone()[0],
+                "COMPLETE",
+            )
+
+    def test_two_process_delivery_workers_share_one_durable_inbox_receipt(self):
+        receiver_path = os.path.join(self.tmp.name, "process-race-receiver.sqlite3")
+        receiver_db = sqlite3.connect(receiver_path)
+        try:
+            receiver_db.execute("BEGIN IMMEDIATE")
+            ensure_reservation_inbox_schema(receiver_db)
+            receiver_db.commit()
+        finally:
+            receiver_db.close()
+
+        ctx = multiprocessing.get_context("spawn")
+        barrier = ctx.Barrier(2)
+        results = ctx.Queue()
+        workers = [
+            ctx.Process(
+                target=_concurrent_delivery_process,
+                args=(self.store.path, receiver_path, barrier, results),
+            )
+            for _ in range(2)
+        ]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=30)
+            if worker.is_alive():
+                worker.terminate()
+                worker.join(timeout=5)
+        self.assertEqual([worker.exitcode for worker in workers], [0, 0])
+
+        outcomes = [results.get(timeout=5) for _ in workers]
+        self.assertEqual(outcomes, [
+            {"delivered": ["reservation-allocation:a-1"]},
+            {"delivered": ["reservation-allocation:a-1"]},
+        ])
+        self.assertEqual(self.store.pending_reservation_outbox(), [])
+        with sqlite3.connect(receiver_path) as receiver_db:
+            self.assertEqual(
+                receiver_db.execute("SELECT COUNT(*) FROM reservation_inbox").fetchone()[0],
+                1,
+            )
+
+        with sqlite3.connect(self.store.path) as sender_db:
+            self.assertEqual(
+                sender_db.execute(
+                    "SELECT status FROM batches WHERE batch_id='b-sell'"
+                ).fetchone()[0],
+                "COMMITTED_PENDING_OUTBOX",
+            )
+        self.store.acknowledge_outbox("settle:sell", receiver_receipt="settlement-receipt")
+        with sqlite3.connect(self.store.path) as sender_db:
+            self.assertEqual(
+                sender_db.execute(
+                    "SELECT status FROM batches WHERE batch_id='b-sell'"
+                ).fetchone()[0],
+                "COMPLETE",
+            )
+
     def test_worker_rejects_receiver_receipt_not_bound_to_payload(self):
         def bad_receiver(payload):
             return "unrelated-receipt"
         with self.assertRaisesRegex(ReservationInboxError, "not bound to this payload"):
             deliver_pending_reservation_outbox(self.store, bad_receiver)
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+
+    def test_sender_payload_mutation_during_receiver_call_blocks_acknowledgement(self):
+        def mutate_sender_after_receiver_accepts(payload):
+            receipt = self.receive(payload)
+            with sqlite3.connect(self.store.path) as sender_db:
+                sender_db.execute(
+                    "UPDATE reservation_outbox SET market_id='ETH/USDT' "
+                    "WHERE idempotency_key=?",
+                    (payload["idempotency_key"],),
+                )
+            return receipt
+
+        with self.assertRaisesRegex(
+            SettlementStoreError, "payload changed during delivery"
+        ):
+            deliver_pending_reservation_outbox(
+                self.store, mutate_sender_after_receiver_accepts
+            )
+
+        self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
+        with sqlite3.connect(self.store.path) as sender_db:
+            status = sender_db.execute(
+                "SELECT status FROM reservation_outbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()[0]
+            self.assertEqual(status, "PENDING")
+        self.assertEqual(
+            self.receiver_db.execute(
+                "SELECT COUNT(*) FROM reservation_inbox "
+                "WHERE idempotency_key='reservation-allocation:a-1'"
+            ).fetchone()[0],
+            1,
+        )
 
     def test_worker_rejects_tampered_outbox_payload_hash_before_receiver(self):
         with sqlite3.connect(self.store.path) as db:

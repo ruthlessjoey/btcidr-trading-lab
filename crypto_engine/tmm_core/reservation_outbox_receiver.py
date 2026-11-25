@@ -102,6 +102,16 @@ def ensure_reservation_inbox_schema(db: sqlite3.Connection) -> None:
     if unexpected:
         raise ReservationInboxError(f"unapproved reservation inbox schema objects: {unexpected}")
 
+    unexpected_temp_triggers = db.execute(
+        "SELECT type,name,tbl_name FROM temp.sqlite_master "
+        "WHERE type='trigger' AND lower(tbl_name)='reservation_inbox' "
+        "ORDER BY name"
+    ).fetchall()
+    if unexpected_temp_triggers:
+        raise ReservationInboxError(
+            f"unapproved TEMP reservation inbox triggers: {unexpected_temp_triggers}"
+        )
+
 
 def accept_reservation_outbox(
     db: sqlite3.Connection, payload: Mapping[str, object],
@@ -120,7 +130,9 @@ def accept_reservation_outbox(
         old_digest, old_payload, old_receipt = existing
         if old_digest != digest or old_payload != canonical:
             raise ReservationInboxError("idempotency key reused with different reservation payload")
-        return old_receipt
+        if old_receipt != receipt:
+            raise ReservationInboxError("stored reservation inbox receipt mismatch")
+        return receipt
     try:
         db.execute(
             "INSERT INTO main.reservation_inbox("
@@ -168,6 +180,7 @@ def deliver_pending_reservation_outbox(
             raise ReservationInboxError("receiver returned a receipt not bound to this payload")
         store.acknowledge_reservation_outbox(
             row["idempotency_key"], receiver_receipt=receipt,
+            expected_payload_sha256=row["payload_sha256"],
         )
         acknowledged.append(row["idempotency_key"])
     return acknowledged
