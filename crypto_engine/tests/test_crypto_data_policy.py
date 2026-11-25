@@ -53,6 +53,22 @@ class TokocryptoNextMePolicyTests(unittest.TestCase):
             validate_approved_kline_request(method="GET", url=self.URL,
                                             headers={"Authorization": "Bearer forbidden"})
 
+    def test_request_url_normalization_and_resource_bounds_fail_closed(self):
+        bad_urls = (
+            self.URL + "#",
+            self.URL + "\n",
+            self.URL.replace("interval=1m", "interval=1m\t"),
+            self.URL.replace("interval=1m", "interval=١m"),
+            self.URL + "&x1=1&x2=2&x3=3",
+            self.URL + "&startTime=10000000000000000000",
+            self.URL + "&startTime=9999999999999999999",
+            self.URL + "&limit=0000000000000000001",
+            "https://www.tokocrypto.site/api/v3/klines?" + "x" * 2100,
+        )
+        for url in bad_urls:
+            with self.subTest(url=url[:100]), self.assertRaises(ProviderPolicyError):
+                validate_approved_kline_request(method="GET", url=url)
+
     def test_other_symbols_credentials_and_duplicate_parameters_are_rejected(self):
         for url in (self.URL.replace("BTCIDR", "BTCUSDT"),
                     self.URL + "&apiKey=x", self.URL + "&signature=x",
