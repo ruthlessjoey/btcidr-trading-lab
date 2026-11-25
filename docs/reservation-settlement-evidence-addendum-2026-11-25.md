@@ -1080,3 +1080,43 @@ This is deliberately fail-closed: a SELL requiring reservation quantity outside 
 8. Keep MEME_INTEL separate until independently ready and explicitly approved.
 
 Release posture unchanged: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
+
+## 26 November — pre-marker legacy stores made read-only (#203/#205)
+
+### Independent finding
+Pre-marker v1 databases can pass historical fill/audit consistency checks without having the later account_initialization_audit and market_registration_audit policy markers/events. The verifier intentionally tolerates missing markers for historical inspection. However, public store methods previously allowed new market registration, new fill batches and outbox delivery/acknowledgement in that legacy mode. A schema-only v1→v2 copy therefore could be opened and used for new operations without an approved initial-cash and market-registration audit baseline.
+
+### PR #203 — fail-closed legacy write/delivery gate
+- Implementation head: 71c601936df25f0ccb84a27876629afa77f206e0.
+- Adds _require_current_audit_baseline, requiring both account_initialization_audit=required-v1 and market_registration_audit=required-v1 after full state verification.
+- Applies gate to market registration, new batch commits, pending legacy/reservation outbox reads before external delivery, and both acknowledgement paths.
+- Leaves snapshot/audit inspection read-only. Idempotent replay of an already completed batch remains read-only.
+- Synthetic regression removes the two markers and initialization event, verifies snapshot still works, and verifies write/delivery entry points fail without partial DB changes.
+- Pre-marker legacy database is now inspectable but not usable for new fills, market registration or outbox delivery until an explicit approved evidence-backed bootstrap establishes the required audit baseline.
+
+### PR #205 — full safe-suite verification
+- Exact head: d3940f94237b7c23e59678612ea11dea86cbd22f.
+- Actions run [45684179463](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45684179463), both Python matrix jobs passed.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed six suites: schema 25, lifecycle 21, allocations 16, atomic allocations 13, settlement store 79, receiver 17 = 171 tests per interpreter.
+- ResourceWarning-as-error; no actual warning or ignored-connection output.
+- Static import-closure review confirms only standard-library and unprotected reservation/settlement modules were imported.
+- PR #205 is a workflow-only validation PR; PR #203 contains the implementation. Both remain open/unmerged.
+
+### Migration status clarification
+PR #157's preflight eligible result is structural only; it is not proof of independently evidenced opening cash, market identity or migration authorization. PR #164/#165 create a copy-only schema artifact and do not establish the later account/market audit baselines. Under #203, such a pre-marker copy remains inspectable but cannot be used for new trades or outbox delivery until a separate approved bootstrap. The old #165 opens-and-SELL-blocked test is historical evidence from an earlier stack, not current-stack readiness.
+
+### External checkpoint review (#206)
+PR #179 remains design-only. PR #206 adds a further trust requirement: the signer must not blindly sign a caller-supplied digest. It must retain independent monotonic ledger identity/sequence/head/checkpoint state, verify chain extension from the last trusted head, reject rollback/forks and perform deterministic semantic reconciliation before signing. If only a generic signing key is available, assurance claims must be limited to byte-level anchoring. No key/storage/network/cloud platform has been selected; owner approval remains required.
+
+### Candidate chain update
+Preferred implementation chain: #172 → #173 → #174 → #176 → #180 → #181 → #182 → #184 → #187 → #188 → #190 → #192 → #194 → #195 → #197 → #198 → #203. PR #202 verifies #198; PR #205 verifies #203. PR #206 is a design-only checkpoint successor.
+
+### Dispositions
+- #200: failed earlier full-suite run due widened reservation precision; superseded by #202.
+- #201: rejected test-only relaxation from 1e-19 to 1e-161, which weakens the 18-decimal reservation limit.
+- #204: failed because its test fixture accidentally changed the default setup market; corrected in #203 and verified by #205.
+- #199: untriggered workflow experiment; superseded by #202.
+- #164/#165 remain copy-only staging proposals; current-stack baseline bootstrap is not implemented.
+
+Release posture remains: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; whole-project completion UNRATED.
