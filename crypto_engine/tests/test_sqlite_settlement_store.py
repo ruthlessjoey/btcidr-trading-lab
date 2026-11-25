@@ -652,6 +652,20 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 "SELECT 1 FROM main.batches WHERE batch_id='b-after-tamper'"
             ).fetchone())
 
+
+    def test_idempotent_batch_replay_rejects_tampered_account_state(self):
+        original = self.buy()
+        self.store.apply_batch(
+            batch_id="b-reserve-buy", fills=[original], timestamp=10
+        )
+        self.enable_reservations()
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE main.account SET cash='999' WHERE singleton=1")
+        with self.assertRaisesRegex(SettlementStoreError, "account cash does not match fill audit state"):
+            self.store.apply_batch(
+                batch_id="b-reserve-buy", fills=[original], timestamp=10
+            )
+
     def test_reservation_outbox_rejects_mutated_allocation_and_rehashed_payload(self):
         self.store.apply_batch(batch_id="b-reserve-buy", fills=[self.buy()], timestamp=10)
         self.enable_reservations()
