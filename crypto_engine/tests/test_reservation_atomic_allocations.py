@@ -228,6 +228,15 @@ class AtomicReservationAllocationTests(unittest.TestCase):
             )
         self.db.rollback()
 
+    def test_batch_timestamp_must_match_fill_timestamp(self):
+        self.prepare_batch([("sell-1", "BTC/USDT", "SELL", "0.4")])
+        with self.assertRaisesRegex(ReservationAllocationError, "batch timestamp"):
+            consume_sell_allocations(
+                self.db, account_id="paper-research", batch_id="b-1",
+                allocations=self.allocations(), timestamp=161,
+            )
+        self.db.rollback()
+
     def test_non_processing_batch_rejected(self):
         self.db.execute("BEGIN IMMEDIATE")
         self.db.execute(
