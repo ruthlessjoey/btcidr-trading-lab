@@ -3,6 +3,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from decimal import Decimal, localcontext
 from contextlib import contextmanager
 import unittest
 
@@ -140,6 +141,34 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SettlementStoreError, "synthetic fill holding audit transition mismatch"
         ):
             self.store.snapshot()
+
+    def test_apply_batch_preserves_precision_beyond_default_decimal_context(self):
+        quantity = "1234567890123456789012345678901234567890"
+        fill = self.buy(qty=quantity)
+        fill["price"] = "1e-40"
+        with localcontext() as decimal_context:
+            decimal_context.prec = 640
+            expected_cash = Decimal("10000") - Decimal(quantity) * Decimal("1e-40")
+        self.store.apply_batch(batch_id="b-high-precision", fills=[fill], timestamp=10)
+        snapshot = self.store.snapshot()
+        self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
+        self.assertEqual(snapshot["holdings"]["BTC/USDT"], quantity)
+
+    def test_apply_batch_round_trips_supported_smallest_scale_decimal(self):
+        self.store.apply_batch(
+            batch_id="b-smallest-scale",
+            fills=[self.buy(qty="1e-160")],
+            timestamp=10,
+        )
+        snapshot = self.store.snapshot()
+        self.assertEqual(
+            snapshot["holdings"]["BTC/USDT"],
+            "0." + ("0" * 159) + "1",
+        )
+        with localcontext() as decimal_context:
+            decimal_context.prec = 640
+            expected_cash = Decimal("10000") - Decimal("1e-160")
+        self.assertEqual(snapshot["cash"], format(expected_cash, "f"))
 
     def test_atomic_commit_updates_cash_holdings_audit_and_batch(self):
         result = self.store.apply_batch(batch_id="b-1",
