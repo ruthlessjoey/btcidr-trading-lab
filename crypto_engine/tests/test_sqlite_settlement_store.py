@@ -815,6 +815,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             db.execute(
                 "UPDATE main.markets SET base_asset='ETH' WHERE market_id='BTC/USDT'"
             )
+            db.commit()
         finally:
             db.close()
         with self.assertRaisesRegex(
