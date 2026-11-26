@@ -252,7 +252,9 @@ class BitstampPublicOhlcTests(unittest.TestCase):
 
     def test_market_identity_must_remain_stable_across_pages(self):
         first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3600), candle(7200)]}}
-        second = {"data": {"pair": "ETH/USD", "ohlc": [candle(0)]}}
+        # Both page labels normalize to the requested btcusd symbol, but
+        # the provider's reported identity representation changes between pages.
+        second = {"data": {"pair": "BTCUSD", "ohlc": [candle(0)]}}
         opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(second))])
         with self.assertRaisesRegex(BitstampDataError, "identity changed between pages"):
             fetch_spot_history(
