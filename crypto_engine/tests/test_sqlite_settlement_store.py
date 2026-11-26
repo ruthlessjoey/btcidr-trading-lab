@@ -1705,6 +1705,62 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             SQLiteSettlementStore(self.path, account_id="paper-research",
                                   currency="USDT", opening_cash="10000")
 
+    def test_audit_chain_rejects_sequence_gap_without_hash_changes(self):
+        with _managed_connection(self.path) as db:
+            db.execute("UPDATE main.audit SET seq=3 WHERE seq=2")
+        # Event JSON and both hashes are untouched; only the persisted sequence
+        # has a gap. A checkpoint sequence must refer to a contiguous prefix.
+        self.assertFalse(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "audit chain verification failed"
+        ):
+            self.store.snapshot()
+
+    def test_audit_chain_requires_genesis_sequence_one(self):
+        with _managed_connection(self.path) as db:
+            db.execute("UPDATE main.audit SET seq=0 WHERE seq=1")
+        self.assertFalse(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "audit chain verification failed"
+        ):
+            self.store.snapshot()
+
+    def test_audit_chain_rejects_duplicate_json_keys(self):
+        with _managed_connection(self.path) as db:
+            event_json = db.execute(
+                "SELECT event_json FROM main.audit WHERE seq=1"
+            ).fetchone()[0]
+            first_member = event_json[1:event_json.index(",")]
+            ambiguous_json = event_json[:-1] + "," + first_member + "}"
+            db.execute(
+                "UPDATE main.audit SET event_json=? WHERE seq=1",
+                (ambiguous_json,),
+            )
+        # Default json.loads would silently retain the duplicate key's last value,
+        # leaving the canonical event hash unchanged. The verifier must reject it.
+        self.assertFalse(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "audit chain verification failed"
+        ):
+            self.store.snapshot()
+
+    def test_audit_chain_rejects_noncanonical_json_encoding(self):
+        with _managed_connection(self.path) as db:
+            event_json = db.execute(
+                "SELECT event_json FROM main.audit WHERE seq=1"
+            ).fetchone()[0]
+            db.execute(
+                "UPDATE main.audit SET event_json=? WHERE seq=1",
+                (" " + event_json,),
+            )
+        # Whitespace changes the stored representation but not json.loads output.
+        # The hash alone is therefore insufficient without canonical encoding.
+        self.assertFalse(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "audit chain verification failed"
+        ):
+            self.store.snapshot()
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)

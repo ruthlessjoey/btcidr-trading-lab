@@ -12,7 +12,10 @@ import sqlite3
 from decimal import Decimal, InvalidOperation
 
 from .sqlite_settlement_store import _event_hash
-from .reservation_schema_v2 import ensure_reservation_schema_v2
+from .reservation_schema_v2 import (
+    ReservationSchemaError, _verify_account_market_baseline,
+    ensure_reservation_schema_v2,
+)
 
 
 _MAX_SQLITE_INTEGER = 2**63 - 1
@@ -41,8 +44,14 @@ def _require_transaction(db: sqlite3.Connection) -> None:
         raise ReservationLifecycleError("a trusted SQLite connection is required")
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
-    ensure_reservation_schema_v2(db)
     _validate_audit_schema(db)
+    try:
+        _verify_account_market_baseline(db)
+    except (ReservationSchemaError, sqlite3.Error) as exc:
+        raise ReservationLifecycleError(
+            "explicit account and market audit baselines must be verified before reservation changes"
+        ) from exc
+    ensure_reservation_schema_v2(db)
 
 
 def _text(value: object, field: str, limit: int = 128) -> str:

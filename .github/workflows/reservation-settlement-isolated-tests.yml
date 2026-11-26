@@ -8,6 +8,12 @@ on:
       - security/reservation-inbox-temp-trigger-receipt-integrity-2026-11-25
       - security/block-legacy-unreserved-sells-2026-11-25
     paths:
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
+      - "crypto_engine/tests/test_offline_settlement.py"
+      - "crypto_engine/tmm_core/offline_portfolio.py"
+      - "crypto_engine/tmm_core/offline_settlement.py"
+      - "crypto_engine/tmm_core/offline_batch_journal.py"
       - ".github/workflows/reservation-settlement-isolated-tests.yml"
       - "crypto_engine/tmm_core/__init__.py"
       - "crypto_engine/tmm_core/sqlite_settlement_store.py"
@@ -24,6 +30,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
+      - "crypto_engine/tests/test_offline_settlement.py"
+      - "crypto_engine/tmm_core/offline_portfolio.py"
+      - "crypto_engine/tmm_core/offline_settlement.py"
+      - "crypto_engine/tmm_core/offline_batch_journal.py"
       - ".github/workflows/reservation-settlement-isolated-tests.yml"
       - "crypto_engine/tmm_core/__init__.py"
       - "crypto_engine/tmm_core/sqlite_settlement_store.py"
@@ -75,12 +87,18 @@ jobs:
             /crypto_engine/tmm_core/reservation_lifecycle.py
             /crypto_engine/tmm_core/reservation_allocations.py
             /crypto_engine/tmm_core/reservation_outbox_receiver.py
+            /crypto_engine/tmm_core/offline_batch_journal.py
+            /crypto_engine/tmm_core/offline_settlement.py
+            /crypto_engine/tmm_core/offline_portfolio.py
+            /crypto_engine/tmm_core/reservation_migration_preflight.py
             /crypto_engine/tests/test_sqlite_settlement_store.py
             /crypto_engine/tests/test_reservation_outbox_receiver.py
             /crypto_engine/tests/test_reservation_schema_v2.py
             /crypto_engine/tests/test_reservation_lifecycle.py
             /crypto_engine/tests/test_reservation_allocations.py
             /crypto_engine/tests/test_reservation_atomic_allocations.py
+            /crypto_engine/tests/test_offline_settlement.py
+            /crypto_engine/tests/test_reservation_migration_preflight.py
 
       - name: Set up supported Python version
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -108,3 +126,9 @@ jobs:
 
       - name: Run reservation receiver regression suite
         run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
+
+      - name: Run offline batch settlement and journal regression suite
+        run: python -X tracemalloc=10 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_offline_settlement.py' -v
+
+      - name: Run read-only reservation migration preflight regression suite
+        run: python -X tracemalloc=10 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_migration_preflight.py' -v

@@ -17,6 +17,8 @@ class AtomicReservationAllocationTests(unittest.TestCase):
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript("""
             CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+            INSERT INTO metadata VALUES('account_initialization_audit','required-v1');
+            INSERT INTO metadata VALUES('market_registration_audit','required-v1');
             CREATE TABLE account(
                 singleton INTEGER PRIMARY KEY CHECK(singleton=1),
                 account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL
@@ -26,6 +28,9 @@ class AtomicReservationAllocationTests(unittest.TestCase):
                 market_id TEXT PRIMARY KEY, base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL
             );
             INSERT INTO markets VALUES('BTC/USDT','BTC','USDT');
+            CREATE TABLE holdings(
+                market_id TEXT PRIMARY KEY REFERENCES markets(market_id), quantity TEXT NOT NULL
+            );
             CREATE TABLE batches(
                 batch_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN
@@ -45,6 +50,23 @@ class AtomicReservationAllocationTests(unittest.TestCase):
                 event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL
             );
         """)
+        initial = {
+            "kind": "ACCOUNT_INITIALIZED", "account_id": "paper-research",
+            "currency": "USDT", "opening_cash": "1000",
+            "market_registration_audit": "required-v1",
+        }
+        initial_json = json.dumps(initial, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        initial_hash = _event_hash("0" * 64, initial)
+        market = {
+            "kind": "MARKET_REGISTERED", "account_id": "paper-research",
+            "market_id": "BTC/USDT", "base_asset": "BTC", "quote_asset": "USDT",
+        }
+        market_json = json.dumps(market, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        market_hash = _event_hash(initial_hash, market)
+        self.db.executemany(
+            "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+            [(initial_json, "0" * 64, initial_hash), (market_json, initial_hash, market_hash)],
+        )
         self.db.commit()
         self.db.execute("BEGIN IMMEDIATE")
         ensure_reservation_schema_v2(self.db)

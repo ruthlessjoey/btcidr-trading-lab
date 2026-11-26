@@ -7,7 +7,9 @@ strategy agents.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
+from decimal import Decimal, InvalidOperation
 
 
 class ReservationSchemaError(RuntimeError):
@@ -77,6 +79,64 @@ def _normalize(sql: str) -> str:
     return "".join(output)
 
 
+def _verify_account_market_baseline(db: sqlite3.Connection) -> None:
+    """Require explicit markers, a valid audit chain and its account genesis event."""
+    try:
+        markers = dict(db.execute(
+            "SELECT key,value FROM main.metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        ))
+        account = db.execute(
+            "SELECT account_id,currency FROM main.account WHERE singleton=1"
+        ).fetchone()
+    except sqlite3.Error as exc:
+        raise ReservationSchemaError(
+            "explicit account and market audit baselines must be verified"
+        ) from exc
+    if markers != {
+        "account_initialization_audit": "required-v1",
+        "market_registration_audit": "required-v1",
+    } or account is None:
+        raise ReservationSchemaError(
+            "explicit account and market audit baselines must be verified"
+        )
+
+    from .sqlite_settlement_store import SQLiteSettlementStore
+    verifier = SQLiteSettlementStore.__new__(SQLiteSettlementStore)
+    verifier.account_id, verifier.currency = account
+    if not verifier._verify_chain(db):
+        raise ReservationSchemaError("account and market audit baseline chain is invalid")
+
+    try:
+        events = [
+            json.loads(row[0])
+            for row in db.execute("SELECT event_json FROM main.audit ORDER BY seq")
+        ]
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ReservationSchemaError("account and market audit baseline JSON is invalid") from exc
+    initial = [event for event in events if isinstance(event, dict)
+               and event.get("kind") == "ACCOUNT_INITIALIZED"]
+    expected_initial_keys = {
+        "kind", "account_id", "currency", "opening_cash",
+        "market_registration_audit",
+    }
+    if (
+        len(initial) != 1 or not events or events[0] != initial[0]
+        or set(initial[0]) != expected_initial_keys
+        or initial[0].get("account_id") != account[0]
+        or initial[0].get("currency") != account[1]
+        or initial[0].get("market_registration_audit") != "required-v1"
+    ):
+        raise ReservationSchemaError(
+            "account and market audit baseline genesis event is invalid"
+        )
+    try:
+        opening_cash = Decimal(str(initial[0].get("opening_cash")))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ReservationSchemaError("initial audited cash is invalid") from exc
+    if not opening_cash.is_finite() or opening_cash <= 0:
+        raise ReservationSchemaError("initial audited cash is invalid")
+
 def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     """Create/verify v2 objects inside a caller-owned transaction.
 
@@ -89,7 +149,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     if not db.in_transaction:
         raise ReservationSchemaError("caller-owned transaction is required")
 
-    required_parents = {"markets", "batches", "fills"}
+    required_parents = {"metadata", "markets", "batches", "fills"}
     present = {
         row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -149,6 +209,21 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         )
 
     if not existing_targets:
+        # Creating reservation state on a pre-marker legacy store would let
+        # callers reserve inventory whose opening account/market authority is
+        # not established. Existing v2 tables may still be verified read-only;
+        # only creation requires both explicit baseline markers.
+        markers = dict(db.execute(
+            "SELECT key,value FROM main.metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        ))
+        if markers != {
+            "account_initialization_audit": "required-v1",
+            "market_registration_audit": "required-v1",
+        }:
+            raise ReservationSchemaError(
+                "reservation schema creation requires an explicit account and market audit baseline"
+            )
         for ddl in _SCHEMA.values():
             db.execute(ddl)
 
