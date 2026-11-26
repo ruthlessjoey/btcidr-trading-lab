@@ -256,6 +256,11 @@ def _backtest(
         intrabar_equity_curve.append(close_equity)
 
     final_equity = close_equity_curve[-1]
+    mark_to_market_return_pct = (
+        (final_equity / INITIAL_CASH - 1) * 100
+    ).quantize(D("0.0001"))
+    terminal_position_is_flat = base <= quantum
+    open_position_mark_value = base * D(candles[-1]["close"])
 
     def _max_drawdown(curve):
         peak = curve[0]
@@ -275,7 +280,14 @@ def _backtest(
     return {
         "initial_cash": str(INITIAL_CASH),
         "final_equity": str(final_equity.quantize(D("0.01"))),
-        "net_return_pct": str(((final_equity / INITIAL_CASH - 1) * 100).quantize(D("0.0001"))),
+        "net_return_pct": str(mark_to_market_return_pct) if terminal_position_is_flat else None,
+        "mark_to_market_return_pct": str(mark_to_market_return_pct),
+        "return_valuation": "MARK_TO_MARKET_AFTER_EXECUTED_COSTS",
+        "terminal_position_status": (
+            "FLAT" if terminal_position_is_flat
+            else "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL"
+        ),
+        "open_position_mark_value": str(open_position_mark_value.quantize(D("0.01"))),
         "max_drawdown_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
         "max_drawdown_intrabar_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
         "max_drawdown_close_pct": str((close_max_drawdown * 100).quantize(D("0.0001"))),
