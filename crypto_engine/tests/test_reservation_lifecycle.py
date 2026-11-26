@@ -110,7 +110,7 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.db.execute("UPDATE audit SET event_hash=? WHERE seq=1", ("0" * 64,))
         self.db.commit()
         with self.assertRaisesRegex(
-            ReservationLifecycleError, "verified account and market audit baselines"
+            ReservationLifecycleError, "explicit account and market audit baselines"
         ):
             self.create(reservation_id="corrupt-audit-r")
 
@@ -212,7 +212,7 @@ class ReservationLifecycleTests(unittest.TestCase):
         )
         self.db.commit()
         self.assertEqual((row["status"], row["version"]), ("ACTIVE", 2))
-        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 2)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 4)
         self.assertTrue(self.audit_is_valid())
 
     def test_authorize_rejects_stale_version(self):
@@ -343,7 +343,7 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.assertIsNone(get_reservation(
             self.db, reservation_id="rollback", account_id="paper-research"
         ))
-        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 0)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 2)
 
     def test_missing_audit_schema_fails_before_reservation_write(self):
         self.db.execute("DROP TABLE audit")
