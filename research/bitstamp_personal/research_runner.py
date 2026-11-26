@@ -357,6 +357,44 @@ def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end
     return all_signals[start:end]
 
 
+
+OOS_FOLD_COUNT = 5
+OOS_INITIAL_HISTORY_RATIO = D("0.50")
+OOS_EMBARGO_BARS = 50
+OOS_MINIMUM_FOLD_BARS = 500
+
+
+def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
+    """Create five sequential, non-overlapping OOS windows after fixed warmup.
+
+    The first 50% of the dataset is historical warm-up/development history.
+    The remaining portion is split into five test windows with 50-bar embargoes.
+    Test ranges are [start, end) indices. Strategy parameters must already be
+    frozen; this helper performs no fitting or tuning.
+    """
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise ValueError("count must be a positive integer")
+    history_end = int(D(count) * OOS_INITIAL_HISTORY_RATIO)
+    remaining = count - history_end
+    usable = remaining - OOS_EMBARGO_BARS * (OOS_FOLD_COUNT - 1)
+    fold_size = usable // OOS_FOLD_COUNT
+    if fold_size < OOS_MINIMUM_FOLD_BARS:
+        raise ValueError("at least 5500 candles are required for five OOS folds")
+    ranges = {}
+    for index in range(OOS_FOLD_COUNT):
+        start = history_end + index * (fold_size + OOS_EMBARGO_BARS)
+        end = count if index == OOS_FOLD_COUNT - 1 else start + fold_size
+        ranges[f"fold_{index + 1}"] = (start, end)
+    previous_end = history_end
+    for start, end in ranges.values():
+        if start - previous_end < (0 if previous_end == history_end else OOS_EMBARGO_BARS):
+            raise AssertionError("internal OOS fold embargo invariant failed")
+        if end - start < OOS_MINIMUM_FOLD_BARS or end <= start:
+            raise AssertionError("internal OOS fold width invariant failed")
+        previous_end = end
+    return ranges
+
+
 def split_ranges(count: int, embargo_bars: int = 50) -> dict[str, tuple[int, int]]:
     if count < 5000:
         raise ValueError("at least 5000 contiguous 1h candles are required")
