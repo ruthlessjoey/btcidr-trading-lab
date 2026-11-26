@@ -12,6 +12,7 @@ on:
       - research/require-zero-inventory-for-flat-return-2026-11-27
       - research/preserve-residual-inventory-after-partial-sell-2026-11-27
       - research/verify-bitstamp-ohlc-pair-identity-2026-11-27
+      - research/block-bitstamp-v1-survivorship-biased-universe-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
