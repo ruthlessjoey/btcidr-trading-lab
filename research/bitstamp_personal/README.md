@@ -89,3 +89,10 @@ The V2 evaluator requires the complete adapter manifest: exact 2024-01-01 00:00 
 
 
 Point-in-time listing research and unresolved conflicts are recorded in `POINT_IN_TIME_UNIVERSE_RESEARCH.md`. The V2 public-data gate remains NOT_VERIFIED.
+
+
+## Hash-pinned point-in-time universe evidence gate
+
+The public-data runner no longer relies on a manually editable `NOT_VERIFIED`/`VERIFIED` string. It loads `POINT_IN_TIME_UNIVERSE_EVIDENCE.json` through the offline verifier in `point_in_time_universe.py`. Reopening public research requires an exact evidence digest pinned in code, an approved date-policy decision, exact per-market listing/matching/market-order timestamps, complete gap-free status intervals through the frozen end, official source snapshots pinned by SHA-256, affirmative personal/noncommercial data-rights acceptance, and two distinct independent reviewers attesting to that evidence digest.
+
+The current manifest is intentionally incomplete and remains blocked. It records official listing notices and known limit-only phases but does not invent first market-order-enable timestamps, historical status intervals, source snapshot hashes, data-rights approval or reviewer acceptance. The common-start conflict for PEPE and the per-market-inception option remain an explicit decision; no option is silently applied. The runner fails before market metadata or OHLC requests until all requirements pass.
