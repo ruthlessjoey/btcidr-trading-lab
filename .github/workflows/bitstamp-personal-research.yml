@@ -29,7 +29,6 @@ concurrency:
 
 jobs:
   offline-tests:
-    if: github.event_name != 'workflow_dispatch' || inputs.allow_public_data_request != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
