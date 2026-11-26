@@ -436,7 +436,7 @@ class WalkForwardFoldTests(unittest.TestCase):
         })
         self.assertTrue(all(f["test_end"] <= 5349 for f in result["walk_forward_folds"]))
         self.assertEqual(result["walk_forward_status"],
-                         "FIVE_OOS_FOLDS_WITH_NEXT_OPEN_TERMINAL_LIQUIDATION_STATISTICS_PENDING")
+                         "FIVE_OOS_FOLDS_STATISTICAL_SCREEN_COMPUTED_FINAL_HOLDOUT_UNTOUCHED")
         self.assertEqual(result["cost_assumptions"]["two_x_fee_bps_per_side"], "32")
         self.assertEqual(result["results"]["walk_forward_folds"], result["walk_forward_folds"])
         for fold in result["walk_forward_folds"]:
