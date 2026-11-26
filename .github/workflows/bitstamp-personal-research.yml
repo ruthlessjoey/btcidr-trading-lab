@@ -8,6 +8,7 @@ on:
       - research/bitstamp-conservative-intrabar-drawdown-2026-11-27
       - research/bitstamp-terminal-mark-to-market-label-2026-11-27
       - research/reset-state-at-bitstamp-segment-boundaries-2026-11-27
+      - research/bitstamp-integrated-state-rsi-identity-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
