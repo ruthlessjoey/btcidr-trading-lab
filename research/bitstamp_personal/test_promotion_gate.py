@@ -2,7 +2,7 @@ import copy, unittest
 from promotion_gate import PromotionEvidenceError,evaluate_promotion_gate
 H="a"*64
 def folds():
- return [{"fold_id":f"f{i}","test_start":i*100,"test_end":i*100+80,"dataset_sha256":H,"registered_trial_count":2,"strategy_net_return":.08,"buy_hold_net_return":.02,"two_x_cost_net_return":.04,"max_drawdown":.1,"profit_factor":1.5,"closed_trade_count":8,"observations":30,"deflated_sharpe_probability":.97,"bootstrap_excess_ci_lower":.005} for i in range(5)]
+ return [{"fold_id":f"f{i}","test_start":i*100,"test_end":i*100+80,"dataset_sha256":H,"cost_model_sha256":"c"*64,"strategy_config_sha256":"d"*64,"return_valuation":"REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT","terminal_position_status":"FLAT","registered_trial_count":2,"strategy_net_return":.08,"buy_hold_net_return":.02,"two_x_cost_net_return":.04,"max_drawdown":.1,"profit_factor":1.5,"closed_trade_count":8,"observations":30,"deflated_sharpe_probability":.97,"bootstrap_excess_ci_lower":.005} for i in range(5)]
 class GateTests(unittest.TestCase):
  def test_pass_means_review_only(self):
   r=evaluate_promotion_gate(folds()); self.assertTrue(all(r["checks"].values())); self.assertEqual(r["profitability_status"],"NOT_VERIFIED")
@@ -49,6 +49,16 @@ class GateTests(unittest.TestCase):
    with self.assertRaises(PromotionEvidenceError):evaluate_promotion_gate(x)
   x=folds();x[0]["dataset_sha256"]="bad"
   with self.assertRaisesRegex(PromotionEvidenceError,"SHA-256"):evaluate_promotion_gate(x)
+ def test_cost_and_strategy_hashes_must_match_across_folds(self):
+  x=folds();x[1]["cost_model_sha256"]="e"*64
+  with self.assertRaisesRegex(PromotionEvidenceError,"cost-model hash"):evaluate_promotion_gate(x)
+  x=folds();x[1]["strategy_config_sha256"]="f"*64
+  with self.assertRaisesRegex(PromotionEvidenceError,"strategy-config hash"):evaluate_promotion_gate(x)
+ def test_unrealized_or_open_terminal_returns_are_rejected(self):
+  x=folds();x[0]["return_valuation"]="MARK_TO_MARKET"
+  with self.assertRaisesRegex(PromotionEvidenceError,"realized after costs"):evaluate_promotion_gate(x)
+  x=folds();x[0]["terminal_position_status"]="OPEN"
+  with self.assertRaisesRegex(PromotionEvidenceError,"must end flat"):evaluate_promotion_gate(x)
  def test_boolean_counts_empty_range_and_input_immutability(self):
   x=folds();x[0]["closed_trade_count"]=True
   with self.assertRaises(PromotionEvidenceError):evaluate_promotion_gate(x)
