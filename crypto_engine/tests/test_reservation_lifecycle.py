@@ -94,7 +94,11 @@ class ReservationLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(
             ReservationLifecycleError, "explicit account and market audit baselines"
         ):
-            self.create()
+            create_reservation(
+                self.db, reservation_id="legacy-r", account_id="paper-research",
+                market_id="BTC/USDT", base_asset="BTC", quote_asset="USDT",
+                authorized_quantity="1", created_at=100, expires_at=200,
+            )
         self.db.rollback()
         self.assertEqual(
             self.db.execute("SELECT COUNT(*) FROM reservations").fetchone()[0], 0
