@@ -13,6 +13,7 @@ on:
       - research/five-fold-walk-forward-execution-2026-11-27
       - research/paired-bootstrap-deflated-sharpe-2026-11-27
       - research/reserve-untouched-final-holdout-2026-11-27
+      - research/integrate-walkforward-statistical-promotion-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"

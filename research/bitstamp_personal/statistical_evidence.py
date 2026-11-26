@@ -19,7 +19,10 @@ def _series(values,name,minimum=30):
 def _moments(x):
     n=len(x); mean=math.fsum(x)/n; c=[v-mean for v in x]
     m2=math.fsum(v*v for v in c)/n
-    if not math.isfinite(m2) or m2<=0: raise StatisticalEvidenceError("return series must have non-zero finite variance")
+    if not math.isfinite(m2): raise StatisticalEvidenceError("return variance must be finite")
+    if m2<=0:
+        if mean==0: return 0.0,0.0,3.0
+        raise StatisticalEvidenceError("constant non-zero return series has undefined Sharpe")
     sharpe=mean/math.sqrt(math.fsum(v*v for v in c)/(n-1))
     skew=math.fsum(v**3 for v in c)/n/(m2**1.5)
     kurt=math.fsum(v**4 for v in c)/n/(m2**2)

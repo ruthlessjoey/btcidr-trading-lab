@@ -81,3 +81,10 @@ These calculations are screening evidence, not independent verification. Trial-r
 
 
 The V2 planner requires at least 6,000 contiguous hourly candles to preserve a minimum 1,500-bar initial training window, five OOS folds of at least 500 bars each, all 50-bar embargoes and the final untouched 10% holdout. The final holdout is explicitly reported as `RESERVED_UNTOUCHED_NOT_EVALUATED`.
+
+
+## Integrated fold-level statistical screening
+
+The V2 runner derives per-candle portfolio returns internally, computes Deflated Sharpe and paired moving-block bootstrap evidence for each strategy in each OOS fold, then submits summaries to `promotion_gate.py`. Return vectors are removed before final JSON serialization. Candidate and same-cost buy-and-hold must both be realized and terminal-flat. Each fold is bound to runner/preregistration source hash, cost-model hash, dataset hash and registered-trial count.
+
+A failed threshold is labeled `REJECT_OR_RESEARCH_MORE`; missing or invalid statistical evidence is `BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE`. A pass only permits independent human review. The final 10% holdout remains untouched. The current DSR calculation uses completed strategy series for the market plus the full registered-trial count; independent review must reconcile completed series with the append-only global trial registry before any promotion.
