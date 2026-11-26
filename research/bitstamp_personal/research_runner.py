@@ -29,6 +29,8 @@ D = Decimal
 INITIAL_CASH = D("10000")
 PARTICIPATION = D("0.05")
 FEE_BPS = D("16")  # documented public API example only; not the user's fee tier
+COST_SENSITIVITY_MULTIPLIERS = (D("1"), D("1.5"), D("2"), D("3"), D("5"))
+PARTICIPATION_SENSITIVITY_LEVELS = (D("0.01"), D("0.025"), D("0.05"), D("0.10"))
 STRATEGIES = ("SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY")
 PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD"
 PREREGISTERED_START = "2024-01-01"
@@ -146,6 +148,7 @@ def _validate_backtest_inputs(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    participation: Decimal,
 ) -> None:
     """Reject malformed inputs before any portfolio arithmetic is performed."""
     if len(candles) != len(signals) or len(candles) < 2:
@@ -160,6 +163,8 @@ def _validate_backtest_inputs(
     ):
         if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
             raise ValueError(f"{name} must be a finite nonnegative Decimal")
+    if not isinstance(participation, Decimal) or not participation.is_finite() or not D("0") < participation <= D("1"):
+        raise ValueError("participation must be a finite Decimal in (0, 1]")
     if fee_bps >= D(10000):
         raise ValueError("fee_bps must be below 10000")
     if half_spread_bps + slippage_bps >= D(10000):
@@ -197,10 +202,12 @@ def _backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    participation: Decimal,
 ) -> dict:
     _validate_backtest_inputs(
         candles, signals, fee_bps=fee_bps,
         half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
+        participation=participation,
     )
     cash = INITIAL_CASH
     base = D("0")
@@ -221,7 +228,7 @@ def _backtest(
         open_price = D(candles[index]["open"])
         close_price = D(candles[index]["close"])
         prior_volume = D(candles[index - 1]["volume"])
-        max_qty = prior_volume * PARTICIPATION
+        max_qty = prior_volume * participation
         equity_at_open = cash + base * open_price
         intrabar_equity_curve.append(equity_at_open)
         desired_base = (equity_at_open * weight / open_price) if open_price > 0 else D("0")
@@ -348,6 +355,7 @@ def backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    participation: Decimal = PARTICIPATION,
 ) -> dict:
     # One fixed precision policy for indicator-adjacent accounting, fee,
     # spread, slippage and cost-basis arithmetic. The caller's context is restored.
@@ -358,6 +366,7 @@ def backtest(
             fee_bps=fee_bps,
             half_spread_bps=half_spread_bps,
             slippage_bps=slippage_bps,
+            participation=participation,
         )
 
 
@@ -434,6 +443,7 @@ def _backtest_walk_forward_fold(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    participation: Decimal = PARTICIPATION,
 ) -> dict:
     """Backtest one OOS range, entering at its first open and liquidating next open."""
     if (test_start < 1 or test_end <= test_start or test_end >= len(all_candles)
@@ -447,7 +457,39 @@ def _backtest_walk_forward_fold(
     return backtest(
         segment, prepared_signals, fee_bps=fee_bps,
         half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
+        participation=participation,
     )
+
+
+def _cost_sensitivity_matrix(
+    candles: list[dict], start: int, end: int, signals: list[int], *,
+    base_spread: Decimal, base_slippage: Decimal,
+) -> list[dict]:
+    """Replay identical signals across a frozen fee/spread/slippage × participation grid."""
+    results = []
+    for multiplier in COST_SENSITIVITY_MULTIPLIERS:
+        for participation in PARTICIPATION_SENSITIVITY_LEVELS:
+            result = _backtest_walk_forward_fold(
+                candles, start, end, signals, initial_target=0,
+                fee_bps=FEE_BPS * multiplier,
+                half_spread_bps=base_spread * multiplier,
+                slippage_bps=base_slippage * multiplier,
+                participation=participation,
+            )
+            results.append({
+                "cost_multiplier": str(multiplier),
+                "participation": str(participation),
+                "net_return_pct": result["net_return_pct"],
+                "mark_to_market_return_pct": result["mark_to_market_return_pct"],
+                "max_drawdown_pct": result["max_drawdown_pct"],
+                "closed_cycles": result["closed_cycles"],
+                "profit_factor": result["profit_factor"],
+                "win_rate_pct": result["win_rate_pct"],
+                "fees_paid": result["fees_paid"],
+                "fill_count": result["fill_count"],
+                "terminal_position_status": result["terminal_position_status"],
+            })
+    return results
 
 
 def split_ranges(count: int, embargo_bars: int = 50) -> dict[str, tuple[int, int]]:
@@ -621,6 +663,10 @@ def evaluate_market(
                     fee_bps=two_x_fee, half_spread_bps=two_x_spread,
                     slippage_bps=two_x_slippage,
                 ),
+                "cost_sensitivity": _cost_sensitivity_matrix(
+                    candles, start, end, signals,
+                    base_spread=base_spread, base_slippage=base_slippage,
+                ),
             }
         buy_hold_signals = [1] * (end - start)
         fold_result["buy_hold_base_costs"] = _backtest_walk_forward_fold(
@@ -652,6 +698,8 @@ def evaluate_market(
         "two_x_half_spread_bps": str(two_x_spread),
         "two_x_slippage_bps": str(two_x_slippage),
         "participation": str(PARTICIPATION),
+        "cost_sensitivity_multipliers": [str(x) for x in COST_SENSITIVITY_MULTIPLIERS],
+        "participation_sensitivity_levels": [str(x) for x in PARTICIPATION_SENSITIVITY_LEVELS],
         "initial_cash": str(INITIAL_CASH),
     }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
