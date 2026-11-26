@@ -19,7 +19,7 @@ MINIMUM_DSR_PROBABILITY = 0.95
 
 _REQUIRED = frozenset({
     "fold_id", "test_start", "test_end", "dataset_sha256",
-    "registered_trial_count", "strategy_net_return", "buy_hold_net_return",
+    "trial_registry_sha256", "registered_trial_count", "strategy_net_return", "buy_hold_net_return",
     "two_x_cost_net_return", "max_drawdown", "profit_factor",
     "closed_trade_count", "observations", "deflated_sharpe_probability",
     "bootstrap_excess_ci_lower",
@@ -53,7 +53,7 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
     if len(folds) < MINIMUM_FOLDS:
         raise PromotionError(f"at least {MINIMUM_FOLDS} untouched OOS folds are required")
     rows, ids = [], set()
-    prior_end, dataset_hash, trial_count = -1, None, None
+    prior_end, dataset_hash, trial_count, common_registry_hash = -1, None, None, None
     for i, fold in enumerate(folds):
         if not isinstance(fold, Mapping) or set(fold) != _REQUIRED:
             raise PromotionError(f"fold[{i}] must contain exactly: {', '.join(sorted(_REQUIRED))}")
@@ -82,6 +82,13 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
             trial_count = trials
         elif trials != trial_count:
             raise PromotionError("all folds must use the same complete registered trial count")
+        registry_hash = fold["trial_registry_sha256"]
+        if not isinstance(registry_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", registry_hash):
+            raise PromotionError(f"fold[{i}].trial_registry_sha256 must be a lowercase SHA-256 digest")
+        if common_registry_hash is None:
+            common_registry_hash = registry_hash
+        elif registry_hash != common_registry_hash:
+            raise PromotionError("all folds must bind to the same immutable trial registry hash")
         row = {
             "fold_id": fid, "test_start": start, "test_end": end,
             "strategy_net_return": _finite(fold["strategy_net_return"], f"fold[{i}].strategy_net_return"),
