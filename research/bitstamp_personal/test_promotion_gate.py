@@ -9,7 +9,8 @@ def valid_folds():
     return [{
         "fold_id": f"fold-{i}", "test_start": i * 1000,
         "test_end": i * 1000 + 900, "dataset_sha256": "a" * 64,
-        "registered_trial_count": 3, "strategy_net_return": 0.05,
+        "trial_registry_sha256": "c" * 64,
+        "registered_trial_count": 2, "strategy_net_return": 0.05,
         "buy_hold_net_return": 0.02, "two_x_cost_net_return": 0.01,
         "max_drawdown": 0.10, "profit_factor": 1.5,
         "closed_trade_count": 8, "observations": 500,
@@ -44,6 +45,12 @@ class PromotionGateTests(unittest.TestCase):
         rows = valid_folds()
         rows[2]["dataset_sha256"] = "b" * 64
         with self.assertRaisesRegex(PromotionError, "same immutable dataset hash"):
+            evaluate_promotion_gate(folds=rows)
+
+    def test_trial_registry_hash_must_match_across_folds(self):
+        rows = valid_folds()
+        rows[3]["trial_registry_sha256"] = "d" * 64
+        with self.assertRaisesRegex(PromotionError, "same immutable trial registry hash"):
             evaluate_promotion_gate(folds=rows)
 
     def test_registered_trial_count_must_match(self):
