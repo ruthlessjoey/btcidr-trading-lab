@@ -7,6 +7,8 @@ from research_runner import (
     make_signals,
     _signals_for_segment,
     split_ranges,
+    plan_walk_forward_folds,
+    _backtest_walk_forward_fold,
     validate_preregistered_run,
     _epoch,
 )
@@ -371,3 +373,53 @@ class ResearchRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WalkForwardFoldTests(unittest.TestCase):
+    def test_five_folds_are_chronological_disjoint_and_embargoed(self):
+        folds = plan_walk_forward_folds(10000)
+        self.assertEqual(len(folds), 5)
+        self.assertEqual(folds[0]["train_start"], 0)
+        self.assertGreaterEqual(folds[0]["train_end"], 1500)
+        for index, fold in enumerate(folds):
+            self.assertEqual(fold["fold_id"], f"wf-{index + 1:02d}")
+            self.assertEqual(fold["liquidation_index"], fold["test_end"])
+            self.assertGreaterEqual(fold["test_start"] - fold["train_end"], 50)
+            self.assertGreaterEqual(fold["test_end"] - fold["test_start"], 500)
+            if index:
+                self.assertGreaterEqual(
+                    fold["test_start"] - folds[index - 1]["liquidation_index"] - 1,
+                    50,
+                )
+                self.assertGreaterEqual(fold["train_end"], folds[index - 1]["test_end"])
+
+    def test_five_fold_plan_ends_with_a_reserved_liquidation_candle(self):
+        folds = plan_walk_forward_folds(5000)
+        self.assertEqual(folds[-1]["liquidation_index"], 4999)
+        self.assertLess(folds[-1]["test_end"], 5000)
+
+    def test_fold_planner_rejects_boolean_and_short_history(self):
+        for value in (True, 4999, 0, -1):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                plan_walk_forward_folds(value)
+
+    def test_fold_backtest_forces_realized_flat_terminal_state(self):
+        candles = [candle() for _ in range(100)]
+        result = _backtest_walk_forward_fold(
+            candles, 10, 50, [1] * 40, initial_target=1,
+            fee_bps=Decimal("16"), half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertEqual(result["terminal_position_status"], "FLAT")
+        self.assertIsNotNone(result["net_return_pct"])
+        self.assertEqual(result["return_valuation"], "MARK_TO_MARKET_AFTER_EXECUTED_COSTS")
+        self.assertEqual(Decimal(result["open_position_at_end"]), Decimal("0"))
+
+    def test_fold_backtest_rejects_missing_liquidation_bar_or_bad_signal_count(self):
+        candles = [candle() for _ in range(30)]
+        with self.assertRaisesRegex(ValueError, "bounds or signals"):
+            _backtest_walk_forward_fold(
+                candles, 10, 30, [0] * 20, initial_target=0,
+                fee_bps=Decimal("16"), half_spread_bps=Decimal("5"),
+                slippage_bps=Decimal("10"),
+            )
