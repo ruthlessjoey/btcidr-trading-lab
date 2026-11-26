@@ -464,10 +464,106 @@ def split_ranges(count: int, embargo_bars: int = 50) -> dict[str, tuple[int, int
     return ranges
 
 
+
+def _evaluate_market_promotion_screens(
+    walk_forward_folds: list[dict], *,
+    dataset_sha256: str,
+    cost_model_sha256: str,
+    strategy_config_sha256: str,
+    registered_trial_count: int,
+    trial_series_by_fold: list[list[list[float]]],
+    bootstrap_replicates: int = 5000,
+) -> dict:
+    """Evaluate each strategy against the complete registered trial series for every fold."""
+    if len(trial_series_by_fold) != len(walk_forward_folds):
+        raise PromotionEvidenceError("global trial-series fold count does not match OOS fold count")
+    if any(len(series) != registered_trial_count for series in trial_series_by_fold):
+        raise PromotionEvidenceError("all registered market-strategy trial series must be present for DSR")
+    screens = {}
+    for strategy_index, strategy in enumerate(STRATEGIES):
+        gate_folds = []
+        fold_statistics = []
+        try:
+            for fold_index, fold in enumerate(walk_forward_folds):
+                candidate = fold["strategies"][strategy]["base_costs"]
+                stress = fold["strategies"][strategy]["two_x_costs"]
+                benchmark = fold["buy_hold_base_costs"]
+                candidate_returns = candidate["_period_returns"]
+                benchmark_returns = benchmark["_period_returns"]
+                trial_series = trial_series_by_fold[fold_index]
+                dsr = deflated_sharpe_probability(
+                    candidate_returns, trial_series,
+                    registered_trial_count=registered_trial_count,
+                )
+                bootstrap = paired_moving_block_bootstrap_lower_bound(
+                    candidate_returns, benchmark_returns,
+                    block_length=24, replicates=bootstrap_replicates,
+                    confidence_level=0.95,
+                    seed=20261127 + fold_index * 100 + strategy_index,
+                )
+                if (candidate["terminal_position_status"] != "FLAT"
+                        or benchmark["terminal_position_status"] != "FLAT"
+                        or candidate["return_valuation"] != "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT"
+                        or benchmark["return_valuation"] != "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT"):
+                    raise PromotionEvidenceError("candidate and same-cost benchmark must both be realized and flat")
+                def pct_fraction(result, field):
+                    value = result[field]
+                    if value is None:
+                        raise PromotionEvidenceError(f"{field} is unavailable for a non-realized result")
+                    return float(D(str(value)) / D(100))
+                gate_folds.append({
+                    "fold_id": fold["fold_id"],
+                    "test_start": fold["test_start"],
+                    "test_end": fold["test_end"],
+                    "dataset_sha256": dataset_sha256,
+                    "cost_model_sha256": cost_model_sha256,
+                    "strategy_config_sha256": strategy_config_sha256,
+                    "return_valuation": candidate["return_valuation"],
+                    "terminal_position_status": candidate["terminal_position_status"],
+                    "registered_trial_count": registered_trial_count,
+                    "strategy_net_return": pct_fraction(candidate, "net_return_pct"),
+                    "buy_hold_net_return": pct_fraction(benchmark, "net_return_pct"),
+                    "two_x_cost_net_return": pct_fraction(stress, "net_return_pct"),
+                    "max_drawdown": pct_fraction(candidate, "max_drawdown_pct"),
+                    "profit_factor": None if candidate["profit_factor"] is None else float(candidate["profit_factor"]),
+                    "closed_trade_count": candidate["closed_cycles"],
+                    "observations": fold["test_end"] - fold["test_start"],
+                    "deflated_sharpe_probability": dsr["deflated_sharpe_probability"],
+                    "bootstrap_excess_ci_lower": bootstrap["bootstrap_excess_ci_lower"],
+                })
+                fold_statistics.append({
+                    "fold_id": fold["fold_id"],
+                    "deflated_sharpe": dsr,
+                    "paired_block_bootstrap": bootstrap,
+                })
+            screen = evaluate_promotion_gate(gate_folds)
+            screens[strategy] = {
+                "status": screen["status"], "screen": screen,
+                "fold_statistics": fold_statistics,
+            }
+        except (StatisticalEvidenceError, PromotionEvidenceError, KeyError, TypeError, ValueError) as exc:
+            screens[strategy] = {
+                "status": "BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE",
+                "reason": str(exc), "fold_statistics": fold_statistics,
+            }
+    return screens
+
+
+def _strip_internal_period_returns(walk_forward_folds: list[dict]) -> None:
+    for fold in walk_forward_folds:
+        for strategy in STRATEGIES:
+            fold["strategies"][strategy]["base_costs"].pop("_period_returns", None)
+            fold["strategies"][strategy]["two_x_costs"].pop("_period_returns", None)
+        fold["buy_hold_base_costs"].pop("_period_returns", None)
+        fold["buy_hold_two_x_costs"].pop("_period_returns", None)
+
+
 def evaluate_market(
     market: dict, dataset: dict, *,
     registered_trial_count: int | None = None,
     bootstrap_replicates: int = 5000,
+    trial_series_by_fold: list[list[list[float]]] | None = None,
+    compute_promotion: bool = True,
 ) -> dict:
     candles = dataset["candles"]
     if dataset["gap_count"]:
@@ -551,84 +647,25 @@ def evaluate_market(
         "initial_cash": str(INITIAL_CASH),
     }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
-    promotion_screens = {}
-    for strategy_index, strategy in enumerate(STRATEGIES):
-        gate_folds = []
-        fold_statistics = []
-        try:
-            for fold_index, fold in enumerate(walk_forward_folds):
-                candidate = fold["strategies"][strategy]["base_costs"]
-                stress = fold["strategies"][strategy]["two_x_costs"]
-                benchmark = fold["buy_hold_base_costs"]
-                candidate_returns = candidate["_period_returns"]
-                benchmark_returns = benchmark["_period_returns"]
-                trial_series = [
-                    fold["strategies"][trial]["base_costs"]["_period_returns"]
-                    for trial in STRATEGIES
-                ]
-                dsr = deflated_sharpe_probability(
-                    candidate_returns, trial_series,
-                    registered_trial_count=registered_trial_count,
-                )
-                bootstrap = paired_moving_block_bootstrap_lower_bound(
-                    candidate_returns, benchmark_returns,
-                    block_length=24, replicates=bootstrap_replicates,
-                    confidence_level=0.95,
-                    seed=20261127 + fold_index * 100 + strategy_index,
-                )
-                if (candidate["terminal_position_status"] != "FLAT"
-                        or benchmark["terminal_position_status"] != "FLAT"
-                        or candidate["return_valuation"] != "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT"
-                        or benchmark["return_valuation"] != "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT"):
-                    raise PromotionEvidenceError("candidate and same-cost benchmark must both be realized and flat")
-                def pct_fraction(result, field):
-                    value = result[field]
-                    if value is None:
-                        raise PromotionEvidenceError(f"{field} is unavailable for a non-realized result")
-                    return float(D(str(value)) / D(100))
-                gate_folds.append({
-                    "fold_id": fold["fold_id"],
-                    "test_start": fold["test_start"],
-                    "test_end": fold["test_end"],
-                    "dataset_sha256": dataset["dataset_sha256"],
-                    "cost_model_sha256": cost_model_sha256,
-                    "strategy_config_sha256": strategy_config_sha256,
-                    "return_valuation": candidate["return_valuation"],
-                    "terminal_position_status": candidate["terminal_position_status"],
-                    "registered_trial_count": registered_trial_count,
-                    "strategy_net_return": pct_fraction(candidate, "net_return_pct"),
-                    "buy_hold_net_return": pct_fraction(benchmark, "net_return_pct"),
-                    "two_x_cost_net_return": pct_fraction(stress, "net_return_pct"),
-                    "max_drawdown": pct_fraction(candidate, "max_drawdown_pct"),
-                    "profit_factor": None if candidate["profit_factor"] is None else float(candidate["profit_factor"]),
-                    "closed_trade_count": candidate["closed_cycles"],
-                    "observations": fold["test_end"] - fold["test_start"],
-                    "deflated_sharpe_probability": dsr["deflated_sharpe_probability"],
-                    "bootstrap_excess_ci_lower": bootstrap["bootstrap_excess_ci_lower"],
-                })
-                fold_statistics.append({
-                    "fold_id": fold["fold_id"],
-                    "deflated_sharpe": dsr,
-                    "paired_block_bootstrap": bootstrap,
-                })
-            screen = evaluate_promotion_gate(gate_folds)
-            promotion_screens[strategy] = {
-                "status": screen["status"], "screen": screen,
-                "fold_statistics": fold_statistics,
-            }
-        except (StatisticalEvidenceError, PromotionEvidenceError, KeyError, TypeError, ValueError) as exc:
-            promotion_screens[strategy] = {
-                "status": "BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE",
-                "reason": str(exc), "fold_statistics": fold_statistics,
-            }
-
-    # Remove internal return vectors before serializing the research summary.
-    for fold in walk_forward_folds:
-        for strategy in STRATEGIES:
-            fold["strategies"][strategy]["base_costs"].pop("_period_returns", None)
-            fold["strategies"][strategy]["two_x_costs"].pop("_period_returns", None)
-        fold["buy_hold_base_costs"].pop("_period_returns", None)
-        fold["buy_hold_two_x_costs"].pop("_period_returns", None)
+    if trial_series_by_fold is None:
+        trial_series_by_fold = [
+            [fold["strategies"][trial]["base_costs"]["_period_returns"] for trial in STRATEGIES]
+            for fold in walk_forward_folds
+        ]
+    promotion_screens = (
+        _evaluate_market_promotion_screens(
+            walk_forward_folds,
+            dataset_sha256=dataset["dataset_sha256"],
+            cost_model_sha256=cost_model_sha256,
+            strategy_config_sha256=strategy_config_sha256,
+            registered_trial_count=registered_trial_count,
+            trial_series_by_fold=trial_series_by_fold,
+            bootstrap_replicates=bootstrap_replicates,
+        )
+        if compute_promotion else {}
+    )
+    if compute_promotion:
+        _strip_internal_period_returns(walk_forward_folds)
 
     return {
         "market_symbol": dataset["market_symbol"],
@@ -643,6 +680,8 @@ def evaluate_market(
         "gap_count": dataset["gap_count"],
         "strategy_family_trial_count": len(STRATEGIES),
         "registered_trial_count": registered_trial_count,
+        "cost_model_sha256": cost_model_sha256,
+        "strategy_config_sha256": strategy_config_sha256,
         "promotion_screens": promotion_screens,
         "preregistered_strategies": list(STRATEGIES),
         "cost_assumptions": {
@@ -703,6 +742,7 @@ def main(argv=None) -> int:
             "holdout_policy": "V2: 40% initial training; five expanding-training, non-overlapping OOS folds in the next 50%; 50-bar embargoes; next-open terminal liquidation candles excluded from OOS test indices; final 10% reserved untouched; fixed strategies and no parameter tuning",
             "markets": [],
         }
+        market_datasets = []
         for market in selected:
             dataset = fetch_spot_history(
                 market["market_symbol"], start_timestamp=start_ts,
@@ -714,9 +754,55 @@ def main(argv=None) -> int:
                 raise BitstampDataError(f"market identity mismatch for {market['market_symbol']}")
             if dataset["row_count"] < 6000:
                 raise BitstampDataError(f"insufficient history for {market['market_symbol']}")
-            output["markets"].append(evaluate_market(
+            market_datasets.append((market, dataset))
+
+        # First build every market's fold returns in memory. DSR then sees all
+        # registered market-strategy trials for each common fold, not only the
+        # two strategies of whichever market happened to be processed first.
+        market_results = [
+            evaluate_market(
                 market, dataset, registered_trial_count=registered_trial_count,
-            ))
+                compute_promotion=False,
+            )
+            for market, dataset in market_datasets
+        ]
+        complete_trial_universe = (
+            len(market_results) == len(selected)
+            and all(len(row.get("walk_forward_folds", [])) == WALK_FORWARD_FOLD_COUNT
+                    for row in market_results)
+        )
+        if complete_trial_universe:
+            global_trial_series_by_fold = []
+            for fold_index in range(WALK_FORWARD_FOLD_COUNT):
+                trial_series = []
+                for row in market_results:
+                    for strategy in STRATEGIES:
+                        trial_series.append(
+                            row["walk_forward_folds"][fold_index]["strategies"][strategy]
+                            ["base_costs"]["_period_returns"]
+                        )
+                global_trial_series_by_fold.append(trial_series)
+            for row in market_results:
+                row["promotion_screens"] = _evaluate_market_promotion_screens(
+                    row["walk_forward_folds"],
+                    dataset_sha256=row["dataset_sha256"],
+                    cost_model_sha256=row["cost_model_sha256"],
+                    strategy_config_sha256=row["strategy_config_sha256"],
+                    registered_trial_count=registered_trial_count,
+                    trial_series_by_fold=global_trial_series_by_fold,
+                )
+                _strip_internal_period_returns(row["walk_forward_folds"])
+        else:
+            for row in market_results:
+                row["promotion_screens"] = {
+                    strategy: {
+                        "status": "BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE",
+                        "reason": "not all preregistered markets produced five valid folds; global DSR trial universe incomplete",
+                        "fold_statistics": [],
+                    } for strategy in STRATEGIES
+                }
+                _strip_internal_period_returns(row.get("walk_forward_folds", []))
+        output["markets"] = market_results
         print(json.dumps(output, indent=2, sort_keys=True))
         if any(row["coverage_status"] != "CONTIGUOUS" for row in output["markets"]):
             return 3
