@@ -1,4 +1,5 @@
 import unittest
+from decimal import Decimal
 from statistical_evidence import (
     BOOTSTRAP_RESAMPLES,
     StatisticalEvidenceError,
