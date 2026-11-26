@@ -112,10 +112,30 @@ jobs:
         run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
 
       - name: Run settlement store regression suite
-        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
+        run: |
+          set +e
+          python -X tracemalloc=10 -W always::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v > "$RUNNER_TEMP/settlement-store.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/settlement-store.log"
+          if grep -q "ResourceWarning:" "$RUNNER_TEMP/settlement-store.log"; then
+            echo "Unclosed SQLite resources detected in settlement store tests"
+            exit 1
+          fi
+          exit "$test_status"
 
       - name: Run reservation receiver regression suite
-        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
+        run: |
+          set +e
+          python -X tracemalloc=10 -W always::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v > "$RUNNER_TEMP/reservation-receiver.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/reservation-receiver.log"
+          if grep -q "ResourceWarning:" "$RUNNER_TEMP/reservation-receiver.log"; then
+            echo "Unclosed SQLite resources detected in reservation receiver tests"
+            exit 1
+          fi
+          exit "$test_status"
 
       - name: Run read-only reservation migration preflight regression suite
         run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_migration_preflight.py' -v
