@@ -1,5 +1,8 @@
+import json
 import sqlite3
 import unittest
+
+from tmm_core.sqlite_settlement_store import _event_hash
 
 from tmm_core.reservation_schema_v2 import (
     ReservationSchemaError,
@@ -15,10 +18,23 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
             INSERT INTO metadata VALUES('account_initialization_audit','required-v1');
             INSERT INTO metadata VALUES('market_registration_audit','required-v1');
+            CREATE TABLE account(
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL
+            );
+            INSERT INTO account VALUES(1,'paper-research','USDT','1000');
             CREATE TABLE markets(
                 market_id TEXT PRIMARY KEY,
                 base_asset TEXT NOT NULL,
                 quote_asset TEXT NOT NULL
+            );
+            CREATE TABLE holdings(
+                market_id TEXT PRIMARY KEY REFERENCES markets(market_id),
+                quantity TEXT NOT NULL
+            );
+            CREATE TABLE audit(
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL
             );
             CREATE TABLE batches(
                 batch_id TEXT PRIMARY KEY,
@@ -39,6 +55,17 @@ class ReservationSchemaV2Tests(unittest.TestCase):
                 timestamp INTEGER NOT NULL
             );
         """)
+        event = {
+            "kind": "ACCOUNT_INITIALIZED", "account_id": "paper-research",
+            "currency": "USDT", "opening_cash": "1000",
+            "market_registration_audit": "required-v1",
+        }
+        encoded = json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        digest = _event_hash("0" * 64, event)
+        db.execute(
+            "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+            (encoded, "0" * 64, digest),
+        )
         return db
 
     def test_rejects_parent_table_without_referenced_primary_key(self):
