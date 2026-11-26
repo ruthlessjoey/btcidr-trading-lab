@@ -10,7 +10,7 @@ import json
 import re
 import sys
 from datetime import date, datetime, time, timezone
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, localcontext
 from typing import Callable
 
 from bitstamp_public_ohlc import (
@@ -73,7 +73,7 @@ def _wilson(wins: int, total: int, z: float = 1.96):
     return [round(max(0.0, center - margin), 6), round(min(1.0, center + margin), 6)]
 
 
-def make_signals(strategy: str, candles: list[dict]) -> list[int]:
+def _make_signals(strategy: str, candles: list[dict]) -> list[int]:
     closes = [D(row["close"]) for row in candles]
     signals = []
     target = 0
@@ -103,7 +103,15 @@ def make_signals(strategy: str, candles: list[dict]) -> list[int]:
     return signals
 
 
-def backtest(
+def make_signals(strategy: str, candles: list[dict]) -> list[int]:
+    # Keep indicator decisions deterministic even if the caller changes the
+    # process-wide Decimal context.
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        return _make_signals(strategy, candles)
+
+
+def _backtest(
     candles: list[dict],
     signals: list[int],
     *,
@@ -221,6 +229,26 @@ def backtest(
         "open_position_at_end": str(base.quantize(quantum)),
         "sample_status": "ADEQUATE_30_PLUS_CLOSED_CYCLES" if len(cycles) >= 30 else "INSUFFICIENT_CLOSED_CYCLES",
     }
+
+
+def backtest(
+    candles: list[dict],
+    signals: list[int],
+    *,
+    fee_bps: Decimal,
+    half_spread_bps: Decimal,
+    slippage_bps: Decimal,
+) -> dict:
+    # One fixed precision policy for indicator-adjacent accounting, fee,
+    # spread, slippage and cost-basis arithmetic. The caller's context is restored.
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        return _backtest(
+            candles, signals,
+            fee_bps=fee_bps,
+            half_spread_bps=half_spread_bps,
+            slippage_bps=slippage_bps,
+        )
 
 
 def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end: int) -> list[int]:
