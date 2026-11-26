@@ -32,6 +32,24 @@ PREREGISTERED_MIN_MARKETS = 3
 PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
 
+# V1 uses the present-day active market list to select a historical universe.
+# This is not point-in-time evidence for the 2024-2026 research window and can
+# omit later-delisted or historically unavailable instruments.
+POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS = "NOT_VERIFIED"
+
+
+def require_point_in_time_universe_evidence() -> None:
+    if POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS != "VERIFIED":
+        raise BitstampDataError(
+            "public research blocked before network access: V1 selects historical "
+            "markets from the current active SPOT list, which can omit delisted or "
+            "historically unavailable instruments and create survivorship bias; "
+            "a versioned V2 preregistration must provide independently reviewed "
+            "point-in-time listing/matching intervals and integrate five-fold OOS "
+            "evaluation with the frozen promotion gate"
+        )
+
+
 
 def _epoch(value: str) -> int:
     """Map a preregistered date to its exact 00:00 UTC boundary.
@@ -472,6 +490,8 @@ def main(argv=None) -> int:
         candidates = validate_preregistered_run(
             args.start, args.end, args.symbols, args.min_markets, args.require_meme
         )
+        # This release gate must run before markets metadata or any OHLC request.
+        require_point_in_time_universe_evidence()
         start_ts = _epoch(args.start)
         end_ts = _epoch(args.end)
         markets, markets_hash = fetch_spot_markets()
