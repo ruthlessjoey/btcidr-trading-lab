@@ -9,6 +9,7 @@ on:
       - research/tokocrypto-fixed-utc-window-2026-11-27
       - security/block-unattested-tokocrypto-current-window-2026-11-27
       - security/centralize-tokocrypto-fixed-window-gate-2026-11-27
+      - security/opaque-tokocrypto-fixed-window-capability-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -29,6 +30,7 @@ on:
       - security/tokocrypto-candle-completeness-2026-11-27
       - research/tokocrypto-fixed-utc-window-2026-11-27
       - security/block-unattested-tokocrypto-current-window-2026-11-27
+      - security/centralize-tokocrypto-fixed-window-gate-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -36,7 +38,10 @@ on:
       - "tests/test_tokocrypto_endpoint_policy.py"
       - "tokocrypto_public_window.py"
       - "tests/test_tokocrypto_public_window.py"
+      - "tokocrypto_fixed_window.py"
+      - "tests/test_tokocrypto_fixed_window.py"
       - "docs/tokocrypto-public-klines-policy.md"
+      - "docs/tokocrypto-candle-completeness.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
 
 permissions:

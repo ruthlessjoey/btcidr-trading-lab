@@ -181,6 +181,26 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
             fetcher.http_get_json(VALID_URL, 5, 1, opener, NO_SLEEP)
         self.assertEqual(opener.calls, [])
 
+    def test_boolean_fixed_window_opt_in_is_not_a_capability(self):
+        source = fetcher.Source(
+            "tokocrypto-mbx",
+            "binance_style",
+            "https://www.tokocrypto.site",
+        )
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto candle retrieval is disabled"):
+            fetcher.fetch_candles(
+                source, "BTC_USDT", "1h", 1699999200, 1700002800,
+                5, 1, opener, NO_SLEEP, _tokocrypto_capability=True,
+            )
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto JSON transport is disabled"):
+            fetcher.http_get_json(
+                VALID_URL, 5, 1, opener, NO_SLEEP, _tokocrypto_capability=True,
+            )
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto transport is disabled"):
+            fetcher._fixed_window_opener(VALID_URL, 5)
+        self.assertEqual(opener.calls, [])
+
     def test_default_opener_blocks_tokocrypto_before_network(self):
         with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto transport is disabled"):
             fetcher.default_opener(VALID_URL, 5)
@@ -231,7 +251,7 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         with self.assertRaisesRegex(fetcher.ApiError, "4 MiB"):
             fetcher.http_get_json(
                 VALID_URL, 5, 1, opener, NO_SLEEP,
-                _allow_tokocrypto_fixed_window=True,
+                _tokocrypto_capability=fetcher._TOKOCRYPTO_FIXED_WINDOW_CAPABILITY,
             )
 
 

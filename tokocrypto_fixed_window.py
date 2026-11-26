@@ -99,7 +99,7 @@ def fetch_tokocrypto_fixed_window(
         timeout, retries,
         opener if opener is not None else fetcher.default_opener,
         sleep if sleep is not None else __import__("time").sleep,
-        _allow_tokocrypto_fixed_window=True,
+        _tokocrypto_capability=fetcher._TOKOCRYPTO_FIXED_WINDOW_CAPABILITY,
     )
     expected_candles = validate_complete_candle_grid(
         candles,
