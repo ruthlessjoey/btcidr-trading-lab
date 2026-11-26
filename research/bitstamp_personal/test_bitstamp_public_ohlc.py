@@ -176,6 +176,25 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         self.assertEqual(dataset["gap_count"], 1)
         self.assertEqual(dataset["coverage_status"], "GAPS_DETECTED_BACKTEST_BLOCKED")
 
+    def test_backward_pagination_stops_after_crossing_start_boundary(self):
+        recent = {
+            "data": {"pair": "BTC/USD", "ohlc": [candle(3 * 3600), candle(4 * 3600)]}
+        }
+        older = {
+            "data": {"pair": "BTC/USD", "ohlc": [candle(0), candle(3600)]}
+        }
+        opener = FakeOpener([FakeResponse(json.dumps(recent)), FakeResponse(json.dumps(older))])
+        dataset = fetch_spot_history(
+            "btcusd", start_timestamp=2 * 3600, end_timestamp=5 * 3600,
+            opener=opener, sleep=lambda _: None,
+        )
+        self.assertEqual(dataset["page_count"], 2)
+        self.assertEqual(dataset["row_count"], 2)
+        self.assertEqual(dataset["gap_count"], 1)
+        self.assertEqual(dataset["gaps"][0]["gap_type"], "LEADING")
+        self.assertEqual(dataset["gaps"][0]["missing_hours"], 1)
+        self.assertEqual(dataset["coverage_status"], "GAPS_DETECTED_BACKTEST_BLOCKED")
+
     def test_missing_range_boundaries_are_reported_as_gaps(self):
         first = {
             "data": {"pair": "BTC/USD", "ohlc": [candle(2 * 3600), candle(3 * 3600)]}
