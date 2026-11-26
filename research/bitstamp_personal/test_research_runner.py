@@ -9,6 +9,7 @@ from research_runner import (
     split_ranges,
     validate_preregistered_run,
     _epoch,
+    five_fold_oos_ranges,
 )
 
 
@@ -299,6 +300,23 @@ class ResearchRunnerTests(unittest.TestCase):
         for start, end in ((-1, 5), (5, 5), (10, 5), (0, 61)):
             with self.subTest(start=start, end=end), self.assertRaises(ValueError):
                 _signals_for_segment("SMA20_50_LONG_ONLY", candles, start, end)
+
+    def test_five_fold_oos_ranges_are_chronological_disjoint_and_embargoed(self):
+        ranges = five_fold_oos_ranges(10000)
+        self.assertEqual(list(ranges), [f"fold_{i}" for i in range(1, 6)])
+        values = list(ranges.values())
+        self.assertEqual(values[0][0], 5000)
+        self.assertEqual(values[-1][1], 10000)
+        for index, (start, end) in enumerate(values):
+            self.assertGreaterEqual(end - start, 500)
+            if index:
+                self.assertGreaterEqual(start - values[index - 1][1], 50)
+        self.assertTrue(all(values[i][1] <= values[i + 1][0] for i in range(4)))
+
+    def test_five_fold_oos_ranges_reject_small_or_invalid_datasets(self):
+        for value in (True, 0, -1, 5499, "10000"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                five_fold_oos_ranges(value)
 
     def test_chronological_splits_have_exact_embargoes(self):
         ranges = split_ranges(10000, embargo_bars=50)
