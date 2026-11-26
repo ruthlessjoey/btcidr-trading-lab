@@ -75,6 +75,19 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(signals[-1], 0)
         self.assertTrue(set(signals).issubset({0, 1}))
 
+    def test_rsi_flat_window_is_neutral_and_does_not_force_exit(self):
+        closes = [str(100 - index) for index in range(15)]
+        closes.extend(["86"] * 14)
+        candles = [{"close": value} for value in closes]
+
+        signals = make_signals("RSI14_MEAN_REVERSION_LONG_ONLY", candles)
+
+        self.assertEqual(signals[14], 1)
+        # The latest 14 changes are all zero: RSI must be 50, so the
+        # existing long target is maintained rather than falsely exited.
+        self.assertEqual(signals[28], 1)
+        self.assertTrue(set(signals).issubset({0, 1}))
+
     def test_backtest_executes_at_next_open_and_accounts_for_costs(self):
         candles = [
             candle("100", "100"),
