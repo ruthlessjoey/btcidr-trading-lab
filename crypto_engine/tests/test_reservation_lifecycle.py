@@ -114,6 +114,14 @@ class ReservationLifecycleTests(unittest.TestCase):
         ):
             self.create(reservation_id="corrupt-audit-r")
 
+    def test_missing_account_genesis_blocks_reservation_mutation(self):
+        self.db.execute("DELETE FROM audit")
+        self.db.commit()
+        with self.assertRaisesRegex(
+            ReservationLifecycleError, "explicit account and market audit baselines"
+        ):
+            self.create(reservation_id="missing-genesis-r")
+
     def test_pre_marker_store_cannot_create_or_change_reservations(self):
         self.db.execute(
             "DELETE FROM metadata WHERE key IN "
