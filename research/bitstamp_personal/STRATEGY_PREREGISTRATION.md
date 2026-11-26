@@ -54,11 +54,15 @@ Each train, validation and holdout segment uses a separate account that starts f
 Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`. This V2 schedule supersedes the earlier 60/20/20 split for the next research run; the earlier schedule remains historical documentation.
 
 - Use 40% of the contiguous history as initial training history.
-- Generate five expanding-training, chronological, non-overlapping OOS test folds.
+- Generate five expanding-training, chronological, non-overlapping OOS test folds in the next 50% of the history.
+- Reserve the final 10% as an untouched holdout; do not backtest, summarize or inspect it until strategy, thresholds and statistical evidence are frozen and independently approved.
 - Require 50-bar embargo between each training cutoff and its OOS test start.
 - Reserve the immediately following candle for next-open terminal liquidation; exclude this candle from the OOS test index range.
-- Require 50 additional embargo bars after the liquidation candle before the next OOS fold.
+- Require 50 additional embargo bars after each liquidation candle, including before the final untouched holdout.
 - Candidate and same-cost buy-and-hold baseline use identical OOS dates and the same terminal liquidation convention.
 - 2x-cost replay doubles every component: per-side fee, half-spread and slippage. Signals and candles remain identical.
 - No parameter tuning, no changes to the fixed strategy family or market universe.
 - Fold results are research-only until all statistical evidence and independent review gates pass.
+
+
+- Minimum history: 6,000 contiguous hourly candles, preserving at least 1,500 initial training bars, five OOS folds of at least 500 bars, all embargoes and the untouched final 10%.
