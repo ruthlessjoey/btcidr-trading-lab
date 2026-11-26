@@ -99,7 +99,7 @@ class WalkForwardEvaluationTests(unittest.TestCase):
                 sort_keys=True, separators=(",", ":"),
             ))
             previous = record_hash
-        raw = ("\\n".join(events) + "\\n").encode()
+        raw = ("\n".join(events) + "\n").encode()
         with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
             evaluate_five_fold_strategy(
                 synthetic_candles(7900), market_symbol="btcusd",
