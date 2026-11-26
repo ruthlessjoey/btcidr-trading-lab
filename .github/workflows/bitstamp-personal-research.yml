@@ -11,6 +11,7 @@ on:
       - research/bitstamp-integrated-state-rsi-identity-2026-11-27
       - research/fail-closed-multifold-promotion-gate-2026-11-27
       - research/five-fold-walk-forward-execution-2026-11-27
+      - research/paired-bootstrap-deflated-sharpe-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
