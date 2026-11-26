@@ -1725,6 +1725,30 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_audit_chain_rejects_duplicate_json_keys_without_hash_change(self):
+        with _managed_connection(self.path) as db:
+            event_json = db.execute(
+                "SELECT event_json FROM main.audit WHERE seq=1"
+            ).fetchone()[0]
+            event = json.loads(event_json)
+            canonical = json.dumps(
+                event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+            # Keep the last value identical so default json.loads semantics and
+            # the canonical event hash would be unchanged; only the duplicate key
+            # ambiguity should invalidate this record.
+            ambiguous = canonical.replace(
+                '"kind":', '"kind":"ACCOUNT_INITIALIZED","kind":', 1
+            )
+            db.execute(
+                "UPDATE main.audit SET event_json=? WHERE seq=1", (ambiguous,)
+            )
+        self.assertFalse(self.store.verify_audit_chain())
+        with self.assertRaisesRegex(
+            SettlementStoreError, "audit chain verification failed"
+        ):
+            self.store.snapshot()
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
