@@ -780,6 +780,7 @@ def main(argv=None) -> int:
         market_results = [
             evaluate_market(
                 market, dataset, registered_trial_count=registered_trial_count,
+                trial_registry_sha256=trial_registry_sha256,
                 compute_promotion=False,
             )
             for market, dataset in market_datasets
