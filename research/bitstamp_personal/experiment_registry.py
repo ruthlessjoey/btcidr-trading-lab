@@ -25,6 +25,8 @@ def parse_trial_registry(raw:bytes,*,expected_market_symbols,expected_strategies
   except (json.JSONDecodeError,TrialRegistryError) as e: raise TrialRegistryError(f"invalid registry JSON at line {line_no}: {e}") from e
   if not isinstance(row,dict) or set(row)!=FIELDS: raise TrialRegistryError(f"line {line_no} must contain exactly the required fields")
   m,s,trial=row["market_symbol"],row["strategy_id"],row["trial_id"]
+  if not all(isinstance(v,str) and v for v in (m,s,trial,row["preregistration_id"],row["event"],row["registered_date"])):
+   raise TrialRegistryError(f"line {line_no} contains a non-string or empty identity field")
   if m not in expected_market_symbols or s not in expected_strategies: raise TrialRegistryError(f"unknown market or strategy at line {line_no}")
   if trial!=f"{preregistration_id}:{m}:{s}" or row["preregistration_id"]!=preregistration_id: raise TrialRegistryError(f"trial identity mismatch at line {line_no}")
   try: date.fromisoformat(row["registered_date"])
