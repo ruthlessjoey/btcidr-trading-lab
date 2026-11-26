@@ -9,6 +9,7 @@ on:
       - "providers.py"
       - "config.json"
       - "tests/test_tokocrypto_endpoint_policy.py"
+      - "docs/tokocrypto-public-klines-policy.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
   pull_request:
     branches:
@@ -18,6 +19,7 @@ on:
       - "providers.py"
       - "config.json"
       - "tests/test_tokocrypto_endpoint_policy.py"
+      - "docs/tokocrypto-public-klines-policy.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
 
 permissions:
