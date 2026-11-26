@@ -1226,3 +1226,7 @@ Apply the same contiguous-sequence invariant to the separate read-only migration
 3. Ensure the full offline workflow—not only the focused six-suite workflow—runs with ResourceWarning promoted to errors and/or an explicit warning-capture assertion that detects unraisable SQLite connection warnings.
 4. Re-run the exact updated head on Python 3.11 and 3.13; require zero ResourceWarnings.
 5. Then independently review the preflight sequence check and migration/bootstrap boundary.
+
+
+### PR #209 post-test head correction
+The prior PR #209 verification run 45789387082 was for SHA `cf6cd4efa645e2850569a521b69a0e3764af281e`. Subsequent fixture/workflow changes advanced the PR to `23ad0126e0eff7ea84cdf12ae7fdcd34a906b6ad`. No run is recorded for this latest head. Therefore 279/279 on both interpreters is historical evidence for the earlier SHA only, and the latest head is unverified. PR #209's description was corrected to state this explicitly. Do not promote the current head until exact-head CI is clean and ResourceWarnings are zero.
