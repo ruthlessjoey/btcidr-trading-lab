@@ -19,6 +19,7 @@ from bitstamp_public_ohlc import (
     BitstampDataError, fetch_spot_history, fetch_spot_markets,
 )
 from promotion_gate import PromotionEvidenceError, evaluate_promotion_gate
+from experiment_registry import TrialRegistryError, load_trial_registry
 from statistical_evidence import (
     StatisticalEvidenceError, deflated_sharpe_probability,
     paired_moving_block_bootstrap_lower_bound,
@@ -471,6 +472,7 @@ def _evaluate_market_promotion_screens(
     cost_model_sha256: str,
     strategy_config_sha256: str,
     registered_trial_count: int,
+    trial_registry_sha256: str,
     trial_series_by_fold: list[list[list[float]]],
     bootstrap_replicates: int = 5000,
 ) -> dict:
@@ -516,6 +518,7 @@ def _evaluate_market_promotion_screens(
                     "test_start": fold["test_start"],
                     "test_end": fold["test_end"],
                     "dataset_sha256": dataset_sha256,
+                    "trial_registry_sha256": trial_registry_sha256,
                     "cost_model_sha256": cost_model_sha256,
                     "strategy_config_sha256": strategy_config_sha256,
                     "return_valuation": candidate["return_valuation"],
@@ -564,6 +567,7 @@ def evaluate_market(
     bootstrap_replicates: int = 5000,
     trial_series_by_fold: list[list[list[float]]] | None = None,
     compute_promotion: bool = True,
+    trial_registry_sha256: str | None = None,
 ) -> dict:
     candles = dataset["candles"]
     if dataset["gap_count"]:
@@ -578,6 +582,10 @@ def evaluate_market(
         }
     if registered_trial_count is None:
         registered_trial_count = len(STRATEGIES)
+    if trial_registry_sha256 is None:
+        trial_registry_sha256 = hashlib.sha256(
+            json.dumps([PREREGISTRATION_ID, list(STRATEGIES)], sort_keys=True).encode("utf-8")
+        ).hexdigest()
     if (isinstance(registered_trial_count, bool)
             or not isinstance(registered_trial_count, int)
             or registered_trial_count < len(STRATEGIES)):
@@ -659,6 +667,7 @@ def evaluate_market(
             cost_model_sha256=cost_model_sha256,
             strategy_config_sha256=strategy_config_sha256,
             registered_trial_count=registered_trial_count,
+            trial_registry_sha256=trial_registry_sha256,
             trial_series_by_fold=trial_series_by_fold,
             bootstrap_replicates=bootstrap_replicates,
         )
@@ -680,6 +689,7 @@ def evaluate_market(
         "gap_count": dataset["gap_count"],
         "strategy_family_trial_count": len(STRATEGIES),
         "registered_trial_count": registered_trial_count,
+        "trial_registry_sha256": trial_registry_sha256,
         "cost_model_sha256": cost_model_sha256,
         "strategy_config_sha256": strategy_config_sha256,
         "promotion_screens": promotion_screens,
@@ -727,7 +737,14 @@ def main(argv=None) -> int:
             raise BitstampDataError(f"only {len(selected)} candidate SPOT markets found; need {args.min_markets}")
         if args.require_meme and not any(row["market_symbol"] in MEME_SYMBOLS for row in selected):
             raise BitstampDataError("no preregistered meme-coin SPOT market is available")
-        registered_trial_count = len(selected) * len(STRATEGIES)
+        registry = load_trial_registry(
+            Path(__file__).with_name("experiment_registry.jsonl"),
+            expected_market_symbols=PREREGISTERED_SYMBOLS,
+            expected_strategies=STRATEGIES,
+            preregistration_id=PREREGISTRATION_ID,
+        )
+        registered_trial_count = registry["registered_trial_count"]
+        trial_registry_sha256 = registry["registry_sha256"]
         output = {
             "research_only": True,
             "preregistration_id": PREREGISTRATION_ID,
@@ -739,6 +756,7 @@ def main(argv=None) -> int:
             "missing_candidate_symbols": missing,
             "strategy_family": list(STRATEGIES),
             "trial_count": registered_trial_count,
+            "trial_registry_sha256": trial_registry_sha256,
             "holdout_policy": "V2: 40% initial training; five expanding-training, non-overlapping OOS folds in the next 50%; 50-bar embargoes; next-open terminal liquidation candles excluded from OOS test indices; final 10% reserved untouched; fixed strategies and no parameter tuning",
             "markets": [],
         }
@@ -767,7 +785,8 @@ def main(argv=None) -> int:
             for market, dataset in market_datasets
         ]
         complete_trial_universe = (
-            len(market_results) == len(selected)
+            len(selected) * len(STRATEGIES) == registered_trial_count
+            and len(market_results) == len(selected)
             and all(len(row.get("walk_forward_folds", [])) == WALK_FORWARD_FOLD_COUNT
                     for row in market_results)
         )
@@ -789,6 +808,7 @@ def main(argv=None) -> int:
                     cost_model_sha256=row["cost_model_sha256"],
                     strategy_config_sha256=row["strategy_config_sha256"],
                     registered_trial_count=registered_trial_count,
+                    trial_registry_sha256=trial_registry_sha256,
                     trial_series_by_fold=global_trial_series_by_fold,
                 )
                 _strip_internal_period_returns(row["walk_forward_folds"])
