@@ -41,4 +41,9 @@ class RegistryTests(unittest.TestCase):
   self.assertEqual(result["event_count"],14)
   self.assertTrue(all(state=="REGISTERED" for state in result["trial_statuses"].values()))
 
+ def test_deeply_nested_json_fails_as_registry_error(self):
+  deeply_nested=b"["*10000+b"0"+b"]"*10000+b"\\n"
+  with self.assertRaisesRegex(TrialRegistryError,"invalid registry JSON at line 1"):
+   parse_trial_registry(deeply_nested,expected_market_symbols=M,expected_strategies=S,preregistration_id=P)
+
 if __name__=="__main__":unittest.main()
