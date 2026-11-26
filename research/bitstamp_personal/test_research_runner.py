@@ -377,6 +377,7 @@ class ResearchRunnerTests(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertEqual(payload["status"], "BLOCKED")
         self.assertIn("point-in-time", payload["error"])
+        self.assertIn("digest is not pinned", payload["error"])
         markets_request.assert_not_called()
         ohlc_request.assert_not_called()
 
