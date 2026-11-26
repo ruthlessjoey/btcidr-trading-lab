@@ -1296,3 +1296,50 @@ Release state unchanged: install/trading NOT READY; profitability NOT ESTABLISHE
 3. Review checkpoint genesis/source-authenticity design and select no signer/storage until iPhone key custody, independent monotonic witness, recovery authority and operational independence are demonstrable.
 4. Synthetic crash/restart, multiprocess concurrency, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
 5. Continue preregistered multi-market profitability research with realistic costs, chronological untouched holdouts and independent reproduction. Persistence tests are not profitability evidence.
+
+
+## Preferred current integrated candidate — PR #210 — 26 November 2026
+
+PR #210 carries the migration preflight and copy-only migration path onto the newer current settlement stack instead of leaving it on PR #164's older branch.
+
+### Exact-head identity and validation
+- PR #210 exact head: `e4d25164065ac63f41e152eae1f72a494eda98a6`.
+- Base: PR #208 exact head `cf10c756df85ede859862beb459174d090b4ae6c`, which sits on PR #205 validation of PR #203's pre-marker legacy read-only gate.
+- Focused Reservation Settlement Isolated Tests run [45793176628](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45793176628): Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed:
+  - schema v2: 25
+  - lifecycle: 21
+  - allocations: 16
+  - atomic allocations: 13
+  - settlement store: 82
+  - receiver: 17
+  - read-only migration preflight: 40
+  - copy-only migration: 8
+  - **222 tests per interpreter**
+- Full Crypto Engine Offline Suite run [45793176563](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45793176563): both Python matrix jobs passed **326 tests per interpreter**.
+- Python 3.11.18 and 3.13.18; SQLite 3.46.1. Both workflows captured ResourceWarning output; zero actual unclosed-database/ignored-connection warnings.
+
+### Included security and reliability changes
+- Migration preflight requires audit sequence start at 1 and remain contiguous; tests cover a non-one genesis and an interior gap with otherwise consistent hashes.
+- Settlement audit verification rejects duplicate JSON object keys. Regression preserves the same final parsed event and canonical hash while inserting a duplicate `kind` key; verification fails closed.
+- Copy-only migration creates a byte-verified backup and separate output with empty reservation v2 tables; source remains unchanged.
+- Integration regression opens the migrated copy through the current settlement store: snapshot inspection works, while market registration, new BUY batch commit, pending outbox reads, and both acknowledgement paths are blocked by PR #203's pre-marker read-only gate.
+- `SQLiteBatchJournal` now uses a journal-owned close-on-exit connection subclass. The full-suite ResourceWarning investigation traced the earlier unclosed connections to the journal's standard SQLite transaction context manager; regression verifies connection is closed after context exit.
+- Focused workflow includes all eight safe migration/reservation suites. Full offline workflow uses tracemalloc, captures ResourceWarning, and fails on actual warning output. PR path filters now include migration preflight/migration and offline journal changes.
+
+### Branch and readiness interpretation
+- PR #210 remains open/draft/unmerged. No PR merged; protected `main` remains `0426e1ecd5bd01913a568272792c355c4b7059c7`.
+- PR #209 is now marked superseded for current-stack integration because its base predates PR #203/#208. Its 176/280 standalone results remain historical for that older stack only.
+- PR #164 is marked superseded as the standalone copy-only implementation; its functionality is carried into #210.
+- Copy-only migration does **not** create current account/market audit baselines or independently establish opening cash, market identity, historic inventory or SELL authority. It is staged/inspectable, not tradable.
+- No existing user DB was inspected or migrated. Any historical bootstrap requires separate owner approval and independently reviewable evidence.
+- PR #206/#207 external checkpoint source-authenticity/genesis design remains documentation-only; no signer/storage/phone recovery architecture selected.
+- Profitability and high win rate remain NOT ESTABLISHED. The persistence/security suite is not profitability evidence.
+
+### Next required work
+1. Independent adversarial review of the current PR #203–#210 settlement/migration stack at immutable SHAs, including exact diffs, import closure, sequence/canonical JSON, transaction boundaries, copy TOCTOU, and legacy-mode bypass.
+2. Define evidence needed for any legacy genesis/bootstrap. Keep it read-only; do not infer opening balances or migrate existing user data.
+3. Review external checkpoint signer and independent monotonic witness design; no implementation until key custody, rollback protection, storage independence and recovery authority are resolved.
+4. Synthetic crash/restart, multiprocess, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion drills.
+5. Continue preregistered multi-market profitability research with point-in-time data, realistic costs, untouched chronological holdouts and independent reproduction.
+
+Release state: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability NOT ESTABLISHED; whole-project completion UNRATED.
