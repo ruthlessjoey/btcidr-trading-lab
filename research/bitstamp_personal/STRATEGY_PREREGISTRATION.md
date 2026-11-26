@@ -57,3 +57,8 @@ The buy-and-hold benchmark is not a 100%-target rebalancing strategy. It establi
 ## Exact flat-state definition
 
 A terminal position is classified as flat only when the simulated base inventory is exactly zero after executed sell fills. One smallest accounting quantum is still an open holding; the simulator must not label it realized or flat merely because its mark rounds to a zero-cent amount.
+
+
+## Partial-sell residual inventory
+
+A sell is a completed position cycle only when executed quantity reduces base inventory to exactly zero. A partial sell that leaves one or more accounting quanta must retain the residual quantity and remaining cost basis, remain an open position, and keep the cycle unclosed. The simulator does not silently write off dust or infer a terminal sell fill.

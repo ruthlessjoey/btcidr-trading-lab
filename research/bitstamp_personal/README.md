@@ -54,3 +54,6 @@ The benchmark uses a fixed base-quantity target determined at the first eligible
 
 
 A position at the smallest inventory quantum is still reported as open until a sell fill reduces inventory to exactly zero; cent-rounded inventory value does not override position status.
+
+
+Partial sells do not close a cycle while any base inventory remains, including one smallest accounting quantum. Residual quantity and its remaining cost basis stay open until a later sell fill actually reduces inventory to zero.

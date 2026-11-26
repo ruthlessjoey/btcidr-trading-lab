@@ -223,6 +223,33 @@ class ResearchRunnerTests(unittest.TestCase):
             "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL",
         )
 
+    def test_partial_sell_leaving_one_quantum_keeps_residual_position_open(self):
+        # The first fill buys two quanta. The next candle's 5% participation
+        # cap allows only one quantum to be sold. The remaining quantum must
+        # stay in inventory; it is not a completed cycle or an implicit dust sale.
+        result = backtest(
+            [
+                candle("100", "100", volume="0.00000000004"),
+                candle("100", "100", volume="0.00000000002"),
+                candle("100", "100", volume="100"),
+            ],
+            [1, 0, 0],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertEqual(result["fill_count"], 2)
+        self.assertEqual(
+            Decimal(result["open_position_at_end"]),
+            Decimal("0.000000000001"),
+        )
+        self.assertEqual(result["closed_cycles"], 0)
+        self.assertIsNone(result["net_return_pct"])
+        self.assertEqual(
+            result["terminal_position_status"],
+            "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL",
+        )
+
     def test_backtest_rejects_invalid_candle_low(self):
         candles = [candle(), candle("100", "105", low_price="101")]
         with self.assertRaisesRegex(ValueError, "candle low"):
