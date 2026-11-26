@@ -210,6 +210,75 @@ class ResearchRunnerTests(unittest.TestCase):
                 slippage_bps=Decimal("10"),
             )
 
+    def test_buy_and_hold_uses_fixed_initial_quantity_after_partial_entry(self):
+        candles = [
+            candle("100", "100", volume="1000"),
+            candle("100", "50", volume="100000"),
+            candle("50", "50", volume="100000"),
+        ]
+        signals = [1, 1, 1]
+        fixed_quantity = backtest(
+            candles, signals,
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+            rebalance_targets=False,
+        )
+        target_weight = backtest(
+            candles, signals,
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+            rebalance_targets=True,
+        )
+        self.assertEqual(
+            fixed_quantity["execution_policy"],
+            "FIXED_QUANTITY_ENTRY_THEN_HOLD",
+        )
+        self.assertEqual(
+            target_weight["execution_policy"],
+            "TARGET_WEIGHT_REBALANCING",
+        )
+        # Price falls during an initially volume-limited entry. The buy-and-hold
+        # baseline keeps the original base-quantity target; it does not deploy
+        # extra units merely because the same cash buys more units at the lower price.
+        fixed_units = Decimal(fixed_quantity["open_position_at_end"])
+        rebalanced_units = Decimal(target_weight["open_position_at_end"])
+        self.assertGreater(fixed_units, Decimal("0"))
+        self.assertGreater(rebalanced_units, fixed_units)
+        self.assertLess(
+            fixed_units,
+            Decimal("110"),
+        )
+
+    def test_buy_and_hold_completes_only_the_fixed_quantity_target(self):
+        candles = [
+            candle("100", "100", volume="1000"),
+            candle("100", "100", volume="100000"),
+            candle("100", "105", volume="100000"),
+            candle("105", "110", volume="100000"),
+        ]
+        result = backtest(
+            candles, [1, 1, 1, 1],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+            rebalance_targets=False,
+        )
+        self.assertEqual(result["execution_policy"], "FIXED_QUANTITY_ENTRY_THEN_HOLD")
+        self.assertEqual(result["fill_count"], 2)
+        self.assertGreater(Decimal(result["open_position_at_end"]), Decimal("0"))
+
+    def test_rebalance_policy_rejects_non_boolean_values(self):
+        with self.assertRaisesRegex(ValueError, "rebalance_targets must be a boolean"):
+            backtest(
+                [candle(), candle()], [0, 1],
+                fee_bps=Decimal("16"),
+                half_spread_bps=Decimal("5"),
+                slippage_bps=Decimal("10"),
+                rebalance_targets=1,
+            )
+
     def test_zero_prior_volume_prevents_entry(self):
         candles = [candle(volume="0"), candle("100", "101", volume="10000")]
         result = backtest(
