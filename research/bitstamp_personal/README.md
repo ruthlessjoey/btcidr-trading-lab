@@ -46,3 +46,8 @@ A segment that ends with an open long position reports mark-to-market return and
 ## Walk-forward segment state
 
 Train, validation and holdout each begin with a separate flat research account. Rolling indicators can use prior historical candles for warmup, but stateful strategy targets (such as RSI's hold-until-exit rule) reset to flat at each segment boundary. No position target from the prior segment is inherited.
+
+
+## Buy-and-hold benchmark
+
+The benchmark uses a fixed base-quantity target determined at the first eligible next-open entry, then holds the position. If entry is partial under the 5% prior-hour volume cap, it retries only the remaining original quantity; it does not increase the target when later prices fall. Candidate strategies continue to use target-weight rebalancing. Both policies use the same modeled execution costs and volume cap.
