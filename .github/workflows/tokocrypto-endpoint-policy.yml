@@ -4,16 +4,20 @@ on:
   push:
     branches:
       - security/tokocrypto-klines-only-2026-11-27
+      - security/tokocrypto-caller-clock-window-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
       - "config.json"
       - "tests/test_tokocrypto_endpoint_policy.py"
+      - "tokocrypto_public_window.py"
+      - "tests/test_tokocrypto_public_window.py"
       - "docs/tokocrypto-public-klines-policy.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
   pull_request:
     branches:
       - main
+      - security/tokocrypto-klines-only-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -52,6 +56,8 @@ jobs:
             /providers.py
             /config.json
             /tests/test_tokocrypto_endpoint_policy.py
+            /tokocrypto_public_window.py
+            /tests/test_tokocrypto_public_window.py
             /tests/test_fetcher.py
 
       - name: Set up supported Python version
@@ -64,3 +70,6 @@ jobs:
 
       - name: Run synthetic Tokocrypto policy tests only
         run: python -m unittest discover -s tests -p 'test_tokocrypto_endpoint_policy.py' -v
+
+      - name: Run caller-clock Tokocrypto candle-window tests
+        run: python -m unittest discover -s tests -p 'test_tokocrypto_public_window.py' -v
