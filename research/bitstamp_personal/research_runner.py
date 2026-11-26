@@ -18,6 +18,9 @@ from typing import Callable
 from bitstamp_public_ohlc import (
     BitstampDataError, fetch_spot_history, fetch_spot_markets,
 )
+from point_in_time_universe import (
+    PointInTimeUniverseError, load_verified_point_in_time_universe_evidence,
+)
 from promotion_gate import PromotionEvidenceError, evaluate_promotion_gate
 from experiment_registry import TrialRegistryError, load_trial_registry
 from statistical_evidence import (
@@ -39,6 +42,17 @@ PREREGISTERED_SYMBOLS = (
 PREREGISTERED_MIN_MARKETS = 3
 PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
+
+
+def require_v2_point_in_time_universe_evidence() -> dict:
+    """Require accepted point-in-time evidence before any provider request."""
+    try:
+        return load_verified_point_in_time_universe_evidence()
+    except PointInTimeUniverseError as exc:
+        raise BitstampDataError(
+            "V2 public research blocked before network access: point-in-time "
+            f"universe evidence is NOT_VERIFIED ({exc})"
+        ) from exc
 
 
 def _epoch(value: str) -> int:
@@ -728,6 +742,8 @@ def main(argv=None) -> int:
         candidates = validate_preregistered_run(
             args.start, args.end, args.symbols, args.min_markets, args.require_meme
         )
+        point_in_time_evidence = require_v2_point_in_time_universe_evidence()
+        eligible_start_by_symbol = point_in_time_evidence["eligible_start_by_symbol"]
         start_ts = _epoch(args.start)
         end_ts = _epoch(args.end)
         markets, markets_hash = fetch_spot_markets()
@@ -757,13 +773,23 @@ def main(argv=None) -> int:
             "strategy_family": list(STRATEGIES),
             "trial_count": registered_trial_count,
             "trial_registry_sha256": trial_registry_sha256,
+            "point_in_time_universe_evidence_sha256": point_in_time_evidence["evidence_sha256"],
+            "point_in_time_date_policy": point_in_time_evidence["date_policy"],
             "holdout_policy": "V2: 40% initial training; five expanding-training, non-overlapping OOS folds in the next 50%; 50-bar embargoes; next-open terminal liquidation candles excluded from OOS test indices; final 10% reserved untouched; fixed strategies and no parameter tuning",
             "markets": [],
         }
         market_datasets = []
         for market in selected:
+            symbol = market["market_symbol"]
+            eligible_start = eligible_start_by_symbol.get(symbol)
+            if (isinstance(eligible_start, bool)
+                    or not isinstance(eligible_start, int)
+                    or eligible_start < start_ts or eligible_start >= end_ts):
+                raise BitstampDataError(
+                    f"point-in-time eligible start is missing or invalid for {symbol}"
+                )
             dataset = fetch_spot_history(
-                market["market_symbol"], start_timestamp=start_ts,
+                symbol, start_timestamp=eligible_start,
                 end_timestamp=end_ts, max_pages=40,
             )
             expected_pair = re.sub(r"[^A-Z0-9]", "", str(market.get("name") or "").upper())
@@ -772,6 +798,7 @@ def main(argv=None) -> int:
                 raise BitstampDataError(f"market identity mismatch for {market['market_symbol']}")
             if dataset["row_count"] < 6000:
                 raise BitstampDataError(f"insufficient history for {market['market_symbol']}")
+            dataset["point_in_time_eligible_start_timestamp"] = eligible_start
             market_datasets.append((market, dataset))
 
         # First build every market's fold returns in memory. DSR then sees all
