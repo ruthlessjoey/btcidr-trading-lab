@@ -77,6 +77,44 @@ def _normalize(sql: str) -> str:
     return "".join(output)
 
 
+def _verify_account_market_baseline(db: sqlite3.Connection) -> None:
+    """Verify marker authority and the complete base settlement audit before schema creation."""
+    try:
+        markers = dict(db.execute(
+            "SELECT key,value FROM main.metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        ))
+    except sqlite3.Error as exc:
+        raise ReservationSchemaError(
+            "reservation schema creation requires an explicit account and market audit baseline"
+        ) from exc
+    if markers != {
+        "account_initialization_audit": "required-v1",
+        "market_registration_audit": "required-v1",
+    }:
+        raise ReservationSchemaError(
+            "reservation schema creation requires an explicit account and market audit baseline"
+        )
+    account = db.execute(
+        "SELECT account_id,currency FROM main.account WHERE singleton=1"
+    ).fetchone()
+    if account is None:
+        raise ReservationSchemaError("audited settlement account identity is missing")
+    # Reuse the canonical settlement verifier so schema creation cannot be
+    # authorized by marker strings alone or by a broken/forged local hash chain.
+    from .sqlite_settlement_store import (
+        SettlementStoreError, SQLiteSettlementStore,
+    )
+    verifier = SQLiteSettlementStore.__new__(SQLiteSettlementStore)
+    verifier.account_id, verifier.currency = account
+    try:
+        verifier._verify_fill_account_state(db)
+    except SettlementStoreError as exc:
+        raise ReservationSchemaError(
+            "account and market audit baseline verification failed"
+        ) from exc
+
+
 def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     """Create/verify v2 objects inside a caller-owned transaction.
 
@@ -89,7 +127,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
     if not db.in_transaction:
         raise ReservationSchemaError("caller-owned transaction is required")
 
-    required_parents = {"metadata", "markets", "batches", "fills"}
+    required_parents = {"metadata", "account", "markets", "holdings", "batches", "fills", "audit"}
     present = {
         row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -153,17 +191,7 @@ def ensure_reservation_schema_v2(db: sqlite3.Connection) -> None:
         # callers reserve inventory whose opening account/market authority is
         # not established. Existing v2 tables may still be verified read-only;
         # only creation requires both explicit baseline markers.
-        markers = dict(db.execute(
-            "SELECT key,value FROM main.metadata WHERE key IN "
-            "('account_initialization_audit','market_registration_audit')"
-        ))
-        if markers != {
-            "account_initialization_audit": "required-v1",
-            "market_registration_audit": "required-v1",
-        }:
-            raise ReservationSchemaError(
-                "reservation schema creation requires an explicit account and market audit baseline"
-            )
+        _verify_account_market_baseline(db)
         for ddl in _SCHEMA.values():
             db.execute(ddl)
 
