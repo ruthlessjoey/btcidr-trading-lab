@@ -298,6 +298,18 @@ def fetch_spot_history(
             and row["open_timestamp"] < cursor
         ]
         if not eligible:
+            # A backwards page containing only candles older than the requested
+            # lower bound proves that pagination reached the range boundary.
+            # Stop cleanly so the explicit leading-coverage check can block any
+            # incomplete dataset instead of treating normal boundary crossing
+            # as an API pagination failure.
+            older_than_range = [
+                row for row in normalized
+                if row["open_timestamp"] < start_timestamp
+                and row["open_timestamp"] < cursor
+            ]
+            if older_than_range:
+                break
             raise BitstampDataError("OHLC pagination returned no rows before the requested cursor")
         oldest = eligible[0]["open_timestamp"]
         for row in eligible:
