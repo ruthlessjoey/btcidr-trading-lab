@@ -101,3 +101,10 @@ The runner now fetches all preregistered markets into memory, generates each mar
 
 
 The ledger parser verifies the current file's exact expected trial universe and event order. Append-only history itself must also be verified against Git commit history and reviewed diffs; the parser cannot detect a malicious rewrite that removes prior status events while retaining all initial registrations.
+
+
+## Cost and participation sensitivity
+
+Every OOS strategy fold now replays the same signal sequence across a frozen 20-case matrix: cost multipliers `1x, 1.5x, 2x, 3x, 5x` applied to per-side fee, half-spread and slippage, crossed with prior-hour-volume participation caps `1%, 2.5%, 5%, 10%`. Each scenario reports net/mark-to-market return, worst-case OHLC drawdown, closed cycles, profit factor, win rate, fees and fill count. The primary promotion gate still uses the preregistered 1x and 2x cost cases at 5% participation; the wider matrix is a fragility diagnostic.
+
+Important limitations: 16 bps per-side fee is only a public example, not the user's actual tier. Base spreads/slippage are assumptions. Capacity uses 5% (or sensitivity level) of the *previous* hourly candle volume because next-hour volume is unknown at decision time. This is not a verified fill model and does not model order-book depth or calibrated market impact. No scenario is described as realistic without venue-specific evidence.
