@@ -485,6 +485,7 @@ class GlobalTrialUniverseTests(unittest.TestCase):
                 cost_model_sha256="b" * 64,
                 strategy_config_sha256="c" * 64,
                 registered_trial_count=4,
+                trial_registry_sha256="e" * 64,
                 trial_series_by_fold=[[] for _ in range(5)],
                 bootstrap_replicates=1000,
             )
