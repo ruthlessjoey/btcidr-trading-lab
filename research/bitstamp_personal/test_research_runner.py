@@ -1,5 +1,5 @@
 import unittest
-from decimal import Decimal
+from decimal import Decimal, getcontext
 
 from research_runner import (
     backtest,
@@ -34,6 +34,34 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(signals_a[:51], signals_b[:51])
         self.assertEqual(signals_a[49], 1)
         self.assertTrue(set(signals_a).issubset({0, 1}))
+
+    def test_sma_threshold_uses_fixed_precision_independent_of_global_context(self):
+        previous_precision = getcontext().prec
+        try:
+            getcontext().prec = 8
+            closes = ["100"] * 49 + ["100.000000000000000000000000000000000001"]
+            candles = [{"close": value} for value in closes]
+            signals = make_signals("SMA20_50_LONG_ONLY", candles)
+            self.assertEqual(signals[-1], 1)
+            self.assertEqual(getcontext().prec, 8)
+        finally:
+            getcontext().prec = previous_precision
+
+    def test_backtest_uses_and_restores_fixed_decimal_context(self):
+        previous_precision = getcontext().prec
+        try:
+            getcontext().prec = 7
+            result = backtest(
+                [candle(), candle("100", "101")],
+                [1, 0],
+                fee_bps=Decimal("16"),
+                half_spread_bps=Decimal("5"),
+                slippage_bps=Decimal("10"),
+            )
+            self.assertTrue(result["final_equity"])
+            self.assertEqual(getcontext().prec, 7)
+        finally:
+            getcontext().prec = previous_precision
 
     def test_rsi_strategy_enters_after_decline_and_exits_after_reversal(self):
         closes = [str(100 - index) for index in range(20)]
