@@ -88,3 +88,8 @@ The V2 planner requires at least 6,000 contiguous hourly candles to preserve a m
 The V2 runner derives per-candle portfolio returns internally, computes Deflated Sharpe and paired moving-block bootstrap evidence for each strategy in each OOS fold, then submits summaries to `promotion_gate.py`. Return vectors are removed before final JSON serialization. Candidate and same-cost buy-and-hold must both be realized and terminal-flat. Each fold is bound to runner/preregistration source hash, cost-model hash, dataset hash and registered-trial count.
 
 A failed threshold is labeled `REJECT_OR_RESEARCH_MORE`; missing or invalid statistical evidence is `BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE`. A pass only permits independent human review. The final 10% holdout remains untouched. The current DSR calculation uses completed strategy series for the market plus the full registered-trial count; independent review must reconcile completed series with the append-only global trial registry before any promotion.
+
+
+## Complete global DSR trial universe
+
+The runner now fetches all preregistered markets into memory, generates each market's five fold return series, and only then calculates DSR. Each fold's DSR trial-series input contains every preregistered market-strategy combination; the count must exactly equal the append-only registered-trial count. If any selected market fails to produce five valid folds, all market promotion screens are blocked as statistically incomplete. The final output still removes per-period return vectors.
