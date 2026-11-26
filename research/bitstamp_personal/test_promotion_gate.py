@@ -106,7 +106,7 @@ class PromotionGateTests(unittest.TestCase):
         extension = REGISTRY_RAW + json.dumps(
             core, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False, allow_nan=False,
-        ).encode("utf-8") + b"\\n"
+        ).encode("utf-8") + b"\n"
         with self.assertRaisesRegex(PromotionError, "digest does not match"):
             evaluate_promotion_gate(
                 folds=valid_folds(), trial_registry_raw=extension,
@@ -116,6 +116,12 @@ class PromotionGateTests(unittest.TestCase):
         rows = valid_folds()
         rows[1]["registered_trial_count"] = 3
         with self.assertRaisesRegex(PromotionError, "independently verified number"):
+            evaluate_promotion_gate(folds=rows)
+
+    def test_each_fold_requires_30_non_overlapping_24_bar_returns(self):
+        rows = valid_folds()
+        rows[2]["observations"] = 29
+        with self.assertRaisesRegex(PromotionError, "30 complete non-overlapping 24-bar returns"):
             evaluate_promotion_gate(folds=rows)
 
     def test_exact_50_bar_embargo_is_required_between_folds(self):
