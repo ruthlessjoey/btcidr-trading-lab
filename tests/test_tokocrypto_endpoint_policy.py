@@ -170,7 +170,7 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         provider = providers.build("tokocrypto")
         opener = ScriptedOpener(b"{}")
         http = providers.Http(5, 1, opener, NO_SLEEP)
-        with self.assertRaisesRegex(fetcher.ApiError, "server-time requests are not approved"):
+        with self.assertRaisesRegex(fetcher.ApiError, "Tokocrypto server-time access is not approved"):
             provider.server_time(http)
         self.assertEqual(http.requests, 0)
         self.assertEqual(opener.calls, [])
