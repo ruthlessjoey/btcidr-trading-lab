@@ -68,3 +68,6 @@ Every fold must also use identical SHA-256 hashes for the frozen cost model and 
 The runner now creates five expanding-training OOS folds. Every fold starts with a flat research account, uses causal prior-close indicator warm-up, enters only from next-open signals, and reserves the next candle after the test interval for explicit terminal liquidation at that candle's open with the same modeled fee/spread/slippage. The liquidation candle is not included in the fold's test index range. Fifty additional candles are embargoed before the next fold. The same fold dates are replayed for the candidate and buy-and-hold baseline.
 
 The 2x-cost replay doubles every cost component, including the per-side fee, half-spread and slippage, while preserving the exact same signals and candles. The fold runner reports base and 2x cost results but remains non-promotable until DSR and paired block-bootstrap statistics are computed and independently verified.
+
+
+The V2 walk-forward schedule and cost stress supersede the earlier 60/20/20 split and prior non-doubled stress assumptions for future research runs. The historical V1 specification is retained for traceability.
