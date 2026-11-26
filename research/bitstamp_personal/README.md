@@ -98,3 +98,6 @@ The runner now fetches all preregistered markets into memory, generates each mar
 ## Append-only registered-trial ledger
 
 `experiment_registry.jsonl` registers all 14 V2 market × strategy combinations before data collection. The runner derives registered-trial count and SHA-256 from this ledger, not from the subset of markets available. Missing market data blocks the complete DSR universe rather than silently reducing the multiple-testing count. The ledger is event-sourced: later `COMPLETED`, `FAILED` or `ABANDONED` events are appended; existing registration events are never edited or deleted. The promotion gate binds every fold to the exact registry SHA-256.
+
+
+The ledger parser verifies the current file's exact expected trial universe and event order. Append-only history itself must also be verified against Git commit history and reviewed diffs; the parser cannot detect a malicious rewrite that removes prior status events while retaining all initial registrations.
