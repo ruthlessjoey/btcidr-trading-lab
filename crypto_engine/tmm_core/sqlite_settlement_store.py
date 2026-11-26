@@ -79,6 +79,16 @@ def _canonical_decimal(value: object, field: str) -> str:
     return format(number, "f")
 
 
+def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON keys instead of silently accepting last-key-wins."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 def _event_hash(previous: str, event: Mapping[str, Any]) -> str:
     encoded = json.dumps(event, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
@@ -1408,7 +1418,12 @@ class SQLiteSettlementStore:
             # prefix, not merely the ordering of rows that happen to remain.
             if sequence != expected_sequence:
                 return False
-            event = json.loads(event_json)
+            try:
+                event = json.loads(event_json, object_pairs_hook=_strict_json_object)
+            except (TypeError, ValueError, RecursionError, UnicodeError):
+                return False
+            if not isinstance(event, dict):
+                return False
             if stored_previous != previous or _event_hash(previous, event) != stored_hash:
                 return False
             previous = stored_hash
