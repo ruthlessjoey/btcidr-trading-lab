@@ -49,3 +49,10 @@ Train, validation and holdout each begin with a separate flat research account. 
 
 
 - Every OHLC page's returned pair identity is normalized and compared to the exact requested market symbol before candle rows are accepted; a stable but wrong pair is rejected.
+
+
+## Statistical promotion screen
+
+The offline gate uses frozen defaults: at least five chronological, non-overlapping OOS folds; at least 60% positive net-return folds and 60% beating same-cost buy-and-hold; positive mean net return and excess; at least 60% positive at 2x costs and positive mean 2x-cost return; maximum fold drawdown <=20%; profit factor >=1.20 in every fold; Deflated Sharpe probability >=0.95 in every fold; positive paired block-bootstrap lower bound in every fold; at least 30 closed trades and 100 observations in aggregate. All folds must use one dataset SHA-256 and one complete registered-trial count.
+
+The gate validates supplied metrics; it does not calculate or authenticate DSR/bootstrap values, prove the holdout was untouched, validate data rights or enable trading. A pass means eligible for independent human review only. The current single 60/20/20 split cannot pass this five-fold gate.
