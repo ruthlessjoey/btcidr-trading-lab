@@ -367,6 +367,8 @@ WALK_FORWARD_INITIAL_TRAIN_NUMERATOR = 2
 WALK_FORWARD_INITIAL_TRAIN_DENOMINATOR = 5
 WALK_FORWARD_MINIMUM_TRAIN_BARS = 1500
 WALK_FORWARD_MINIMUM_TEST_BARS = 500
+WALK_FORWARD_HOLDOUT_START_NUMERATOR = 9
+WALK_FORWARD_HOLDOUT_START_DENOMINATOR = 10
 
 
 def plan_walk_forward_folds(count: int) -> list[dict]:
@@ -377,23 +379,26 @@ def plan_walk_forward_folds(count: int) -> list[dict]:
     metrics. Fifty additional bars separate one liquidation bar from the next
     test window. Training ends fifty bars before each test starts.
     """
-    if isinstance(count, bool) or not isinstance(count, int) or count < 5000:
-        raise ValueError("at least 5000 contiguous candles are required")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 6000:
+        raise ValueError("at least 6000 contiguous candles are required")
     initial_train_end = count * WALK_FORWARD_INITIAL_TRAIN_NUMERATOR // WALK_FORWARD_INITIAL_TRAIN_DENOMINATOR
+    final_holdout_start = count * WALK_FORWARD_HOLDOUT_START_NUMERATOR // WALK_FORWARD_HOLDOUT_START_DENOMINATOR
     if initial_train_end - WALK_FORWARD_EMBARGO_BARS < WALK_FORWARD_MINIMUM_TRAIN_BARS:
         raise ValueError("initial training window is too small after embargo")
-    cursor = initial_train_end
+    cursor = initial_train_end + WALK_FORWARD_EMBARGO_BARS
     folds = []
     for index in range(WALK_FORWARD_FOLD_COUNT):
         remaining = WALK_FORWARD_FOLD_COUNT - index
-        reserved = 1 + WALK_FORWARD_EMBARGO_BARS * (remaining - 1)
-        test_length = (count - cursor - reserved) // remaining
+        # Reserve one next-open liquidation candle and 50 embargo candles
+        # after every fold, including the final fold before the untouched holdout.
+        reserved = remaining * (1 + WALK_FORWARD_EMBARGO_BARS)
+        test_length = (final_holdout_start - cursor - reserved) // remaining
         if test_length < WALK_FORWARD_MINIMUM_TEST_BARS:
             raise ValueError("walk-forward OOS fold is too small")
         test_start = cursor
         test_end = test_start + test_length
-        if test_end >= count:
-            raise ValueError("walk-forward fold lacks a terminal liquidation candle")
+        if test_end >= final_holdout_start:
+            raise ValueError("walk-forward fold overlaps the untouched final holdout")
         folds.append({
             "fold_id": f"wf-{index + 1:02d}",
             "train_start": 0,
@@ -526,6 +531,11 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
         "results": results,
         "walk_forward_folds": walk_forward_folds,
         "walk_forward_status": "FIVE_OOS_FOLDS_WITH_NEXT_OPEN_TERMINAL_LIQUIDATION_STATISTICS_PENDING",
+        "final_holdout": {
+            "start_index": len(candles) * WALK_FORWARD_HOLDOUT_START_NUMERATOR // WALK_FORWARD_HOLDOUT_START_DENOMINATOR,
+            "end_index": len(candles),
+            "status": "RESERVED_UNTOUCHED_NOT_EVALUATED",
+        },
         "promotion_status": "RESEARCH_ONLY_NOT_PROMOTABLE",
     }
 
@@ -563,7 +573,7 @@ def main(argv=None) -> int:
             "missing_candidate_symbols": missing,
             "strategy_family": list(STRATEGIES),
             "trial_count": len(selected) * len(STRATEGIES),
-            "holdout_policy": "V2: 40% initial training history; five expanding-training, non-overlapping OOS folds; 50-bar embargo; next-open terminal liquidation candle excluded from OOS test indices; fixed strategies and no parameter tuning",
+            "holdout_policy": "V2: 40% initial training; five expanding-training, non-overlapping OOS folds in the next 50%; 50-bar embargoes; next-open terminal liquidation candles excluded from OOS test indices; final 10% reserved untouched; fixed strategies and no parameter tuning",
             "markets": [],
         }
         for market in selected:
@@ -575,7 +585,7 @@ def main(argv=None) -> int:
             observed_pair = re.sub(r"[^A-Z0-9]", "", str(dataset["pair"]).upper())
             if expected_pair and expected_pair != observed_pair:
                 raise BitstampDataError(f"market identity mismatch for {market['market_symbol']}")
-            if dataset["row_count"] < 5000:
+            if dataset["row_count"] < 6000:
                 raise BitstampDataError(f"insufficient history for {market['market_symbol']}")
             output["markets"].append(evaluate_market(market, dataset))
         print(json.dumps(output, indent=2, sort_keys=True))
