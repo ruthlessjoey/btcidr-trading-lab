@@ -73,6 +73,10 @@ class WalkForwardEvaluationTests(unittest.TestCase):
             bad=dict(dataset);bad["gap_count"]=1
             evaluate_five_fold_strategy(dataset["candles"],market_symbol="dogeusd",
               strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",trial_registry_bytes=trial_registry(),dataset_manifest=bad)
+        changed=list(dataset["candles"]);changed[0]=dict(changed[0],close="999")
+        with self.assertRaisesRegex(WalkForwardEvaluationError,"do not match verified dataset manifest"):
+            evaluate_five_fold_strategy(changed,market_symbol="dogeusd",
+              strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",trial_registry_bytes=trial_registry(),dataset_manifest=dataset)
 
     def test_strategy_must_be_present_in_verified_trial_registry(self):
         # Two registered SMA attempts meet the minimum trial count, but RSI
