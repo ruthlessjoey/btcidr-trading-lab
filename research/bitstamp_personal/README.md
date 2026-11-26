@@ -56,3 +56,8 @@ Train, validation and holdout each begin with a separate flat research account. 
 The offline gate uses frozen defaults: at least five chronological, non-overlapping OOS folds; at least 60% positive net-return folds and 60% beating same-cost buy-and-hold; positive mean net return and excess; at least 60% positive at 2x costs and positive mean 2x-cost return; maximum fold drawdown <=20%; profit factor >=1.20 in every fold; Deflated Sharpe probability >=0.95 in every fold; positive paired block-bootstrap lower bound in every fold; at least 30 closed trades and 100 observations in aggregate. All folds must use one dataset SHA-256 and one complete registered-trial count.
 
 The gate validates supplied metrics; it does not calculate or authenticate DSR/bootstrap values, prove the holdout was untouched, validate data rights or enable trading. A pass means eligible for independent human review only. The current single 60/20/20 split cannot pass this five-fold gate.
+
+
+## Five-fold OOS design (next preregistration version)
+
+A separate helper now defines five sequential, non-overlapping test windows after a fixed 50% historical warm-up region, with 50-bar embargoes between folds and at least 500 bars per fold. Strategy parameters must be frozen before these windows are evaluated; the helper does not fit or tune strategies. This is a design component only: the current V1 runner still executes its original 60/20/20 split, and no V2 data run is authorized or enabled by this helper. A versioned V2 preregistration and fold-metric integration are required before any new public-data request.

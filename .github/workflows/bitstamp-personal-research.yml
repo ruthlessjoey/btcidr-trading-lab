@@ -10,6 +10,7 @@ on:
       - research/reset-state-at-bitstamp-segment-boundaries-2026-11-27
       - research/bitstamp-integrated-state-rsi-identity-2026-11-27
       - research/bitstamp-fail-closed-promotion-gate-2026-11-27
+      - research/bitstamp-five-fold-oos-window-design-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
