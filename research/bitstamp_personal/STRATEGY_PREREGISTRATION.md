@@ -2,6 +2,10 @@
 
 Date: 27 November 2026
 
+Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`
+
+The executable runner rejects overrides to the date range, candidate universe, minimum market count or meme-market requirement. Any change to this design requires a new versioned preregistration before any provider data is requested.
+
 ## Scope
 Personal, noncommercial, research-only spot data. No raw data redistribution. No live trading, account access or exchange order endpoints.
 
