@@ -1,0 +1,77 @@
+name: Research backtest (Step 2)
+
+# READ-ONLY research. Uses the pinned dataset version stored on the 'research-data' branch.
+# Whether the TEST window is evaluated is set in backtest_config.json ("evaluate_test"), so the
+# decision is a visible, reviewable commit. Results are appended to 'research-data'; nothing is
+# overwritten or force-pushed.
+on:
+  workflow_dispatch:
+  push:
+    branches: [milestone-3-data]
+    paths: [run_backtest.py, run_crosscheck.py, backtest_config.json, "research/**",
+            ".github/workflows/research-backtest.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: research-data
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Offline unit tests (must pass before anything runs on real data)
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Load preserved datasets and earlier test records
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git fetch -q --depth=1 "$URL" research-data
+          git archive FETCH_HEAD datasets | tar -x -C prev
+          git archive FETCH_HEAD test_evaluations 2>/dev/null | tar -x -C prev || true
+          ls -R prev | head -30
+
+      - name: Cross-check flagged candles against independent sources
+        continue-on-error: true
+        run: python3 run_crosscheck.py --datasets-root prev/datasets
+
+      - name: Backtest on the pinned dataset
+        run: python3 run_backtest.py --datasets-root prev/datasets --prev-results prev --crosscheck out/crosscheck.json
+
+      - name: Keep the reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-report
+          path: out/
+          if-no-files-found: ignore
+
+      - name: Publish results to the research-data branch (append only)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          rm -rf /tmp/pub
+          git clone -q --depth 1 --branch research-data "$URL" /tmp/pub
+          cd /tmp/pub
+          R=results/${{ github.run_id }}
+          mkdir -p "$R" test_evaluations
+          cp "$GITHUB_WORKSPACE"/out/*.md "$GITHUB_WORKSPACE"/out/*.json "$GITHUB_WORKSPACE"/out/*.csv "$R"/ 2>/dev/null || true
+          if [ -d "$GITHUB_WORKSPACE/out/test_evaluations" ]; then cp -rn "$GITHUB_WORKSPACE/out/test_evaluations/." test_evaluations/; fi
+          cp "$GITHUB_WORKSPACE"/out/backtest_report.md LATEST_BACKTEST_REPORT.md 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE"/out/crosscheck.md LATEST_CROSSCHECK.md 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q --allow-empty -m "Backtest run ${{ github.run_id }}"
+          git push -q "$URL" HEAD:research-data
