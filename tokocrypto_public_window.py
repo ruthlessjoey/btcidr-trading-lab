@@ -93,13 +93,23 @@ def fetch_tokocrypto_candles(
     if not candles:
         raise fetcher.ApiError("approved Tokocrypto klines endpoint returned zero candles")
     previous_open = None
+    expected_open = int(window["start_timestamp"])
+    interval = int(window["interval_seconds"])
+    end_exclusive = int(window["end_exclusive_timestamp"])
     for candle in candles:
         if (isinstance(candle.time, bool) or not isinstance(candle.time, int)
-                or candle.time % int(window["interval_seconds"]) != 0
+                or candle.time % interval != 0
                 or candle.time < int(window["start_timestamp"])
-                or candle.time + int(window["interval_seconds"]) >
-                   int(window["end_exclusive_timestamp"])):
+                or candle.time + interval > end_exclusive):
             raise fetcher.ApiError("Tokocrypto returned a candle outside the requested closed UTC window")
+        if candle.time < expected_open:
+            raise fetcher.ApiError("Tokocrypto returned duplicate or out-of-order candle timestamps")
+        if candle.time > expected_open:
+            missing = (candle.time - expected_open) // interval
+            raise fetcher.ApiError(
+                f"Tokocrypto candle grid is incomplete: {missing} missing interval(s) "
+                f"before candle {candle.time}"
+            )
         if previous_open is not None and candle.time <= previous_open:
             raise fetcher.ApiError("Tokocrypto returned duplicate or out-of-order candle timestamps")
         values = (candle.open, candle.high, candle.low, candle.close, candle.volume)
@@ -111,10 +121,25 @@ def fetch_tokocrypto_candles(
                 or candle.low > min(candle.open, candle.close, candle.high)):
             raise fetcher.ApiError("Tokocrypto returned inconsistent OHLC bounds")
         previous_open = candle.time
+        expected_open += interval
+
+    if expected_open != end_exclusive:
+        missing = (end_exclusive - expected_open) // interval
+        raise fetcher.ApiError(
+            f"Tokocrypto candle grid is incomplete: {missing} trailing interval(s) are missing"
+        )
+
+    expected_candles = (end_exclusive - int(window["start_timestamp"])) // interval
+    if len(candles) != expected_candles:
+        raise fetcher.ApiError("Tokocrypto candle count does not match the complete requested interval grid")
+
     return {
         **window,
         "candles": candles,
         "requests_made": requests_made,
+        "expected_candles": expected_candles,
+        "received_candles": len(candles),
+        "data_quality_status": "COMPLETE_CONTIGUOUS_CLOSED_GRID",
         "provider": "tokocrypto",
         "endpoint": fetcher.TOKOCRYPTO_KLINES_PATH,
     }
