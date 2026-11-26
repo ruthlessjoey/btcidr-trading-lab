@@ -9,9 +9,12 @@ from research_runner import (
 )
 
 
-def candle(open_price="100", close_price="100", volume="10000"):
+def candle(open_price="100", close_price="100", volume="10000", low_price=None):
+    low = min(Decimal(open_price), Decimal(close_price)) if low_price is None else Decimal(low_price)
     return {
         "open": open_price,
+        "high": str(max(Decimal(open_price), Decimal(close_price))),
+        "low": str(low),
         "close": close_price,
         "volume": volume,
     }
@@ -73,6 +76,39 @@ class ResearchRunnerTests(unittest.TestCase):
             Decimal(result["final_equity"]),
             Decimal(free_cost_result["final_equity"]),
         )
+
+    def test_intrabar_low_drawdown_is_not_hidden_by_candle_close(self):
+        candles = [
+            candle("100", "100"),
+            candle("100", "105", low_price="70"),
+            candle("110", "110"),
+            candle("110", "110"),
+        ]
+        result = backtest(
+            candles, [1, 0, 0, 0],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertGreater(Decimal(result["max_drawdown_intrabar_pct"]), Decimal("20"))
+        self.assertLess(
+            Decimal(result["max_drawdown_close_pct"]),
+            Decimal(result["max_drawdown_intrabar_pct"]),
+        )
+        self.assertEqual(
+            result["max_drawdown_pct"],
+            result["max_drawdown_intrabar_pct"],
+        )
+
+    def test_backtest_rejects_invalid_candle_low(self):
+        candles = [candle(), candle("100", "105", low_price="101")]
+        with self.assertRaisesRegex(ValueError, "candle low"):
+            backtest(
+                candles, [1, 0],
+                fee_bps=Decimal("16"),
+                half_spread_bps=Decimal("5"),
+                slippage_bps=Decimal("10"),
+            )
 
     def test_zero_prior_volume_prevents_entry(self):
         candles = [candle(volume="0"), candle("100", "101", volume="10000")]
