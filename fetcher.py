@@ -116,7 +116,6 @@ def validate_request_url(url):
         start_ms, end_ms, limit = int(values["startTime"]), int(values["endTime"]), int(values["limit"])
         step_ms = TF_SECONDS[values["interval"]] * 1000
         if (start_ms < 0 or end_ms <= start_ms or not 1 <= limit <= CANDLES_PER_REQUEST
-                or start_ms % step_ms
                 or end_ms - start_ms > limit * step_ms):
             raise ApiError("Tokocrypto klines range or row limit is outside the approved bounds")
     except (TypeError, ValueError) as exc:
