@@ -22,6 +22,8 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript("""
             CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+            INSERT INTO metadata VALUES('account_initialization_audit','required-v1');
+            INSERT INTO metadata VALUES('market_registration_audit','required-v1');
             CREATE TABLE account(
                 singleton INTEGER PRIMARY KEY CHECK(singleton=1),
                 account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL
@@ -82,6 +84,21 @@ class ReservationLifecycleTests(unittest.TestCase):
                 return False
             previous = stored_hash
         return True
+
+    def test_pre_marker_store_cannot_create_or_change_reservations(self):
+        self.db.execute(
+            "DELETE FROM metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        )
+        self.begin()
+        with self.assertRaisesRegex(
+            ReservationLifecycleError, "explicit account and market audit baselines"
+        ):
+            self.create()
+        self.db.rollback()
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM reservations").fetchone()[0], 0
+        )
 
     def test_create_is_pending_and_audited(self):
         row = self.create()
