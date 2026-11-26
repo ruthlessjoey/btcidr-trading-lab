@@ -12,7 +12,8 @@ Personal, noncommercial SPOT research only. No raw data redistribution, account 
 - 1-hour closed candles; 2024-01-01 00:00 UTC candle open through 2026-11-01 00:00 UTC inclusive candle-close boundary.
 - Exact market identity required on every page; gaps/incomplete coverage block the market.
 - First 50% of contiguous candles is historical indicator warm-up/development history; no model fitting.
-- Five sequential, non-overlapping test windows on the remaining bars; 50-bar embargo between folds; >=500 bars per fold; minimum dataset 5,500 candles.
+- Five sequential, non-overlapping test windows on the remaining bars; at least 50-bar embargo between adjacent folds; >=721 bars per fold; minimum dataset 7,609 candles.
+- The 721-bar minimum is required to produce 30 complete non-overlapping 24-bar returns per fold (720 intervals plus the starting equity mark), the minimum accepted by the DSR and paired-bootstrap evidence primitives.
 - Each fold starts flat; indicators use only prior closes available at the signal time.
 - Signal at close, execute at next open; max participation 5% of prior-hour base volume.
 
@@ -33,6 +34,10 @@ Personal, noncommercial SPOT research only. No raw data redistribution, account 
 - All folds share dataset hash, registry hash and registered-trial count. Passing qualifies for independent human review only; it does not prove future profitability or authorize PAPER/LIVE.
 - DSR independence assumptions, bootstrap assumptions, data rights and untouched holdout status require independent review.
 
+## Historical universe release gate
+
+The current V2 runner uses the current active Bitstamp market list, not a dated historical listing/matching record. This can omit markets that later delisted or were historically halted and create survivorship bias. The V2 runner therefore fails closed before market metadata/OHLC requests while point-in-time listing, trading and matching intervals remain `NOT_VERIFIED`. A new point-in-time evidence manifest must be independently reviewed, hash-pinned and used to determine each symbol's eligible intervals before this gate can be reopened.
+
 ## Trial registry
 - Family: `BITSTAMP_PERSONAL_SPOT_V2`
 - Current candidate trials: 2
@@ -41,3 +46,8 @@ Personal, noncommercial SPOT research only. No raw data redistribution, account 
 - Append every new/failed/abandoned candidate trial; do not delete or rewrite previous events. Preserve Git history. The hash chain is tamper-evident, not WORM or an external trust anchor.
 
 No public-data request is made by this preregistration.
+
+
+## Promotion evidence binding
+
+The promotion gate must receive the exact raw `trial_registry.jsonl` bytes. It verifies the JSONL hash chain, matches the exact frozen SHA-256 in this preregistration, and confirms the registered V2 candidate family/count before accepting fold metrics. Each fold's registry digest and registered candidate count must match those independently verified bytes. The fixed no-tuning buy-and-hold comparator is not a candidate trial and is not included in the registered candidate count. Adjacent test folds must have at least 50 excluded bars between the preceding exclusive end and the next start index.
