@@ -10,7 +10,10 @@ import re
 from typing import Callable
 
 import fetcher
-from tokocrypto_public_window import validate_complete_candle_grid
+from tokocrypto_public_window import (
+    ALLOWED_TOKOCRYPTO_PAIRS,
+    validate_complete_candle_grid,
+)
 
 MAX_FIXED_WINDOW_DAYS = 14
 PAIR_RE = re.compile(r"^[A-Z0-9]{2,10}_[A-Z0-9]{2,10}$")
@@ -22,6 +25,8 @@ def validate_fixed_window(*, pair: str, timeframe: str,
     """Validate a finite, aligned UTC interval without consulting current time."""
     if not isinstance(pair, str) or not PAIR_RE.fullmatch(pair):
         raise ValueError("pair must use BASE_QUOTE uppercase symbol form")
+    if pair not in ALLOWED_TOKOCRYPTO_PAIRS:
+        raise ValueError("pair is not in the reviewed Tokocrypto adapter allowlist")
     if timeframe not in fetcher.TF_SECONDS:
         raise ValueError("timeframe is not supported by the approved candle adapter")
     for name, value in (

@@ -87,6 +87,12 @@ class FixedWindowTests(unittest.TestCase):
         opener = FakeOpener()
         with self.assertRaises(ValueError):
             fetch_tokocrypto_fixed_window(
+                pair="ETH_USDT", timeframe="1h",
+                start_epoch_utc=START, end_epoch_utc_exclusive=END,
+                opener=opener, sleep=lambda _: None,
+            )
+        with self.assertRaises(ValueError):
+            fetch_tokocrypto_fixed_window(
                 pair="BTC/USDT", timeframe="1h",
                 start_epoch_utc=START, end_epoch_utc_exclusive=END,
                 opener=opener, sleep=lambda _: None,

@@ -53,3 +53,10 @@ A separate fixed-boundary helper can retrieve a pre-registered interval without 
 It deliberately does **not** assert that the selected interval is in the past, authenticate the preregistration record, verify the provider clock, or establish market identity. Its output labels the temporal past assertion `NOT_PERFORMED` and provider clock skew `NOT_VERIFIED`. Only use fixed windows whose boundaries have been preregistered and independently verified as historical. Do not use this interface for unattended current-market collection.
 
 The interface makes no request during validation or testing; all regressions use synthetic responses. The only network path available when a caller explicitly invokes retrieval remains the exact approved public `/api/v3/klines` GET.
+
+
+## Static pair allowlist
+
+The Tokocrypto helper currently accepts only `BTC_USDT`, matching the one static Tokocrypto mapping present in the reviewed repository config/provider adapter. This is an implementation scope boundary, **not** proof that the pair is currently listed, that the provider's symbol identity is verified, or that the venue data are suitable for research. The identity status remains `NOT_VERIFIED`.
+
+Any additional Tokocrypto pair requires a separate evidence-backed identity review and explicit allowlist update before the adapter will issue a request. The wider Twin Money Maker project remains multi-market; this restriction applies only to this single Tokocrypto adapter until its market registry is independently reviewed.

@@ -14,6 +14,9 @@ import fetcher
 
 MAX_LOOKBACK_DAYS = 14
 PAIR_RE = re.compile(r"^[A-Z0-9]{2,10}_[A-Z0-9]{2,10}$")
+# Only the single Tokocrypto market configured in the reviewed repository
+# snapshot is eligible for this adapter. This does not prove the listing is live.
+ALLOWED_TOKOCRYPTO_PAIRS = frozenset({"BTC_USDT"})
 
 
 def build_window(*, pair: str, timeframe: str, lookback_days: int,
@@ -21,6 +24,8 @@ def build_window(*, pair: str, timeframe: str, lookback_days: int,
     """Build a closed-candle UTC window without querying provider time."""
     if not isinstance(pair, str) or not PAIR_RE.fullmatch(pair):
         raise ValueError("pair must use BASE_QUOTE uppercase symbol form")
+    if pair not in ALLOWED_TOKOCRYPTO_PAIRS:
+        raise ValueError("pair is not in the reviewed Tokocrypto adapter allowlist")
     if timeframe not in fetcher.TF_SECONDS:
         raise ValueError("timeframe is not supported by the approved candle adapter")
     if (isinstance(lookback_days, bool) or not isinstance(lookback_days, int)
