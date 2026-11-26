@@ -1249,3 +1249,50 @@ The prior PR #209 verification run 45789387082 was for SHA `cf6cd4efa645e2850569
 5. Resume independent adversarial review and evidence-backed migration/bootstrap design.
 
 Release state unchanged: install/trading NOT READY; profitability NOT ESTABLISHED; PAPER ON HOLD; LIVE DISABLED/ABSENT; whole-project completion UNRATED.
+
+
+## Superseding exact-head result — PR #209 and full Crypto Engine suite — 26 November 2026
+
+### PR #209 — audit sequence and migration preflight
+- Current exact head: `6cfd68bcb02d95caae9272efd5883e45bddce4e4`.
+- Focused Actions run: [45791578696](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45791578696), both Python matrix jobs passed.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed all eight focused suites:
+  - reservation schema v2: 25
+  - reservation lifecycle: 21
+  - reservation allocations: 16
+  - reservation atomic allocations: 13
+  - settlement store: 38
+  - receiver: 16
+  - read-only migration preflight: 40
+  - copy-only migration: 7
+  - **total: 176 tests per interpreter**
+- Zero actual ResourceWarning / ignored-connection output in either matrix job.
+
+### Full Crypto Engine run
+- Same exact PR #209 head `6cfd68bcb02d95caae9272efd5883e45bddce4e4`.
+- Full offline Actions run: [45791578783](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45791578783), both Python matrix jobs passed.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed **280 tests**.
+- The full offline workflow now enables tracemalloc and captures ResourceWarning output; it fails if the log contains `ResourceWarning:`. Both interpreters had zero actual warnings.
+
+### Root cause and correction
+- The wider-suite warnings were not caused by `reservation_schema_v2.ensure_reservation_schema_v2`; that function takes a caller-owned SQLite connection and must not close it.
+- The actual leak was in `SQLiteBatchJournal`: its `_connect()` returned a standard SQLite connection, while constructor/claim/complete used the connection transaction context manager, which commits/rolls back but does not close the handle.
+- Added a journal-owned `_ClosingConnection` subclass and supplied it as the `sqlite3.connect` factory, preserving transaction behavior and ensuring connection close on context exit.
+- Added a regression that opens a journal connection, exits its context and asserts subsequent use raises `sqlite3.ProgrammingError`.
+- The settlement/receiver/migration test fixture cleanup fixes remain; the schema-v2 fixture also registers `addCleanup(db.close)`.
+- No caller-owned reservation connection lifecycle was changed.
+
+### Migration and release limits remain
+- PR #157 remains structural preflight only; #164 remains a copy-only staged schema artifact; #165's earlier store-open test does not override current gate semantics.
+- PR #203/#205 keep pre-marker legacy stores inspectable but read-only until an owner-approved evidence-backed bootstrap has both account and market audit baselines.
+- No existing user database was inspected or migrated, and no opening cash/market identity/inventory authority was inferred.
+- PR #209 and #164 remain open/draft/unmerged. Independent adversarial acceptance still pending.
+- External checkpoint signer/storage/genesis design remains documentation-only (#206/#207).
+- Install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; overall completion UNRATED.
+
+### Next priorities
+1. Independent adversarial review of the PR #203–#209 legacy-read-only, audit-sequence and migration stack at immutable SHAs.
+2. Reconcile #157/#164/#165 preflight and copy-only migration with the current account/market baseline gate; any bootstrap requires separate owner approval and independently evidenced historical balances/market identity.
+3. Review checkpoint genesis/source-authenticity design and select no signer/storage until iPhone key custody, independent monotonic witness, recovery authority and operational independence are demonstrable.
+4. Synthetic crash/restart, multiprocess concurrency, backup/restore, corruption, truncation, rollback/fork and resource-exhaustion tests.
+5. Continue preregistered multi-market profitability research with realistic costs, chronological untouched holdouts and independent reproduction. Persistence tests are not profitability evidence.
