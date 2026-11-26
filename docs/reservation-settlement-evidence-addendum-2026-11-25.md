@@ -1230,3 +1230,22 @@ Apply the same contiguous-sequence invariant to the separate read-only migration
 
 ### PR #209 post-test head correction
 The prior PR #209 verification run 45789387082 was for SHA `cf6cd4efa645e2850569a521b69a0e3764af281e`. Subsequent fixture/workflow changes advanced the PR to `23ad0126e0eff7ea84cdf12ae7fdcd34a906b6ad`. No run is recorded for this latest head. Therefore 279/279 on both interpreters is historical evidence for the earlier SHA only, and the latest head is unverified. PR #209's description was corrected to state this explicitly. Do not promote the current head until exact-head CI is clean and ResourceWarnings are zero.
+
+
+## Session refresh — 26 November 2026, latest PR #209 state
+
+- Refreshed open PR state: PR #209 is still draft/open/unmerged; current exact head is `bf1c78c2d31b291355c98ee6694b1ac2685374aa`, base is copy-only migration staging branch `85704d6ddf1531d1a320f1beaa8976b4d1b9621c`.
+- Exact-head Actions/status lookup returned no run and no status for `bf1c78c2d31b291355c98ee6694b1ac2685374aa`. Previous 279/279-per-interpreter run is for older SHA `cf6cd4efa645e2850569a521b69a0e3764af281e` only.
+- Current workflow was statically re-inspected. A previous editing operation had removed the four reservation suite step names, leaving malformed/invalid step structure. Restored explicit named steps for schema v2, lifecycle, allocations and atomic allocations. The focused workflow still uses sparse checkout and read-only permissions; no protected imports are included.
+- The warning issue remains unresolved. Python 3.13 emitted repeated `ResourceWarning: unclosed database` messages while `ensure_reservation_schema_v2` was called from the receiver idempotent-retry test. The warning traceback did not include allocation provenance because tracemalloc was not enabled in the full-suite job. Do not change the helper to close caller-owned connections; next capture needs allocation traceback and exact connection ownership.
+- PR #209 description corrected to distinguish older-SHA test results from the unverified current head.
+- No merge, migration, database access, provider access, trading activation, credentials or protected-path access.
+
+### Immediate next priority
+1. Get a workflow run on exact head `bf1c78c2d31b291355c98ee6694b1ac2685374aa` (if pull_request CI does not auto-trigger, use an approved manual workflow dispatch path; connected GitHub tools currently expose no workflow-dispatch action).
+2. Trace SQLite connection allocations with `-X tracemalloc=10` and `-W always::ResourceWarning`, including the complete warning output.
+3. Fix the actual owner leak, not the schema helper's caller-owned connection contract.
+4. Make the complete offline crypto_engine workflow fail on ResourceWarning and verify both Python versions.
+5. Resume independent adversarial review and evidence-backed migration/bootstrap design.
+
+Release state unchanged: install/trading NOT READY; profitability NOT ESTABLISHED; PAPER ON HOLD; LIVE DISABLED/ABSENT; whole-project completion UNRATED.
