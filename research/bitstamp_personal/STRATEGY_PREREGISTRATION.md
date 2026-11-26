@@ -42,3 +42,8 @@ Realized net return (reported only when the segment ends flat), mark-to-market r
 
 ## Promotion
 This run is exploratory only. No strategy can be promoted from this run. Independent review, multiple-testing adjustment, realistic historical spread/impact, untouched external holdout, provider-rights approval and full release gates remain mandatory.
+
+
+## Segment state reset
+
+Each train, validation and holdout segment uses a separate account that starts flat. Indicator calculations may use only historical closes available up to each signal candle, including pre-segment history for rolling-window warmup. Stateful strategy position targets are reset to flat at the first candle of every segment; a prior segment's open/held target is not carried into the next segment. The first new position can only be entered by a signal generated within the new segment and filled at the following candle open.
