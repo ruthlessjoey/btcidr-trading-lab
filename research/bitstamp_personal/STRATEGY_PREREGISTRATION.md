@@ -38,7 +38,7 @@ No parameter optimization or search is permitted in this run.
 - Spread/slippage are assumptions, not historical observations. The actual user fee tier is unknown and no private fee endpoint is accessed.
 
 ## Metrics
-Net return, maximum drawdown, closed-cycle count, win rate, Wilson 95% interval, profit factor, expectancy, fees, turnover and fill count. Fewer than 30 closed cycles is marked insufficient sample.
+Realized net return (reported only when the segment ends flat), mark-to-market return, terminal position status/value, maximum drawdown, closed-cycle count, win rate, Wilson 95% interval, profit factor, expectancy, fees, turnover and fill count. If a segment ends with an open position, `net_return_pct` is null and the mark-to-market return is shown separately; no exit fill or liquidation cost is assumed. Fewer than 30 closed cycles is marked insufficient sample.
 
 ## Promotion
 This run is exploratory only. No strategy can be promoted from this run. Independent review, multiple-testing adjustment, realistic historical spread/impact, untouched external holdout, provider-rights approval and full release gates remain mandatory.
