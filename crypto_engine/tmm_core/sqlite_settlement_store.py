@@ -1420,9 +1420,17 @@ class SQLiteSettlementStore:
                 return False
             try:
                 event = json.loads(event_json, object_pairs_hook=_reject_duplicate_json_keys)
+                canonical = json.dumps(
+                    event, sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=False, allow_nan=False,
+                )
             except (TypeError, ValueError, RecursionError):
                 return False
-            if stored_previous != previous or _event_hash(previous, event) != stored_hash:
+            if (
+                canonical != event_json
+                or stored_previous != previous
+                or _event_hash(previous, event) != stored_hash
+            ):
                 return False
             previous = stored_hash
             expected_sequence += 1
