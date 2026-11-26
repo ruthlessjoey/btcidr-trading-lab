@@ -91,6 +91,17 @@ def fetch_tokocrypto_candles(
     )
     if not candles:
         raise fetcher.ApiError("approved Tokocrypto klines endpoint returned zero candles")
+    previous_open = None
+    for candle in candles:
+        if (isinstance(candle.time, bool) or not isinstance(candle.time, int)
+                or candle.time % int(window["interval_seconds"]) != 0
+                or candle.time < int(window["start_timestamp"])
+                or candle.time + int(window["interval_seconds"]) >
+                   int(window["end_exclusive_timestamp"])):
+            raise fetcher.ApiError("Tokocrypto returned a candle outside the requested closed UTC window")
+        if previous_open is not None and candle.time <= previous_open:
+            raise fetcher.ApiError("Tokocrypto returned duplicate or out-of-order candle timestamps")
+        previous_open = candle.time
     return {
         **window,
         "candles": candles,
