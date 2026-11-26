@@ -428,7 +428,7 @@ class WalkForwardFoldTests(unittest.TestCase):
             "gap_count": 0,
             "candles": candles,
         }
-        result = evaluate_market({"market_symbol": "btcusd"}, dataset)
+        result = evaluate_market({"market_symbol": "btcusd"}, dataset, bootstrap_replicates=1000)
         self.assertEqual(len(result["walk_forward_folds"]), 5)
         self.assertEqual(result["final_holdout"], {
             "start_index": 5400, "end_index": 6000,
@@ -453,6 +453,15 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
+        self.assertEqual(result["registered_trial_count"], 2)
+        self.assertIn("promotion_screens", result)
+        self.assertEqual(set(result["promotion_screens"]), {"SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY"})
+        for screen in result["promotion_screens"].values():
+            self.assertIn(screen["status"], {
+                "REJECT_OR_RESEARCH_MORE",
+                "BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE",
+                "ELIGIBLE_FOR_INDEPENDENT_HUMAN_REVIEW_NOT_PROVEN_PROFITABLE",
+            })
 
     def test_fold_backtest_rejects_missing_liquidation_bar_or_bad_signal_count(self):
         candles = [candle() for _ in range(30)]
