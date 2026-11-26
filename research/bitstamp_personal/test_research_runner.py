@@ -6,6 +6,7 @@ from research_runner import (
     evaluate_market,
     make_signals,
     split_ranges,
+    validate_preregistered_run,
 )
 
 
@@ -120,6 +121,38 @@ class ResearchRunnerTests(unittest.TestCase):
         )
         self.assertEqual(result["fill_count"], 0)
         self.assertEqual(result["open_position_at_end"], "0E-12")
+
+    def test_runner_accepts_only_the_frozen_preregistered_configuration(self):
+        symbols = "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd"
+        self.assertEqual(
+            validate_preregistered_run("2024-01-01", "2026-11-01", symbols, 3, True),
+            ["btcusd", "ethusd", "xrpusd", "dogeusd", "shibusd", "pepeusd", "solusd"],
+        )
+
+    def test_runner_rejects_date_range_override(self):
+        with self.assertRaisesRegex(ValueError, "date range differs"):
+            validate_preregistered_run(
+                "2024-01-01", "2026-10-01",
+                "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd", 3, True,
+            )
+
+    def test_runner_rejects_unregistered_symbols_and_universe_changes(self):
+        with self.assertRaisesRegex(ValueError, "market universe differs"):
+            validate_preregistered_run(
+                "2024-01-01", "2026-11-01",
+                "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd,bonkusd", 3, True,
+            )
+        with self.assertRaisesRegex(ValueError, "market universe differs"):
+            validate_preregistered_run(
+                "2024-01-01", "2026-11-01", "btcusd", 3, True,
+            )
+
+    def test_runner_rejects_lower_minimum_or_missing_meme_requirement(self):
+        symbols = "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd"
+        with self.assertRaisesRegex(ValueError, "minimum market count differs"):
+            validate_preregistered_run("2024-01-01", "2026-11-01", symbols, 1, True)
+        with self.assertRaisesRegex(ValueError, "meme-market requirement differs"):
+            validate_preregistered_run("2024-01-01", "2026-11-01", symbols, 3, False)
 
     def test_chronological_splits_have_exact_embargoes(self):
         ranges = split_ranges(10000, embargo_bars=50)
