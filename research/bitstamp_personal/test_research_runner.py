@@ -1,5 +1,9 @@
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
 from decimal import Decimal, getcontext
+from unittest.mock import patch
 
 from research_runner import (
     backtest,
@@ -10,6 +14,10 @@ from research_runner import (
     validate_preregistered_run,
     _epoch,
     five_fold_oos_ranges,
+    main,
+    BitstampDataError,
+    OOS_MINIMUM_FOLD_BARS,
+    require_v2_point_in_time_universe_evidence,
 )
 
 
@@ -327,15 +335,54 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(values[0][0], 5000)
         self.assertEqual(values[-1][1], 10000)
         for index, (start, end) in enumerate(values):
-            self.assertGreaterEqual(end - start, 500)
+            self.assertGreaterEqual(end - start, OOS_MINIMUM_FOLD_BARS)
             if index:
                 self.assertGreaterEqual(start - values[index - 1][1], 50)
         self.assertTrue(all(values[i][1] <= values[i + 1][0] for i in range(4)))
 
     def test_five_fold_oos_ranges_reject_small_or_invalid_datasets(self):
-        for value in (True, 0, -1, 5499, "10000"):
+        for value in (True, 0, -1, 7608, "10000"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 five_fold_oos_ranges(value)
+
+    def test_five_fold_minimum_dataset_yields_721_bars_and_30_complete_24_bar_returns_per_fold(self):
+        self.assertEqual(OOS_MINIMUM_FOLD_BARS, 721)
+        ranges = five_fold_oos_ranges(7609)
+        values = list(ranges.values())
+        self.assertEqual(len(values), 5)
+        for index, (start, end) in enumerate(values):
+            self.assertEqual(end - start, 721)
+            if index:
+                self.assertEqual(start - values[index - 1][1], 50)
+        self.assertEqual(values[0][0], 3804)
+        self.assertEqual(values[-1][1], 7609)
+
+    def test_v2_point_in_time_universe_gate_blocks_before_any_network_request(self):
+        output = io.StringIO()
+        with patch(
+            "research_runner.fetch_spot_markets",
+            side_effect=AssertionError("markets request must not occur"),
+        ) as markets_request, patch(
+            "research_runner.fetch_spot_history",
+            side_effect=AssertionError("OHLC request must not occur"),
+        ) as ohlc_request, redirect_stdout(output):
+            result = main([
+                "--start", "2024-01-01",
+                "--end", "2026-11-01",
+                "--symbols", "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd",
+                "--min-markets", "3",
+                "--require-meme",
+            ])
+        self.assertEqual(result, 2)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertIn("point-in-time", payload["error"])
+        markets_request.assert_not_called()
+        ohlc_request.assert_not_called()
+
+    def test_v2_point_in_time_universe_gate_fails_closed(self):
+        with self.assertRaisesRegex(BitstampDataError, "point-in-time"):
+            require_v2_point_in_time_universe_evidence()
 
     def test_chronological_splits_have_exact_embargoes(self):
         ranges = split_ranges(10000, embargo_bars=50)

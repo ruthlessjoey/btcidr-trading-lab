@@ -6,6 +6,9 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
+from trial_registry import TrialRegistryError, verify_trial_registry
+from statistical_evidence import MINIMUM_RETURN_OBSERVATIONS
+
 class PromotionError(ValueError):
     """Malformed or incomplete promotion evidence."""
 
@@ -16,6 +19,11 @@ MINIMUM_PROFIT_FACTOR = 1.20
 MINIMUM_CLOSED_TRADES = 30
 MINIMUM_OBSERVATIONS = 100
 MINIMUM_DSR_PROBABILITY = 0.95
+MINIMUM_FOLD_EMBARGO_BARS = 50
+MAXIMUM_TRIAL_REGISTRY_BYTES = 1_048_576
+FROZEN_RESEARCH_FAMILY = "BITSTAMP_PERSONAL_SPOT_V2"
+FROZEN_REGISTERED_TRIAL_COUNT = 2
+FROZEN_TRIAL_REGISTRY_SHA256 = "7fa30c75dfc71d1db2b939586b3bf3d3006607a4479f5187dabf1b479e530778"
 
 _REQUIRED = frozenset({
     "fold_id", "test_start", "test_end", "dataset_sha256",
@@ -41,19 +49,41 @@ def _count(value: object, name: str) -> int:
         raise PromotionError(f"{name} must be a nonnegative integer")
     return value
 
-def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[str, Any]:
-    """Screen supplied OOS fold metrics. A pass permits human review only.
+def evaluate_promotion_gate(
+    *,
+    folds: Sequence[Mapping[str, object]],
+    trial_registry_raw: bytes,
+) -> dict[str, Any]:
+    """Screen OOS folds against the exact frozen, hash-chained trial registry.
 
     Returns are fractions, not percentages. DSR and paired block-bootstrap
-    bounds must be independently computed. This function cannot authenticate
-    rights, raw data, holdout non-use, or the calculation of those statistics.
+    bounds must be independently computed. The registry bytes are authenticated
+    against the V2 preregistration digest before any fold metrics are accepted.
+    This function cannot authenticate external source rights, holdout non-use,
+    or the calculation of supplied statistics.
     """
+    if not isinstance(trial_registry_raw, bytes) or not trial_registry_raw:
+        raise PromotionError("trial_registry_raw must be non-empty bytes")
+    if len(trial_registry_raw) > MAXIMUM_TRIAL_REGISTRY_BYTES:
+        raise PromotionError("trial registry exceeds the 1 MiB verification bound")
+    try:
+        registry_evidence = verify_trial_registry(trial_registry_raw)
+    except TrialRegistryError as exc:
+        raise PromotionError(f"trial registry failed verification: {exc}") from exc
+    verified_registry_hash = registry_evidence["registry_sha256"]
+    if verified_registry_hash != FROZEN_TRIAL_REGISTRY_SHA256:
+        raise PromotionError("trial registry digest does not match the frozen V2 preregistration")
+    expected_trial_counts = {
+        FROZEN_RESEARCH_FAMILY: FROZEN_REGISTERED_TRIAL_COUNT,
+    }
+    if registry_evidence["trial_counts"] != expected_trial_counts:
+        raise PromotionError("verified trial registry family/count differs from the frozen V2 preregistration")
     if isinstance(folds, (str, bytes)) or not isinstance(folds, Sequence):
         raise PromotionError("folds must be a sequence of fold mappings")
     if len(folds) < MINIMUM_FOLDS:
         raise PromotionError(f"at least {MINIMUM_FOLDS} untouched OOS folds are required")
     rows, ids = [], set()
-    prior_end, dataset_hash, trial_count, common_registry_hash = -1, None, None, None
+    prior_end, dataset_hash = -1, None
     for i, fold in enumerate(folds):
         if not isinstance(fold, Mapping) or set(fold) != _REQUIRED:
             raise PromotionError(f"fold[{i}] must contain exactly: {', '.join(sorted(_REQUIRED))}")
@@ -65,8 +95,12 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
         ids.add(fid)
         start = _count(fold["test_start"], f"fold[{i}].test_start")
         end = _count(fold["test_end"], f"fold[{i}].test_end")
-        if end <= start or start < prior_end:
-            raise PromotionError("OOS test ranges must be ordered, non-empty and non-overlapping")
+        if end <= start:
+            raise PromotionError("OOS test ranges must be ordered and non-empty")
+        if i > 0 and start - prior_end < MINIMUM_FOLD_EMBARGO_BARS:
+            raise PromotionError(
+                f"adjacent OOS folds require at least {MINIMUM_FOLD_EMBARGO_BARS} embargo bars"
+            )
         prior_end = end
         digest = fold["dataset_sha256"]
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
@@ -76,19 +110,18 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
         elif digest != dataset_hash:
             raise PromotionError("all folds must bind to the same immutable dataset hash")
         trials = _count(fold["registered_trial_count"], f"fold[{i}].registered_trial_count")
-        if trials < 2:
-            raise PromotionError("registered_trial_count must include all candidate trials and baseline")
-        if trial_count is None:
-            trial_count = trials
-        elif trials != trial_count:
-            raise PromotionError("all folds must use the same complete registered trial count")
+        if trials != FROZEN_REGISTERED_TRIAL_COUNT:
+            raise PromotionError(
+                "registered_trial_count must equal the independently verified number "
+                "of candidate trials; the fixed buy-and-hold comparator is not a candidate trial"
+            )
         registry_hash = fold["trial_registry_sha256"]
         if not isinstance(registry_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", registry_hash):
             raise PromotionError(f"fold[{i}].trial_registry_sha256 must be a lowercase SHA-256 digest")
-        if common_registry_hash is None:
-            common_registry_hash = registry_hash
-        elif registry_hash != common_registry_hash:
-            raise PromotionError("all folds must bind to the same immutable trial registry hash")
+        if registry_hash != verified_registry_hash:
+            raise PromotionError(
+                f"fold[{i}].trial_registry_sha256 does not match the verified frozen registry bytes"
+            )
         row = {
             "fold_id": fid, "test_start": start, "test_end": end,
             "strategy_net_return": _finite(fold["strategy_net_return"], f"fold[{i}].strategy_net_return"),
@@ -107,6 +140,11 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
             raise PromotionError("max_drawdown must be in [0, 1)")
         if row["profit_factor"] < 0:
             raise PromotionError("profit_factor cannot be negative")
+        if row["observations"] < MINIMUM_RETURN_OBSERVATIONS:
+            raise PromotionError(
+                f"fold[{i}].observations must include at least "
+                f"{MINIMUM_RETURN_OBSERVATIONS} complete non-overlapping 24-bar returns"
+            )
         if not 0 <= row["deflated_sharpe_probability"] <= 1:
             raise PromotionError("deflated_sharpe_probability must be in [0, 1]")
         rows.append(row)
@@ -151,6 +189,10 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
         "minimum_fold_dsr_probability": min_dsr,
         "minimum_fold_bootstrap_excess_ci_lower": min_bootstrap,
         "total_closed_trades": trades, "total_observations": observations,
+        "trial_registry_verified": True,
+        "trial_registry_sha256": verified_registry_hash,
+        "registered_trial_count": FROZEN_REGISTERED_TRIAL_COUNT,
+        "trial_registry_family": FROZEN_RESEARCH_FAMILY,
         "checks": checks,
         "frozen_policy": {
             "minimum_folds": MINIMUM_FOLDS,
@@ -160,8 +202,14 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
             "minimum_closed_trades": MINIMUM_CLOSED_TRADES,
             "minimum_observations": MINIMUM_OBSERVATIONS,
             "minimum_dsr_probability": MINIMUM_DSR_PROBABILITY,
-            "same_dataset_hash": True, "same_registered_trial_count": True,
-            "ordered_non_overlapping_test_ranges": True,
+            "minimum_fold_embargo_bars": MINIMUM_FOLD_EMBARGO_BARS,
+            "minimum_observations_per_fold": MINIMUM_RETURN_OBSERVATIONS,
+            "maximum_trial_registry_bytes": MAXIMUM_TRIAL_REGISTRY_BYTES,
+            "frozen_trial_registry_sha256": FROZEN_TRIAL_REGISTRY_SHA256,
+            "frozen_trial_registry_family": FROZEN_RESEARCH_FAMILY,
+            "frozen_registered_trial_count": FROZEN_REGISTERED_TRIAL_COUNT,
+            "same_dataset_hash": True, "same_verified_registered_trial_count": True,
+            "ordered_test_ranges_with_embargo": True,
         },
         "limitations": [
             "Fold summaries must be independently shown to be untouched and chronological.",

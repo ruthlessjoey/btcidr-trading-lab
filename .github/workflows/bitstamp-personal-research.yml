@@ -13,6 +13,7 @@ on:
       - research/bitstamp-five-fold-oos-window-design-2026-11-27
       - research/bitstamp-statistical-evidence-metrics-2026-11-27
       - research/bitstamp-hash-chained-trial-registry-2026-11-27
+      - research/verify-promotion-registry-and-fold-statistics-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"

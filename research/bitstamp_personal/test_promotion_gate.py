@@ -1,15 +1,30 @@
+import hashlib
+import json
 import unittest
+from pathlib import Path
+
 from promotion_gate import (
+    FROZEN_REGISTERED_TRIAL_COUNT, FROZEN_TRIAL_REGISTRY_SHA256,
     MAXIMUM_FOLD_DRAWDOWN, MINIMUM_DSR_PROBABILITY, MINIMUM_FOLDS,
-    MINIMUM_POSITIVE_RATIO, MINIMUM_PROFIT_FACTOR, PromotionError,
-    evaluate_promotion_gate,
+    MINIMUM_FOLD_EMBARGO_BARS, MINIMUM_POSITIVE_RATIO,
+    MINIMUM_PROFIT_FACTOR, PromotionError,
+    evaluate_promotion_gate as _evaluate_promotion_gate,
 )
+
+REGISTRY_RAW = Path(__file__).with_name("trial_registry.jsonl").read_bytes()
+REGISTRY_SHA256 = hashlib.sha256(REGISTRY_RAW).hexdigest()
+
+
+def evaluate_promotion_gate(*, folds, trial_registry_raw=REGISTRY_RAW):
+    return _evaluate_promotion_gate(
+        folds=folds, trial_registry_raw=trial_registry_raw,
+    )
 
 def valid_folds():
     return [{
         "fold_id": f"fold-{i}", "test_start": i * 1000,
         "test_end": i * 1000 + 900, "dataset_sha256": "a" * 64,
-        "trial_registry_sha256": "c" * 64,
+        "trial_registry_sha256": REGISTRY_SHA256,
         "registered_trial_count": 2, "strategy_net_return": 0.05,
         "buy_hold_net_return": 0.02, "two_x_cost_net_return": 0.01,
         "max_drawdown": 0.10, "profit_factor": 1.5,
@@ -24,6 +39,10 @@ class PromotionGateTests(unittest.TestCase):
         self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
         self.assertTrue(all(result["checks"].values()))
         self.assertEqual(result["total_closed_trades"], 40)
+        self.assertTrue(result["trial_registry_verified"])
+        self.assertEqual(result["trial_registry_sha256"], FROZEN_TRIAL_REGISTRY_SHA256)
+        self.assertEqual(result["registered_trial_count"], FROZEN_REGISTERED_TRIAL_COUNT)
+        self.assertEqual(FROZEN_REGISTERED_TRIAL_COUNT, 2)
 
     def test_requires_five_folds(self):
         with self.assertRaisesRegex(PromotionError, "at least 5"):
@@ -32,7 +51,7 @@ class PromotionGateTests(unittest.TestCase):
     def test_overlapping_ranges_rejected(self):
         rows = valid_folds()
         rows[1]["test_start"] = 800
-        with self.assertRaisesRegex(PromotionError, "non-overlapping"):
+        with self.assertRaisesRegex(PromotionError, "50 embargo bars"):
             evaluate_promotion_gate(folds=rows)
 
     def test_duplicate_fold_ids_rejected(self):
@@ -50,14 +69,70 @@ class PromotionGateTests(unittest.TestCase):
     def test_trial_registry_hash_must_match_across_folds(self):
         rows = valid_folds()
         rows[3]["trial_registry_sha256"] = "d" * 64
-        with self.assertRaisesRegex(PromotionError, "same immutable trial registry hash"):
+        with self.assertRaisesRegex(PromotionError, "does not match the verified frozen registry bytes"):
             evaluate_promotion_gate(folds=rows)
 
     def test_registered_trial_count_must_match(self):
         rows = valid_folds()
         rows[2]["registered_trial_count"] = 4
-        with self.assertRaisesRegex(PromotionError, "same complete registered trial count"):
+        with self.assertRaisesRegex(PromotionError, "independently verified number"):
             evaluate_promotion_gate(folds=rows)
+
+    def test_trial_registry_raw_bytes_are_hash_chain_verified(self):
+        tampered = REGISTRY_RAW.replace(b"TRIAL_STARTED", b"TRIAL_TAMPERED", 1)
+        with self.assertRaisesRegex(PromotionError, "trial registry failed verification"):
+            evaluate_promotion_gate(
+                folds=valid_folds(), trial_registry_raw=tampered,
+            )
+
+    def test_valid_but_unpinned_registry_extension_is_rejected(self):
+        last = json.loads(REGISTRY_RAW.splitlines()[-1])
+        core = {
+            "seq": 3,
+            "event": "TRIAL_STARTED",
+            "payload": {
+                "trial_id": "BITSTAMP_V2_TEST_EXTRA",
+                "research_family": "BITSTAMP_PERSONAL_SPOT_V2",
+                "strategy_id": "EXTRA_CANDIDATE",
+                "config_sha256": "b" * 64,
+            },
+            "previous_hash": last["record_hash"],
+        }
+        canonical = json.dumps(
+            core, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")
+        core["record_hash"] = hashlib.sha256(canonical).hexdigest()
+        extension = REGISTRY_RAW + json.dumps(
+            core, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8") + b"\n"
+        with self.assertRaisesRegex(PromotionError, "digest does not match"):
+            evaluate_promotion_gate(
+                folds=valid_folds(), trial_registry_raw=extension,
+            )
+
+    def test_exact_verified_trial_count_is_required_in_every_fold(self):
+        rows = valid_folds()
+        rows[1]["registered_trial_count"] = 3
+        with self.assertRaisesRegex(PromotionError, "independently verified number"):
+            evaluate_promotion_gate(folds=rows)
+
+    def test_each_fold_requires_30_non_overlapping_24_bar_returns(self):
+        rows = valid_folds()
+        rows[2]["observations"] = 29
+        with self.assertRaisesRegex(PromotionError, "30 complete non-overlapping 24-bar returns"):
+            evaluate_promotion_gate(folds=rows)
+
+    def test_exact_50_bar_embargo_is_required_between_folds(self):
+        rows = valid_folds()
+        rows[1]["test_start"] = rows[0]["test_end"] + 49
+        with self.assertRaisesRegex(PromotionError, "50 embargo bars"):
+            evaluate_promotion_gate(folds=rows)
+        rows = valid_folds()
+        rows[1]["test_start"] = rows[0]["test_end"] + 50
+        result = evaluate_promotion_gate(folds=rows)
+        self.assertTrue(result["frozen_policy"]["ordered_test_ranges_with_embargo"])
 
     def test_exact_schema_required(self):
         rows = valid_folds()
@@ -126,6 +201,8 @@ class PromotionGateTests(unittest.TestCase):
         self.assertEqual(MAXIMUM_FOLD_DRAWDOWN, 0.20)
         self.assertEqual(MINIMUM_PROFIT_FACTOR, 1.20)
         self.assertEqual(MINIMUM_DSR_PROBABILITY, 0.95)
+        self.assertEqual(MINIMUM_FOLD_EMBARGO_BARS, 50)
+        self.assertEqual(hashlib.sha256(REGISTRY_RAW).hexdigest(), FROZEN_TRIAL_REGISTRY_SHA256)
         with self.assertRaises(TypeError):
             evaluate_promotion_gate(folds=valid_folds(), minimum_folds=3)
 
