@@ -196,6 +196,8 @@ def _normalize_candle(row: object, *, step: int) -> dict[str, object]:
         or (isinstance(raw_timestamp, str) and not raw_timestamp.isdecimal())
     ):
         raise BitstampDataError("OHLC timestamp must be an integer Unix timestamp")
+    if len(str(raw_timestamp)) > 12:
+        raise BitstampDataError("OHLC timestamp exceeds the supported digit bound")
     open_ts = int(raw_timestamp)
     if open_ts < 0 or open_ts % step:
         raise BitstampDataError("OHLC timestamp is negative or not aligned to the requested step")
@@ -207,12 +209,19 @@ def _normalize_candle(row: object, *, step: int) -> dict[str, object]:
             raise BitstampDataError(f"invalid OHLC {key}") from exc
         if isinstance(raw_value, bool) or not isinstance(raw_value, (str, int)):
             raise BitstampDataError(f"invalid OHLC {key}")
+        raw_text = str(raw_value)
+        if len(raw_text) > 80:
+            raise BitstampDataError(f"OHLC {key} text exceeds the supported bound")
         try:
-            value = Decimal(str(raw_value))
+            value = Decimal(raw_text)
         except (InvalidOperation, TypeError, ValueError) as exc:
             raise BitstampDataError(f"invalid OHLC {key}") from exc
         if not value.is_finite():
             raise BitstampDataError(f"non-finite OHLC {key}")
+        parts = value.as_tuple()
+        if (len(parts.digits) > 40 or parts.exponent < -60 or parts.exponent > 60
+                or (not value.is_zero() and abs(value.adjusted()) > 60)):
+            raise BitstampDataError(f"OHLC {key} exceeds supported decimal precision or magnitude")
         values[key] = value
     if min(values[k] for k in ("open", "high", "low", "close")) <= 0:
         raise BitstampDataError("OHLC prices must be positive")
@@ -287,6 +296,8 @@ def fetch_spot_history(
         rows = data.get("ohlc")
         if not isinstance(rows, list):
             raise BitstampDataError("OHLC response data.ohlc must be a list")
+        if len(rows) > MAX_PAGE_ROWS:
+            raise BitstampDataError("OHLC response exceeds the 1000-row page bound")
         if not rows:
             break
         normalized = [_normalize_candle(row, step=STEP_SECONDS) for row in rows]
