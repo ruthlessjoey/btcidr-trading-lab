@@ -1,170 +1,140 @@
-"""Evaluate frozen V2 strategies over five OOS folds with fixed costs and evidence."""
-from __future__ import annotations
-
-from decimal import Decimal
 import hashlib
 import json
-import math
-import re
-from typing import Any
+import unittest
+from decimal import Decimal
 
-from promotion_gate import evaluate_promotion_gate
-from research_runner import STRATEGIES, _signals_for_segment, backtest, five_fold_oos_ranges
-from statistical_evidence import (
-    deflated_sharpe_probability, non_overlapping_24bar_returns,
-    paired_block_bootstrap_excess_lower_bound,
+from walkforward_evaluation import (
+    WalkForwardEvaluationError, canonical_dataset_sha256,
+    evaluate_five_fold_strategy,
 )
 from trial_registry import verify_trial_registry
-from dataset_manifest import verify_dataset_manifest, DatasetManifestError
-
-RESEARCH_FAMILY = "BITSTAMP_PERSONAL_SPOT_V2"
-BASE_FEE_BPS = Decimal("16")
-MARKET_COSTS = {
-    "btcusd": (Decimal("5"), Decimal("10")),
-    "ethusd": (Decimal("5"), Decimal("10")),
-    "xrpusd": (Decimal("5"), Decimal("10")),
-    "solusd": (Decimal("5"), Decimal("10")),
-    "dogeusd": (Decimal("15"), Decimal("20")),
-    "shibusd": (Decimal("15"), Decimal("20")),
-    "pepeusd": (Decimal("15"), Decimal("20")),
-}
+from dataset_manifest import verify_dataset_manifest
 
 
-class WalkForwardEvaluationError(ValueError):
-    """Five-fold evaluation is incomplete or unsafe."""
+def trial_registry():
+    lines = [
+        '{"event":"TRIAL_STARTED","payload":{"config_sha256":"19754128395ac4f102c189419600c200ad39cc3257658e4855bac20191e5012f","research_family":"BITSTAMP_PERSONAL_SPOT_V2","strategy_id":"SMA20_50_LONG_ONLY","trial_id":"BITSTAMP_V2_SMA20_50_LONG_ONLY"},"previous_hash":"0000000000000000000000000000000000000000000000000000000000000000","record_hash":"726b28a3c72e7e7a2569e26653e6ef9bd87ca7c1401c3a810e81d54d66baf3f4","seq":1}',
+        '{"event":"TRIAL_STARTED","payload":{"config_sha256":"a409c684088f65388511d018933b542a120cb424d77c7fc26eba482b3f018612","research_family":"BITSTAMP_PERSONAL_SPOT_V2","strategy_id":"RSI14_MEAN_REVERSION_LONG_ONLY","trial_id":"BITSTAMP_V2_RSI14_MEAN_REVERSION_LONG_ONLY"},"previous_hash":"726b28a3c72e7e7a2569e26653e6ef9bd87ca7c1401c3a810e81d54d66baf3f4","record_hash":"8c6bf55aca81224db38deac1840131f1b0af76f32cf0de0f3471ad56ebccbcc3","seq":2}',
+    ]
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def canonical_dataset_sha256(market_symbol: str, candles: list[dict]) -> str:
-    """Hash the exact normalized in-memory market rows and market identity."""
-    if not isinstance(market_symbol, str) or market_symbol.casefold() not in MARKET_COSTS:
-        raise WalkForwardEvaluationError("market_symbol is not in the frozen V2 universe")
-    if not isinstance(candles, list) or not candles:
-        raise WalkForwardEvaluationError("candles must be a non-empty list")
-    try:
-        encoded = json.dumps(
-            {"market_symbol": market_symbol.casefold(), "interval": "1h", "candles": candles},
-            sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
-        ).encode("utf-8")
-    except (TypeError, ValueError, RecursionError) as exc:
-        raise WalkForwardEvaluationError("candles are not canonical JSON data") from exc
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _fraction_percent(value: object, field: str) -> float:
-    if value is None:
-        raise WalkForwardEvaluationError(f"{field} is unavailable; fold cannot be promoted")
-    try:
-        result = float(Decimal(str(value)) / Decimal(100))
-    except Exception as exc:
-        raise WalkForwardEvaluationError(f"{field} is invalid") from exc
-    if not math.isfinite(result) or result <= -1:
-        raise WalkForwardEvaluationError(f"{field} is outside the supported range")
-    return result
-
-
-def evaluate_five_fold_strategy(
-    candles: list[dict],
-    *,
-    market_symbol: str,
-    strategy_id: str,
-    trial_registry_bytes: bytes,
-    dataset_manifest: Mapping[str, object],
-) -> dict[str, Any]:
-    """Build gate-ready metrics using only frozen market costs and registry bytes.
-
-    Dataset SHA-256 is derived from the normalized candle rows and market
-    identity. Costs are selected from the frozen V2 symbol map; callers cannot
-    lower them. Base and exactly 2x-all-cost replays use identical signals/data.
-    """
-    try:
-        verified_dataset = verify_dataset_manifest(dataset_manifest)
-    except DatasetManifestError as exc:
-        raise WalkForwardEvaluationError("dataset manifest failed completeness validation") from exc
-    normalized_symbol = verified_dataset["market_symbol"]
-    if (not isinstance(market_symbol, str) or market_symbol.casefold() != normalized_symbol
-            or candles != verified_dataset["candles"]):
-        raise WalkForwardEvaluationError("supplied candles or market identity do not match verified dataset manifest")
-    if strategy_id not in STRATEGIES:
-        raise WalkForwardEvaluationError("strategy_id is not preregistered")
-    dataset_hash = verified_dataset["manifest_sha256"]
-    try:
-        registry = verify_trial_registry(trial_registry_bytes)
-    except ValueError as exc:
-        raise WalkForwardEvaluationError("trial registry failed integrity validation") from exc
-    trial_count = registry["trial_counts"].get(RESEARCH_FAMILY, 0)
-    registered_strategies = registry["trial_strategies"].get(RESEARCH_FAMILY, [])
-    if trial_count < 2:
-        raise WalkForwardEvaluationError("verified trial registry has fewer than two candidate trials")
-    if strategy_id not in registered_strategies:
-        raise WalkForwardEvaluationError("strategy_id is missing from the verified trial registry")
-    registry_hash = registry["registry_sha256"]
-    half_spread_bps, slippage_bps = MARKET_COSTS[normalized_symbol]
-
-    ranges = five_fold_oos_ranges(len(candles))
-    fold_rows = []
-    for fold_id, (start, end) in ranges.items():
-        segment = candles[start:end]
-        signals = _signals_for_segment(strategy_id, candles, start, end)
-        base = backtest(
-            segment, signals, fee_bps=BASE_FEE_BPS,
-            half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
-            include_equity_curve=True,
-        )
-        baseline = backtest(
-            segment, [1] * len(segment), fee_bps=BASE_FEE_BPS,
-            half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
-            include_equity_curve=True,
-        )
-        stress = backtest(
-            segment, signals, fee_bps=BASE_FEE_BPS * Decimal(2),
-            half_spread_bps=half_spread_bps * Decimal(2),
-            slippage_bps=slippage_bps * Decimal(2),
-            include_equity_curve=True,
-        )
-        strategy_returns = non_overlapping_24bar_returns(base["equity_curve"])
-        baseline_returns = non_overlapping_24bar_returns(baseline["equity_curve"])
-        dsr = deflated_sharpe_probability(strategy_returns, registered_trial_count=trial_count)
-        bootstrap_lower = paired_block_bootstrap_excess_lower_bound(
-            strategy_returns, baseline_returns,
-            dataset_sha256=dataset_hash, fold_id=fold_id,
-        )
-        profit_factor = base["profit_factor"]
-        if profit_factor is None:
-            raise WalkForwardEvaluationError(
-                f"{fold_id}: profit factor is undefined because the fold has no closed losses"
-            )
-        fold_rows.append({
-            "fold_id": fold_id, "test_start": start, "test_end": end,
-            "dataset_sha256": dataset_hash, "trial_registry_sha256": registry_hash,
-            "registered_trial_count": trial_count,
-            "strategy_net_return": _fraction_percent(base["mark_to_market_return_pct"], "strategy return"),
-            "buy_hold_net_return": _fraction_percent(baseline["mark_to_market_return_pct"], "buy-and-hold return"),
-            "two_x_cost_net_return": _fraction_percent(stress["mark_to_market_return_pct"], "2x-cost strategy return"),
-            "max_drawdown": _fraction_percent(base["max_drawdown_intrabar_pct"], "intrabar drawdown"),
-            "profit_factor": float(profit_factor),
-            "closed_trade_count": base["closed_cycles"],
-            "observations": len(strategy_returns),
-            "deflated_sharpe_probability": dsr,
-            "bootstrap_excess_ci_lower": bootstrap_lower,
+def synthetic_dataset():
+    rows = []
+    previous = Decimal("100")
+    for index in range(24840):
+        phase = index % 40
+        if phase < 20:
+            close = Decimal("100") - Decimal(phase) * Decimal("0.4")
+        else:
+            close = Decimal("92") + Decimal(phase - 20) * Decimal("0.4")
+        open_price = previous
+        high = max(open_price, close) + Decimal("0.5")
+        low = min(open_price, close) - Decimal("0.5")
+        opened = 1704067200 + index * 3600
+        rows.append({
+            "open_timestamp": opened, "timestamp": opened + 3600,
+            "open": str(open_price), "high": str(high), "low": str(low),
+            "close": str(close), "volume": "10000",
         })
-    promotion = evaluate_promotion_gate(folds=fold_rows, trial_registry_raw=trial_registry_bytes)
+        previous = close
+    raw = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return {
-        "market_symbol": normalized_symbol,
-        "strategy_id": strategy_id,
-        "dataset_sha256": dataset_hash,
-        "raw_page_sha256": verified_dataset["raw_page_sha256"],
-        "manifest_sha256": verified_dataset["manifest_sha256"],
-        "trial_registry_sha256": registry_hash,
-        "registered_trial_count": trial_count,
-        "costs": {
-            "fee_bps_per_side": str(BASE_FEE_BPS),
-            "half_spread_bps_per_side": str(half_spread_bps),
-            "slippage_bps_per_side": str(slippage_bps),
-            "stress_multiplier": "2x_all_costs",
-        },
-        "folds": fold_rows,
-        "promotion_screen": promotion,
-        "status": promotion["status"],
-        "profitability_status": "NOT_VERIFIED",
-        "note": "A passing screen only qualifies for independent human review; no order authority is created.",
+        "market_symbol": "dogeusd", "pair": "DOGE/USD", "step_seconds": 3600,
+        "row_count": 24840, "first_open_timestamp": 1704067200,
+        "last_close_timestamp": 1793491200, "gap_count": 0, "gaps": [],
+        "coverage_status": "CONTIGUOUS",
+        "dataset_sha256": hashlib.sha256(raw).hexdigest(),
+        "raw_page_sha256": "b" * 64, "page_count": 25, "candles": rows,
     }
+
+
+class WalkForwardEvaluationTests(unittest.TestCase):
+    def test_builds_five_gate_ready_folds_and_same_cost_baseline(self):
+        dataset = synthetic_dataset()
+        result = evaluate_five_fold_strategy(
+            dataset["candles"], market_symbol="dogeusd",
+            strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+            trial_registry_bytes=trial_registry(), dataset_manifest=dataset,
+        )
+        self.assertEqual(len(result["folds"]), 5)
+        self.assertEqual(result["registered_trial_count"], 2)
+        self.assertEqual(result["trial_registry_sha256"], verify_trial_registry(trial_registry())["registry_sha256"])
+        self.assertEqual(result["dataset_sha256"], verify_dataset_manifest(dataset)["manifest_sha256"])
+        self.assertEqual(result["raw_page_sha256"], dataset["raw_page_sha256"])
+        self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
+        self.assertEqual(result["costs"]["fee_bps_per_side"], "16")
+        self.assertEqual(result["costs"]["half_spread_bps_per_side"], "15")
+        self.assertEqual(result["costs"]["slippage_bps_per_side"], "20")
+        for fold in result["folds"]:
+            self.assertEqual(fold["observations"], 101)
+            self.assertEqual(fold["registered_trial_count"], 2)
+            self.assertEqual(fold["trial_registry_sha256"], result["trial_registry_sha256"])
+            self.assertTrue(0 <= fold["max_drawdown"] < 1)
+            self.assertTrue(0 <= fold["deflated_sharpe_probability"] <= 1)
+
+    def test_invalid_strategy_or_registry_fails_closed(self):
+        dataset = synthetic_dataset()
+        kwargs = {
+            "market_symbol": "dogeusd", "trial_registry_bytes": trial_registry(),
+            "dataset_manifest": dataset,
+        }
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "not preregistered"):
+            evaluate_five_fold_strategy(
+                dataset["candles"], strategy_id="UNREGISTERED", **kwargs,
+            )
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "integrity validation"):
+            evaluate_five_fold_strategy(
+                dataset["candles"], strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                **{**kwargs, "trial_registry_bytes": b"tampered\n"},
+            )
+
+    def test_costs_and_dataset_identity_are_frozen_by_market_symbol(self):
+        dataset = synthetic_dataset()
+        digest = canonical_dataset_sha256("dogeusd", dataset["candles"])
+        self.assertEqual(len(digest), 64)
+        self.assertNotEqual(digest, canonical_dataset_sha256("btcusd", dataset["candles"]))
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "frozen V2 universe"):
+            canonical_dataset_sha256("not-a-market", dataset["candles"])
+        bad = dict(dataset)
+        bad["gap_count"] = 1
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "completeness validation"):
+            evaluate_five_fold_strategy(
+                dataset["candles"], market_symbol="dogeusd",
+                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                trial_registry_bytes=trial_registry(), dataset_manifest=bad,
+            )
+        changed = list(dataset["candles"])
+        changed[0] = dict(changed[0], close="999")
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "do not match verified dataset manifest"):
+            evaluate_five_fold_strategy(
+                changed, market_symbol="dogeusd",
+                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                trial_registry_bytes=trial_registry(), dataset_manifest=dataset,
+            )
+
+    def test_strategy_must_be_present_in_verified_trial_registry(self):
+        events = []
+        previous = "0" * 64
+        for seq, trial_id in enumerate(("SMA_TRIAL_ONE", "SMA_TRIAL_TWO"), 1):
+            payload = {
+                "config_sha256": ("a" if seq == 1 else "b") * 64,
+                "research_family": "BITSTAMP_PERSONAL_SPOT_V2",
+                "strategy_id": "SMA20_50_LONG_ONLY", "trial_id": trial_id,
+            }
+            core = {"seq": seq, "event": "TRIAL_STARTED", "payload": payload, "previous_hash": previous}
+            digest = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            events.append(json.dumps({**core, "record_hash": digest}, sort_keys=True, separators=(",", ":")))
+            previous = digest
+        raw = ("\n".join(events) + "\n").encode()
+        dataset = synthetic_dataset()
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
+            evaluate_five_fold_strategy(
+                dataset["candles"], market_symbol="dogeusd",
+                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                trial_registry_bytes=raw, dataset_manifest=dataset,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
