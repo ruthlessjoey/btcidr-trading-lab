@@ -21,7 +21,7 @@ No parameter optimization or search is permitted in this run.
 
 ## Data and timing
 - 1-hour closed candles only.
-- Requested range 2024-01-01 00:00 UTC through 2026-11-01 00:00 UTC.
+- Requested range: start at the 2024-01-01 00:00 UTC candle open; include candles only while their close timestamp is at or before 2026-11-01 00:00 UTC. The end is an inclusive candle-close boundary, not an inclusive calendar day.
 - Signal is calculated at candle close; fill is at the next candle open.
 - A 50-bar embargo separates train, validation and holdout segments.
 - Each segment starts with a separate USD 10,000 research account; positions are not carried across split boundaries.

@@ -18,7 +18,7 @@ The public API documentation states that companies using Bitstamp exchange data 
 Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`. The runner rejects date, candidate-universe, minimum-market and meme-market requirement overrides; any design change must be versioned and frozen before a new data request.
 - Symbols: BTC/USD, ETH/USD, XRP/USD, DOGE/USD, SHIB/USD, PEPE/USD and SOL/USD where Bitstamp currently exposes a SPOT market.
 - Interval: 1 hour; closed candles only.
-- Period: 2024-01-01 through 2026-11-01 UTC.
+- Period: first eligible candle opens at 2024-01-01 00:00 UTC; last eligible candle closes no later than 2026-11-01 00:00 UTC.
 - Strategies: fixed SMA20/50 long-only trend; fixed RSI14 long-only mean reversion (enter below 30, exit above 55); buy-and-hold is a baseline only.
 - Chronological split: 60% train / 20% validation / 20% holdout with 50-bar embargo between segments.
 - No parameter search, no tuning on validation or holdout, all preregistered strategies reported.

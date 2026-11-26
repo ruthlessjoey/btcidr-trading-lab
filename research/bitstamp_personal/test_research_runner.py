@@ -7,6 +7,7 @@ from research_runner import (
     make_signals,
     split_ranges,
     validate_preregistered_run,
+    _epoch,
 )
 
 
@@ -149,6 +150,15 @@ class ResearchRunnerTests(unittest.TestCase):
         )
         self.assertEqual(result["fill_count"], 0)
         self.assertEqual(result["open_position_at_end"], "0E-12")
+
+    def test_preregistered_date_boundaries_map_to_exact_utc_midnight(self):
+        # The final requested candle must close exactly at 2026-11-01 00:00 UTC.
+        self.assertEqual(_epoch("2024-01-01"), 1704067200)
+        self.assertEqual(_epoch("2026-11-01"), 1793491200)
+
+    def test_date_boundary_rejects_non_iso_date(self):
+        with self.assertRaisesRegex(ValueError, "YYYY-MM-DD"):
+            _epoch("2026/11/01")
 
     def test_runner_accepts_only_the_frozen_preregistered_configuration(self):
         symbols = "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd"

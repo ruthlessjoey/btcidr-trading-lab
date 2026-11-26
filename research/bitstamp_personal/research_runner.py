@@ -9,7 +9,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_DOWN, localcontext
 from typing import Callable
 
@@ -33,17 +33,20 @@ PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
 
 
-def _epoch(value: str, *, end: bool = False) -> int:
+def _epoch(value: str) -> int:
+    """Map a preregistered date to its exact 00:00 UTC boundary.
+
+    The start boundary is the first eligible candle open; the end boundary
+    is the last eligible candle close. Bitstamp's adapter filters candles by
+    close timestamp <= end_timestamp, so do not extend an end date to the
+    following midnight.
+    """
     try:
         parsed = date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError("dates must use YYYY-MM-DD") from exc
-    moment = datetime.combine(
-        parsed, time(23, 0) if end else time(0, 0), tzinfo=timezone.utc
-    )
-    if end:
-        moment = moment.replace(hour=23, minute=0)
-    return int(moment.timestamp()) + (3600 if end else 0)
+    moment = datetime.combine(parsed, datetime.min.time(), tzinfo=timezone.utc)
+    return int(moment.timestamp())
 
 
 def validate_preregistered_run(
@@ -408,7 +411,7 @@ def main(argv=None) -> int:
             args.start, args.end, args.symbols, args.min_markets, args.require_meme
         )
         start_ts = _epoch(args.start)
-        end_ts = _epoch(args.end, end=True)
+        end_ts = _epoch(args.end)
         markets, markets_hash = fetch_spot_markets()
         selected = [markets[symbol] for symbol in candidates if symbol in markets]
         missing = [symbol for symbol in candidates if symbol not in markets]
