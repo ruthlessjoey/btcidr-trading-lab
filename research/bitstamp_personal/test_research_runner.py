@@ -391,12 +391,13 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertGreaterEqual(fold["train_end"], folds[index - 1]["test_end"])
 
     def test_five_fold_plan_ends_with_a_reserved_liquidation_candle(self):
-        folds = plan_walk_forward_folds(5000)
-        self.assertEqual(folds[-1]["liquidation_index"], 4999)
-        self.assertLess(folds[-1]["test_end"], 5000)
+        folds = plan_walk_forward_folds(6000)
+        self.assertEqual(folds[-1]["liquidation_index"], 5349)
+        self.assertLess(folds[-1]["test_end"], 5400)
+        self.assertEqual(folds[-1]["train_end"], folds[-1]["test_start"] - 50)
 
     def test_fold_planner_rejects_boolean_and_short_history(self):
-        for value in (True, 4999, 0, -1):
+        for value in (True, 5999, 0, -1):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 plan_walk_forward_folds(value)
 
@@ -413,7 +414,7 @@ class WalkForwardFoldTests(unittest.TestCase):
         self.assertEqual(Decimal(result["open_position_at_end"]), Decimal("0"))
 
     def test_market_evaluation_uses_only_five_fold_oos_results(self):
-        candles = [candle() for _ in range(5000)]
+        candles = [candle() for _ in range(6000)]
         dataset = {
             "market_symbol": "btcusd",
             "pair": "BTC/USD",
@@ -429,6 +430,11 @@ class WalkForwardFoldTests(unittest.TestCase):
         }
         result = evaluate_market({"market_symbol": "btcusd"}, dataset)
         self.assertEqual(len(result["walk_forward_folds"]), 5)
+        self.assertEqual(result["final_holdout"], {
+            "start_index": 5400, "end_index": 6000,
+            "status": "RESERVED_UNTOUCHED_NOT_EVALUATED",
+        })
+        self.assertTrue(all(f["test_end"] <= 5349 for f in result["walk_forward_folds"]))
         self.assertEqual(result["walk_forward_status"],
                          "FIVE_OOS_FOLDS_WITH_NEXT_OPEN_TERMINAL_LIQUIDATION_STATISTICS_PENDING")
         self.assertEqual(result["cost_assumptions"]["two_x_fee_bps_per_side"], "32")
