@@ -5,6 +5,7 @@ on:
     branches:
       - research/bitstamp-public-ohlc-personal-2026-11-27
       - research/fix-bitstamp-preregistered-end-boundary-2026-11-27
+      - research/bitstamp-conservative-intrabar-drawdown-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
