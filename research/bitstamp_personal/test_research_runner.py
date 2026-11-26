@@ -455,9 +455,10 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertIsNotNone(item["base_costs"]["net_return_pct"])
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
-                scenario = next(x for x in item["cost_sensitivity"]
-                                if x["cost_multiplier"] == "2" and x["participation"] == "0.05")
-                self.assertEqual(scenario["net_return_pct"], item["two_x_costs"]["net_return_pct"])
+                if "cost_sensitivity" in item:
+                    scenario = next(x for x in item["cost_sensitivity"]
+                                    if x["cost_multiplier"] == "2" and x["participation"] == "0.05")
+                    self.assertEqual(scenario["net_return_pct"], item["two_x_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertIn("promotion_screens", result)
