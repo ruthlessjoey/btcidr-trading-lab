@@ -218,3 +218,45 @@ Do not call a second file, another directory, or a backup on the same writable d
 - Simulate the witness being unavailable before genesis and after a settlement commit; no state-changing progression is permitted.
 
 These are design requirements only. They do not select a signer, device, storage service, network dependency, recovery owner, or operational deployment.
+
+
+## 16. iPhone-only / Rp0 feasibility boundary — 27 November 2026
+
+### Verified platform capabilities
+
+Apple's current developer documentation describes Secure Enclave key protection as follows:
+- The private key is created inside the Secure Enclave and is not exposed in plaintext to the app.
+- Secure Enclave key use is limited to NIST P-256 keys for signatures/verification or ECDH.
+- The key is device-bound; only the device that created it can use it.
+- Access control can require the device to be unlocked and optionally user authentication.
+- The Secure Enclave does not import a pre-existing plaintext private key.
+
+Reference: [Apple Developer — Protecting keys with the Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave.md).
+
+Apple Platform Security (August 2026) describes Secure Storage Component counter lockboxes in the context of passcode-protected user data and passcode-attempt limits. It also describes anti-replay services for Secure Enclave protected data and platform security boundaries. These descriptions do not establish a general application API for storing an arbitrary monotonic ledger sequence/head or an append-only application checkpoint log.
+
+Reference: [Apple Platform Security — August 2026](https://help.apple.com/pdf/security/en_US/apple-platform-security-guide.pdf), especially the Secure Enclave and Secure nonvolatile storage sections (PDF pages 10–16).
+
+### Security interpretation
+
+- A Secure Enclave key may be suitable for **device-bound key custody** if a dedicated native app is built and reviewed.
+- It is not, by itself, an independent checkpoint store, an application-level monotonic counter, a second recovery authority, or proof that a ledger suffix is authentic.
+- A private key that can sign a caller-supplied digest but has no independent retained last-trusted ledger head can still sign a fabricated replacement suffix.
+- A second file or USB volume controlled by the same phone/operator account is not automatically an independent monotonic witness. It may provide a separate copy, but does not prove anti-rollback against an actor able to replace both copies.
+- Device-bound keys create a recovery constraint: a lost/replaced phone cannot simply export and restore the old private key. Key rotation/recovery needs an independently approved ceremony and externally retained trust state.
+
+### Current project constraint assessment
+
+The current operator workflow is iPhone-only, no paid service, and Rp0. No second trusted device, hardware token with an application monotonic counter, independent append-only service, or separately controlled recovery authority has been approved.
+
+Therefore:
+1. Do not select Secure Enclave alone as the external checkpoint trust anchor.
+2. Do not generate a signing key or add a signer API in this milestone.
+3. Do not use a local file, same-phone USB volume, or ordinary backup as a claim of independent anti-rollback protection.
+4. Keep the checkpoint signer, storage, genesis and recovery implementation unimplemented.
+5. Keep state-changing ledger operations subject to the existing release gates; this design does not authorize PAPER activation.
+6. Revisit only after a separate architecture decision identifies an actually independent monotonic witness and recovery authority within the approved budget and device constraints.
+
+### Decision status
+
+**No compliant iPhone-only / Rp0 deployment design has been established.** This is a documented feasibility blocker, not a reason to weaken the trust model or silently add cloud/network dependencies. The proposal remains documentation-only.
