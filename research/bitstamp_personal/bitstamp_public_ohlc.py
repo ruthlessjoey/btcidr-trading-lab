@@ -146,6 +146,8 @@ def fetch_spot_markets(*, opener=None) -> tuple[dict[str, dict[str, object]], st
             continue
         if row.get("market_type") != "SPOT":
             continue
+        if symbol in markets:
+            raise BitstampDataError("duplicate SPOT market symbol in markets response")
         markets[symbol] = {
             "market_symbol": symbol,
             "name": row.get("name"),
@@ -166,16 +168,29 @@ def _normalize_candle(row: object, *, step: int) -> dict[str, object]:
     if not isinstance(row, Mapping):
         raise BitstampDataError("OHLC row must be an object")
     try:
-        open_ts = int(row["timestamp"])
-    except (KeyError, TypeError, ValueError) as exc:
+        raw_timestamp = row["timestamp"]
+    except KeyError as exc:
         raise BitstampDataError("OHLC timestamp must be an integer Unix timestamp") from exc
+    if (
+        isinstance(raw_timestamp, bool)
+        or not isinstance(raw_timestamp, (str, int))
+        or (isinstance(raw_timestamp, str) and not raw_timestamp.isdecimal())
+    ):
+        raise BitstampDataError("OHLC timestamp must be an integer Unix timestamp")
+    open_ts = int(raw_timestamp)
     if open_ts < 0 or open_ts % step:
         raise BitstampDataError("OHLC timestamp is negative or not aligned to the requested step")
     values = {}
     for key in ("open", "high", "low", "close", "volume"):
         try:
-            value = Decimal(str(row[key]))
-        except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
+            raw_value = row[key]
+        except KeyError as exc:
+            raise BitstampDataError(f"invalid OHLC {key}") from exc
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (str, int)):
+            raise BitstampDataError(f"invalid OHLC {key}")
+        try:
+            value = Decimal(str(raw_value))
+        except (InvalidOperation, TypeError, ValueError) as exc:
             raise BitstampDataError(f"invalid OHLC {key}") from exc
         if not value.is_finite():
             raise BitstampDataError(f"non-finite OHLC {key}")
