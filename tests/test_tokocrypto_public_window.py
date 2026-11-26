@@ -116,6 +116,24 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
                         sleep=lambda _: None,
                     )
 
+    def test_parser_rejects_fractional_boolean_and_malformed_timestamps(self):
+        bad_rows = (
+            [1699995600.5, "100", "102", "99", "101", "12"],
+            [True, "100", "102", "99", "101", "12"],
+            ["16999956.00", "100", "102", "99", "101", "12"],
+            ["-1699995600", "100", "102", "99", "101", "12"],
+        )
+        for row in bad_rows:
+            with self.subTest(row=row), self.assertRaises(fetcher.ApiError):
+                fetcher.parse_klines([row])
+
+    def test_parser_rejects_boolean_price_and_volume_values(self):
+        for index in range(1, 6):
+            row = [1699995600000, "100", "102", "99", "101", "12"]
+            row[index] = True
+            with self.subTest(index=index), self.assertRaises(fetcher.ApiError):
+                fetcher.parse_klines([row])
+
     def test_empty_provider_response_fails_closed(self):
         opener = FakeOpener(rows=[])
         with self.assertRaisesRegex(fetcher.ApiError, "zero candles"):
