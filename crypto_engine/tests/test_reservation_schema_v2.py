@@ -66,6 +66,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
             "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
             (encoded, "0" * 64, digest),
         )
+        db.commit()
         return db
 
     def test_rejects_parent_table_without_referenced_primary_key(self):
