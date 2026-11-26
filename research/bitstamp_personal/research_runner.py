@@ -189,6 +189,7 @@ def _backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    include_equity_curve: bool = False,
 ) -> dict:
     _validate_backtest_inputs(
         candles, signals, fee_bps=fee_bps,
@@ -322,6 +323,8 @@ def _backtest(
         "fill_count": fills,
         "open_position_at_end": str(base.quantize(quantum)),
         "sample_status": "ADEQUATE_30_PLUS_CLOSED_CYCLES" if len(cycles) >= 30 else "INSUFFICIENT_CLOSED_CYCLES",
+        **({"equity_curve": [str(value) for value in close_equity_curve]}
+           if include_equity_curve else {}),
     }
 
 
@@ -332,7 +335,10 @@ def backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    include_equity_curve: bool = False,
 ) -> dict:
+    if type(include_equity_curve) is not bool:
+        raise ValueError("include_equity_curve must be boolean")
     # One fixed precision policy for indicator-adjacent accounting, fee,
     # spread, slippage and cost-basis arithmetic. The caller's context is restored.
     with localcontext() as decimal_context:
@@ -342,6 +348,7 @@ def backtest(
             fee_bps=fee_bps,
             half_spread_bps=half_spread_bps,
             slippage_bps=slippage_bps,
+            include_equity_curve=include_equity_curve,
         )
 
 
