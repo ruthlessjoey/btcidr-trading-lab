@@ -51,3 +51,6 @@ No public-data request is made by this preregistration.
 ## Promotion evidence binding
 
 The promotion gate must receive the exact raw `trial_registry.jsonl` bytes. It verifies the JSONL hash chain, matches the exact frozen SHA-256 in this preregistration, and confirms the registered V2 candidate family/count before accepting fold metrics. Each fold's registry digest and registered candidate count must match those independently verified bytes. The fixed no-tuning buy-and-hold comparator is not a candidate trial and is not included in the registered candidate count. Adjacent test folds must have at least 50 excluded bars between the preceding exclusive end and the next start index.
+
+
+Each of the five OOS fold summaries supplied to the promotion screen must contain at least 30 complete, non-overlapping 24-bar return observations. The gate rejects a fold with fewer than 30 observations even if the total observations across all folds would otherwise exceed the aggregate minimum.
