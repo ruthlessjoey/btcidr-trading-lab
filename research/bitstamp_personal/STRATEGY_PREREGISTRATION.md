@@ -66,3 +66,13 @@ Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`. This 
 
 
 - Minimum history: 6,000 contiguous hourly candles, preserving at least 1,500 initial training bars, five OOS folds of at least 500 bars, all embargoes and the untouched final 10%.
+
+
+## V2 cost sensitivity amendment
+
+The base promotion scenario remains the preregistered fee/spread/slippage assumption at 5% of prior-hour volume. In addition to the required 2x-cost promotion replay, diagnostic sensitivity uses a frozen 20-case grid:
+- Cost multipliers: 1x, 1.5x, 2x, 3x, 5x, applied equally to per-side fee, half-spread and slippage.
+- Prior-hour-volume participation caps: 1%, 2.5%, 5%, 10%.
+- Signals, candles, fold boundaries and terminal liquidation remain identical across scenarios.
+- The wider matrix is diagnostic only and cannot be used to tune parameters or reopen the final holdout.
+- Fee, spread, slippage and impact assumptions remain unverified until supported by venue-specific evidence.

@@ -9,6 +9,9 @@ from research_runner import (
     split_ranges,
     plan_walk_forward_folds,
     _backtest_walk_forward_fold,
+    _cost_sensitivity_matrix,
+    COST_SENSITIVITY_MULTIPLIERS,
+    PARTICIPATION_SENSITIVITY_LEVELS,
     validate_preregistered_run,
     _epoch,
 )
@@ -452,6 +455,10 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertIsNotNone(item["base_costs"]["net_return_pct"])
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
+                if "cost_sensitivity" in item:
+                    scenario = next(x for x in item["cost_sensitivity"]
+                                    if x["cost_multiplier"] == "2" and x["participation"] == "0.05")
+                    self.assertEqual(scenario["net_return_pct"], item["two_x_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertIn("promotion_screens", result)
@@ -489,6 +496,36 @@ class GlobalTrialUniverseTests(unittest.TestCase):
                 trial_series_by_fold=[[] for _ in range(5)],
                 bootstrap_replicates=1000,
             )
+
+
+
+
+class CostSensitivityTests(unittest.TestCase):
+    def test_cost_sensitivity_grid_has_twenty_frozen_scenarios(self):
+        candles = [candle() for _ in range(100)]
+        signals = [1] * 40
+        grid = _cost_sensitivity_matrix(
+            candles, 10, 50, signals,
+            base_spread=Decimal("5"), base_slippage=Decimal("10"),
+        )
+        self.assertEqual(len(grid), 20)
+        self.assertEqual(len({(x["cost_multiplier"], x["participation"]) for x in grid}), 20)
+        self.assertIn(("2", "0.05"), {(x["cost_multiplier"], x["participation"]) for x in grid})
+        self.assertTrue(all(x["terminal_position_status"] == "FLAT" for x in grid))
+
+    def test_participation_is_validated_and_changes_capacity(self):
+        candles = [candle(volume="100") for _ in range(8)]
+        signals = [1, 1, 1, 1, 0, 0, 0, 0]
+        kwargs = {
+            "fee_bps": Decimal("0"), "half_spread_bps": Decimal("0"),
+            "slippage_bps": Decimal("0"),
+        }
+        low = backtest(candles, signals, participation=Decimal("0.01"), **kwargs)
+        high = backtest(candles, signals, participation=Decimal("0.10"), **kwargs)
+        self.assertLess(Decimal(low["turnover"]), Decimal(high["turnover"]))
+        for value in (Decimal("0"), Decimal("1.01"), True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                backtest(candles, signals, participation=value, **kwargs)
 
 
 if __name__ == "__main__":
