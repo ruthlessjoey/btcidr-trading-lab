@@ -1,5 +1,7 @@
 name: Reservation Settlement Isolated Tests
 
+# Revalidate PR 209 audit-sequence preflight and deterministic test-connection cleanup. Parent PR 164 now carries the same deterministic fixture cleanup and warning-trace gate.
+
 on:
   push:
     branches:

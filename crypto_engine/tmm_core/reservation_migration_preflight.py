@@ -280,10 +280,11 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
             or max_bytes > _AUDIT_MAX_EVENT_BYTES):
         return False, count
     previous = "0" * 64
+    expected_sequence = 1
     verified_count = 0
     try:
         cursor = db.execute(
-            "SELECT event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
+            "SELECT seq,event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
         )
         while True:
             try:
@@ -294,7 +295,9 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
                 return False, verified_count
             if row is None:
                 break
-            event_json, previous_hash, event_hash = row
+            sequence,event_json,previous_hash,event_hash = row
+            if sequence != expected_sequence:
+                return False, verified_count
             if previous_hash != previous:
                 return False, verified_count
             try:
@@ -313,6 +316,7 @@ def _audit_is_valid(db: sqlite3.Connection) -> tuple[bool, int]:
             if event_hash != expected:
                 return False, verified_count
             previous = event_hash
+            expected_sequence += 1
             verified_count += 1
     except (sqlite3.DatabaseError, UnicodeError):
         return False, verified_count

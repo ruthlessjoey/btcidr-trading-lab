@@ -56,6 +56,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "crypto_engine/tests/test_reservation_migration.py"
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
       - "crypto_engine/tmm_core/__init__.py"
       - "crypto_engine/tmm_core/exposure_policy.py"
       - "crypto_engine/tmm_core/ingest.py"
@@ -187,4 +191,14 @@ jobs:
         run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
 
       - name: Run the complete isolated crypto_engine test suite
-        run: python -m unittest discover -s crypto_engine/tests -p 'test_*.py' -v
+        run: |
+          set +e
+          python -X tracemalloc=10 -W always::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_*.py' -v > "$RUNNER_TEMP/crypto-engine-offline-suite.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/crypto-engine-offline-suite.log"
+          if grep -q "ResourceWarning:" "$RUNNER_TEMP/crypto-engine-offline-suite.log"; then
+            echo "Unclosed SQLite or other resource warnings detected in full crypto_engine suite"
+            exit 1
+          fi
+          exit "$test_status"
