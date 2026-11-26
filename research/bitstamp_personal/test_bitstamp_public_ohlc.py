@@ -255,7 +255,7 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3600), candle(7200)]}}
         second = {"data": {"pair": "ETH/USD", "ohlc": [candle(0)]}}
         opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(second))])
-        with self.assertRaisesRegex(BitstampDataError, "identity changed between pages"):
+        with self.assertRaisesRegex(BitstampDataError, "does not match the requested market symbol"):
             fetch_spot_history(
                 "btcusd", start_timestamp=0, end_timestamp=3 * 3600,
                 opener=opener, sleep=lambda _: None,
