@@ -358,6 +358,35 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
+    def test_audit_genesis_sequence_must_be_one(self):
+        payload = '{"kind":"TEST"}'
+        digest = hashlib.sha256(("0" * 64 + payload).encode("utf-8")).hexdigest()
+        self.db.execute(
+            "INSERT INTO main.audit VALUES(2,?,?,?)",
+            (payload, "0" * 64, digest),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain verification failed" in item for item in result.blockers))
+
+    def test_audit_sequence_gap_is_blocked_even_when_hash_chain_is_valid(self):
+        first = '{"kind":"FIRST"}'
+        second = '{"kind":"SECOND"}'
+        previous = "0" * 64
+        first_hash = hashlib.sha256((previous + first).encode("utf-8")).hexdigest()
+        second_hash = hashlib.sha256((first_hash + second).encode("utf-8")).hexdigest()
+        self.db.execute(
+            "INSERT INTO main.audit VALUES(1,?,?,?)",
+            (first, previous, first_hash),
+        )
+        self.db.execute(
+            "INSERT INTO main.audit VALUES(3,?,?,?)",
+            (second, first_hash, second_hash),
+        )
+        result = self.inspect()
+        self.assertFalse(result.eligible)
+        self.assertTrue(any("audit chain verification failed" in item for item in result.blockers))
+
     def test_broken_audit_chain_is_blocked(self):
         self.db.execute(
             "INSERT INTO audit VALUES(1,'{}',?,?)",
