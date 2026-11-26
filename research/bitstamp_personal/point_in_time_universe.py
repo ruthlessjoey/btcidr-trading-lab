@@ -254,7 +254,10 @@ def _verify_market(
         if max(first_listing, first_matching, first_market_orders) > FROZEN_START_TIMESTAMP:
             raise PointInTimeUniverseError(f"{symbol} was not fully eligible at the common V2 start")
     elif date_policy == "PER_MARKET_INCEPTION":
-        expected_start = _ceil_hour(max(first_listing, first_matching, first_market_orders))
+        expected_start = max(
+            FROZEN_START_TIMESTAMP,
+            _ceil_hour(max(first_listing, first_matching, first_market_orders)),
+        )
         if eligible_start != expected_start:
             raise PointInTimeUniverseError(
                 f"{symbol} per-market inception does not follow full-order eligibility"
