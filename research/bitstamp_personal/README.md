@@ -74,3 +74,6 @@ The hash-chained registry records every candidate trial, including failed and ab
 
 
 The V2 evaluator derives the dataset SHA-256 from canonical normalized candles plus exact market symbol/interval, verifies the selected strategy exists in the hash-chained registry, and selects frozen costs from the exact market symbol. Fee/spread/slippage cannot be lowered by caller parameters.
+
+
+The V2 evaluator additionally requires the complete adapter manifest: exact 2024-01-01 00:00 UTC through 2026-11-01 00:00 UTC coverage, 24,840 contiguous 1-hour candles, zero gaps, exact pair identity, raw-page hash and normalized-row hash. Missing, reordered, truncated or mismatched data fail closed before backtesting.
