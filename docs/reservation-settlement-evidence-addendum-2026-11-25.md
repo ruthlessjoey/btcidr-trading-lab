@@ -1175,3 +1175,28 @@ Release posture remains: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED
 3. Review #157/#164/#165 preflight and copy-only migration against the current read-only baseline gate; no existing DB migration.
 4. Continue synthetic-only crash/restart, concurrency, corruption, truncation, rollback/fork and resource-exhaustion work.
 5. Continue preregistered multi-market profitability research with realistic costs and untouched holdouts. No performance claim from these persistence tests.
+
+
+## PR #208 exact-head full-suite milestone — 26 November 2026
+
+- Implementation head: `cf10c756df85ede859862beb459174d090b4ae6c`.
+- Exact Actions run: [45787899755](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45787899755), both Python jobs succeeded.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed all six suites:
+  - reservation schema v2: 25
+  - lifecycle: 21
+  - allocations: 16
+  - atomic allocations: 13
+  - settlement store: 81
+  - reservation receiver: 17
+  - total: **173 tests per interpreter**
+- ResourceWarning treated as error; no actual ResourceWarning or ignored-connection output.
+- The regression updates only stored audit sequence values, preserving all event JSON and hashes. The old verifier accepted the gap; the corrected verifier rejects both an interior sequence gap and a genesis sequence other than 1, and snapshot inspection fails closed.
+- Workflow sparse-checkout includes only unprotected settlement/reservation modules and tests. All six test steps ran; no protected import closure.
+
+PR #208 remains draft/open/unmerged and requires independent adversarial review. This verifies the candidate on its tested SHA; it does not imply mainline integration, external checkpoint implementation, full repository acceptance, profitability, installation or trading readiness.
+
+### Preferred immediate security candidate
+PR #208 is the newest verified settlement/audit candidate and sits on the PR #205 full-suite validation branch, which sits on PR #203's legacy read-only gate. PR #207 remains documentation-only external checkpoint/genesis/source-authenticity design. PR #157/#164/#165 remain structurally staged legacy-migration proposals, not tradable bootstrap.
+
+### Next priority
+Apply the same contiguous-sequence invariant to the separate read-only migration preflight audit verifier; run the migration preflight/copy tests in a narrow isolated workflow whose sparse checkout/import closure excludes all protected modules. Then continue independent adversarial review of checkpoint genesis, migration and recovery.
