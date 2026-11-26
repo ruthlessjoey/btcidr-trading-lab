@@ -2,7 +2,7 @@
 
 Date: 27 November 2026
 
-Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`
+Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`
 
 The executable runner rejects overrides to the date range, candidate universe, minimum market count or meme-market requirement. Any change to this design requires a new versioned preregistration before any provider data is requested.
 
@@ -47,3 +47,18 @@ This run is exploratory only. No strategy can be promoted from this run. Indepen
 ## Segment state reset
 
 Each train, validation and holdout segment uses a separate account that starts flat. Indicator calculations may use only historical closes available up to each signal candle, including pre-segment history for rolling-window warmup. Stateful strategy position targets are reset to flat at the first candle of every segment; a prior segment's open/held target is not carried into the next segment. The first new position can only be entered by a signal generated within the new segment and filled at the following candle open.
+
+
+## V2 five-fold walk-forward amendment
+
+Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`. This V2 schedule supersedes the earlier 60/20/20 split for the next research run; the earlier schedule remains historical documentation.
+
+- Use 40% of the contiguous history as initial training history.
+- Generate five expanding-training, chronological, non-overlapping OOS test folds.
+- Require 50-bar embargo between each training cutoff and its OOS test start.
+- Reserve the immediately following candle for next-open terminal liquidation; exclude this candle from the OOS test index range.
+- Require 50 additional embargo bars after the liquidation candle before the next OOS fold.
+- Candidate and same-cost buy-and-hold baseline use identical OOS dates and the same terminal liquidation convention.
+- 2x-cost replay doubles every component: per-side fee, half-spread and slippage. Signals and candles remain identical.
+- No parameter tuning, no changes to the fixed strategy family or market universe.
+- Fold results are research-only until all statistical evidence and independent review gates pass.

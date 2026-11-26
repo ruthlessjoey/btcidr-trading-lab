@@ -22,7 +22,7 @@ INITIAL_CASH = D("10000")
 PARTICIPATION = D("0.05")
 FEE_BPS = D("16")  # documented public API example only; not the user's fee tier
 STRATEGIES = ("SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY")
-PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1"
+PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD"
 PREREGISTERED_START = "2024-01-01"
 PREREGISTERED_END = "2026-11-01"
 PREREGISTERED_SYMBOLS = (
@@ -299,7 +299,10 @@ def _backtest(
         "final_equity": str(final_equity.quantize(D("0.01"))),
         "net_return_pct": str(mark_to_market_return_pct) if terminal_position_is_flat else None,
         "mark_to_market_return_pct": str(mark_to_market_return_pct),
-        "return_valuation": "MARK_TO_MARKET_AFTER_EXECUTED_COSTS",
+        "return_valuation": (
+            "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT" if terminal_position_is_flat
+            else "MARK_TO_MARKET_AFTER_EXECUTED_COSTS"
+        ),
         "terminal_position_status": (
             "FLAT" if terminal_position_is_flat
             else "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL"
@@ -357,6 +360,78 @@ def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end
     return all_signals[start:end]
 
 
+
+WALK_FORWARD_FOLD_COUNT = 5
+WALK_FORWARD_EMBARGO_BARS = 50
+WALK_FORWARD_INITIAL_TRAIN_NUMERATOR = 2
+WALK_FORWARD_INITIAL_TRAIN_DENOMINATOR = 5
+WALK_FORWARD_MINIMUM_TRAIN_BARS = 1500
+WALK_FORWARD_MINIMUM_TEST_BARS = 500
+
+
+def plan_walk_forward_folds(count: int) -> list[dict]:
+    """Create five expanding-train, chronological OOS folds with embargo and exit bars.
+
+    Each test range is half-open [test_start, test_end). The candle at test_end
+    is reserved for next-open terminal liquidation and is excluded from OOS
+    metrics. Fifty additional bars separate one liquidation bar from the next
+    test window. Training ends fifty bars before each test starts.
+    """
+    if isinstance(count, bool) or not isinstance(count, int) or count < 5000:
+        raise ValueError("at least 5000 contiguous candles are required")
+    initial_train_end = count * WALK_FORWARD_INITIAL_TRAIN_NUMERATOR // WALK_FORWARD_INITIAL_TRAIN_DENOMINATOR
+    if initial_train_end - WALK_FORWARD_EMBARGO_BARS < WALK_FORWARD_MINIMUM_TRAIN_BARS:
+        raise ValueError("initial training window is too small after embargo")
+    cursor = initial_train_end
+    folds = []
+    for index in range(WALK_FORWARD_FOLD_COUNT):
+        remaining = WALK_FORWARD_FOLD_COUNT - index
+        reserved = 1 + WALK_FORWARD_EMBARGO_BARS * (remaining - 1)
+        test_length = (count - cursor - reserved) // remaining
+        if test_length < WALK_FORWARD_MINIMUM_TEST_BARS:
+            raise ValueError("walk-forward OOS fold is too small")
+        test_start = cursor
+        test_end = test_start + test_length
+        if test_end >= count:
+            raise ValueError("walk-forward fold lacks a terminal liquidation candle")
+        folds.append({
+            "fold_id": f"wf-{index + 1:02d}",
+            "train_start": 0,
+            "train_end": test_start - WALK_FORWARD_EMBARGO_BARS,
+            "test_start": test_start,
+            "test_end": test_end,
+            "liquidation_index": test_end,
+        })
+        cursor = test_end + 1 + WALK_FORWARD_EMBARGO_BARS
+    return folds
+
+
+def _backtest_walk_forward_fold(
+    all_candles: list[dict],
+    test_start: int,
+    test_end: int,
+    test_signals: list[int],
+    *,
+    initial_target: int,
+    fee_bps: Decimal,
+    half_spread_bps: Decimal,
+    slippage_bps: Decimal,
+) -> dict:
+    """Backtest one OOS range, entering at its first open and liquidating next open."""
+    if (test_start < 1 or test_end <= test_start or test_end >= len(all_candles)
+            or len(test_signals) != test_end - test_start
+            or initial_target not in (0, 1)):
+        raise ValueError("walk-forward fold bounds or signals are invalid")
+    # Include the prior candle for the first next-open execution and one
+    # embargo candle after the OOS range for explicit terminal liquidation.
+    segment = all_candles[test_start - 1:test_end + 1]
+    prepared_signals = [initial_target] + list(test_signals[:-1]) + [0, 0]
+    return backtest(
+        segment, prepared_signals, fee_bps=fee_bps,
+        half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
+    )
+
+
 def split_ranges(count: int, embargo_bars: int = 50) -> dict[str, tuple[int, int]]:
     if count < 5000:
         raise ValueError("at least 5000 contiguous 1h candles are required")
@@ -384,36 +459,48 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
             "promotion_status": "BLOCKED_GAPS",
             "results": {},
         }
-    ranges = split_ranges(len(candles))
     is_meme = dataset["market_symbol"] in MEME_SYMBOLS
     base_spread = D(15 if is_meme else 5)
     base_slippage = D(20 if is_meme else 10)
-    stress_spread = D(30 if is_meme else 10)
-    stress_slippage = D(50 if is_meme else 25)
+    two_x_fee = FEE_BPS * D(2)
+    two_x_spread = base_spread * D(2)
+    two_x_slippage = base_slippage * D(2)
     results = {}
-    for strategy in STRATEGIES:
-        results[strategy] = {}
-        for split_name, (start, end) in ranges.items():
-            segment = candles[start:end]
-            segment_signals = _signals_for_segment(strategy, candles, start, end)
-            results[strategy][split_name] = {
-                "base_costs": backtest(
-                    segment, segment_signals, fee_bps=FEE_BPS,
-                    half_spread_bps=base_spread, slippage_bps=base_slippage,
+    # Five expanding-training OOS folds, each ending with a next-open
+    # liquidation candle. OOS ranges are non-overlapping and embargoed.
+    walk_forward_folds = []
+    for fold in plan_walk_forward_folds(len(candles)):
+        start, end = fold["test_start"], fold["test_end"]
+        fold_result = dict(fold)
+        fold_result["strategies"] = {}
+        for strategy in STRATEGIES:
+            signals = _signals_for_segment(strategy, candles, start, end)
+            fold_result["strategies"][strategy] = {
+                "base_costs": _backtest_walk_forward_fold(
+                    candles, start, end, signals, initial_target=0,
+                    fee_bps=FEE_BPS, half_spread_bps=base_spread,
+                    slippage_bps=base_slippage,
                 ),
-                "stress_costs": backtest(
-                    segment, segment_signals, fee_bps=FEE_BPS,
-                    half_spread_bps=stress_spread, slippage_bps=stress_slippage,
+                "two_x_costs": _backtest_walk_forward_fold(
+                    candles, start, end, signals, initial_target=0,
+                    fee_bps=two_x_fee, half_spread_bps=two_x_spread,
+                    slippage_bps=two_x_slippage,
                 ),
             }
-    buy_hold_signals = [1] * len(candles)
-    holdout_start, holdout_end = ranges["holdout"]
-    results["BUY_AND_HOLD_BASELINE"] = {
-        "holdout_base_costs": backtest(
-            candles[holdout_start:holdout_end], buy_hold_signals[holdout_start:holdout_end],
-            fee_bps=FEE_BPS, half_spread_bps=base_spread, slippage_bps=base_slippage,
+        buy_hold_signals = [1] * (end - start)
+        fold_result["buy_hold_base_costs"] = _backtest_walk_forward_fold(
+            candles, start, end, buy_hold_signals, initial_target=1,
+            fee_bps=FEE_BPS, half_spread_bps=base_spread,
+            slippage_bps=base_slippage,
         )
-    }
+        fold_result["buy_hold_two_x_costs"] = _backtest_walk_forward_fold(
+            candles, start, end, buy_hold_signals, initial_target=1,
+            fee_bps=two_x_fee, half_spread_bps=two_x_spread,
+            slippage_bps=two_x_slippage,
+        )
+        walk_forward_folds.append(fold_result)
+
+    results["walk_forward_folds"] = walk_forward_folds
     return {
         "market_symbol": dataset["market_symbol"],
         "pair": dataset["pair"],
@@ -431,11 +518,14 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
             "taker_fee_bps_per_side": str(FEE_BPS),
             "base_half_spread_bps": str(base_spread),
             "base_slippage_bps": str(base_slippage),
-            "stress_half_spread_bps": str(stress_spread),
-            "stress_slippage_bps": str(stress_slippage),
+            "two_x_fee_bps_per_side": str(two_x_fee),
+            "two_x_half_spread_bps": str(two_x_spread),
+            "two_x_slippage_bps": str(two_x_slippage),
             "note": "Fee is a public API example, not the user's account tier. Spread/slippage are assumptions, not historical observations.",
         },
         "results": results,
+        "walk_forward_folds": walk_forward_folds,
+        "walk_forward_status": "FIVE_OOS_FOLDS_WITH_NEXT_OPEN_TERMINAL_LIQUIDATION_STATISTICS_PENDING",
         "promotion_status": "RESEARCH_ONLY_NOT_PROMOTABLE",
     }
 
@@ -473,7 +563,7 @@ def main(argv=None) -> int:
             "missing_candidate_symbols": missing,
             "strategy_family": list(STRATEGIES),
             "trial_count": len(selected) * len(STRATEGIES),
-            "holdout_policy": "fixed preregistered strategies; no parameter search; chronological 60/20/20 with 50-bar embargo; report all results",
+            "holdout_policy": "V2: 40% initial training history; five expanding-training, non-overlapping OOS folds; 50-bar embargo; next-open terminal liquidation candle excluded from OOS test indices; fixed strategies and no parameter tuning",
             "markets": [],
         }
         for market in selected:
