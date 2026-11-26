@@ -299,7 +299,10 @@ def _backtest(
         "final_equity": str(final_equity.quantize(D("0.01"))),
         "net_return_pct": str(mark_to_market_return_pct) if terminal_position_is_flat else None,
         "mark_to_market_return_pct": str(mark_to_market_return_pct),
-        "return_valuation": "MARK_TO_MARKET_AFTER_EXECUTED_COSTS",
+        "return_valuation": (
+            "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT" if terminal_position_is_flat
+            else "MARK_TO_MARKET_AFTER_EXECUTED_COSTS"
+        ),
         "terminal_position_status": (
             "FLAT" if terminal_position_is_flat
             else "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL"
@@ -583,7 +586,7 @@ def main(argv=None) -> int:
             "missing_candidate_symbols": missing,
             "strategy_family": list(STRATEGIES),
             "trial_count": len(selected) * len(STRATEGIES),
-            "holdout_policy": "fixed preregistered strategies; no parameter search; chronological 60/20/20 with 50-bar embargo; report all results",
+            "holdout_policy": "V2: 40% initial training history; five expanding-training, non-overlapping OOS folds; 50-bar embargo; next-open terminal liquidation candle excluded from OOS test indices; fixed strategies and no parameter tuning",
             "markets": [],
         }
         for market in selected:
