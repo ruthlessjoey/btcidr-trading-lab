@@ -83,6 +83,7 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
         opener = FakeOpener()
         bad = (
             {"pair": "BTC/USDT", "timeframe": "1h", "lookback_days": 1, "now_epoch_utc": 1_700_000_000},
+            {"pair": "ETH_USDT", "timeframe": "1h", "lookback_days": 1, "now_epoch_utc": 1_700_000_000},
             {"pair": "BTC_USDT", "timeframe": "1s", "lookback_days": 1, "now_epoch_utc": 1_700_000_000},
             {"pair": "BTC_USDT", "timeframe": "1h", "lookback_days": 15, "now_epoch_utc": 1_700_000_000},
             {"pair": "BTC_USDT", "timeframe": "1h", "lookback_days": True, "now_epoch_utc": 1_700_000_000},
