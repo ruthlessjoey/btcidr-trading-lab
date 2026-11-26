@@ -163,6 +163,15 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
     holdings = {market_id: D("0") for market_id in market_ids}
     fills = []
     equity_curve = [{"timestamp": clean_bars[0]["timestamp"], "equity": str(cash)}]
+    exposure_curve = [{
+        "timestamp": clean_bars[0]["timestamp"],
+        "equity": str(cash),
+        "cash": str(cash),
+        "cash_weight": "1",
+        "market_values": {market_id: "0" for market_id in sorted(market_ids)},
+        "market_weights": {market_id: "0" for market_id in sorted(market_ids)},
+        "gross_exposure": "0",
+    }]
     fees_paid = D("0")
     turnover = D("0")
     max_drawdown = D("0")
@@ -239,9 +248,27 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
                         filled_quantity=qty, timestamp=bar["open_timestamp"])
         if cash < 0 or any(qty < 0 for qty in holdings.values()):
             raise AssertionError("multi-market long-only cash/inventory invariant failed")
-        close_equity = cash + sum((holdings[m] * bar["markets"][m]["close_quote"]
-                                   * bar["markets"][m]["close_fx"] for m in market_ids), D("0"))
+        close_market_values = {
+            m: holdings[m] * bar["markets"][m]["close_quote"] * bar["markets"][m]["close_fx"]
+            for m in market_ids
+        }
+        invested_value = sum(close_market_values.values(), D("0"))
+        close_equity = cash + invested_value
+        market_weights = {
+            m: str(close_market_values[m] / close_equity) for m in sorted(market_ids)
+        }
+        gross_exposure = invested_value / close_equity
+        cash_weight = cash / close_equity
         equity_curve.append({"timestamp": bar["timestamp"], "equity": str(close_equity)})
+        exposure_curve.append({
+            "timestamp": bar["timestamp"],
+            "equity": str(close_equity),
+            "cash": str(cash),
+            "cash_weight": str(cash_weight),
+            "market_values": {m: str(close_market_values[m]) for m in sorted(market_ids)},
+            "market_weights": market_weights,
+            "gross_exposure": str(gross_exposure),
+        })
         peak = max(peak, close_equity)
         if peak > 0:
             max_drawdown = max(max_drawdown, (peak - close_equity) / peak)
@@ -272,4 +299,5 @@ def run_multi_market_backtest(*, bars: Sequence[Mapping[str, object]],
             "dust_holdings": {m: str(qty) for m, qty in sorted(holdings.items())
                               if qty > 0 and not rules[m].meets_minimums(
                                   qty, clean_bars[-1]["markets"][m]["close_quote"])},
-            "equity_curve": equity_curve}
+            "equity_curve": equity_curve,
+            "exposure_curve": exposure_curve}
