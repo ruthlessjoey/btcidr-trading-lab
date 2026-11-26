@@ -22,7 +22,7 @@ INITIAL_CASH = D("10000")
 PARTICIPATION = D("0.05")
 FEE_BPS = D("16")  # documented public API example only; not the user's fee tier
 STRATEGIES = ("SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY")
-PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1"
+PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2"
 PREREGISTERED_START = "2024-01-01"
 PREREGISTERED_END = "2026-11-01"
 PREREGISTERED_SYMBOLS = (
@@ -31,6 +31,23 @@ PREREGISTERED_SYMBOLS = (
 PREREGISTERED_MIN_MARKETS = 3
 PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
+
+# V2 cannot use the current active-market list as a historical universe. It can
+# omit later-delisted or historically unavailable instruments. Keep all public
+# data collection blocked until independently reviewed, point-in-time listing
+# and trading/matching interval evidence is available and hash-pinned.
+POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS = "NOT_VERIFIED"
+
+
+def require_v2_point_in_time_universe_evidence() -> None:
+    if POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS != "VERIFIED":
+        raise BitstampDataError(
+            "V2 public research blocked before network access: point-in-time SPOT "
+            "listing/trading/matching history is NOT_VERIFIED; current active "
+            "markets can omit delisted or historically unavailable instruments "
+            "and create survivorship bias"
+        )
+
 
 
 def _epoch(value: str) -> int:
@@ -368,7 +385,9 @@ def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end
 OOS_FOLD_COUNT = 5
 OOS_INITIAL_HISTORY_RATIO = D("0.50")
 OOS_EMBARGO_BARS = 50
-OOS_MINIMUM_FOLD_BARS = 500
+# 30 complete non-overlapping 24-bar returns require 720 intervals plus
+# the starting equity mark. Each fold therefore needs at least 721 candles.
+OOS_MINIMUM_FOLD_BARS = 721
 
 
 def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
@@ -381,14 +400,14 @@ def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
     """
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise ValueError("count must be a positive integer")
-    if count < 5500:
-        raise ValueError("at least 5500 candles are required for five OOS folds")
+    if count < 7609:
+        raise ValueError("at least 7609 candles are required for five OOS folds")
     history_end = int(D(count) * OOS_INITIAL_HISTORY_RATIO)
     remaining = count - history_end
     usable = remaining - OOS_EMBARGO_BARS * (OOS_FOLD_COUNT - 1)
     fold_size = usable // OOS_FOLD_COUNT
     if fold_size < OOS_MINIMUM_FOLD_BARS:
-        raise ValueError("at least 5500 candles are required for five OOS folds")
+        raise ValueError("at least 7609 candles are required for five OOS folds")
     ranges = {}
     for index in range(OOS_FOLD_COUNT):
         start = history_end + index * (fold_size + OOS_EMBARGO_BARS)
@@ -500,6 +519,7 @@ def main(argv=None) -> int:
         candidates = validate_preregistered_run(
             args.start, args.end, args.symbols, args.min_markets, args.require_meme
         )
+        require_v2_point_in_time_universe_evidence()
         start_ts = _epoch(args.start)
         end_ts = _epoch(args.end)
         markets, markets_hash = fetch_spot_markets()
