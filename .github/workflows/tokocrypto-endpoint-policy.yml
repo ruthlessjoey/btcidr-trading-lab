@@ -6,6 +6,7 @@ on:
       - security/tokocrypto-klines-only-2026-11-27
       - security/tokocrypto-caller-clock-window-2026-11-27
       - security/tokocrypto-candle-completeness-2026-11-27
+      - research/tokocrypto-fixed-utc-window-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -13,6 +14,8 @@ on:
       - "tests/test_tokocrypto_endpoint_policy.py"
       - "tokocrypto_public_window.py"
       - "tests/test_tokocrypto_public_window.py"
+      - "tokocrypto_fixed_window.py"
+      - "tests/test_tokocrypto_fixed_window.py"
       - "docs/tokocrypto-public-klines-policy.md"
       - "docs/tokocrypto-candle-completeness.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
@@ -21,6 +24,7 @@ on:
       - main
       - security/tokocrypto-klines-only-2026-11-27
       - security/tokocrypto-caller-clock-window-2026-11-27
+      - security/tokocrypto-candle-completeness-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -63,6 +67,8 @@ jobs:
             /tests/test_tokocrypto_endpoint_policy.py
             /tokocrypto_public_window.py
             /tests/test_tokocrypto_public_window.py
+            /tokocrypto_fixed_window.py
+            /tests/test_tokocrypto_fixed_window.py
             /tests/test_fetcher.py
 
       - name: Set up supported Python version
@@ -78,3 +84,6 @@ jobs:
 
       - name: Run caller-clock Tokocrypto candle-window tests
         run: python -m unittest discover -s tests -p 'test_tokocrypto_public_window.py' -v
+
+      - name: Run fixed-UTC-window Tokocrypto tests
+        run: python -m unittest discover -s tests -p 'test_tokocrypto_fixed_window.py' -v

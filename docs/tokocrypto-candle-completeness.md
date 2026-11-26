@@ -44,3 +44,12 @@ A future attestor must provide a bounded evidence record containing the UTC epoc
 On iPhone, the user-facing “Set Automatically” setting is an operator configuration, not an attestation readable by this Python helper; it cannot alone certify unattended automation. A runtime platform and its supported clock-status interface must be selected and independently tested before implementing the attestor. This project does not yet have an approved platform attestor.
 
 Historical research can avoid dependence on current wall-clock time by preregistering fixed UTC start/end boundaries that are wholly in the past, then applying the complete-grid and point-in-time gates. That is a separate research-window interface; it must not silently reuse the current-window helper with an arbitrary timestamp.
+
+
+## Fixed UTC-boundary research windows
+
+A separate fixed-boundary helper can retrieve a pre-registered interval without reading a current wall clock or requesting provider server time. The caller supplies exact integer UTC start and end-exclusive epochs; both must align to the timeframe, increase, and remain within the 14-day request bound. The helper reuses the same complete-grid and OHLCV checks.
+
+It deliberately does **not** assert that the selected interval is in the past, authenticate the preregistration record, verify the provider clock, or establish market identity. Its output labels the temporal past assertion `NOT_PERFORMED` and provider clock skew `NOT_VERIFIED`. Only use fixed windows whose boundaries have been preregistered and independently verified as historical. Do not use this interface for unattended current-market collection.
+
+The interface makes no request during validation or testing; all regressions use synthetic responses. The only network path available when a caller explicitly invokes retrieval remains the exact approved public `/api/v3/klines` GET.
