@@ -1454,3 +1454,19 @@ The settlement-store audit verifier now rejects noncanonical JSON encodings as w
 - **231 tests per interpreter / 462 total; zero actual ResourceWarning or ignored-connection output.**
 
 Independent adversarial review remains pending; this test result is not a release or profitability certification.
+
+
+## iPhone-only / Rp0 external-checkpoint feasibility — 27 November 2026
+
+PR #207's design proposal now records an evidence-based platform boundary:
+- Apple documents Secure Enclave as device-bound P-256 key custody; private key material is not exposed in plaintext to the app and the key cannot be imported/exported as an ordinary key.
+- Apple's August 2026 Platform Security guide describes counter lockboxes for passcode-protected user data and anti-replay services for platform-managed Secure Enclave data. It does not establish a general app-managed monotonic ledger sequence/head or independent append-only checkpoint store.
+- Therefore Secure Enclave signing alone cannot satisfy the design's separate monotonic witness, append-only storage and recovery-authority requirements.
+- Current iPhone-only / Rp0 constraints have no approved second independent device, hardware monotonic witness or independent append-only service.
+- No signing key was generated; no signer/storage code or platform was selected. Keep the proposal documentation-only and do not weaken anti-rollback requirements.
+
+Sources:
+- Apple Developer, *Protecting keys with the Secure Enclave*: https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave.md
+- Apple, *Apple Platform Security*, August 2026: https://help.apple.com/pdf/security/en_US/apple-platform-security-guide.pdf
+
+This is a platform feasibility constraint, not an implementation failure or permission to introduce a cloud/network dependency. No PAPER activation is authorized.
