@@ -36,3 +36,8 @@ Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`. The runner 
 
 ## Important limits
 This is exploratory research, not an installable trading system. The workflow does not place orders. Results do not establish profitability, high win rate, independent validation or production readiness. A missing/unsupported meme-coin market is reported; the script does not substitute another asset silently.
+
+
+## Terminal return valuation
+
+A segment that ends with an open long position reports mark-to-market return and the marked value of the remaining inventory separately. The `net_return_pct` field is null unless the segment ends flat, because the simulator does not invent a terminal exit fill or liquidation cost. The mark-to-market return is after costs on the fills that were actually simulated, not a realized liquidation return.
