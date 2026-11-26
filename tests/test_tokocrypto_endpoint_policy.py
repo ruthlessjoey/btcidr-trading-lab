@@ -20,12 +20,12 @@ import providers  # noqa: E402
 NO_SLEEP = lambda seconds: None  # noqa: E731
 VALID_URL = (
     "https://www.tokocrypto.site/api/v3/klines?"
-    "symbol=BTCUSDT&interval=1h&startTime=1700000000000&"
-    "endTime=1700003600000&limit=500"
+    "symbol=BTCUSDT&interval=1h&startTime=1699999200000&"
+    "endTime=1700002800000&limit=500"
 )
 
 
-def synthetic_kline(timestamp_ms=1700000000000):
+def synthetic_kline(timestamp_ms=1699999200000):
     return [[timestamp_ms, "100", "101", "99", "100.5", "10"]]
 
 
@@ -89,12 +89,12 @@ class TokocryptoUrlPolicyTests(unittest.TestCase):
             "https://www.tokocrypto.site/api/v3/exchangeInfo?symbol=BTCUSDT",
             "https://www.tokocrypto.site/open/v1/common/time",
             "https://www.tokocrypto.site/open/v1/market/klines",
-            "https://www.tokocrypto.com/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
-            "https://api.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
-            "https://www.tokocrypto.site.evil.example/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
-            "http://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
-            "https://user:pass@www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
-            "https://www.tokocrypto.site:443/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1700000000000&endTime=1700003600000&limit=500",
+            "https://www.tokocrypto.com/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
+            "https://api.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
+            "https://www.tokocrypto.site.evil.example/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
+            "http://www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
+            "https://user:pass@www.tokocrypto.site/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
+            "https://www.tokocrypto.site:443/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1699999200000&endTime=1700002800000&limit=500",
         )
         for url in blocked:
             with self.subTest(url=url), self.assertRaises(fetcher.ApiError):
@@ -115,7 +115,7 @@ class TokocryptoUrlPolicyTests(unittest.TestCase):
             ("symbol", "BTC_USDT"),
             ("interval", "7m"),
             ("startTime", "-1"),
-            ("endTime", "1700000000000"),
+            ("endTime", "1699999200000"),
             ("limit", "501"),
             ("limit", "0"),
         )
@@ -129,6 +129,28 @@ class TokocryptoUrlPolicyTests(unittest.TestCase):
             ))
             with self.subTest(key=key, value=value), self.assertRaises(fetcher.ApiError):
                 fetcher.validate_request_url(url)
+
+    def test_encoded_tokocrypto_hostname_is_not_a_bypass(self):
+        url = VALID_URL.replace("www.tokocrypto.site", "www.%74okocrypto.site")
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.validate_request_url(url)
+
+    def test_unaligned_or_unbounded_candle_window_is_blocked(self):
+        parsed = urllib.parse.urlsplit(VALID_URL)
+        query = dict(urllib.parse.parse_qsl(parsed.query))
+        query["startTime"] = "1699999200001"
+        unaligned = urllib.parse.urlunsplit((
+            parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), "",
+        ))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.validate_request_url(unaligned)
+        query["startTime"] = "1699999200000"
+        query["endTime"] = str(1699999200000 + 501 * 3600 * 1000)
+        too_wide = urllib.parse.urlunsplit((
+            parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), "",
+        ))
+        with self.assertRaises(fetcher.ApiError):
+            fetcher.validate_request_url(too_wide)
 
     def test_disallowed_url_is_rejected_before_the_opener_is_called(self):
         opener = ScriptedOpener(b"[]")
@@ -154,12 +176,12 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
         candles, requests = fetcher.fetch_candles(
             source, "BTC_USDT", "1h",
-            1700000000, 1700003600,
+            1699999200, 1700002800,
             5, 1, opener, NO_SLEEP,
         )
         self.assertEqual(requests, 1)
         self.assertEqual(len(candles), 1)
-        self.assertEqual(candles[0].time, 1700000000)
+        self.assertEqual(candles[0].time, 1699999200)
         self.assertEqual(len(opener.calls), 1)
         parsed = urllib.parse.urlsplit(opener.calls[0][0])
         self.assertEqual(parsed.scheme, "https")
@@ -179,7 +201,7 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         provider = providers.build("tokocrypto")
         opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
         http = providers.Http(5, 1, opener, NO_SLEEP)
-        candles = provider.candles("1h", 1700000000, 1700003600, http)
+        candles = provider.candles("1h", 1699999200, 1700002800, http)
         self.assertEqual(len(candles), 1)
         self.assertEqual(http.requests, 1)
         self.assertEqual(len(http.log), 1)
