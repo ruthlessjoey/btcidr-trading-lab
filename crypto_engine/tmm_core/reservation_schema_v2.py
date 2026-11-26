@@ -116,8 +116,13 @@ def _verify_account_market_baseline(db: sqlite3.Connection) -> None:
         raise ReservationSchemaError("account and market audit baseline JSON is invalid") from exc
     initial = [event for event in events if isinstance(event, dict)
                and event.get("kind") == "ACCOUNT_INITIALIZED"]
+    expected_initial_keys = {
+        "kind", "account_id", "currency", "opening_cash",
+        "market_registration_audit",
+    }
     if (
         len(initial) != 1 or not events or events[0] != initial[0]
+        or set(initial[0]) != expected_initial_keys
         or initial[0].get("account_id") != account[0]
         or initial[0].get("currency") != account[1]
         or initial[0].get("market_registration_audit") != "required-v1"
