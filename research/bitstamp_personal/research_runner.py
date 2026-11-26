@@ -94,7 +94,8 @@ def backtest(
     cost_basis = D("0")
     cycle_pnl = D("0")
     cycles = []
-    equity_curve = [INITIAL_CASH]
+    close_equity_curve = [INITIAL_CASH]
+    intrabar_equity_curve = [INITIAL_CASH]
     fees_paid = D("0")
     turnover = D("0")
     fills = 0
@@ -109,6 +110,7 @@ def backtest(
         prior_volume = D(candles[index - 1]["volume"])
         max_qty = prior_volume * PARTICIPATION
         equity_at_open = cash + base * open_price
+        intrabar_equity_curve.append(equity_at_open)
         desired_base = (equity_at_open * weight / open_price) if open_price > 0 else D("0")
         delta = desired_base - base
 
@@ -147,15 +149,29 @@ def backtest(
                     base = D("0")
                     cost_basis = D("0")
 
-        equity_curve.append(cash + base * close_price)
+        close_equity = cash + base * close_price
+        low_price = D(candles[index]["low"])
+        if not low_price.is_finite() or low_price <= 0 or low_price > min(open_price, close_price):
+            raise ValueError("candle low must be finite, positive and no higher than open or close")
+        close_equity_curve.append(close_equity)
+        # A long-only portfolio is most adversely marked at the candle low.
+        # Mark after the next-open fill decision and retain the open-gap mark.
+        intrabar_equity_curve.append(cash + base * low_price)
+        intrabar_equity_curve.append(close_equity)
 
-    final_equity = equity_curve[-1]
-    peak = equity_curve[0]
-    max_drawdown = D("0")
-    for equity in equity_curve:
-        peak = max(peak, equity)
-        if peak > 0:
-            max_drawdown = max(max_drawdown, (peak - equity) / peak)
+    final_equity = close_equity_curve[-1]
+
+    def _max_drawdown(curve):
+        peak = curve[0]
+        drawdown = D("0")
+        for equity in curve:
+            peak = max(peak, equity)
+            if peak > 0:
+                drawdown = max(drawdown, (peak - equity) / peak)
+        return drawdown
+
+    close_max_drawdown = _max_drawdown(close_equity_curve)
+    intrabar_max_drawdown = _max_drawdown(intrabar_equity_curve)
     wins = sum(1 for pnl in cycles if pnl > 0)
     losses = sum(1 for pnl in cycles if pnl < 0)
     gross_wins = sum((pnl for pnl in cycles if pnl > 0), D("0"))
@@ -164,7 +180,10 @@ def backtest(
         "initial_cash": str(INITIAL_CASH),
         "final_equity": str(final_equity.quantize(D("0.01"))),
         "net_return_pct": str(((final_equity / INITIAL_CASH - 1) * 100).quantize(D("0.0001"))),
-        "max_drawdown_pct": str((max_drawdown * 100).quantize(D("0.0001"))),
+        "max_drawdown_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
+        "max_drawdown_intrabar_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
+        "max_drawdown_close_pct": str((close_max_drawdown * 100).quantize(D("0.0001"))),
+        "drawdown_measurement": "open-gap, intrabar low and candle-close equity marks; adverse intrabar path is conservative but OHLC does not reveal event ordering",
         "closed_cycles": len(cycles),
         "wins": wins,
         "losses": losses,
