@@ -88,11 +88,16 @@ def valid_manifest():
     return manifest
 
 
-def verify_fixture(manifest):
+def verify_fixture(manifest, *, refresh_review=True):
+    digest = evidence_payload_sha256(manifest)
+    if refresh_review and isinstance(manifest.get("independent_review"), dict):
+        for reviewer in manifest["independent_review"].get("reviewers", []):
+            if isinstance(reviewer, dict):
+                reviewer["reviewed_evidence_sha256"] = digest
     raw = json.dumps(manifest, sort_keys=True, separators=(",", ":"),
                      ensure_ascii=False).encode()
     return verify_point_in_time_universe_evidence(
-        raw, expected_sha256=evidence_payload_sha256(manifest),
+        raw, expected_sha256=digest,
     )
 
 
@@ -206,7 +211,7 @@ class PointInTimeUniverseTests(unittest.TestCase):
         manifest = valid_manifest()
         manifest["independent_review"]["reviewers"][1]["reviewed_evidence_sha256"] = "0" * 64
         with self.assertRaisesRegex(PointInTimeUniverseError, "different evidence digest"):
-            verify_fixture(manifest)
+            verify_fixture(manifest, refresh_review=False)
 
     def test_duplicate_keys_nonstandard_json_and_size_fail(self):
         with self.assertRaisesRegex(PointInTimeUniverseError, "duplicate JSON key"):
