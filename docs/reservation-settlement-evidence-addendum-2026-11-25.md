@@ -1411,3 +1411,32 @@ A static call-path review of the combined #203/#205/#208 candidate found that th
 - SQLite 3.46.1. Offline sparse-checkout workflow; no provider or exchange network access.
 
 This is an additional verified fail-closed control, not proof of complete system security or profitability. Independent adversarial review remains pending.
+
+
+## Low-level reservation audit-genesis guard — exact-head verification — 27 November 2026
+
+A follow-up review identified that low-level reservation lifecycle operations should not trust marker strings alone. PR #208 now checks the audit chain and account genesis event before every reservation mutation.
+
+### Added guard
+- Require both `account_initialization_audit=required-v1` and `market_registration_audit=required-v1`.
+- Require canonical settlement audit schema.
+- Require a valid sequence/hash chain using the same strict chain verifier as the settlement store.
+- Require exactly one `ACCOUNT_INITIALIZED` genesis event, first in the audit stream, matching the stored account ID/currency and the required market-registration audit policy.
+- Require positive finite audited opening cash.
+- Read-only reservation lookup remains separate.
+- Schema creation remains marker-gated; full genesis/chain verification occurs at the lifecycle mutation boundary.
+
+### New regression coverage
+- Missing audit baseline markers block reservation mutations.
+- Missing account initialization genesis blocks reservation mutations even when marker strings exist.
+- Corrupted audit hash chain blocks reservation mutations.
+- Existing tests for lifecycle transitions, stale versions, expiry, rollback and allocation validation continue to run.
+
+### Exact-head CI evidence
+- PR #208 head: `d4dc180322f6c2b1cbd9e583a904f9651abb0e0c`.
+- Actions run [45870346841](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45870346841): Python 3.11.18 and 3.13.18 both passed.
+- SQLite 3.46.1.
+- Eight suites: 26 schema, 24 lifecycle, 16 allocations, 13 atomic allocations, 82 settlement store, 17 receiver, 12 offline journal/settlement, 40 read-only migration preflight.
+- **230 tests per interpreter / 460 total; zero actual ResourceWarning or ignored-connection output.**
+
+This is an additional fail-closed guard, not independent security acceptance or proof of profitability.
