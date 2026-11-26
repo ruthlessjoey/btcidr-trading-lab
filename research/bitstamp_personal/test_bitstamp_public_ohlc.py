@@ -117,12 +117,12 @@ class BitstampPublicOhlcTests(unittest.TestCase):
             "btcusd", start_timestamp=0, end_timestamp=5 * 3600,
             opener=opener, sleep=lambda _: None,
         )
-        self.assertEqual(dataset["row_count"], 4)
+        self.assertEqual(dataset["row_count"], 5)
         self.assertEqual(dataset["coverage_status"], "CONTIGUOUS")
         self.assertEqual(dataset["gap_count"], 0)
         self.assertEqual(
             [row["open_timestamp"] for row in dataset["candles"]],
-            [3600, 7200, 10800, 14400],
+            [0, 3600, 7200, 10800, 14400],
         )
         self.assertEqual(dataset["last_close_timestamp"], 5 * 3600)
         self.assertEqual(dataset["page_count"], 2)
