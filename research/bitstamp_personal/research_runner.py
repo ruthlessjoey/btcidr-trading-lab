@@ -111,6 +111,57 @@ def make_signals(strategy: str, candles: list[dict]) -> list[int]:
         return _make_signals(strategy, candles)
 
 
+def _validate_backtest_inputs(
+    candles: list[dict],
+    signals: list[int],
+    *,
+    fee_bps: Decimal,
+    half_spread_bps: Decimal,
+    slippage_bps: Decimal,
+) -> None:
+    """Reject malformed inputs before any portfolio arithmetic is performed."""
+    if len(candles) != len(signals) or len(candles) < 2:
+        raise ValueError("candles/signals length mismatch or insufficient bars")
+    for index, signal in enumerate(signals):
+        if type(signal) is not int or signal not in (0, 1):
+            raise ValueError(f"signal at index {index} must be integer 0 or 1")
+    for name, value in (
+        ("fee_bps", fee_bps),
+        ("half_spread_bps", half_spread_bps),
+        ("slippage_bps", slippage_bps),
+    ):
+        if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
+            raise ValueError(f"{name} must be a finite nonnegative Decimal")
+    if fee_bps >= D(10000):
+        raise ValueError("fee_bps must be below 10000")
+    if half_spread_bps + slippage_bps >= D(10000):
+        raise ValueError("combined spread and slippage must be below 10000 bps")
+
+    for index, row in enumerate(candles):
+        if not isinstance(row, dict):
+            raise ValueError(f"candle at index {index} must be an object")
+        values = {}
+        for field in ("open", "high", "low", "close", "volume"):
+            raw = row.get(field)
+            if isinstance(raw, bool) or raw is None:
+                raise ValueError(f"candle {field} at index {index} is invalid")
+            try:
+                value = D(str(raw))
+            except Exception as exc:
+                raise ValueError(f"candle {field} at index {index} is invalid") from exc
+            if not value.is_finite():
+                raise ValueError(f"candle {field} at index {index} must be finite")
+            values[field] = value
+        if min(values["open"], values["high"], values["low"], values["close"]) <= 0:
+            raise ValueError(f"candle prices at index {index} must be positive")
+        if values["volume"] < 0:
+            raise ValueError(f"candle volume at index {index} cannot be negative")
+        if values["high"] < max(values["open"], values["close"], values["low"]):
+            raise ValueError(f"candle high at index {index} violates OHLC bounds")
+        if values["low"] > min(values["open"], values["close"], values["high"]):
+            raise ValueError(f"candle low at index {index} violates OHLC bounds")
+
+
 def _backtest(
     candles: list[dict],
     signals: list[int],
@@ -119,8 +170,10 @@ def _backtest(
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
 ) -> dict:
-    if len(candles) != len(signals) or len(candles) < 2:
-        raise ValueError("candles/signals length mismatch or insufficient bars")
+    _validate_backtest_inputs(
+        candles, signals, fee_bps=fee_bps,
+        half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
+    )
     cash = INITIAL_CASH
     base = D("0")
     cost_basis = D("0")
