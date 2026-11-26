@@ -368,7 +368,7 @@ def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end
 OOS_FOLD_COUNT = 5
 OOS_INITIAL_HISTORY_RATIO = D("0.50")
 OOS_EMBARGO_BARS = 50
-OOS_MINIMUM_FOLD_BARS = 500
+OOS_MINIMUM_FOLD_BARS = 750
 
 
 def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
@@ -381,8 +381,8 @@ def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
     """
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise ValueError("count must be a positive integer")
-    if count < 5500:
-        raise ValueError("at least 5500 candles are required for five OOS folds")
+    if count < 7900:
+        raise ValueError("at least 7900 candles are required for five OOS folds")
     history_end = int(D(count) * OOS_INITIAL_HISTORY_RATIO)
     remaining = count - history_end
     usable = remaining - OOS_EMBARGO_BARS * (OOS_FOLD_COUNT - 1)
