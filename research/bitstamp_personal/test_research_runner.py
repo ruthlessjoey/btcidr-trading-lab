@@ -5,6 +5,7 @@ from research_runner import (
     backtest,
     evaluate_market,
     make_signals,
+    _signals_for_segment,
     split_ranges,
     validate_preregistered_run,
     _epoch,
@@ -260,6 +261,31 @@ class ResearchRunnerTests(unittest.TestCase):
             validate_preregistered_run("2024-01-01", "2026-11-01", symbols, 1, True)
         with self.assertRaisesRegex(ValueError, "meme-market requirement differs"):
             validate_preregistered_run("2024-01-01", "2026-11-01", symbols, 3, False)
+
+    def test_rsi_segment_signal_state_resets_but_indicator_uses_prior_history(self):
+        # Start in a falling market so the global RSI state is long. Follow it
+        # with seven up and seven down hourly moves, making the RSI neutral at
+        # the split boundary. A fresh account must remain flat until a new
+        # in-segment entry condition occurs.
+        closes = [str(100 - index) for index in range(15)]
+        closes.extend(str(value) for value in (87, 88, 89, 90, 91, 92, 93,
+                                               92, 91, 90, 89, 88, 87, 86))
+        candles = [{"close": value} for value in closes]
+        start = 28
+        global_signals = make_signals("RSI14_MEAN_REVERSION_LONG_ONLY", candles)
+        segment_signals = _signals_for_segment(
+            "RSI14_MEAN_REVERSION_LONG_ONLY", candles, start, len(candles),
+        )
+        self.assertEqual(global_signals[start], 1)
+        self.assertEqual(segment_signals[0], 0)
+        self.assertEqual(len(segment_signals), len(candles) - start)
+        self.assertTrue(set(segment_signals).issubset({0, 1}))
+
+    def test_segment_signal_helper_rejects_invalid_bounds(self):
+        candles = [{"close": "100"} for _ in range(60)]
+        for start, end in ((-1, 5), (5, 5), (10, 5), (0, 61)):
+            with self.subTest(start=start, end=end), self.assertRaises(ValueError):
+                _signals_for_segment("SMA20_50_LONG_ONLY", candles, start, end)
 
     def test_chronological_splits_have_exact_embargoes(self):
         ranges = split_ranges(10000, embargo_bars=50)
