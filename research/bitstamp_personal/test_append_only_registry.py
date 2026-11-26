@@ -1,8 +1,10 @@
+import hashlib
 import json
 import unittest
 
 from verify_append_only_registry import (
     GENESIS_GIT_BLOB_SHA1,
+    GENESIS_SHA256,
     AppendOnlyRegistryError,
     git_blob_sha1,
     verify_append_only_registry,
@@ -49,6 +51,7 @@ def verify(base, head, *, genesis=GENESIS):
 class AppendOnlyRegistryTests(unittest.TestCase):
     def test_committed_genesis_snapshot_matches_pinned_git_blob(self):
         self.assertEqual(git_blob_sha1(GENESIS), GENESIS_GIT_BLOB_SHA1)
+        self.assertEqual(hashlib.sha256(GENESIS).hexdigest(), GENESIS_SHA256)
 
     def test_unchanged_complete_ledger_is_accepted(self):
         result = verify(GENESIS, GENESIS)
