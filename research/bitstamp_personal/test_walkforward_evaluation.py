@@ -51,7 +51,8 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         self.assertEqual(result["costs"]["fee_bps_per_side"], "16")
         self.assertEqual(result["costs"]["half_spread_bps_per_side"], "15")
         self.assertEqual(result["costs"]["slippage_bps_per_side"], "20")
-        self.assertEqual(result["dataset_sha256"], canonical_dataset_sha256("dogeusd", dataset["candles"]))
+        self.assertEqual(result["dataset_sha256"], verify_dataset_manifest(dataset)["manifest_sha256"])
+        self.assertEqual(result["raw_page_sha256"], dataset["raw_page_sha256"])
         self.assertEqual(result["trial_registry_sha256"], verify_trial_registry(trial_registry())["registry_sha256"])
         self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
         for fold in result["folds"]:
@@ -99,11 +100,12 @@ class WalkForwardEvaluationTests(unittest.TestCase):
             ))
             previous = record_hash
         raw = ("\n".join(events) + "\n").encode()
+        dataset=synthetic_dataset()
         with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
             evaluate_five_fold_strategy(
-                synthetic_dataset()["candles"], market_symbol="dogeusd",
+                dataset["candles"], market_symbol="dogeusd",
                 strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
-                trial_registry_bytes=raw,
+                trial_registry_bytes=raw, dataset_manifest=dataset,
             )
 
     def test_invalid_strategy_or_registry_fails_closed(self):
