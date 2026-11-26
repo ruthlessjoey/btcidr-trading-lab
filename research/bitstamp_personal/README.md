@@ -65,7 +65,7 @@ Every fold must also use identical SHA-256 hashes for the frozen cost model and 
 
 ## Five-fold walk-forward execution (V2)
 
-The runner now creates five expanding-training OOS folds. Every fold starts with a flat research account, uses causal prior-close indicator warm-up, enters only from next-open signals, and reserves the next candle after the test interval for explicit terminal liquidation at that candle's open with the same modeled fee/spread/slippage. The liquidation candle is not included in the fold's test index range. Fifty additional candles are embargoed before the next fold. The same fold dates are replayed for the candidate and buy-and-hold baseline.
+The runner now uses 40% initial training history, five expanding-training OOS folds in the next 50%, and reserves the final 10% as an untouched holdout. Every fold starts with a flat research account, uses causal prior-close indicator warm-up, enters only from next-open signals, and reserves the next candle after the test interval for explicit terminal liquidation at that candle's open with the same modeled fee/spread/slippage. The liquidation candle is not included in the fold's test index range. Fifty additional candles are embargoed before the next fold and before the untouched holdout. The final 10% is not backtested, summarized or used for threshold selection.
 
 The 2x-cost replay doubles every cost component, including the per-side fee, half-spread and slippage, while preserving the exact same signals and candles. The fold runner reports base and 2x cost results but remains non-promotable until DSR and paired block-bootstrap statistics are computed and independently verified.
 
@@ -78,3 +78,6 @@ The V2 walk-forward schedule and cost stress supersede the earlier 60/20/20 spli
 `statistical_evidence.py` implements a dependency-free Deflated Sharpe probability and paired circular moving-block bootstrap lower confidence bound from per-period strategy and same-cost benchmark returns. DSR uses sample Sharpe, skewness, non-excess kurtosis, completed-trial Sharpe dispersion and the complete append-only registered-trial count. The bootstrap resamples paired return differences in circular blocks; defaults are 24 hourly observations, 5,000 replicates, 95% confidence and a fixed seed.
 
 These calculations are screening evidence, not independent verification. Trial-registry completeness, candidate inclusion, return-series provenance, dependence assumptions and bootstrap block length still require review. No provider access or strategy execution is performed by this module.
+
+
+The V2 planner requires at least 6,000 contiguous hourly candles to preserve a minimum 1,500-bar initial training window, five OOS folds of at least 500 bars each, all 50-bar embargoes and the final untouched 10% holdout. The final holdout is explicitly reported as `RESERVED_UNTOUCHED_NOT_EVALUATED`.
