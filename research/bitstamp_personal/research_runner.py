@@ -238,12 +238,20 @@ def _backtest(
                     cost_basis = D("0")
 
         close_equity = cash + base * close_price
+        high_price = D(candles[index]["high"])
         low_price = D(candles[index]["low"])
-        if not low_price.is_finite() or low_price <= 0 or low_price > min(open_price, close_price):
+        if (not high_price.is_finite() or high_price <= 0
+                or high_price < max(open_price, close_price, low_price)):
+            raise ValueError("candle high must be finite, positive and no lower than open, close or low")
+        if (not low_price.is_finite() or low_price <= 0
+                or low_price > min(open_price, close_price)):
             raise ValueError("candle low must be finite, positive and no higher than open or close")
         close_equity_curve.append(close_equity)
-        # A long-only portfolio is most adversely marked at the candle low.
-        # Mark after the next-open fill decision and retain the open-gap mark.
+        # Use a deliberately adverse high-first, then low path for a long-only
+        # position. OHLC does not reveal event order; this produces a
+        # conservative peak-to-trough drawdown bound without claiming the path
+        # actually occurred. Keep the open-gap mark before the fill decision.
+        intrabar_equity_curve.append(cash + base * high_price)
         intrabar_equity_curve.append(cash + base * low_price)
         intrabar_equity_curve.append(close_equity)
 
@@ -271,7 +279,8 @@ def _backtest(
         "max_drawdown_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
         "max_drawdown_intrabar_pct": str((intrabar_max_drawdown * 100).quantize(D("0.0001"))),
         "max_drawdown_close_pct": str((close_max_drawdown * 100).quantize(D("0.0001"))),
-        "drawdown_measurement": "open-gap, intrabar low and candle-close equity marks; adverse intrabar path is conservative but OHLC does not reveal event ordering",
+        "drawdown_measurement": "open-gap, worst-case high-first then low then candle-close equity marks; conservative OHLC bound, not observed intrabar sequencing",
+        "drawdown_path_assumption": "WORST_CASE_HIGH_BEFORE_LOW",
         "closed_cycles": len(cycles),
         "wins": wins,
         "losses": losses,

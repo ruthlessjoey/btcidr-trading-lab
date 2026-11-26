@@ -130,6 +130,37 @@ class ResearchRunnerTests(unittest.TestCase):
             result["max_drawdown_intrabar_pct"],
         )
 
+    def test_intrabar_drawdown_includes_high_first_peak_before_low(self):
+        # The high-to-low path is the worst ordering allowed by OHLC for a
+        # long-only position. Omitting the high would understate peak-to-trough risk.
+        candles = [
+            candle("100", "100"),
+            {**candle("100", "110", low_price="70"), "high": "150"},
+            candle("110", "110"),
+        ]
+        result = backtest(
+            candles, [1, 1, 0],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertGreater(
+            Decimal(result["max_drawdown_intrabar_pct"]),
+            Decimal("50"),
+        )
+        self.assertLess(
+            Decimal(result["max_drawdown_close_pct"]),
+            Decimal(result["max_drawdown_intrabar_pct"]),
+        )
+        self.assertEqual(
+            result["max_drawdown_pct"],
+            result["max_drawdown_intrabar_pct"],
+        )
+        self.assertEqual(
+            result["drawdown_path_assumption"],
+            "WORST_CASE_HIGH_BEFORE_LOW",
+        )
+
     def test_backtest_rejects_invalid_candle_low(self):
         candles = [candle(), candle("100", "105", low_price="101")]
         with self.assertRaisesRegex(ValueError, "candle low"):

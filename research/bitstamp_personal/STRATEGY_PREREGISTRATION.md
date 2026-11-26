@@ -34,7 +34,7 @@ No parameter optimization or search is permitted in this run.
 - Large-market base assumptions: 5 bps half-spread + 10 bps slippage per side.
 - Meme-market base assumptions: 15 bps half-spread + 20 bps slippage per side.
 - Stress costs are separately reported (10/25 bps for large markets; 30/50 bps for meme markets).
-- Drawdown is reported on both close-to-close and adverse intrabar-low equity marks. The headline maximum drawdown uses the intrabar-low mark after the next-open execution decision; the order of events inside an OHLC candle is unknown, so this does not replace tick/order-book simulation.
+- Drawdown is reported on both close-to-close and adverse OHLC equity marks. For the headline risk measure, each post-execution candle is evaluated using a worst-case high-first-then-low sequence, so the candle high can raise the running peak before the low is marked. This is a conservative upper-bound assumption for a long-only position, not a claim about the actual intrabar event order; OHLC does not reveal sequencing, liquidity or actual stop/market execution and does not replace tick/order-book simulation.
 - Spread/slippage are assumptions, not historical observations. The actual user fee tier is unknown and no private fee endpoint is accessed.
 
 ## Metrics
