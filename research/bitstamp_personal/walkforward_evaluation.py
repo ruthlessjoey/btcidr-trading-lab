@@ -81,7 +81,8 @@ def evaluate_five_fold_strategy(
     except DatasetManifestError as exc:
         raise WalkForwardEvaluationError("dataset manifest failed completeness validation") from exc
     normalized_symbol = verified_dataset["market_symbol"]
-    if market_symbol.casefold() != normalized_symbol or candles != verified_dataset["candles"]:
+    if (not isinstance(market_symbol, str) or market_symbol.casefold() != normalized_symbol
+            or candles != verified_dataset["candles"]):
         raise WalkForwardEvaluationError("supplied candles or market identity do not match verified dataset manifest")
     if strategy_id not in STRATEGIES:
         raise WalkForwardEvaluationError("strategy_id is not preregistered")
