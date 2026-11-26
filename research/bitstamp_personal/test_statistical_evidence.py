@@ -18,7 +18,7 @@ class StatisticalEvidenceTests(unittest.TestCase):
   with self.assertRaisesRegex(StatisticalEvidenceError,"equal observation"):deflated_sharpe_probability(a,[a,b[:-1]],registered_trial_count=2)
  def test_dsr_rejects_zero_variance(self):
   a=[.001]*50
-  with self.assertRaisesRegex(StatisticalEvidenceError,"non-zero"):deflated_sharpe_probability(a,[a,a],registered_trial_count=2)
+  with self.assertRaisesRegex(StatisticalEvidenceError,"constant non-zero"):deflated_sharpe_probability(a,[a,a],registered_trial_count=2)
  def test_bootstrap_is_deterministic_and_positive(self):
   a=[.002+(i%5)*.0001 for i in range(200)];b=[.0001+(i%5)*.00005 for i in range(200)]
   x=paired_moving_block_bootstrap_lower_bound(a,b,seed=17);y=paired_moving_block_bootstrap_lower_bound(a,b,seed=17)
@@ -37,3 +37,10 @@ class StatisticalEvidenceTests(unittest.TestCase):
    x=list(good);x[0]=bad
    with self.subTest(bad=bad),self.assertRaises(StatisticalEvidenceError):paired_moving_block_bootstrap_lower_bound(x,good)
 if __name__=="__main__":unittest.main()
+
+    def test_zero_return_variance_maps_to_zero_sharpe_for_no_trade_trial(self):
+        constant = [0.0] * 50
+        variable = [0.001 + (i % 5) * 0.0001 for i in range(50)]
+        result = deflated_sharpe_probability(constant, [constant, variable], registered_trial_count=2)
+        self.assertEqual(result["candidate_sharpe_per_period"], 0.0)
+        self.assertTrue(0.0 <= result["deflated_sharpe_probability"] <= 1.0)
