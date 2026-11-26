@@ -99,6 +99,23 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
                 sleep=lambda _: None,
             )
 
+    def test_nonfinite_or_invalid_ohlcv_is_rejected(self):
+        invalid_rows = (
+            [1699995600000, "NaN", "102", "99", "101", "12"],
+            [1699995600000, "100", "102", "99", "101", "-1"],
+            [1699995600000, "100", "99", "98", "101", "12"],
+            [1699995600000, "100", "102", "101", "101", "12"],
+        )
+        for row in invalid_rows:
+            with self.subTest(row=row):
+                opener = FakeOpener(rows=[row])
+                with self.assertRaises(fetcher.ApiError):
+                    fetch_tokocrypto_candles(
+                        pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                        now_epoch_utc=1_700_000_000, opener=opener,
+                        sleep=lambda _: None,
+                    )
+
     def test_empty_provider_response_fails_closed(self):
         opener = FakeOpener(rows=[])
         with self.assertRaisesRegex(fetcher.ApiError, "zero candles"):
