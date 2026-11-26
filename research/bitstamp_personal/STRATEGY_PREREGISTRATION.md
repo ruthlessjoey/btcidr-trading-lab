@@ -47,3 +47,10 @@ This run is exploratory only. No strategy can be promoted from this run. Indepen
 ## Segment state reset
 
 Each train, validation and holdout segment uses a separate account that starts flat. Indicator calculations may use only historical closes available up to each signal candle, including pre-segment history for rolling-window warmup. Stateful strategy position targets are reset to flat at the first candle of every segment; a prior segment's open/held target is not carried into the next segment. The first new position can only be entered by a signal generated within the new segment and filled at the following candle open.
+
+
+## Frozen statistical promotion policy
+
+At least five chronological, non-overlapping OOS folds are required. At least 60% must have positive net return and beat same-cost buy-and-hold; mean net return and mean excess must be positive. At least 60% must remain positive at 2x costs and mean 2x-cost return must be positive. Every fold must have maximum drawdown <=20%, profit factor >=1.20, Deflated Sharpe probability >=0.95 and positive paired block-bootstrap lower bound. Aggregate closed trades >=30 and observations >=100. Every fold must use the same dataset hash and complete registered-trial count.
+
+These frozen defaults are conservative screening rules, not universal financial laws. The current single train/validation/holdout split is insufficient. Passing permits independent human review only; source rights, holdout integrity, DSR/bootstrap calculation validity and production review remain separate gates.
