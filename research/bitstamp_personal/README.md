@@ -81,3 +81,8 @@ The five-fold helper and statistics/promotion components are still a design/rese
 
 
 The promotion screen also requires at least 30 complete, non-overlapping 24-bar return observations in every OOS fold, not only 100 observations in aggregate.
+
+
+## V2 dataset completeness and identity
+
+The V2 evaluator requires the complete adapter manifest: exact 2024-01-01 00:00 UTC through 2026-11-01 00:00 UTC coverage, 24,840 contiguous 1-hour candles, zero gaps, exact pair identity, raw-page hash and normalized-row hash. Missing, reordered, truncated or mismatched data fail closed before backtesting. The full manifest digest is bound into every promotion fold.
