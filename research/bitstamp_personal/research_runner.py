@@ -287,7 +287,9 @@ def _backtest(
     mark_to_market_return_pct = (
         (final_equity / INITIAL_CASH - 1) * 100
     ).quantize(D("0.0001"))
-    terminal_position_is_flat = base <= quantum
+    # Base quantities are quantized to `quantum`; exactly one quantum is still a holding.
+    # A flat realized-return label therefore requires precisely zero inventory.
+    terminal_position_is_flat = base == 0
     open_position_mark_value = base * D(candles[-1]["close"])
 
     def _max_drawdown(curve):
