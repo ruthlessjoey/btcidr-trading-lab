@@ -1,7 +1,8 @@
-"""Verify that the event-sourced trial ledger only grows by appended events.
+"""Verify trial ledger growth against a pinned genesis and Git base.
 
-The semantic parser validates current ledger contents. This layer proves the
-head preserves the exact byte prefix present in the PR base / previous commit.
+The genesis file has a pinned Git blob SHA-1. The current ledger must preserve
+that exact root and the complete base-commit byte prefix; only complete
+LF-delimited semantic events may be appended.
 """
 from __future__ import annotations
 
@@ -14,6 +15,8 @@ from typing import Any
 from experiment_registry import TrialRegistryError, parse_trial_registry
 
 MAX_REGISTRY_BYTES = 1024 * 1024
+GENESIS_GIT_BLOB_SHA1 = "10dbeb52941c08cda1f7b1d724b543b41dd6fdc2"
+GENESIS_SHA256 = "d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d"
 EXPECTED_MARKETS = (
     "btcusd", "ethusd", "xrpusd", "dogeusd", "shibusd", "pepeusd", "solusd",
 )
@@ -27,21 +30,58 @@ class AppendOnlyRegistryError(ValueError):
     """Raised when registry history is rewritten, truncated or malformed."""
 
 
+def git_blob_sha1(raw: bytes) -> str:
+    """Return Git's SHA-1 object ID for a blob's exact bytes."""
+    return hashlib.sha1(
+        b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
+    ).hexdigest()
+
+
 def verify_append_only_registry(
-    base_bytes: bytes,
-    head_bytes: bytes,
+    genesis_bytes: bytes,
+    base_bytes: bytes | None = None,
+    head_bytes: bytes | None = None,
     *,
     expected_market_symbols=EXPECTED_MARKETS,
     expected_strategies=EXPECTED_STRATEGIES,
     preregistration_id=EXPECTED_PREREGISTRATION,
 ) -> dict[str, Any]:
-    """Verify exact prefix preservation and current-ledger semantic validity."""
-    if not isinstance(base_bytes, bytes) or not isinstance(head_bytes, bytes):
-        raise AppendOnlyRegistryError("base and head registry values must be bytes")
-    if len(base_bytes) > MAX_REGISTRY_BYTES or len(head_bytes) > MAX_REGISTRY_BYTES:
+    """Verify the pinned genesis root, base prefix and head-ledger semantics.
+
+    The two-argument form is retained for the previous verifier API:
+    (base_bytes, head_bytes). It loads the committed, SHA-1-pinned genesis
+    snapshot, so older semantic regression tests remain valid.
+    """
+    if head_bytes is None:
+        if base_bytes is None:
+            raise AppendOnlyRegistryError("base and head registry values are required")
+        base_bytes, head_bytes = genesis_bytes, base_bytes
+        try:
+            genesis_bytes = Path(__file__).with_name(
+                "experiment_registry.genesis.jsonl"
+            ).read_bytes()
+        except OSError as exc:
+            raise AppendOnlyRegistryError("pinned genesis snapshot is unavailable") from exc
+    if base_bytes is None:
+        raise AppendOnlyRegistryError("base registry value is required")
+    if any(not isinstance(value, bytes) for value in (genesis_bytes, base_bytes, head_bytes)):
+        raise AppendOnlyRegistryError("genesis, base and head registry values must be bytes")
+    if any(len(value) > MAX_REGISTRY_BYTES for value in (genesis_bytes, base_bytes, head_bytes)):
         raise AppendOnlyRegistryError("trial registry exceeds the 1 MiB bound")
-    if not head_bytes:
-        raise AppendOnlyRegistryError("head trial registry must be non-empty")
+    if not genesis_bytes or not head_bytes:
+        raise AppendOnlyRegistryError("genesis and head registries must be non-empty")
+    actual_genesis_sha1 = git_blob_sha1(genesis_bytes)
+    if actual_genesis_sha1 != GENESIS_GIT_BLOB_SHA1:
+        raise AppendOnlyRegistryError(
+            "genesis snapshot does not match the pinned Git blob SHA-1"
+        )
+    actual_genesis_sha256 = hashlib.sha256(genesis_bytes).hexdigest()
+    if actual_genesis_sha256 != GENESIS_SHA256:
+        raise AppendOnlyRegistryError(
+            "genesis snapshot does not match the pinned SHA-256"
+        )
+    if not genesis_bytes.endswith(b"\n"):
+        raise AppendOnlyRegistryError("genesis registry must end at a complete LF-delimited event")
     if base_bytes and not base_bytes.endswith(b"\n"):
         raise AppendOnlyRegistryError(
             "base registry must end at a complete LF-delimited event"
@@ -50,8 +90,16 @@ def verify_append_only_registry(
         raise AppendOnlyRegistryError(
             "head registry must end at a complete LF-delimited event"
         )
-    if b"\r" in base_bytes or b"\r" in head_bytes:
+    if any(b"\r" in value for value in (genesis_bytes, base_bytes, head_bytes)):
         raise AppendOnlyRegistryError("trial registry must use LF-only line endings")
+    if base_bytes and not base_bytes.startswith(genesis_bytes):
+        raise AppendOnlyRegistryError(
+            "base registry does not preserve the pinned genesis prefix"
+        )
+    if not head_bytes.startswith(genesis_bytes):
+        raise AppendOnlyRegistryError(
+            "head registry history rewrote, reordered or truncated the pinned genesis prefix"
+        )
     if not head_bytes.startswith(base_bytes):
         raise AppendOnlyRegistryError(
             "trial registry history was rewritten, reordered or truncated; "
@@ -78,13 +126,15 @@ def verify_append_only_registry(
             expected_strategies=expected_strategies,
             preregistration_id=preregistration_id,
         )
-    except TrialRegistryError as exc:
+    except (TrialRegistryError, RecursionError, ValueError) as exc:
         raise AppendOnlyRegistryError(
             f"head trial registry semantic validation failed: {exc}"
         ) from exc
 
     return {
         "status": "APPEND_ONLY_VERIFIED",
+        "genesis_git_blob_sha1": actual_genesis_sha1,
+        "genesis_sha256": actual_genesis_sha256,
         "base_sha256": hashlib.sha256(base_bytes).hexdigest(),
         "head_sha256": hashlib.sha256(head_bytes).hexdigest(),
         "base_bytes": len(base_bytes),
@@ -98,11 +148,13 @@ def verify_append_only_registry(
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("genesis_file", type=Path)
     parser.add_argument("base_file", type=Path)
     parser.add_argument("head_file", type=Path)
     args = parser.parse_args(argv)
     try:
         result = verify_append_only_registry(
+            args.genesis_file.read_bytes(),
             args.base_file.read_bytes(),
             args.head_file.read_bytes(),
         )

@@ -129,3 +129,13 @@ The 16 bps fee is a public API example, not the user's actual fee tier; spread a
 ## Automated Git-history append-only enforcement
 
 The trial-registry parser validates current-ledger schema, the 14 preregistered trials and event order. CI now adds a base-to-head byte-prefix check: `experiment_registry.jsonl` must preserve the exact previous file bytes and may only add complete LF-delimited JSON events at the end. The check uses the PR base SHA on pull requests and the previous commit SHA on pushes, then passes the current full ledger through the existing semantic parser. Rewrites, deletions, reordering, partial events, CRLF changes and invalid appended entries fail offline CI. No provider requests are made.
+
+
+### Pinned ledger genesis
+
+The 14 original V2_5FOLD registrations are retained as `experiment_registry.genesis.jsonl`. Its Git blob SHA-1 is pinned in `verify_append_only_registry.py` as `10dbeb52941c08cda1f7b1d724b543b41dd6fdc2`. CI verifies the snapshot's exact Git blob identity, requires both the PR base ledger and head ledger to preserve that genesis byte prefix, and then requires the head to preserve the exact base prefix. This protects the root of the event history, not just the latest PR-to-base delta.
+
+
+### Collision-resistant genesis digest
+
+In addition to the Git blob SHA-1 needed to identify the original repository object, the genesis snapshot is now pinned to SHA-256 `d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d`. CI verifies both digests before accepting the base/head prefix chain. The SHA-256 pin supplies the collision-resistant content commitment; the Git blob ID ties the snapshot to the original Git object.
