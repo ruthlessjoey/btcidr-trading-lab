@@ -1200,3 +1200,29 @@ PR #208 is the newest verified settlement/audit candidate and sits on the PR #20
 
 ### Next priority
 Apply the same contiguous-sequence invariant to the separate read-only migration preflight audit verifier; run the migration preflight/copy tests in a narrow isolated workflow whose sparse checkout/import closure excludes all protected modules. Then continue independent adversarial review of checkpoint genesis, migration and recovery.
+
+
+## PR #209 exact-head migration preflight and full offline-suite result — 26 November 2026
+
+- PR #209 exact head: `cf6cd4efa645e2850569a521b69a0e3764af281e`.
+- Exact Actions run: [45789387082](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45789387082); Python 3.11 and 3.13 jobs both completed successfully.
+- Python 3.11.18 / SQLite 3.46.1: 279 tests passed, no ResourceWarning output.
+- Python 3.13.18 / SQLite 3.46.1: 279 tests passed, but multiple unclosed SQLite connection ResourceWarnings were emitted from `reservation_schema_v2.py:219` during receiver idempotent-retry coverage. A successful unittest exit does not make those warnings acceptable.
+- The PR adds contiguous sequence validation to the separate read-only migration preflight audit verifier, with synthetic cases for non-one genesis and an interior gap while preserving a valid event hash chain.
+- The candidate workflow has a sparse checkout limited to unprotected crypto-engine files/tests. The six-suite focused workflow has also been updated to treat ResourceWarning as errors, but the full offline-suite run above is a distinct workflow and its Python 3.13 warnings remain visible.
+- Test fixture connection wrappers were added to settlement-store and receiver tests to close test-owned connections deterministically. This did not eliminate all warnings; the remaining warning source must be traced to its actual connection owner before declaring clean acceptance.
+- PR #209 remains draft/open/unmerged. Treat its migration-preflight sequence logic as candidate code only pending a clean exact-head rerun and independent review.
+
+### Current verification matrix
+| Candidate | Python 3.11 | Python 3.13 | Disposition |
+|---|---:|---:|---|
+| PR #203 via #205 | 171/171 | 171/171 | Passed six safe suites |
+| PR #208 | 173/173 | 173/173 | Passed six safe suites |
+| PR #209 | 279/279 | 279/279 | Test exit passed; 3.13 ResourceWarnings remain, not clean acceptance |
+
+### Next task — do not skip
+1. Trace Python 3.13 ResourceWarnings from the receiver idempotent-retry test to the exact connection allocation/owner. Do not silence warnings or weaken the workflow.
+2. Add a deterministic connection-close fix at the correct ownership boundary, or correct the tests if they own the leaked handles. Preserve caller-owned transaction semantics.
+3. Ensure the full offline workflow—not only the focused six-suite workflow—runs with ResourceWarning promoted to errors and/or an explicit warning-capture assertion that detects unraisable SQLite connection warnings.
+4. Re-run the exact updated head on Python 3.11 and 3.13; require zero ResourceWarnings.
+5. Then independently review the preflight sequence check and migration/bootstrap boundary.
