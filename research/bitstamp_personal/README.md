@@ -60,7 +60,7 @@ The gate validates supplied metrics; it does not calculate or authenticate DSR/b
 
 ## Five-fold OOS design (next preregistration version)
 
-A separate helper now defines five sequential, non-overlapping test windows after a fixed 50% historical warm-up region, with 50-bar embargoes between folds and at least 500 bars per fold. Strategy parameters must be frozen before these windows are evaluated; the helper does not fit or tune strategies. This is a design component only: the current V1 runner still executes its original 60/20/20 split, and no V2 data run is authorized or enabled by this helper. A versioned V2 preregistration and fold-metric integration are required before any new public-data request.
+A separate helper now defines five sequential, non-overlapping test windows after a fixed 50% historical warm-up region, with 50-bar embargoes between folds and at least 721 bars per fold (minimum 7,609 candles overall). The 721 bars provide 30 complete non-overlapping 24-bar returns for the frozen DSR/bootstrap inputs. Strategy parameters must be frozen before these windows are evaluated; the helper does not fit or tune strategies. This is a design component only: the current V1 runner still executes its original 60/20/20 split, and no V2 data run is authorized or enabled by this helper. A versioned V2 preregistration and fold-metric integration are required before any new public-data request.
 
 
 ## Statistical evidence primitives
@@ -71,3 +71,10 @@ The research simulator can optionally expose its close-equity marks for offline 
 ## Trial registry and V2 preregistration
 
 The hash-chained registry records every candidate trial, including failed and abandoned trials. V2 currently contains two fixed candidate strategies; registry SHA-256 is `7fa30c75dfc71d1db2b939586b3bf3d3006607a4479f5187dabf1b479e530778`. The V2 preregistration freezes five OOS folds, 50-bar embargoes, doubled fee/spread/slippage replay and statistical thresholds. The registry hash is required in every promotion fold. This remains a research design; source rights, holdout integrity and independent review remain separate.
+
+
+## V2 release gates and evidence binding
+
+V2 public research is blocked before network access while point-in-time listing/trading/matching intervals remain unverified; the current active-market snapshot is not a historical universe and can create survivorship bias. The statistical promotion gate verifies the exact raw hash-chained trial-registry bytes against the frozen V2 preregistration digest, binds every fold to the verified candidate count and hash, and requires at least 50 bars between adjacent fold ranges. The fixed buy-and-hold comparator is not counted as a candidate trial. A gate pass would qualify for independent human review only; it is not proof of profitability.
+
+The five-fold helper and statistics/promotion components are still a design/research branch and have not yet been integrated into a complete V2 empirical runner. No public-data run is authorized by this change.
