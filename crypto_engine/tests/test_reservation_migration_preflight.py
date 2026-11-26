@@ -56,6 +56,12 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.execute("BEGIN IMMEDIATE")
+        self.db.execute(
+            "INSERT INTO metadata VALUES('account_initialization_audit','required-v1')"
+        )
+        self.db.execute(
+            "INSERT INTO metadata VALUES('market_registration_audit','required-v1')"
+        )
         ensure_reservation_schema_v2(self.db)
         self.db.commit()
         result = self.inspect()
