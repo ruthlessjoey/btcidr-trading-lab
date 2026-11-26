@@ -8,6 +8,7 @@ on:
       - research/bitstamp-conservative-intrabar-drawdown-2026-11-27
       - research/bitstamp-terminal-mark-to-market-label-2026-11-27
       - research/fix-flat-window-rsi-neutral-state-2026-11-27
+      - security/verify-bitstamp-requested-market-identity-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
