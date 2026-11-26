@@ -2,7 +2,7 @@
 
 Date: 27 November 2026
 
-Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`
+Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`
 
 The executable runner rejects overrides to the date range, candidate universe, minimum market count or meme-market requirement. Any change to this design requires a new versioned preregistration before any provider data is requested.
 
