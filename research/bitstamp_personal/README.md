@@ -24,7 +24,7 @@ Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`. The runner 
 - No parameter search, no tuning on validation or holdout, all preregistered strategies reported.
 - Execution: signal at candle close, execute at next candle open; maximum participation 5% of prior-hour base volume.
 - Costs: 16 bps taker fee per side as a documented public API example (not the user's actual fee tier); assumed spread/slippage scenarios are reported separately. These are assumptions, not historical order-book observations.
-- Drawdown reporting includes both close-to-close marks and an adverse intrabar mark using each candle's low after the next-open execution decision; the top-level maximum drawdown is the intrabar measure. OHLC data cannot establish the exact order of high/low events or actual stop/limit execution, so this remains a conservative approximation rather than a tick-level execution model.
+- Drawdown reporting includes close-to-close marks and a worst-case high-first-then-low OHLC path after the next-open execution decision. The top-level maximum drawdown uses that conservative peak-to-trough mark; actual intrabar sequencing, liquidity and stop/market execution are not known from OHLC data, so this is an upper-bound assumption rather than tick-level execution simulation.
 - Long-only spot, no shorts, leverage, margin or derivatives.
 
 ## Fail-closed conditions
