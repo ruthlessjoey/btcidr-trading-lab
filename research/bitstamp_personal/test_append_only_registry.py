@@ -63,7 +63,7 @@ class AppendOnlyRegistryTests(unittest.TestCase):
         self.assertEqual(result["registered_trial_count"], 14)
 
     def test_deeply_nested_appended_json_fails_closed_without_traceback(self):
-        deeply_nested = b"[" * 10000 + b"0" + b"]" * 10000 + b"\\n" + b"\\n"
+        deeply_nested = b"[" * 10000 + b"0" + b"]" * 10000 + b"\n"
         with self.assertRaisesRegex(AppendOnlyRegistryError, "semantic validation failed"):
             verify_append_only_registry(GENESIS, GENESIS + deeply_nested)
 
