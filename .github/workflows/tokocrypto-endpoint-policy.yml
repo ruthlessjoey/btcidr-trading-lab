@@ -50,11 +50,15 @@ jobs:
             /providers.py
             /config.json
             /tests/test_tokocrypto_endpoint_policy.py
+            /tests/test_fetcher.py
 
       - name: Set up supported Python version
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "${{ matrix.python-version }}"
 
-      - name: Run synthetic offline policy tests only
+      - name: Run safe offline fetcher regression tests
+        run: python -m unittest discover -s tests -p 'test_fetcher.py' -v
+
+      - name: Run synthetic Tokocrypto policy tests only
         run: python -m unittest discover -s tests -p 'test_tokocrypto_endpoint_policy.py' -v
