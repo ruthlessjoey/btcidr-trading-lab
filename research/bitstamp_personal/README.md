@@ -57,3 +57,6 @@ A position at the smallest inventory quantum is still reported as open until a s
 
 
 Partial sells do not close a cycle while any base inventory remains, including one smallest accounting quantum. Residual quantity and its remaining cost basis stay open until a later sell fill actually reduces inventory to zero.
+
+
+The OHLC reader verifies that the provider's returned pair normalizes to the exact requested market symbol on every page, in addition to requiring stable identity across pages.

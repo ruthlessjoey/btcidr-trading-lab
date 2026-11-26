@@ -230,9 +230,31 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         self.assertEqual([gap["gap_type"] for gap in dataset["gaps"]], ["LEADING", "TRAILING"])
         self.assertEqual([gap["missing_hours"] for gap in dataset["gaps"]], [1, 1])
 
+    def test_ohlc_response_pair_must_match_requested_market_symbol(self):
+        payload = {
+            "data": {
+                "pair": "ETH/USD",
+                "ohlc": [candle(3600)],
+            }
+        }
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        with self.assertRaisesRegex(
+            BitstampDataError,
+            "does not match requested market symbol",
+        ):
+            fetch_spot_history(
+                "btcusd",
+                start_timestamp=0,
+                end_timestamp=2 * 3600,
+                opener=opener,
+                sleep=lambda _: None,
+            )
+
     def test_market_identity_must_remain_stable_across_pages(self):
         first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3600), candle(7200)]}}
-        second = {"data": {"pair": "ETH/USD", "ohlc": [candle(0)]}}
+        # Both page labels normalize to the requested btcusd symbol, but
+        # the provider's reported identity representation changes between pages.
+        second = {"data": {"pair": "BTCUSD", "ohlc": [candle(0)]}}
         opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(second))])
         with self.assertRaisesRegex(BitstampDataError, "identity changed between pages"):
             fetch_spot_history(
