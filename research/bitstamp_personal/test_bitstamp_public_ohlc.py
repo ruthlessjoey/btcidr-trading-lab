@@ -44,6 +44,19 @@ def candle(ts, *, open_="100", high="102", low="99", close="101", volume="10"):
     }
 
 
+def spot_market(symbol="btcusd", name="BTC/USD", base="BTC", quote="USD",
+                trading="Enabled", matching="Enabled"):
+    return {
+        "market_symbol": symbol,
+        "market_type": "SPOT",
+        "name": name,
+        "base_currency": base,
+        "counter_currency": quote,
+        "trading": trading,
+        "matching": matching,
+    }
+
+
 class BitstampPublicOhlcTests(unittest.TestCase):
     def test_exact_host_and_endpoint_allowlist(self):
         self.assertEqual(_validate_url(BASE + "/markets/"), {"kind": "markets"})
@@ -75,7 +88,7 @@ class BitstampPublicOhlcTests(unittest.TestCase):
 
     def test_market_list_filters_to_spot_and_valid_symbols(self):
         payload = [
-            {"market_symbol": "btcusd", "market_type": "SPOT", "name": "BTC/USD"},
+            spot_market(),
             {"market_symbol": "btcusd-perp", "market_type": "FUTURES", "name": "BTC/USD Perpetual"},
             {"market_symbol": "../evil", "market_type": "SPOT", "name": "invalid"},
         ]
@@ -87,11 +100,34 @@ class BitstampPublicOhlcTests(unittest.TestCase):
 
     def test_market_list_rejects_duplicate_spot_symbols(self):
         payload = [
-            {"market_symbol": "btcusd", "market_type": "SPOT", "name": "BTC/USD"},
-            {"market_symbol": "btcusd", "market_type": "SPOT", "name": "BTC/USD"},
+            spot_market(),
+            spot_market(),
         ]
         opener = FakeOpener([FakeResponse(json.dumps(payload))])
         with self.assertRaisesRegex(BitstampDataError, "duplicate SPOT market"):
+            fetch_spot_markets(opener=opener)
+
+    def test_market_list_excludes_disabled_trading_or_matching(self):
+        payload = [
+            spot_market("btcusd"),
+            spot_market("ethusd", "ETH/USD", "ETH", "USD", trading="Disabled"),
+            spot_market("xrpusd", "XRP/USD", "XRP", "USD", matching="Disabled"),
+        ]
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        markets, _ = fetch_spot_markets(opener=opener)
+        self.assertEqual(list(markets), ["btcusd"])
+
+    def test_market_list_rejects_inconsistent_market_identity(self):
+        payload = [spot_market("btcusd", "ETH/USD", "BTC", "USD")]
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        with self.assertRaisesRegex(BitstampDataError, "identity do not agree"):
+            fetch_spot_markets(opener=opener)
+
+    def test_market_list_rejects_incomplete_identity_metadata(self):
+        payload = [spot_market()]
+        payload[0]["counter_currency"] = None
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        with self.assertRaisesRegex(BitstampDataError, "metadata is incomplete"):
             fetch_spot_markets(opener=opener)
 
     def test_candle_validation_rejects_bad_prices_and_volume(self):
