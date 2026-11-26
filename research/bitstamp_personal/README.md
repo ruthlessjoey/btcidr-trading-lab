@@ -22,6 +22,7 @@ The public API documentation states that companies using Bitstamp exchange data 
 - No parameter search, no tuning on validation or holdout, all preregistered strategies reported.
 - Execution: signal at candle close, execute at next candle open; maximum participation 5% of prior-hour base volume.
 - Costs: 16 bps taker fee per side as a documented public API example (not the user's actual fee tier); assumed spread/slippage scenarios are reported separately. These are assumptions, not historical order-book observations.
+- Drawdown reporting includes both close-to-close marks and an adverse intrabar mark using each candle's low after the next-open execution decision; the top-level maximum drawdown is the intrabar measure. OHLC data cannot establish the exact order of high/low events or actual stop/limit execution, so this remains a conservative approximation rather than a tick-level execution model.
 - Long-only spot, no shorts, leverage, margin or derivatives.
 
 ## Fail-closed conditions
