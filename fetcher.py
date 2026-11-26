@@ -6,6 +6,7 @@ exchange-info, account, order or .com endpoint is permitted.
 """
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
