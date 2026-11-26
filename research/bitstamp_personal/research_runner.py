@@ -93,7 +93,13 @@ def _make_signals(strategy: str, candles: list[dict]) -> list[int]:
                 changes = [closes[j] - closes[j - 1] for j in range(index - 13, index + 1)]
                 gains = sum((max(change, D("0")) for change in changes), D("0")) / D(14)
                 losses = sum((max(-change, D("0")) for change in changes), D("0")) / D(14)
-                rsi = D(100) if losses == 0 else D(100) - D(100) / (D(1) + gains / losses)
+                if gains == 0 and losses == 0:
+                    # A flat 14-period window is neutral, not overbought.
+                    rsi = D(50)
+                elif losses == 0:
+                    rsi = D(100)
+                else:
+                    rsi = D(100) - D(100) / (D(1) + gains / losses)
                 if rsi < D(30):
                     target = 1
                 elif rsi > D(55):
