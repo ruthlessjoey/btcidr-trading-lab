@@ -473,8 +473,6 @@ class WalkForwardFoldTests(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class GlobalTrialUniverseTests(unittest.TestCase):
@@ -490,3 +488,7 @@ class GlobalTrialUniverseTests(unittest.TestCase):
                 trial_series_by_fold=[[] for _ in range(5)],
                 bootstrap_replicates=1000,
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
