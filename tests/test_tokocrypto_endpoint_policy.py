@@ -203,6 +203,29 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         self.assertEqual(http.requests, 0)
         self.assertEqual(opener.calls, [])
 
+    def test_non_tokocrypto_fetcher_candles_path_remains_available(self):
+        source = fetcher.Source("generic", "binance_style", "https://example.test")
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        candles, requests = fetcher.fetch_candles(
+            source, "BTC_USDT", "1h",
+            1699999200, 1700002800,
+            5, 1, opener, NO_SLEEP,
+        )
+        self.assertEqual(requests, 1)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(len(opener.calls), 1)
+        self.assertIn("example.test", opener.calls[0][0])
+
+    def test_non_tokocrypto_provider_adapter_path_remains_available(self):
+        provider = providers.build("binance-vision")
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        http = providers.Http(5, 1, opener, NO_SLEEP)
+        candles = provider.candles("1h", 1699999200, 1700002800, http)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(http.requests, 1)
+        self.assertEqual(len(opener.calls), 1)
+        self.assertIn("data-api.binance.vision", opener.calls[0][0])
+
     def test_public_response_size_is_bounded(self):
         opener = ScriptedOpener(b" " * (fetcher.MAX_RESPONSE_BYTES + 1))
         with self.assertRaisesRegex(fetcher.ApiError, "4 MiB"):
