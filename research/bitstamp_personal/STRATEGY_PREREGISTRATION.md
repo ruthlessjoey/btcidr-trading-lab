@@ -62,3 +62,8 @@ A terminal position is classified as flat only when the simulated base inventory
 ## Partial-sell residual inventory
 
 A sell is a completed position cycle only when executed quantity reduces base inventory to exactly zero. A partial sell that leaves one or more accounting quanta must retain the residual quantity and remaining cost basis, remain an open position, and keep the cycle unclosed. The simulator does not silently write off dust or infer a terminal sell fill.
+
+
+## Requested versus returned OHLC market identity
+
+For every OHLC page, the normalized response `data.pair`/`data.market` identity must match the requested `market_symbol` after case-folding and removing separators (for example, requested `btcusd` matches response `BTC/USD`). Page-to-page consistency alone is insufficient: a stable but wrong pair must fail before any candle row is accepted.
