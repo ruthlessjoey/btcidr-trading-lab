@@ -1,6 +1,12 @@
 name: Bitstamp personal research only
 
 on:
+  push:
+    branches:
+      - research/bitstamp-public-ohlc-personal-2026-11-27
+    paths:
+      - "research/bitstamp_personal/**"
+      - ".github/workflows/bitstamp-personal-research.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -17,9 +23,10 @@ concurrency:
 jobs:
   offline-tests-and-ephemeral-data-research:
     if: >-
-      github.event_name == 'pull_request' &&
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.repo.full_name == github.repository
+      github.event.pull_request.base.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
