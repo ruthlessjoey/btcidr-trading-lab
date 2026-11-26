@@ -108,3 +108,8 @@ The ledger parser verifies the current file's exact expected trial universe and 
 Every OOS strategy fold now replays the same signal sequence across a frozen 20-case matrix: cost multipliers `1x, 1.5x, 2x, 3x, 5x` applied to per-side fee, half-spread and slippage, crossed with prior-hour-volume participation caps `1%, 2.5%, 5%, 10%`. Each scenario reports net/mark-to-market return, worst-case OHLC drawdown, closed cycles, profit factor, win rate, fees and fill count. The primary promotion gate still uses the preregistered 1x and 2x cost cases at 5% participation; the wider matrix is a fragility diagnostic.
 
 Important limitations: 16 bps per-side fee is only a public example, not the user's actual tier. Base spreads/slippage are assumptions. Capacity uses 5% (or sensitivity level) of the *previous* hourly candle volume because next-hour volume is unknown at decision time. This is not a verified fill model and does not model order-book depth or calibrated market impact. No scenario is described as realistic without venue-specific evidence.
+
+
+## Additive market-impact sensitivity (uncalibrated)
+
+A separate 20-case diagnostic adds per-side impact surcharges of 0, 5, 10, 20 and 40 bps across 1%, 2.5%, 5% and 10% prior-hour-volume participation. This is an additive surcharge, not a calibrated square-root impact model and not a claim about actual fills. It exists to show how quickly a strategy degrades under additional execution friction. The surcharge levels are assumptions and must be replaced or bounded using venue-specific depth/impact evidence before any promotion decision.

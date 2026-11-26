@@ -76,3 +76,8 @@ The base promotion scenario remains the preregistered fee/spread/slippage assump
 - Signals, candles, fold boundaries and terminal liquidation remain identical across scenarios.
 - The wider matrix is diagnostic only and cannot be used to tune parameters or reopen the final holdout.
 - Fee, spread, slippage and impact assumptions remain unverified until supported by venue-specific evidence.
+
+
+## Market-impact sensitivity amendment
+
+A separate diagnostic matrix adds 0, 5, 10, 20 and 40 bps per-side impact surcharges across 1%, 2.5%, 5% and 10% prior-hour-volume participation. These values are uncalibrated stress assumptions only. They are not a market-impact estimate, do not substitute for order-book depth or execution data, and cannot be used to tune strategies on OOS folds or the final holdout.

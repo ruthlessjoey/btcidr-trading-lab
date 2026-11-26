@@ -31,6 +31,7 @@ PARTICIPATION = D("0.05")
 FEE_BPS = D("16")  # documented public API example only; not the user's fee tier
 COST_SENSITIVITY_MULTIPLIERS = (D("1"), D("1.5"), D("2"), D("3"), D("5"))
 PARTICIPATION_SENSITIVITY_LEVELS = (D("0.01"), D("0.025"), D("0.05"), D("0.10"))
+MARKET_IMPACT_SURCHARGE_BPS = (D("0"), D("5"), D("10"), D("20"), D("40"))
 STRATEGIES = ("SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY")
 PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD"
 PREREGISTERED_START = "2024-01-01"
@@ -149,6 +150,7 @@ def _validate_backtest_inputs(
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
     participation: Decimal,
+    market_impact_bps: Decimal,
 ) -> None:
     """Reject malformed inputs before any portfolio arithmetic is performed."""
     if len(candles) != len(signals) or len(candles) < 2:
@@ -165,6 +167,10 @@ def _validate_backtest_inputs(
             raise ValueError(f"{name} must be a finite nonnegative Decimal")
     if not isinstance(participation, Decimal) or not participation.is_finite() or not D("0") < participation <= D("1"):
         raise ValueError("participation must be a finite Decimal in (0, 1]")
+    if not isinstance(market_impact_bps, Decimal) or not market_impact_bps.is_finite() or market_impact_bps < 0:
+        raise ValueError("market_impact_bps must be a finite nonnegative Decimal")
+    if fee_bps + half_spread_bps + slippage_bps + market_impact_bps >= D(10000):
+        raise ValueError("combined per-side costs must remain below 10000 bps")
     if fee_bps >= D(10000):
         raise ValueError("fee_bps must be below 10000")
     if half_spread_bps + slippage_bps >= D(10000):
@@ -203,11 +209,12 @@ def _backtest(
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
     participation: Decimal,
+    market_impact_bps: Decimal,
 ) -> dict:
     _validate_backtest_inputs(
         candles, signals, fee_bps=fee_bps,
         half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
-        participation=participation,
+        participation=participation, market_impact_bps=market_impact_bps,
     )
     cash = INITIAL_CASH
     base = D("0")
@@ -220,7 +227,7 @@ def _backtest(
     turnover = D("0")
     fills = 0
     fee_rate = fee_bps / D(10000)
-    cost_rate = (half_spread_bps + slippage_bps) / D(10000)
+    cost_rate = (half_spread_bps + slippage_bps + market_impact_bps) / D(10000)
     quantum = D("0.000000000001")
 
     for index in range(1, len(candles)):
@@ -356,6 +363,7 @@ def backtest(
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
     participation: Decimal = PARTICIPATION,
+    market_impact_bps: Decimal = D("0"),
 ) -> dict:
     # One fixed precision policy for indicator-adjacent accounting, fee,
     # spread, slippage and cost-basis arithmetic. The caller's context is restored.
@@ -367,6 +375,7 @@ def backtest(
             half_spread_bps=half_spread_bps,
             slippage_bps=slippage_bps,
             participation=participation,
+            market_impact_bps=market_impact_bps,
         )
 
 
@@ -444,6 +453,7 @@ def _backtest_walk_forward_fold(
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
     participation: Decimal = PARTICIPATION,
+    market_impact_bps: Decimal = D("0"),
 ) -> dict:
     """Backtest one OOS range, entering at its first open and liquidating next open."""
     if (test_start < 1 or test_end <= test_start or test_end >= len(all_candles)
@@ -458,6 +468,7 @@ def _backtest_walk_forward_fold(
         segment, prepared_signals, fee_bps=fee_bps,
         half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
         participation=participation,
+        market_impact_bps=market_impact_bps,
     )
 
 
@@ -485,6 +496,33 @@ def _cost_sensitivity_matrix(
                 "closed_cycles": result["closed_cycles"],
                 "profit_factor": result["profit_factor"],
                 "win_rate_pct": result["win_rate_pct"],
+                "fees_paid": result["fees_paid"],
+                "fill_count": result["fill_count"],
+                "terminal_position_status": result["terminal_position_status"],
+            })
+    return results
+
+
+
+def _market_impact_sensitivity_matrix(
+    candles: list[dict], start: int, end: int, signals: list[int], *,
+    base_spread: Decimal, base_slippage: Decimal,
+) -> list[dict]:
+    """Add uncalibrated per-side impact surcharges to fixed base costs."""
+    results = []
+    for impact_bps in MARKET_IMPACT_SURCHARGE_BPS:
+        for participation in PARTICIPATION_SENSITIVITY_LEVELS:
+            result = _backtest_walk_forward_fold(
+                candles, start, end, signals, initial_target=0,
+                fee_bps=FEE_BPS, half_spread_bps=base_spread,
+                slippage_bps=base_slippage, participation=participation,
+                market_impact_bps=impact_bps,
+            )
+            results.append({
+                "market_impact_surcharge_bps_per_side": str(impact_bps),
+                "participation": str(participation),
+                "net_return_pct": result["net_return_pct"],
+                "max_drawdown_pct": result["max_drawdown_pct"],
                 "fees_paid": result["fees_paid"],
                 "fill_count": result["fill_count"],
                 "terminal_position_status": result["terminal_position_status"],
@@ -667,6 +705,10 @@ def evaluate_market(
                     candles, start, end, signals,
                     base_spread=base_spread, base_slippage=base_slippage,
                 ),
+                "market_impact_sensitivity": _market_impact_sensitivity_matrix(
+                    candles, start, end, signals,
+                    base_spread=base_spread, base_slippage=base_slippage,
+                ),
             }
         buy_hold_signals = [1] * (end - start)
         fold_result["buy_hold_base_costs"] = _backtest_walk_forward_fold(
@@ -700,6 +742,7 @@ def evaluate_market(
         "participation": str(PARTICIPATION),
         "cost_sensitivity_multipliers": [str(x) for x in COST_SENSITIVITY_MULTIPLIERS],
         "participation_sensitivity_levels": [str(x) for x in PARTICIPATION_SENSITIVITY_LEVELS],
+        "market_impact_surcharge_bps_per_side": [str(x) for x in MARKET_IMPACT_SURCHARGE_BPS],
         "initial_cash": str(INITIAL_CASH),
     }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 

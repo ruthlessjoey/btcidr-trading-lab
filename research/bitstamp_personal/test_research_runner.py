@@ -12,6 +12,8 @@ from research_runner import (
     _cost_sensitivity_matrix,
     COST_SENSITIVITY_MULTIPLIERS,
     PARTICIPATION_SENSITIVITY_LEVELS,
+    _market_impact_sensitivity_matrix,
+    MARKET_IMPACT_SURCHARGE_BPS,
     validate_preregistered_run,
     _epoch,
 )
@@ -526,6 +528,33 @@ class CostSensitivityTests(unittest.TestCase):
         for value in (Decimal("0"), Decimal("1.01"), True):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 backtest(candles, signals, participation=value, **kwargs)
+
+
+
+
+class MarketImpactSensitivityTests(unittest.TestCase):
+    def test_impact_matrix_has_twenty_uncalibrated_scenarios(self):
+        candles = [candle() for _ in range(100)]
+        grid = _market_impact_sensitivity_matrix(
+            candles, 10, 50, [1] * 40,
+            base_spread=Decimal("5"), base_slippage=Decimal("10"),
+        )
+        self.assertEqual(len(grid), 20)
+        self.assertEqual(len({(x["market_impact_surcharge_bps_per_side"], x["participation"]) for x in grid}), 20)
+        self.assertIn(("20", "0.05"), {(x["market_impact_surcharge_bps_per_side"], x["participation"]) for x in grid})
+        self.assertTrue(all(x["terminal_position_status"] == "FLAT" for x in grid))
+
+    def test_additive_impact_surcharge_reduces_net_return(self):
+        candles = [candle(volume="1000") for _ in range(8)]
+        signals = [1, 1, 1, 1, 0, 0, 0, 0]
+        kwargs = {"fee_bps": Decimal("0"), "half_spread_bps": Decimal("0"),
+                  "slippage_bps": Decimal("0"), "participation": Decimal("0.10")}
+        zero = backtest(candles, signals, market_impact_bps=Decimal("0"), **kwargs)
+        impact = backtest(candles, signals, market_impact_bps=Decimal("20"), **kwargs)
+        self.assertLess(Decimal(impact["net_return_pct"]), Decimal(zero["net_return_pct"]))
+        self.assertEqual(impact["fill_count"], zero["fill_count"])
+        with self.assertRaises(ValueError):
+            backtest(candles, signals, market_impact_bps=Decimal("-1"), **kwargs)
 
 
 if __name__ == "__main__":
