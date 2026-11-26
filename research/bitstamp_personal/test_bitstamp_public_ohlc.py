@@ -143,6 +143,26 @@ class BitstampPublicOhlcTests(unittest.TestCase):
             with self.subTest(row=row), self.assertRaises(BitstampDataError):
                 _normalize_candle(row, step=3600)
 
+    def test_candle_numeric_inputs_are_bounded(self):
+        for row in (
+            candle(3600, open_="1e61"),
+            candle(3600, volume="9" * 41),
+            candle(3600, close_="1e-61"),
+            {**candle(3600), "timestamp": "9" * 13},
+        ):
+            with self.subTest(row=row), self.assertRaises(BitstampDataError):
+                _normalize_candle(row, step=3600)
+
+    def test_ohlc_response_cannot_exceed_page_row_limit(self):
+        rows = [candle((index + 1) * 3600) for index in range(1001)]
+        payload = {"data": {"pair": "BTC/USD", "ohlc": rows}}
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        with self.assertRaisesRegex(BitstampDataError, "1000-row page bound"):
+            fetch_spot_history(
+                "btcusd", start_timestamp=0, end_timestamp=1002 * 3600,
+                opener=opener, sleep=lambda _: None,
+            )
+
     def test_backward_pagination_returns_sorted_contiguous_closed_candles(self):
         first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3 * 3600), candle(4 * 3600)]}}
         second = {"data": {"pair": "BTC/USD", "ohlc": [
