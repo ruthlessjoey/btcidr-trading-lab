@@ -455,6 +455,9 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertIsNotNone(item["base_costs"]["net_return_pct"])
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
+                scenario = next(x for x in item["cost_sensitivity"]
+                                if x["cost_multiplier"] == "2" and x["participation"] == "0.05")
+                self.assertEqual(scenario["net_return_pct"], item["two_x_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertIn("promotion_screens", result)
@@ -494,8 +497,6 @@ class GlobalTrialUniverseTests(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class CostSensitivityTests(unittest.TestCase):
@@ -512,7 +513,7 @@ class CostSensitivityTests(unittest.TestCase):
         self.assertTrue(all(x["terminal_position_status"] == "FLAT" for x in grid))
 
     def test_participation_is_validated_and_changes_capacity(self):
-        candles = [candle() for _ in range(8)]
+        candles = [candle(volume="100") for _ in range(8)]
         signals = [1, 1, 1, 1, 0, 0, 0, 0]
         kwargs = {
             "fee_bps": Decimal("0"), "half_spread_bps": Decimal("0"),
@@ -524,3 +525,7 @@ class CostSensitivityTests(unittest.TestCase):
         for value in (Decimal("0"), Decimal("1.01"), True):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 backtest(candles, signals, participation=value, **kwargs)
+
+
+if __name__ == "__main__":
+    unittest.main()
