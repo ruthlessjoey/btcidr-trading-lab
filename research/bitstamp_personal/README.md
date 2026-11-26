@@ -71,3 +71,10 @@ The 2x-cost replay doubles every cost component, including the per-side fee, hal
 
 
 The V2 walk-forward schedule and cost stress supersede the earlier 60/20/20 split and prior non-doubled stress assumptions for future research runs. The historical V1 specification is retained for traceability.
+
+
+## Statistical evidence (offline, deterministic)
+
+`statistical_evidence.py` implements a dependency-free Deflated Sharpe probability and paired circular moving-block bootstrap lower confidence bound from per-period strategy and same-cost benchmark returns. DSR uses sample Sharpe, skewness, non-excess kurtosis, completed-trial Sharpe dispersion and the complete append-only registered-trial count. The bootstrap resamples paired return differences in circular blocks; defaults are 24 hourly observations, 5,000 replicates, 95% confidence and a fixed seed.
+
+These calculations are screening evidence, not independent verification. Trial-registry completeness, candidate inclusion, return-series provenance, dependence assumptions and bootstrap block length still require review. No provider access or strategy execution is performed by this module.
