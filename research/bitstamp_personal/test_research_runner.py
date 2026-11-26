@@ -200,6 +200,29 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(result["terminal_position_status"], "FLAT")
         self.assertEqual(Decimal(result["open_position_mark_value"]), Decimal("0"))
 
+    def test_one_quantum_terminal_inventory_is_not_reported_as_flat(self):
+        # 5% of 2e-11 base volume permits exactly 1e-12 units. That quantity
+        # must remain an open marked-to-market position until an actual sell fill.
+        result = backtest(
+            [
+                candle("100", "100", volume="0.00000000002"),
+                candle("100", "100", volume="100"),
+            ],
+            [1, 1],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertEqual(
+            Decimal(result["open_position_at_end"]),
+            Decimal("0.000000000001"),
+        )
+        self.assertIsNone(result["net_return_pct"])
+        self.assertEqual(
+            result["terminal_position_status"],
+            "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL",
+        )
+
     def test_backtest_rejects_invalid_candle_low(self):
         candles = [candle(), candle("100", "105", low_price="101")]
         with self.assertRaisesRegex(ValueError, "candle low"):

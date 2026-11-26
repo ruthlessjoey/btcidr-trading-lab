@@ -51,3 +51,6 @@ Train, validation and holdout each begin with a separate flat research account. 
 ## Buy-and-hold benchmark
 
 The benchmark uses a fixed base-quantity target determined at the first eligible next-open entry, then holds the position. If entry is partial under the 5% prior-hour volume cap, it retries only the remaining original quantity; it does not increase the target when later prices fall. Candidate strategies continue to use target-weight rebalancing. Both policies use the same modeled execution costs and volume cap.
+
+
+A position at the smallest inventory quantum is still reported as open until a sell fill reduces inventory to exactly zero; cent-rounded inventory value does not override position status.
