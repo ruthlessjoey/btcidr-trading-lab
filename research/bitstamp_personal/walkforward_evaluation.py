@@ -15,6 +15,7 @@ from statistical_evidence import (
     paired_block_bootstrap_excess_lower_bound,
 )
 from trial_registry import verify_trial_registry
+from dataset_manifest import verify_dataset_manifest, DatasetManifestError
 
 RESEARCH_FAMILY = "BITSTAMP_PERSONAL_SPOT_V2"
 BASE_FEE_BPS = Decimal("16")
@@ -67,6 +68,7 @@ def evaluate_five_fold_strategy(
     market_symbol: str,
     strategy_id: str,
     trial_registry_bytes: bytes,
+    dataset_manifest: Mapping[str, object],
 ) -> dict[str, Any]:
     """Build gate-ready metrics using only frozen market costs and registry bytes.
 
@@ -74,9 +76,13 @@ def evaluate_five_fold_strategy(
     identity. Costs are selected from the frozen V2 symbol map; callers cannot
     lower them. Base and exactly 2x-all-cost replays use identical signals/data.
     """
-    normalized_symbol = market_symbol.casefold() if isinstance(market_symbol, str) else ""
-    if normalized_symbol not in MARKET_COSTS:
-        raise WalkForwardEvaluationError("market_symbol is not in the frozen V2 universe")
+    try:
+        verified_dataset = verify_dataset_manifest(dataset_manifest)
+    except DatasetManifestError as exc:
+        raise WalkForwardEvaluationError("dataset manifest failed completeness validation") from exc
+    normalized_symbol = verified_dataset["market_symbol"]
+    if market_symbol.casefold() != normalized_symbol or candles != verified_dataset["candles"]:
+        raise WalkForwardEvaluationError("supplied candles or market identity do not match verified dataset manifest")
     if strategy_id not in STRATEGIES:
         raise WalkForwardEvaluationError("strategy_id is not preregistered")
     dataset_hash = canonical_dataset_sha256(normalized_symbol, candles)
@@ -145,6 +151,8 @@ def evaluate_five_fold_strategy(
         "market_symbol": normalized_symbol,
         "strategy_id": strategy_id,
         "dataset_sha256": dataset_hash,
+        "raw_page_sha256": verified_dataset["raw_page_sha256"],
+        "manifest_sha256": verified_dataset["manifest_sha256"],
         "trial_registry_sha256": registry_hash,
         "registered_trial_count": trial_count,
         "costs": {
