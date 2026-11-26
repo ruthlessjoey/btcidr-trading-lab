@@ -132,10 +132,13 @@ def _validate_backtest_inputs(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    rebalance_targets: bool,
 ) -> None:
     """Reject malformed inputs before any portfolio arithmetic is performed."""
     if len(candles) != len(signals) or len(candles) < 2:
         raise ValueError("candles/signals length mismatch or insufficient bars")
+    if type(rebalance_targets) is not bool:
+        raise ValueError("rebalance_targets must be a boolean")
     for index, signal in enumerate(signals):
         if type(signal) is not int or signal not in (0, 1):
             raise ValueError(f"signal at index {index} must be integer 0 or 1")
@@ -183,10 +186,12 @@ def _backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    rebalance_targets: bool,
 ) -> dict:
     _validate_backtest_inputs(
         candles, signals, fee_bps=fee_bps,
         half_spread_bps=half_spread_bps, slippage_bps=slippage_bps,
+        rebalance_targets=rebalance_targets,
     )
     cash = INITIAL_CASH
     base = D("0")
@@ -201,6 +206,7 @@ def _backtest(
     fee_rate = fee_bps / D(10000)
     cost_rate = (half_spread_bps + slippage_bps) / D(10000)
     quantum = D("0.000000000001")
+    fixed_base_target = None
 
     for index in range(1, len(candles)):
         weight = D(signals[index - 1])
@@ -210,7 +216,18 @@ def _backtest(
         max_qty = prior_volume * PARTICIPATION
         equity_at_open = cash + base * open_price
         intrabar_equity_curve.append(equity_at_open)
-        desired_base = (equity_at_open * weight / open_price) if open_price > 0 else D("0")
+        if rebalance_targets:
+            desired_base = (equity_at_open * weight / open_price) if open_price > 0 else D("0")
+        else:
+            if weight == 0:
+                desired_base = D("0")
+            else:
+                if fixed_base_target is None:
+                    initial_buy_price = open_price * (D(1) + cost_rate)
+                    fixed_base_target = (
+                        cash / (initial_buy_price * (D(1) + fee_rate))
+                    ).quantize(quantum, rounding=ROUND_DOWN)
+                desired_base = fixed_base_target
         delta = desired_base - base
 
         if delta > 0 and cash > 0 and max_qty > 0:
@@ -290,6 +307,10 @@ def _backtest(
     gross_losses = -sum((pnl for pnl in cycles if pnl < 0), D("0"))
     return {
         "initial_cash": str(INITIAL_CASH),
+        "execution_policy": (
+            "TARGET_WEIGHT_REBALANCING" if rebalance_targets
+            else "FIXED_QUANTITY_ENTRY_THEN_HOLD"
+        ),
         "final_equity": str(final_equity.quantize(D("0.01"))),
         "net_return_pct": str(mark_to_market_return_pct) if terminal_position_is_flat else None,
         "mark_to_market_return_pct": str(mark_to_market_return_pct),
@@ -326,6 +347,7 @@ def backtest(
     fee_bps: Decimal,
     half_spread_bps: Decimal,
     slippage_bps: Decimal,
+    rebalance_targets: bool = True,
 ) -> dict:
     # One fixed precision policy for indicator-adjacent accounting, fee,
     # spread, slippage and cost-basis arithmetic. The caller's context is restored.
@@ -336,6 +358,7 @@ def backtest(
             fee_bps=fee_bps,
             half_spread_bps=half_spread_bps,
             slippage_bps=slippage_bps,
+            rebalance_targets=rebalance_targets,
         )
 
 
@@ -406,6 +429,7 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
         "holdout_base_costs": backtest(
             candles[holdout_start:holdout_end], buy_hold_signals[holdout_start:holdout_end],
             fee_bps=FEE_BPS, half_spread_bps=base_spread, slippage_bps=base_slippage,
+            rebalance_targets=False,
         )
     }
     return {

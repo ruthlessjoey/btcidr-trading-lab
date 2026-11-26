@@ -47,3 +47,8 @@ This run is exploratory only. No strategy can be promoted from this run. Indepen
 ## Segment state reset
 
 Each train, validation and holdout segment uses a separate account that starts flat. Indicator calculations may use only historical closes available up to each signal candle, including pre-segment history for rolling-window warmup. Stateful strategy position targets are reset to flat at the first candle of every segment; a prior segment's open/held target is not carried into the next segment. The first new position can only be entered by a signal generated within the new segment and filled at the following candle open.
+
+
+## Buy-and-hold benchmark execution
+
+The buy-and-hold benchmark is not a 100%-target rebalancing strategy. It establishes one fixed base-quantity target from the initial next-open entry price after modeled fee/spread/slippage. If the 5% prior-hour participation cap prevents full entry, the remaining quantity is retried at later eligible opens, but the original base-quantity target does not increase when the price falls. Once entered, the position is held; no hourly target-weight rebalance occurs. The benchmark remains long-only and uses the same next-open fill, fee, spread/slippage and participation assumptions.
