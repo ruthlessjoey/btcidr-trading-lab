@@ -239,6 +239,9 @@ def fetch_spot_history(
         if not isinstance(payload, Mapping) or not isinstance(payload.get("data"), Mapping):
             raise BitstampDataError("OHLC response is missing the data object")
         data = payload["data"]
+        pair = data.get("pair") or data.get("market")
+        if not isinstance(pair, str) or not pair.strip():
+            raise BitstampDataError("OHLC response is missing its market identity")
         rows = data.get("ohlc")
         if not isinstance(rows, list):
             raise BitstampDataError("OHLC response data.ohlc must be a list")
@@ -285,6 +288,7 @@ def fetch_spot_history(
     ).encode("utf-8")
     return {
         "market_symbol": market_symbol,
+        "pair": pair,
         "step_seconds": STEP_SECONDS,
         "row_count": len(candles),
         "first_open_timestamp": candles[0]["open_timestamp"],
