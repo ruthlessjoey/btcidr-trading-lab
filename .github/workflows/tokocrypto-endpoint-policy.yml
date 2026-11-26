@@ -7,6 +7,7 @@ on:
       - security/tokocrypto-caller-clock-window-2026-11-27
       - security/tokocrypto-candle-completeness-2026-11-27
       - research/tokocrypto-fixed-utc-window-2026-11-27
+      - security/block-unattested-tokocrypto-current-window-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -25,6 +26,7 @@ on:
       - security/tokocrypto-klines-only-2026-11-27
       - security/tokocrypto-caller-clock-window-2026-11-27
       - security/tokocrypto-candle-completeness-2026-11-27
+      - research/tokocrypto-fixed-utc-window-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
