@@ -89,6 +89,11 @@ def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_json_constant(value: str) -> None:
+    """Reject JavaScript-style NaN and Infinity tokens in audit evidence."""
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
 def _event_hash(previous: str, event: Mapping[str, Any]) -> str:
     encoded = json.dumps(event, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256((previous + encoded).encode("utf-8")).hexdigest()
@@ -1410,24 +1415,47 @@ class SQLiteSettlementStore:
             return self._verify_chain(db)
 
     def _verify_chain(self, db: sqlite3.Connection) -> bool:
+        """Return False for any malformed, noncanonical or unverifiable audit row."""
         previous = "0" * 64
         expected_sequence = 1
-        for sequence, event_json, stored_previous, stored_hash in db.execute(
-                "SELECT seq,event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"):
-            # The chain's checkpoint sequence must identify an exact contiguous
-            # prefix, not merely the ordering of rows that happen to remain.
-            if sequence != expected_sequence:
-                return False
-            try:
-                event = json.loads(event_json, object_pairs_hook=_strict_json_object)
-            except (TypeError, ValueError, RecursionError, UnicodeError):
-                return False
-            if not isinstance(event, dict):
-                return False
-            if stored_previous != previous or _event_hash(previous, event) != stored_hash:
-                return False
-            previous = stored_hash
-            expected_sequence += 1
+        try:
+            rows = db.execute(
+                "SELECT seq,event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"
+            )
+            for sequence, event_json, stored_previous, stored_hash in rows:
+                # A checkpoint sequence must identify an exact contiguous prefix.
+                if sequence != expected_sequence:
+                    return False
+                try:
+                    event = json.loads(
+                        event_json,
+                        object_pairs_hook=_strict_json_object,
+                        parse_constant=_reject_json_constant,
+                    )
+                    if not isinstance(event, dict):
+                        return False
+                    # Storage uses compact, sorted-key UTF-8 JSON. Require the
+                    # persisted representation to match the audit writer exactly.
+                    canonical = json.dumps(
+                        event,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    )
+                    if canonical != event_json:
+                        return False
+                    expected_hash = _event_hash(previous, event)
+                except (TypeError, ValueError, RecursionError, UnicodeError):
+                    return False
+                if stored_previous != previous or expected_hash != stored_hash:
+                    return False
+                previous = stored_hash
+                expected_sequence += 1
+        except (sqlite3.DatabaseError, TypeError, ValueError, RecursionError, UnicodeError):
+            # Corrupt SQLite text and malformed rows must not escape the
+            # verifier's boolean fail-closed contract as exceptions.
+            return False
         return True
 
     def _initialize(self, db: sqlite3.Connection, opening_cash: str) -> None:
