@@ -1,4 +1,8 @@
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
+from unittest.mock import patch
 from decimal import Decimal, getcontext
 
 from research_runner import (
@@ -11,6 +15,7 @@ from research_runner import (
     _backtest_walk_forward_fold,
     validate_preregistered_run,
     _epoch,
+    main,
 )
 
 
@@ -26,6 +31,30 @@ def candle(open_price="100", close_price="100", volume="10000", low_price=None):
 
 
 class ResearchRunnerTests(unittest.TestCase):
+    def test_point_in_time_gate_blocks_before_any_public_request(self):
+        output = io.StringIO()
+        with patch(
+            "research_runner.fetch_spot_markets",
+            side_effect=AssertionError("market metadata request must not occur"),
+        ) as markets_request, patch(
+            "research_runner.fetch_spot_history",
+            side_effect=AssertionError("OHLC request must not occur"),
+        ) as history_request, redirect_stdout(output):
+            result = main([
+                "--start", "2024-01-01",
+                "--end", "2026-11-01",
+                "--symbols", "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd",
+                "--min-markets", "3",
+                "--require-meme",
+            ])
+        self.assertEqual(result, 2)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertIn("point-in-time", payload["error"])
+        self.assertIn("digest is not pinned", payload["error"])
+        markets_request.assert_not_called()
+        history_request.assert_not_called()
+
     def test_sma_signals_are_causal_and_long_only(self):
         closes_a = [str(100 + index) for index in range(60)]
         closes_b = closes_a[:51] + [str(1000 - index) for index in range(51, 60)]
