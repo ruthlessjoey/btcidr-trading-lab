@@ -58,6 +58,21 @@ class TrialRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(TrialRegistryError, "status"):
             verify_trial_registry(encode([(i + 1, *event) for i, event in enumerate(events)]))
 
+    def test_rejects_double_finish_and_requires_result_hash_for_completed_trial(self):
+        events = [
+            start("one"),
+            ("TRIAL_FINISHED", {"trial_id": "one", "status": "FAILED", "result_sha256": None}),
+            ("TRIAL_FINISHED", {"trial_id": "one", "status": "ABANDONED", "result_sha256": None}),
+        ]
+        with self.assertRaisesRegex(TrialRegistryError, "finished once"):
+            verify_trial_registry(encode([(i + 1, *event) for i, event in enumerate(events)]))
+        events = [
+            start("two"),
+            ("TRIAL_FINISHED", {"trial_id": "two", "status": "COMPLETED", "result_sha256": None}),
+        ]
+        with self.assertRaisesRegex(TrialRegistryError, "requires result SHA-256"):
+            verify_trial_registry(encode([(i + 1, *event) for i, event in enumerate(events)]))
+
     def test_rejects_duplicate_json_keys_and_missing_newline(self):
         with self.assertRaisesRegex(TrialRegistryError, "ending with newline"):
             verify_trial_registry(b"{}")
