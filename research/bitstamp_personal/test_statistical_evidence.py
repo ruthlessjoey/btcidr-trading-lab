@@ -1,4 +1,5 @@
 import unittest
+from decimal import Decimal
 from statistical_evidence import (
     BOOTSTRAP_RESAMPLES,
     StatisticalEvidenceError,
@@ -11,6 +12,12 @@ from statistical_evidence import (
 class StatisticalEvidenceTests(unittest.TestCase):
     def test_non_overlapping_24bar_returns_have_expected_count(self):
         curve = [10000.0 * (1.001 ** index) for index in range(24 * 31 + 1)]
+        returns = non_overlapping_24bar_returns(curve)
+        self.assertEqual(len(returns), 31)
+        self.assertTrue(all(value > 0 for value in returns))
+
+    def test_equity_curve_accepts_internal_decimal_strings(self):
+        curve = [str(Decimal("10000") * (Decimal("1.001") ** index)) for index in range(24 * 31 + 1)]
         returns = non_overlapping_24bar_returns(curve)
         self.assertEqual(len(returns), 31)
         self.assertTrue(all(value > 0 for value in returns))

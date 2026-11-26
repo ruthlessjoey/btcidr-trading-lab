@@ -333,7 +333,7 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertTrue(all(values[i][1] <= values[i + 1][0] for i in range(4)))
 
     def test_five_fold_oos_ranges_reject_small_or_invalid_datasets(self):
-        for value in (True, 0, -1, 5499, "10000"):
+        for value in (True, 0, -1, 7899, "10000"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 five_fold_oos_ranges(value)
 

@@ -12,7 +12,7 @@ Personal, noncommercial SPOT research only. No raw data redistribution, account 
 - 1-hour closed candles; 2024-01-01 00:00 UTC candle open through 2026-11-01 00:00 UTC inclusive candle-close boundary.
 - Exact market identity required on every page; gaps/incomplete coverage block the market.
 - First 50% of contiguous candles is historical indicator warm-up/development history; no model fitting.
-- Five sequential, non-overlapping test windows on the remaining bars; 50-bar embargo between folds; >=500 bars per fold; minimum dataset 5,500 candles.
+- Five sequential, non-overlapping test windows on the remaining bars; 50-bar embargo between folds; >=750 bars per fold; minimum dataset 7,900 candles. This provides at least 30 complete non-overlapping 24-bar return observations per fold for the DSR/bootstrap evidence.
 - Each fold starts flat; indicators use only prior closes available at the signal time.
 - Signal at close, execute at next open; max participation 5% of prior-hour base volume.
 
