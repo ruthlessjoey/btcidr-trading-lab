@@ -89,7 +89,7 @@ def _is_tokocrypto_host(url):
         host = urllib.parse.urlsplit(url).hostname or ""
     except (TypeError, ValueError):
         return False
-    return "tokocrypto" in host.casefold()
+    return "tokocrypto" in urllib.parse.unquote(host).casefold()
 
 
 def validate_request_url(url):
@@ -114,7 +114,10 @@ def validate_request_url(url):
                 or not re.fullmatch(r"[0-9]{1,3}", values["limit"])):
             raise ApiError("Tokocrypto klines query values are invalid")
         start_ms, end_ms, limit = int(values["startTime"]), int(values["endTime"]), int(values["limit"])
-        if start_ms < 0 or end_ms <= start_ms or not 1 <= limit <= CANDLES_PER_REQUEST:
+        step_ms = TF_SECONDS[values["interval"]] * 1000
+        if (start_ms < 0 or end_ms <= start_ms or not 1 <= limit <= CANDLES_PER_REQUEST
+                or start_ms % step_ms
+                or end_ms - start_ms > limit * step_ms):
             raise ApiError("Tokocrypto klines range or row limit is outside the approved bounds")
     except (TypeError, ValueError) as exc:
         if isinstance(exc, ApiError):
