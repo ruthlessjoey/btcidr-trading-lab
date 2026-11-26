@@ -1388,3 +1388,26 @@ Release state: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; p
 - LIVE: DISABLED / ABSENT.
 - Profitability/high win rate: NOT ESTABLISHED.
 - Overall completion: UNRATED.
+
+
+## Follow-on security gate: low-level reservation API and schema bypass closed — 27 November 2026
+
+A static call-path review of the combined #203/#205/#208 candidate found that the high-level settlement store enforced both audit baseline markers, but low-level public reservation functions called `ensure_reservation_schema_v2` directly. Before this correction:
+- A caller could invoke schema creation on a pre-marker legacy v1 database if the base tables existed.
+- Reservation lifecycle functions could mutate already-existing v2 reservation tables without independently checking the account/market baseline markers.
+
+### Correction in PR #208
+- `ensure_reservation_schema_v2` now requires both `account_initialization_audit=required-v1` and `market_registration_audit=required-v1` before creating any reservation tables.
+- Existing complete v2 tables can still be verified without those markers, preserving read-only inspection of pre-marker stores.
+- Every mutating reservation lifecycle entry point now checks both markers before schema verification or mutation. The read-only `get_reservation` query remains separate.
+- Schema and lifecycle fixtures now establish explicit baseline markers. The preflight v2 fixture does so only for its synthetic current-v2 classification test; clean v1 fixtures remain pre-marker.
+- Added regressions: schema creation without markers is rejected without creating reservation tables; an existing-v2 pre-marker store cannot create/change reservations.
+
+### Exact-head verification
+- PR #208 exact head: `bd2fda456af6b4763027ff639fda5704835c856e`.
+- Actions run [45869148888](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45869148888), both Python 3.11.18 and 3.13.18 passed.
+- Eight suites: 26 schema, 22 lifecycle, 16 allocations, 13 atomic allocations, 82 settlement store, 17 receiver, 12 offline journal/settlement, 40 read-only migration preflight.
+- **228 tests per interpreter / 456 total; zero actual ResourceWarning or ignored-connection output.**
+- SQLite 3.46.1. Offline sparse-checkout workflow; no provider or exchange network access.
+
+This is an additional verified fail-closed control, not proof of complete system security or profitability. Independent adversarial review remains pending.
