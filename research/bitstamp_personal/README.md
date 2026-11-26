@@ -71,3 +71,6 @@ The research simulator can optionally expose its close-equity marks for offline 
 ## Trial registry and V2 preregistration
 
 The hash-chained registry records every candidate trial, including failed and abandoned trials. V2 currently contains two fixed candidate strategies; registry SHA-256 is `7fa30c75dfc71d1db2b939586b3bf3d3006607a4479f5187dabf1b479e530778`. The V2 preregistration freezes five OOS folds, 50-bar embargoes, doubled fee/spread/slippage replay and statistical thresholds. The registry hash is required in every promotion fold. This remains a research design; source rights, holdout integrity and independent review remain separate.
+
+
+The V2 evaluator derives the dataset SHA-256 from canonical normalized candles plus exact market symbol/interval, verifies the selected strategy exists in the hash-chained registry, and selects frozen costs from the exact market symbol. Fee/spread/slippage cannot be lowered by caller parameters.
