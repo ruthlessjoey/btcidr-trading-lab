@@ -41,10 +41,10 @@ jobs:
           sparse-checkout: |
             /research/bitstamp_personal
 
-      - name: Set up Python 3.13.5
+      - name: Set up latest Python 3.13 patch
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13.5"
+          python-version: "3.13"
 
       - name: Run offline provider and pagination tests
         run: python -m unittest discover -s research/bitstamp_personal -p 'test_*.py' -v
