@@ -374,6 +374,8 @@ def five_fold_oos_ranges(count: int) -> dict[str, tuple[int, int]]:
     """
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise ValueError("count must be a positive integer")
+    if count < 5500:
+        raise ValueError("at least 5500 candles are required for five OOS folds")
     history_end = int(D(count) * OOS_INITIAL_HISTORY_RATIO)
     remaining = count - history_end
     usable = remaining - OOS_EMBARGO_BARS * (OOS_FOLD_COUNT - 1)
