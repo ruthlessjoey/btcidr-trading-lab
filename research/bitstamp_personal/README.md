@@ -78,3 +78,6 @@ The hash-chained registry records every candidate trial, including failed and ab
 V2 public research is blocked before network access while point-in-time listing/trading/matching intervals remain unverified; the current active-market snapshot is not a historical universe and can create survivorship bias. The statistical promotion gate verifies the exact raw hash-chained trial-registry bytes against the frozen V2 preregistration digest, binds every fold to the verified candidate count and hash, and requires at least 50 bars between adjacent fold ranges. The fixed buy-and-hold comparator is not counted as a candidate trial. A gate pass would qualify for independent human review only; it is not proof of profitability.
 
 The five-fold helper and statistics/promotion components are still a design/research branch and have not yet been integrated into a complete V2 empirical runner. No public-data run is authorized by this change.
+
+
+The promotion screen also requires at least 30 complete, non-overlapping 24-bar return observations in every OOS fold, not only 100 observations in aggregate.
