@@ -30,6 +30,16 @@ class SettlementStoreError(RuntimeError):
     """Unsafe, inconsistent, or unresolved durable settlement state."""
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects instead of silently keeping the last key."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 _DECIMAL_INPUT_TEXT_LIMIT = 128
 _DECIMAL_INPUT_DIGITS = 80
 _DECIMAL_INPUT_MIN_EXPONENT = -160
@@ -1408,7 +1418,10 @@ class SQLiteSettlementStore:
             # prefix, not merely the ordering of rows that happen to remain.
             if sequence != expected_sequence:
                 return False
-            event = json.loads(event_json)
+            try:
+                event = json.loads(event_json, object_pairs_hook=_reject_duplicate_json_keys)
+            except (TypeError, ValueError, RecursionError):
+                return False
             if stored_previous != previous or _event_hash(previous, event) != stored_hash:
                 return False
             previous = stored_hash
