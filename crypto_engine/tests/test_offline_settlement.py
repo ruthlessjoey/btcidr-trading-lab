@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 from decimal import Decimal
@@ -118,6 +119,17 @@ class OfflineSettlementTests(unittest.TestCase):
         with self.assertRaises(BatchJournalError):
             self.controller.process(batch_id="payload-bound", proposals={"BTC/USDT": "0.5"},
                                     bars={"BTC/USDT": self.bar}, timestamp=101)
+
+    def test_batch_journal_context_manager_closes_sqlite_connection(self):
+        db = self.journal._connect()
+        with db as managed:
+            self.assertIs(managed, db)
+            self.assertEqual(
+                managed.execute("SELECT value FROM metadata WHERE key='runtime_id'").fetchone()[0],
+                "runtime-test",
+            )
+        with self.assertRaises(sqlite3.ProgrammingError):
+            db.execute("SELECT 1")
 
     def test_journal_rejects_new_runtime_after_restart(self):
         with self.assertRaises(BatchJournalError):
