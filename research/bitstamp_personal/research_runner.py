@@ -259,10 +259,9 @@ def _backtest(
                 fees_paid += fee
                 turnover += notional
                 fills += 1
-                if base <= quantum:
+                if base == 0:
                     cycles.append(cycle_pnl)
                     cycle_pnl = D("0")
-                    base = D("0")
                     cost_basis = D("0")
 
         close_equity = cash + base * close_price
