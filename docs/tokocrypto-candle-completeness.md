@@ -27,3 +27,20 @@ A complete contiguous grid is necessary but not sufficient for research eligibil
 - Every adjacent candle open time differs by exactly one timeframe interval.
 - Actual candle count equals the number of intervals in the requested window.
 - Any missing interval causes a fail-closed error before downstream research can consume the series.
+
+
+## Clock trust gate
+
+The current caller-clock helper accepts a positive integer epoch and labels its source, but it cannot authenticate that value. A syntactically valid integer, a call to the process wall clock, and an elapsed-time check against a monotonic clock do not establish absolute UTC accuracy. A monotonic clock can detect elapsed-time discontinuities after a trusted anchor; it cannot prove that the initial anchor is correct.
+
+Until a reviewed host-clock attestor exists:
+- current-window collection, freshness claims and unattended scheduling remain blocked;
+- caller-supplied timestamps must remain explicitly `NOT_VERIFIED`;
+- the provider's candle timestamps must not be treated as a substitute for a trusted current-time source;
+- do not restore Tokocrypto `/api/v3/time`, use `.com`, query another unapproved endpoint, or introduce an external time service without separate approval.
+
+A future attestor must provide a bounded evidence record containing the UTC epoch, clock source and synchronization state, last successful synchronization time, uncertainty bound, and paired monotonic reading. The consumer must reject missing/stale evidence, unsynchronized status, uncertainty above the preregistered threshold, or wall-clock/monotonic discontinuity. The implementation must prove which host service produced the evidence rather than trusting caller-supplied booleans or labels.
+
+On iPhone, the user-facing “Set Automatically” setting is an operator configuration, not an attestation readable by this Python helper; it cannot alone certify unattended automation. A runtime platform and its supported clock-status interface must be selected and independently tested before implementing the attestor. This project does not yet have an approved platform attestor.
+
+Historical research can avoid dependence on current wall-clock time by preregistering fixed UTC start/end boundaries that are wholly in the past, then applying the complete-grid and point-in-time gates. That is a separate research-window interface; it must not silently reuse the current-window helper with an arbitrary timestamp.
