@@ -1,10 +1,17 @@
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
 from decimal import Decimal, getcontext
+from unittest.mock import patch
 
 from research_runner import (
     backtest,
     evaluate_market,
     make_signals,
+    main,
+    BitstampDataError,
+    require_point_in_time_universe_evidence,
     _signals_for_segment,
     split_ranges,
     validate_preregistered_run,
@@ -348,6 +355,35 @@ class ResearchRunnerTests(unittest.TestCase):
     def test_date_boundary_rejects_non_iso_date(self):
         with self.assertRaisesRegex(ValueError, "YYYY-MM-DD"):
             _epoch("2026/11/01")
+
+    def test_current_active_market_snapshot_is_blocked_before_any_network_request(self):
+        output = io.StringIO()
+        args = [
+            "--start", "2024-01-01",
+            "--end", "2026-11-01",
+            "--symbols", "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd",
+            "--min-markets", "3",
+            "--require-meme",
+        ]
+        with patch(
+            "research_runner.fetch_spot_markets",
+            side_effect=AssertionError("markets request must not occur"),
+        ) as markets_request, patch(
+            "research_runner.fetch_spot_history",
+            side_effect=AssertionError("OHLC request must not occur"),
+        ) as ohlc_request, redirect_stdout(output):
+            result = main(args)
+
+        self.assertEqual(result, 2)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["status"], "BLOCKED")
+        self.assertIn("survivorship bias", payload["error"])
+        markets_request.assert_not_called()
+        ohlc_request.assert_not_called()
+
+    def test_point_in_time_universe_gate_fails_closed(self):
+        with self.assertRaisesRegex(BitstampDataError, "survivorship bias"):
+            require_point_in_time_universe_evidence()
 
     def test_runner_accepts_only_the_frozen_preregistered_configuration(self):
         symbols = "btcusd,ethusd,xrpusd,dogeusd,shibusd,pepeusd,solusd"
