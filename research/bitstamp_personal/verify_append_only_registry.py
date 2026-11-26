@@ -16,6 +16,7 @@ from experiment_registry import TrialRegistryError, parse_trial_registry
 
 MAX_REGISTRY_BYTES = 1024 * 1024
 GENESIS_GIT_BLOB_SHA1 = "10dbeb52941c08cda1f7b1d724b543b41dd6fdc2"
+GENESIS_SHA256 = "d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d"
 EXPECTED_MARKETS = (
     "btcusd", "ethusd", "xrpusd", "dogeusd", "shibusd", "pepeusd", "solusd",
 )
@@ -74,6 +75,11 @@ def verify_append_only_registry(
         raise AppendOnlyRegistryError(
             "genesis snapshot does not match the pinned Git blob SHA-1"
         )
+    actual_genesis_sha256 = hashlib.sha256(genesis_bytes).hexdigest()
+    if actual_genesis_sha256 != GENESIS_SHA256:
+        raise AppendOnlyRegistryError(
+            "genesis snapshot does not match the pinned SHA-256"
+        )
     if not genesis_bytes.endswith(b"\n"):
         raise AppendOnlyRegistryError("genesis registry must end at a complete LF-delimited event")
     if base_bytes and not base_bytes.endswith(b"\n"):
@@ -128,6 +134,7 @@ def verify_append_only_registry(
     return {
         "status": "APPEND_ONLY_VERIFIED",
         "genesis_git_blob_sha1": actual_genesis_sha1,
+        "genesis_sha256": actual_genesis_sha256,
         "base_sha256": hashlib.sha256(base_bytes).hexdigest(),
         "head_sha256": hashlib.sha256(head_bytes).hexdigest(),
         "base_bytes": len(base_bytes),
