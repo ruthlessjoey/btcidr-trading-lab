@@ -1749,6 +1749,44 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ):
             self.store.snapshot()
 
+    def test_audit_chain_rejects_noncanonical_json_without_hash_change(self):
+        with _managed_connection(self.path) as db:
+            event_json = db.execute(
+                "SELECT event_json FROM main.audit WHERE seq=1"
+            ).fetchone()[0]
+            event = json.loads(event_json)
+            noncanonical = json.dumps(
+                event, sort_keys=True, separators=(",", ": "), ensure_ascii=False
+            )
+            self.assertNotEqual(noncanonical, event_json)
+            db.execute(
+                "UPDATE main.audit SET event_json=? WHERE seq=1", (noncanonical,)
+            )
+        # The parsed event value and canonical event hash are unchanged.
+        self.assertFalse(self.store.verify_audit_chain())
+
+    def test_audit_chain_rejects_nonfinite_json_without_raising(self):
+        with _managed_connection(self.path) as db:
+            event_json = db.execute(
+                "SELECT event_json FROM main.audit WHERE seq=1"
+            ).fetchone()[0]
+            event = json.loads(event_json)
+            event["non_finite_probe"] = float("nan")
+            malformed = json.dumps(
+                event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+            db.execute(
+                "UPDATE main.audit SET event_json=? WHERE seq=1", (malformed,)
+            )
+        self.assertFalse(self.store.verify_audit_chain())
+
+    def test_audit_chain_rejects_invalid_utf8_without_raising(self):
+        with _managed_connection(self.path) as db:
+            db.execute(
+                "UPDATE main.audit SET event_json=CAST(x'ff' AS TEXT) WHERE seq=1"
+            )
+        self.assertFalse(self.store.verify_audit_chain())
+
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
