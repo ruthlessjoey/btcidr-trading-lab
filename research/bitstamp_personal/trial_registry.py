@@ -41,6 +41,7 @@ def verify_trial_registry(raw: bytes) -> dict:
         raise TrialRegistryError("registry must be strict UTF-8") from exc
     previous = _ZERO
     started = {}
+    trial_strategies = {}
     finished = set()
     counts = {}
     event_count = 0
@@ -82,6 +83,7 @@ def verify_trial_registry(raw: bytes) -> dict:
             if trial_id in started:
                 raise TrialRegistryError("trial_id may only be started once")
             started[trial_id] = family
+            trial_strategies.setdefault(family, []).append(strategy)
             counts[family] = counts.get(family, 0) + 1
         elif record["event"] == "TRIAL_FINISHED":
             if set(payload) != {"trial_id", "status", "result_sha256"}:
@@ -102,10 +104,6 @@ def verify_trial_registry(raw: bytes) -> dict:
             raise TrialRegistryError("unknown trial registry event")
         previous = digest
         event_count += 1
-    strategies = {}
-    for trial_id, family in started.items():
-        # Strategy IDs are retained in a separate verified map below.
-        pass
     return {
         "registry_sha256": hashlib.sha256(raw).hexdigest(),
         "event_count": event_count,
