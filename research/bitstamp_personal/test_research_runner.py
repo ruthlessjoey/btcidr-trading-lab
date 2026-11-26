@@ -473,5 +473,22 @@ class WalkForwardFoldTests(unittest.TestCase):
             )
 
 
+
+
+class GlobalTrialUniverseTests(unittest.TestCase):
+    def test_global_trial_screen_requires_all_registered_trial_series(self):
+        from research_runner import _evaluate_market_promotion_screens
+        with self.assertRaisesRegex(ValueError, "all registered market-strategy trial series"):
+            _evaluate_market_promotion_screens(
+                [{} for _ in range(5)],
+                dataset_sha256="a" * 64,
+                cost_model_sha256="b" * 64,
+                strategy_config_sha256="c" * 64,
+                registered_trial_count=4,
+                trial_series_by_fold=[[] for _ in range(5)],
+                bootstrap_replicates=1000,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
