@@ -124,3 +124,8 @@ Every OOS strategy fold replays the same signal sequence across a frozen 20-case
 A separate 20-case grid adds per-side impact surcharges of `0, 5, 10, 20, 40 bps` across `1%, 2.5%, 5%, 10%` prior-hour-volume participation. This is an additive surcharge, not a calibrated square-root impact model or a claim about actual fills. It is a diagnostic stress only and cannot be called realistic without venue-specific order-book depth and execution evidence. All matrix constants are included in the cost-model hash.
 
 The 16 bps fee is a public API example, not the user's actual fee tier; spread and slippage remain assumptions. Participation uses previous-hour volume because future volume is unknown at the decision point. The sensitivity matrix does not replace a calibrated fill model or enable trading.
+
+
+## Automated Git-history append-only enforcement
+
+The trial-registry parser validates current-ledger schema, the 14 preregistered trials and event order. CI now adds a base-to-head byte-prefix check: `experiment_registry.jsonl` must preserve the exact previous file bytes and may only add complete LF-delimited JSON events at the end. The check uses the PR base SHA on pull requests and the previous commit SHA on pushes, then passes the current full ledger through the existing semantic parser. Rewrites, deletions, reordering, partial events, CRLF changes and invalid appended entries fail offline CI. No provider requests are made.
