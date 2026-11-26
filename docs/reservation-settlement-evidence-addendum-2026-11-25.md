@@ -1120,3 +1120,58 @@ Preferred implementation chain: #172 → #173 → #174 → #176 → #180 → #18
 - #164/#165 remain copy-only staging proposals; current-stack baseline bootstrap is not implemented.
 
 Release posture remains: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability/high win rate NOT ESTABLISHED; whole-project completion UNRATED.
+
+
+## 26 November — full safe-suite verification and audit-sequence correction
+
+### Current verified legacy gate — PR #203 / validation PR #205
+- PR #203 exact implementation head: `71c601936df25f0ccb84a27876629afa77f206e0`.
+- PR #205 full-suite validation head: `d3940f94237b7c23e59678612ea11dea86cbd22f`.
+- Exact Actions run: [45684179463](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45684179463).
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed all six suites: schema 25, lifecycle 21, allocations 16, atomic allocations 13, settlement store 79, receiver 17 = 171 tests per interpreter.
+- All six steps ran and succeeded on both matrix jobs. ResourceWarning was an error; logs show no actual ResourceWarning or ignored-connection output.
+- Pre-marker legacy databases remain inspectable, but market registration, new fill batches, pending outbox reads, and both outbox acknowledgements fail closed until current account/market audit baseline markers and events are present and verified. Completed-batch replay remains read-only.
+- A schema-only v1→v2 copy without those baselines is an archival/staged copy, not a tradable database. No opening cash, market identity or inventory is inferred.
+
+### PR #207 — external checkpoint source-authenticity/genesis design
+- Exact head: `52f63bd6c78423aefb7c7193cad5cf61703d6dba`, stacked on PR #206.
+- Adds distinct assurance categories: byte integrity, chain continuity, semantic consistency, source authenticity and action authorization.
+- Requires a new-ledger genesis checkpoint before mutation; historical/pre-marker ledgers require separate owner-approved evidence-backed bootstrap.
+- Sets one committed state-changing settlement batch per checkpoint as the safe default, with subsequent mutations blocked while a checkpoint is pending.
+- Clarifies that a local OS keystore supplies key custody only; it does not by itself provide independent monotonic state or rollback protection.
+- Adds evidence provenance requirements for market observations, strategy decisions, risk verdict references, PAPER fills and bootstrap approvals.
+- Documentation only. No signer, network, storage, key manager or operational deployment selected.
+
+### PR #208 — audit-sequence contiguity guard
+- Finding: `SQLiteSettlementStore._verify_chain()` previously ignored the stored `seq` column. Changing a row sequence to create a gap or changing the first sequence away from 1 left event JSON and hashes untouched, and the verifier still returned true.
+- New branch/PR head: `cf10c756df85ede859862beb459174d090b4ae6c`.
+- Change: require `main.audit` sequence values to start at 1 and remain contiguous; add synthetic regressions for an interior gap and non-one genesis, and require snapshot verification to fail closed.
+- Stacked on PR #205, so the existing workflow runs all six safe suites on the PR.
+- Exact-head CI was not yet visible at the time of this tracker update. Do not count the tests as passed until both Python matrix jobs complete successfully.
+
+### Migration-preflight disposition
+- PR #157 remains structural, read-only v1 preflight only. Its `eligible` result does not establish independently evidenced opening cash, market registration or sell inventory.
+- PR #164 creates byte-verified source/backup/output copies and empty current-v2 tables only. It does not create the later account/market audit baselines.
+- PR #165's historical copy-open test predates PR #203's stronger read-only gate and is not current-stack acceptance.
+- No existing user database inspection or migration is authorized by these proposals. Current PR #203 requires evidence-backed bootstrap before state-changing use.
+
+### External checkpoint design chain
+- PR #206 head `6b9b1be9f9b1b54d8095b7a80dc7ba6d00c1e9e4` requires independent monotonic state, chain-extension checking, fork/rollback rejection and semantic reconciliation.
+- PR #207 extends this with event-source provenance and genesis/first-anchor requirements.
+- Both remain documentation-only. iPhone key custody, independent storage/witness, checkpoint cadence, max unanchored window and recovery authority remain undecided.
+
+### Updated release/readiness gates
+- Install readiness: NOT READY.
+- Trading readiness: NOT READY.
+- PAPER: ON HOLD.
+- LIVE: DISABLED / ABSENT.
+- Profitability/high win rate: NOT ESTABLISHED.
+- Whole-project completion: UNRATED.
+- Preferred candidate chain now includes PR #203 legacy gate and PR #208 pending sequence-contiguity correction. PR #205 is validation-only; PR #207 is a design-only checkpoint follow-up.
+
+### Next work
+1. Validate PR #208 exact head on Python 3.11 and 3.13 across all six suites; fix any failure on a new immutable head.
+2. Independently review audit-chain sequence semantics, checkpoint sequence/head binding and genesis adoption.
+3. Review #157/#164/#165 preflight and copy-only migration against the current read-only baseline gate; no existing DB migration.
+4. Continue synthetic-only crash/restart, concurrency, corruption, truncation, rollback/fork and resource-exhaustion work.
+5. Continue preregistered multi-market profitability research with realistic costs and untouched holdouts. No performance claim from these persistence tests.
