@@ -60,3 +60,10 @@ The interface makes no request during validation or testing; all regressions use
 The Tokocrypto helper currently accepts only `BTC_USDT`, matching the one static Tokocrypto mapping present in the reviewed repository config/provider adapter. This is an implementation scope boundary, **not** proof that the pair is currently listed, that the provider's symbol identity is verified, or that the venue data are suitable for research. The identity status remains `NOT_VERIFIED`.
 
 Any additional Tokocrypto pair requires a separate evidence-backed identity review and explicit allowlist update before the adapter will issue a request. The wider Twin Money Maker project remains multi-market; this restriction applies only to this single Tokocrypto adapter until its market registry is independently reviewed.
+
+
+## Runtime enforcement of the current-window clock gate
+
+The legacy `fetch_tokocrypto_candles` compatibility entry point is intentionally blocked and raises before invoking the opener. The earlier implementation merely labelled caller time `NOT_VERIFIED` while still allowing a network request; that contradicted the release rule above. Only a separately reviewed host-clock attestor may reopen current-window retrieval.
+
+The fixed UTC-boundary research interface remains separate. It still does not prove the boundaries are historical or authenticate their preregistration record; the operator must independently freeze and verify those boundaries before a request. Market identity and provider rights remain separate hard gates.

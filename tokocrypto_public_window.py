@@ -133,53 +133,17 @@ def fetch_tokocrypto_candles(
     opener: Callable | None = None,
     sleep: Callable[[float], None] | None = None,
 ) -> dict[str, object]:
-    """Fetch only the approved public klines endpoint for the bounded window.
+    """Fail closed: current-window retrieval requires a reviewed UTC attestor.
 
-    The caller must supply a trusted UTC epoch. This function never requests
-    provider server time and does not claim that the caller's clock is synced.
+    The prior version accepted any caller-supplied positive integer epoch and
+    proceeded to the network despite documenting that its synchronization was
+    unverified. This compatibility entry point is intentionally disabled.
+    Historical fixed-boundary retrieval remains available through
+    `tokocrypto_fixed_window.fetch_tokocrypto_fixed_window`, subject to its
+    separately documented preregistration and market-identity gates.
     """
-    if (isinstance(timeout, bool) or not isinstance(timeout, int)
-            or not 1 <= timeout <= 60):
-        raise ValueError("timeout must be an integer from 1 to 60 seconds")
-    if (isinstance(retries, bool) or not isinstance(retries, int)
-            or not 1 <= retries <= 5):
-        raise ValueError("retries must be an integer from 1 to 5")
-
-    window = build_window(
-        pair=pair, timeframe=timeframe, lookback_days=lookback_days,
-        now_epoch_utc=now_epoch_utc,
+    raise fetcher.ApiError(
+        "Tokocrypto current-window collection is blocked: caller-supplied UTC "
+        "time is unauthenticated; a platform host-clock attestor must be "
+        "implemented and independently reviewed before current-window retrieval"
     )
-    source = fetcher.Source(
-        name="tokocrypto", style="binance_style",
-        base_url=fetcher.TOKOCRYPTO_BASE_URL,
-    )
-    kwargs = {}
-    if sleep is not None:
-        kwargs["sleep"] = sleep
-    candles, requests_made = fetcher.fetch_candles(
-        source, pair, timeframe,
-        int(window["start_timestamp"]),
-        int(window["end_timestamp_inclusive"]),
-        timeout, retries,
-        opener if opener is not None else fetcher.default_opener,
-        kwargs.get("sleep", __import__("time").sleep),
-    )
-    if not candles:
-        raise fetcher.ApiError("approved Tokocrypto klines endpoint returned zero candles")
-    expected_candles = validate_complete_candle_grid(
-        candles,
-        start_epoch_utc=int(window["start_timestamp"]),
-        end_epoch_utc_exclusive=int(window["end_exclusive_timestamp"]),
-        timeframe=timeframe,
-    )
-
-    return {
-        **window,
-        "candles": candles,
-        "requests_made": requests_made,
-        "expected_candles": expected_candles,
-        "received_candles": len(candles),
-        "data_quality_status": "COMPLETE_CONTIGUOUS_CLOSED_GRID",
-        "provider": "tokocrypto",
-        "endpoint": fetcher.TOKOCRYPTO_KLINES_PATH,
-    }
