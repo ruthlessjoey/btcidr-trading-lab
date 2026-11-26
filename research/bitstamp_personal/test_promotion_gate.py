@@ -68,7 +68,7 @@ class GateTests(unittest.TestCase):
 
 
  def test_trial_registry_hash_must_match_across_folds(self):
-  rows = valid_folds()
+  rows = folds()
   rows[1]["trial_registry_sha256"] = "f" * 64
   with self.assertRaisesRegex(PromotionEvidenceError, "trial-registry hash"):
    evaluate_promotion_gate(rows)
