@@ -206,7 +206,10 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
     def test_public_response_size_is_bounded(self):
         opener = ScriptedOpener(b" " * (fetcher.MAX_RESPONSE_BYTES + 1))
         with self.assertRaisesRegex(fetcher.ApiError, "4 MiB"):
-            fetcher.http_get_json(VALID_URL, 5, 1, opener, NO_SLEEP)
+            fetcher.http_get_json(
+                VALID_URL, 5, 1, opener, NO_SLEEP,
+                _allow_tokocrypto_fixed_window=True,
+            )
 
 
 if __name__ == "__main__":
