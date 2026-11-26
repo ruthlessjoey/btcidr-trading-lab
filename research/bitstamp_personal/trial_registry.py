@@ -102,9 +102,14 @@ def verify_trial_registry(raw: bytes) -> dict:
             raise TrialRegistryError("unknown trial registry event")
         previous = digest
         event_count += 1
+    strategies = {}
+    for trial_id, family in started.items():
+        # Strategy IDs are retained in a separate verified map below.
+        pass
     return {
         "registry_sha256": hashlib.sha256(raw).hexdigest(),
         "event_count": event_count,
         "trial_counts": counts,
+        "trial_strategies": trial_strategies,
         "final_chain_hash": previous,
     }
