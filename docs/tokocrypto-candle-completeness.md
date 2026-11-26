@@ -67,3 +67,10 @@ Any additional Tokocrypto pair requires a separate evidence-backed identity revi
 The legacy `fetch_tokocrypto_candles` compatibility entry point is intentionally blocked and raises before invoking the opener. The earlier implementation merely labelled caller time `NOT_VERIFIED` while still allowing a network request; that contradicted the release rule above. Only a separately reviewed host-clock attestor may reopen current-window retrieval.
 
 The fixed UTC-boundary research interface remains separate. It still does not prove the boundaries are historical or authenticate their preregistration record; the operator must independently freeze and verify those boundaries before a request. Market identity and provider rights remain separate hard gates.
+
+
+## Canonical Tokocrypto candle request path
+
+The general fetcher, low-level JSON transport, and legacy provider adapter are not authorized entry points for Tokocrypto candles. They reject Tokocrypto requests before invoking an opener. The only supported helper that opts into the Tokocrypto transport scope is `fetch_tokocrypto_fixed_window`, which requires explicit frozen UTC boundaries and passes the private fixed-window scope through the bounded fetcher.
+
+This narrows ordinary call paths; it does not make caller-supplied boundaries authentic. The fixed-window helper still labels provider clock skew `NOT_VERIFIED` and temporal past assertion `NOT_PERFORMED`. A request must only be made after the preregistration is independently verified as historical and market identity/data rights are accepted. No current-window or unattended collection is enabled.
