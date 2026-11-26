@@ -134,7 +134,7 @@ def fetch_json(url: str, *, opener=None, timeout: int = 20) -> tuple[object, str
 
 
 def fetch_spot_markets(*, opener=None) -> tuple[dict[str, dict[str, object]], str]:
-    payload, raw_hash = fetch_json(BASE + MARKETS_PATH, opener=opener)
+    payload, raw_hash = fetch_json(f"https://{HOST}{MARKETS_PATH}", opener=opener)
     if not isinstance(payload, list):
         raise BitstampDataError("markets response must be a JSON list")
     markets = {}
@@ -271,7 +271,7 @@ def fetch_spot_history(
             and row["open_timestamp"] < cursor
         ]
         if not eligible:
-            break
+            raise BitstampDataError("OHLC pagination returned no rows before the requested cursor")
         oldest = eligible[0]["open_timestamp"]
         for row in eligible:
             ts = row["open_timestamp"]
@@ -281,7 +281,7 @@ def fetch_spot_history(
         if oldest >= cursor:
             raise BitstampDataError("OHLC pagination made no backwards progress")
         cursor = oldest - 1
-        if len(rows) < MAX_PAGE_ROWS:
+        if oldest <= start_timestamp:
             break
         sleep(0.15)
 
