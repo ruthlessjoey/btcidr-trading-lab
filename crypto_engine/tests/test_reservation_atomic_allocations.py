@@ -17,6 +17,8 @@ class AtomicReservationAllocationTests(unittest.TestCase):
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript("""
             CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+            INSERT INTO metadata VALUES('account_initialization_audit','required-v1');
+            INSERT INTO metadata VALUES('market_registration_audit','required-v1');
             CREATE TABLE account(
                 singleton INTEGER PRIMARY KEY CHECK(singleton=1),
                 account_id TEXT NOT NULL, currency TEXT NOT NULL, cash TEXT NOT NULL
