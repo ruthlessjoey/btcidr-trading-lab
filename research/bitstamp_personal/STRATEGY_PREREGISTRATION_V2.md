@@ -54,3 +54,8 @@ The promotion gate must receive the exact raw `trial_registry.jsonl` bytes. It v
 
 
 Each of the five OOS fold summaries supplied to the promotion screen must contain at least 30 complete, non-overlapping 24-bar return observations. The gate rejects a fold with fewer than 30 observations even if the total observations across all folds would otherwise exceed the aggregate minimum.
+
+
+## Dataset completeness and identity gate
+
+The evaluator accepts only the complete adapter manifest for the frozen interval: 24,840 contiguous 1-hour candles from 2024-01-01 00:00 UTC through the 2026-11-01 00:00 UTC close boundary; exact requested market symbol and returned pair; zero gaps; matching row count and timestamps; valid normalized-row SHA-256 and raw-page SHA-256. Any mismatch blocks all fold evaluation. The evaluator binds the exact market identity, interval, normalized rows and raw page provenance into the dataset manifest hash.
