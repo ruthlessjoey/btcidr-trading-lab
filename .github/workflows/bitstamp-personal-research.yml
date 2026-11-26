@@ -15,6 +15,7 @@ on:
       - research/bitstamp-hash-chained-trial-registry-2026-11-27
       - research/verify-promotion-registry-and-fold-statistics-2026-11-27
       - research/bitstamp-v2-integrated-promotion-and-data-manifest-2026-11-27
+      - research/bitstamp-point-in-time-universe-evidence-review-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
