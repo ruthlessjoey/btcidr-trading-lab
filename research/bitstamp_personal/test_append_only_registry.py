@@ -57,6 +57,16 @@ class AppendOnlyRegistryTests(unittest.TestCase):
         self.assertEqual(result["appended_events"], 0)
         self.assertEqual(result["base_sha256"], result["head_sha256"])
 
+    def test_previous_two_argument_verifier_api_remains_supported(self):
+        result = verify_append_only_registry(GENESIS, GENESIS)
+        self.assertEqual(result["status"], "APPEND_ONLY_VERIFIED")
+        self.assertEqual(result["registered_trial_count"], 14)
+
+    def test_deeply_nested_appended_json_fails_closed_without_traceback(self):
+        deeply_nested = b"[" * 10000 + b"0" + b"]" * 10000 + b"\\n"
+        with self.assertRaisesRegex(AppendOnlyRegistryError, "semantic validation failed"):
+            verify_append_only_registry(GENESIS, GENESIS + deeply_nested)
+
     def test_complete_new_event_may_be_appended(self):
         appended = raw_registry([
             event("btcusd", "SMA20_50_LONG_ONLY", "FAILED"),
@@ -107,7 +117,7 @@ class AppendOnlyRegistryTests(unittest.TestCase):
             verify(tampered, tampered, genesis=tampered)
 
     def test_base_cannot_omit_or_rewrite_the_pinned_genesis(self):
-        base = GENESIS[:100]
+        base = GENESIS.splitlines(keepends=True)[0]
         head = GENESIS + raw_registry([
             event("btcusd", "SMA20_50_LONG_ONLY", "FAILED"),
         ])
