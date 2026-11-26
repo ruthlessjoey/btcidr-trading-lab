@@ -1,0 +1,88 @@
+name: Bitstamp personal research only
+
+on:
+  push:
+    branches:
+      - research/bitstamp-public-ohlc-personal-2026-11-27
+    paths:
+      - "research/bitstamp_personal/**"
+      - ".github/workflows/bitstamp-personal-research.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/bitstamp_personal/**"
+      - ".github/workflows/bitstamp-personal-research.yml"
+  workflow_dispatch:
+    inputs:
+      allow_public_data_request:
+        description: "Explicitly authorize one unauthenticated public Bitstamp research run"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bitstamp-personal-research-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout research-only files
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /research/bitstamp_personal
+
+      - name: Set up supported Python version
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "${{ matrix.python-version }}"
+
+      - name: Run offline provider, pagination and strategy tests
+        run: python -m unittest discover -s research/bitstamp_personal -p 'test_*.py' -v
+
+  public-research:
+    if: github.event_name == 'workflow_dispatch' && inputs.allow_public_data_request == true
+    needs: offline-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Sparse checkout research-only files
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /research/bitstamp_personal
+
+      - name: Set up latest Python 3.13 patch
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Run approved personal noncommercial research (no dataset artifacts)
+        run: >-
+          python research/bitstamp_personal/research_runner.py
+          --start 2024-01-01
+          --end 2026-11-01
+          --min-markets 3
+          --require-meme
+
+      # Intentionally no upload-artifact step: raw provider data must not be redistributed.
