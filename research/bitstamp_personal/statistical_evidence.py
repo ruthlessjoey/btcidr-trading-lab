@@ -45,9 +45,23 @@ def non_overlapping_24bar_returns(equity_curve: Sequence[object]) -> list[float]
     blocks are ignored. Observations are non-overlapping to reduce (not remove)
     hourly serial dependence in the DSR input.
     """
-    marks = _numeric_series(equity_curve, "equity_curve", minimum=BLOCK_BARS + 1)
-    if any(mark <= 0 for mark in marks):
-        raise StatisticalEvidenceError("equity marks must be strictly positive")
+    if isinstance(equity_curve, (str, bytes)) or not isinstance(equity_curve, Sequence):
+        raise StatisticalEvidenceError("equity_curve must be a numeric sequence")
+    if len(equity_curve) < BLOCK_BARS + 1:
+        raise StatisticalEvidenceError(
+            f"equity_curve requires at least {BLOCK_BARS + 1} marks"
+        )
+    marks = []
+    for index, value in enumerate(equity_curve):
+        if isinstance(value, bool):
+            raise StatisticalEvidenceError(f"equity_curve[{index}] cannot be boolean")
+        try:
+            mark = float(Decimal(str(value)))
+        except (TypeError, ValueError, OverflowError, ArithmeticError) as exc:
+            raise StatisticalEvidenceError(f"equity_curve[{index}] must be numeric") from exc
+        if not math.isfinite(mark) or mark <= 0:
+            raise StatisticalEvidenceError("equity marks must be finite and strictly positive")
+        marks.append(mark)
     returns = [
         marks[index + BLOCK_BARS] / marks[index] - 1.0
         for index in range(0, len(marks) - BLOCK_BARS, BLOCK_BARS)
