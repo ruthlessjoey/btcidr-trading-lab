@@ -148,3 +148,115 @@ A checkpoint can make post-anchor database-only rewriting, truncation, rollback 
 - Demonstrate that a generic signing-only key service cannot, by itself, claim semantic verification.
 
 These are design requirements only. They do not authorize a signer, storage platform, network dependency, key management workflow, or operational deployment.
+
+
+## 12. Separate integrity, consistency, authenticity, and authorization claims
+
+The checkpoint protocol must not collapse four distinct properties into the word "verified":
+
+1. **Byte integrity:** a stored event prefix is unchanged relative to a trusted checkpoint digest.
+2. **Chain continuity:** the candidate prefix extends the previous trusted sequence/head without gaps, rollback, replay or fork.
+3. **Semantic consistency:** a deterministic verifier reconstructs account, market, holdings, fill, reservation, allocation and outbox state and confirms the recorded transitions obey the accepted schemas/invariants.
+4. **Source authenticity and authorization:** evidence that an input came from an approved source and that the relevant action was authorized by the appropriate trusted boundary.
+
+Properties 1–3 do not establish property 4. Recomputing a valid hash chain and reconciling balances can still validate a fabricated but internally consistent fill. A signature from a local signer does not prove a market price came from an exchange, that an order/fill occurred, or that a strategy was approved. A checkpoint authenticates only the exact bytes and state progression it is designed to attest.
+
+Before any stronger source-authenticity claim, each event class must define its own evidence:
+- Market observations: source/venue, instrument identity, retrieval time, event time, interval, pagination/coverage, raw response or immutable content digest, adapter/version and data-quality result. If the source does not sign data, say that provenance is locally recorded rather than cryptographically authenticated.
+- Strategy decisions: immutable strategy/config/code digest, point-in-time input references and parameters, decision timestamp and deterministic replay evidence.
+- Risk decisions: a reference to the existing independently controlled risk verdict and its exact input/output digests. The checkpoint design must not bypass, recreate, weaken or modify protected risk controls.
+- PAPER fills: the approved simulator/version, source observations, fee/spread/slippage/impact model version, fill model inputs and deterministic simulated-fill result. A PAPER fill is a simulation record, not evidence of an exchange execution.
+- Administrative/bootstrap events: an owner approval reference, evidence bundle digest, approving authority, scope and timestamp. A hash or signature must not be used to imply approval that was never granted.
+
+The independent verifier may check that evidence references are present, canonical, correctly bound and consistent. It cannot independently prove off-platform facts unless it has a separate trusted source or attestation mechanism. Unsupported source-authenticity assertions must fail closed or be explicitly downgraded to "locally recorded, not independently authenticated."
+
+## 13. Genesis and first-anchor requirements
+
+A checkpoint chain needs an independently trusted genesis. It must not begin by accepting a caller-supplied current database head as the first trusted state.
+
+- For a new ledger, initialize the account and explicit market policy, verify the corresponding initial audit events, then create and externally commit a genesis checkpoint before enabling any state-changing trading/simulation workflow.
+- The genesis record binds a newly generated stable ledger ID, account/currency identity, schema version, initial audit sequence/head, key ID/algorithm and an explicit no-previous-checkpoint marker.
+- The independent trust boundary records the genesis digest and identity in monotonic state. Repeating genesis with the same identity/digest is idempotent; a different digest or identity is a conflict.
+- A pre-marker or historical ledger must not be silently adopted as a new genesis. It remains read-only until a separate, owner-approved bootstrap procedure supplies independently reviewable opening-cash, market-identity and inventory evidence. The bootstrap itself must be recorded as an explicit event and separately anchored before subsequent mutations.
+- Never infer opening cash or tradable inventory from an unanchored database snapshot. A schema-only v1→v2 copy does not satisfy genesis or bootstrap evidence.
+- If genesis/checkpoint storage is unavailable, no state-changing workflow may become enabled.
+
+## 14. Checkpoint cadence and unanchored suffix bound
+
+The safe default for a paper settlement ledger is one checkpoint per committed state-changing settlement batch:
+- Commit the ledger mutation and its exact pending checkpoint request atomically in SQLite.
+- Block subsequent state-changing strategy/settlement/reservation mutations while that checkpoint is pending.
+- The independent verifier checks chain extension and semantic consistency, commits the signed checkpoint with monotonic anti-rollback state, reads it back, and only then allows local acknowledgement/unblocking.
+- A retry must use the same ledger ID, sequence, previous checkpoint digest, audit head and idempotency key. Changed content at the same sequence is a fork/conflict.
+- If an implementation proposes batching multiple mutations per checkpoint, it must explicitly quantify the maximum event/time exposure, justify why intermediate mutations remain blocked or otherwise tamper-evident, and obtain independent security review plus owner approval. A time-based interval alone is not an adequate security argument.
+
+This does not solve malicious fabrication before the first trusted genesis, or prove economic truth of market data/fills. Source authenticity and bootstrap requirements above remain independent gates.
+
+## 15. Independent-state placement and recovery authority
+
+A private key in a phone/OS keystore provides key custody only. It does not automatically provide rollback-resistant monotonic ledger state, independent storage, semantic verification, or protection against a compromised operator account.
+
+Before selecting a deployment model, document separately:
+- where the private key is held;
+- where monotonic ledger/checkpoint state is retained;
+- where append-only checkpoint records are stored;
+- which actors can rewrite each location;
+- whether those locations share the same device, account, administrator or recovery credentials;
+- how the system recovers after loss of the phone, signer, storage or network;
+- who can approve recovery/key rotation and how that authority is recorded.
+
+Do not call a second file, another directory, or a backup on the same writable device an independent trust anchor. Do not add a cloud/network service or select an iPhone key-storage mechanism without a separate owner-approved architecture decision. If there is no practical independent state boundary for the intended installation, keep external checkpoint protection unimplemented and keep the ledger's assurance limitation explicit.
+
+### Additional required adversarial cases
+
+- A caller presents a correctly hashed but fabricated PAPER fill with internally consistent cash/holdings; confirm that the checkpoint layer claims only semantic consistency unless simulator/input provenance is independently bound.
+- A caller tries to establish genesis from a pre-existing pre-marker database with a fabricated opening balance; reject without an approved bootstrap evidence bundle.
+- A caller changes only the strategy or simulator digest while retaining the same fill payload; reject or surface the mismatch.
+- A locally stored keystore key signs bytes while monotonic state remains on the same rollbackable filesystem; prove this is not accepted as independent anti-rollback protection.
+- Attempt a second state mutation while one checkpoint is pending; reject before any balance, reservation, audit, fill or outbox write.
+- Lose or restore the operator device while the independent witness retains a newer head; require recovery authority and fail closed.
+- Simulate the witness being unavailable before genesis and after a settlement commit; no state-changing progression is permitted.
+
+These are design requirements only. They do not select a signer, device, storage service, network dependency, recovery owner, or operational deployment.
+
+
+## 16. iPhone-only / Rp0 feasibility boundary — 27 November 2026
+
+### Verified platform capabilities
+
+Apple's current developer documentation describes Secure Enclave key protection as follows:
+- The private key is created inside the Secure Enclave and is not exposed in plaintext to the app.
+- Secure Enclave key use is limited to NIST P-256 keys for signatures/verification or ECDH.
+- The key is device-bound; only the device that created it can use it.
+- Access control can require the device to be unlocked and optionally user authentication.
+- The Secure Enclave does not import a pre-existing plaintext private key.
+
+Reference: [Apple Developer — Protecting keys with the Secure Enclave](https://developer.apple.com/documentation/security/protecting-keys-with-the-secure-enclave.md).
+
+Apple Platform Security (August 2026) describes Secure Storage Component counter lockboxes in the context of passcode-protected user data and passcode-attempt limits. It also describes anti-replay services for Secure Enclave protected data and platform security boundaries. These descriptions do not establish a general application API for storing an arbitrary monotonic ledger sequence/head or an append-only application checkpoint log.
+
+Reference: [Apple Platform Security — August 2026](https://help.apple.com/pdf/security/en_US/apple-platform-security-guide.pdf), especially the Secure Enclave and Secure nonvolatile storage sections (PDF pages 10–16).
+
+### Security interpretation
+
+- A Secure Enclave key may be suitable for **device-bound key custody** if a dedicated native app is built and reviewed.
+- It is not, by itself, an independent checkpoint store, an application-level monotonic counter, a second recovery authority, or proof that a ledger suffix is authentic.
+- A private key that can sign a caller-supplied digest but has no independent retained last-trusted ledger head can still sign a fabricated replacement suffix.
+- A second file or USB volume controlled by the same phone/operator account is not automatically an independent monotonic witness. It may provide a separate copy, but does not prove anti-rollback against an actor able to replace both copies.
+- Device-bound keys create a recovery constraint: a lost/replaced phone cannot simply export and restore the old private key. Key rotation/recovery needs an independently approved ceremony and externally retained trust state.
+
+### Current project constraint assessment
+
+The current operator workflow is iPhone-only, no paid service, and Rp0. No second trusted device, hardware token with an application monotonic counter, independent append-only service, or separately controlled recovery authority has been approved.
+
+Therefore:
+1. Do not select Secure Enclave alone as the external checkpoint trust anchor.
+2. Do not generate a signing key or add a signer API in this milestone.
+3. Do not use a local file, same-phone USB volume, or ordinary backup as a claim of independent anti-rollback protection.
+4. Keep the checkpoint signer, storage, genesis and recovery implementation unimplemented.
+5. Keep state-changing ledger operations subject to the existing release gates; this design does not authorize PAPER activation.
+6. Revisit only after a separate architecture decision identifies an actually independent monotonic witness and recovery authority within the approved budget and device constraints.
+
+### Decision status
+
+**No compliant iPhone-only / Rp0 deployment design has been established.** This is a documented feasibility blocker, not a reason to weaken the trust model or silently add cloud/network dependencies. The proposal remains documentation-only.
