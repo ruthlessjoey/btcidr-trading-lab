@@ -109,7 +109,9 @@ class BitstampPublicOhlcTests(unittest.TestCase):
 
     def test_backward_pagination_returns_sorted_contiguous_closed_candles(self):
         first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3 * 3600), candle(4 * 3600)]}}
-        second = {"data": {"pair": "BTC/USD", "ohlc": [candle(1 * 3600), candle(2 * 3600)]}}
+        second = {"data": {"pair": "BTC/USD", "ohlc": [
+            candle(0), candle(1 * 3600), candle(2 * 3600)
+        ]}}
         opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(second))])
         dataset = fetch_spot_history(
             "btcusd", start_timestamp=0, end_timestamp=5 * 3600,
@@ -132,11 +134,45 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         payload = {"data": {"pair": "BTC/USD", "ohlc": [candle(3600), candle(3 * 3600)]}}
         opener = FakeOpener([FakeResponse(json.dumps(payload))])
         dataset = fetch_spot_history(
-            "btcusd", start_timestamp=0, end_timestamp=4 * 3600,
+            "btcusd", start_timestamp=3600, end_timestamp=4 * 3600,
             opener=opener, sleep=lambda _: None,
         )
         self.assertEqual(dataset["gap_count"], 1)
         self.assertEqual(dataset["coverage_status"], "GAPS_DETECTED_BACKTEST_BLOCKED")
+
+    def test_missing_range_boundaries_are_reported_as_gaps(self):
+        first = {
+            "data": {"pair": "BTC/USD", "ohlc": [candle(2 * 3600), candle(3 * 3600)]}
+        }
+        empty = {"data": {"pair": "BTC/USD", "ohlc": []}}
+        opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(empty))])
+        dataset = fetch_spot_history(
+            "btcusd", start_timestamp=3600, end_timestamp=5 * 3600,
+            opener=opener, sleep=lambda _: None,
+        )
+        self.assertEqual(dataset["gap_count"], 2)
+        self.assertEqual(dataset["coverage_status"], "GAPS_DETECTED_BACKTEST_BLOCKED")
+        self.assertEqual([gap["gap_type"] for gap in dataset["gaps"]], ["LEADING", "TRAILING"])
+        self.assertEqual([gap["missing_hours"] for gap in dataset["gaps"]], [1, 1])
+
+    def test_market_identity_must_remain_stable_across_pages(self):
+        first = {"data": {"pair": "BTC/USD", "ohlc": [candle(3600), candle(7200)]}}
+        second = {"data": {"pair": "ETH/USD", "ohlc": [candle(0)]}}
+        opener = FakeOpener([FakeResponse(json.dumps(first)), FakeResponse(json.dumps(second))])
+        with self.assertRaisesRegex(BitstampDataError, "identity changed between pages"):
+            fetch_spot_history(
+                "btcusd", start_timestamp=0, end_timestamp=3 * 3600,
+                opener=opener, sleep=lambda _: None,
+            )
+
+    def test_requested_range_must_align_to_hourly_boundaries(self):
+        opener = FakeOpener([])
+        with self.assertRaisesRegex(BitstampDataError, "align to exact 1-hour"):
+            fetch_spot_history(
+                "btcusd", start_timestamp=1, end_timestamp=2 * 3600,
+                opener=opener, sleep=lambda _: None,
+            )
+        self.assertEqual(opener.urls, [])
 
     def test_missing_market_identity_fails_closed(self):
         payload = {"data": {"ohlc": [candle(3600)]}}
