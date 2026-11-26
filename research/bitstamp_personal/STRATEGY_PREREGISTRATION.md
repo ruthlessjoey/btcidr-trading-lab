@@ -67,3 +67,14 @@ A sell is a completed position cycle only when executed quantity reduces base in
 ## Requested versus returned OHLC market identity
 
 For every OHLC page, the normalized response `data.pair`/`data.market` identity must match the requested `market_symbol` after case-folding and removing separators (for example, requested `btcusd` matches response `BTC/USD`). Page-to-page consistency alone is insufficient: a stable but wrong pair must fail before any candle row is accepted.
+
+
+## V1 universe eligibility blocker — point-in-time market history not verified
+
+The V1 runner currently calls the present-day public markets endpoint and selects only symbols whose SPOT trading and matching states are currently Enabled. That endpoint is a current snapshot, not a dated historical membership record for the full 2024-01-01 through 2026-11-01 test period. Using it as the historical universe can omit instruments that later delisted, were halted, or changed eligibility, introducing survivorship and availability bias.
+
+**Release gate:** the V1 public research runner is disabled before its first provider request. No current market-list request or OHLC request is allowed from V1 while point-in-time membership remains `NOT_VERIFIED`.
+
+A future versioned V2 preregistration must provide independently reviewed, hash-pinned evidence of each candidate market's historical SPOT listing/trading/matching eligibility over its applicable test intervals; define handling of listing, halt, delisting and symbol-mapping events; and bind the five chronological OOS folds to those eligible intervals. V2 must integrate the fold evaluator and frozen statistical promotion gate into the actual runner rather than merely shipping separate helper functions. The evidence file, exact digest, lifecycle coverage and non-survivorship policy must be independently reviewed before the release gate is changed.
+
+The current active-market snapshot may be used as present-day metadata only. It must not be treated as proof of past availability or as the historical candidate universe. This is a genuine research blocker, not a formatting/reporting warning.
