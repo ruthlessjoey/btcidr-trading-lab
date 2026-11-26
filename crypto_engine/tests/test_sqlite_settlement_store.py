@@ -2,12 +2,24 @@ import hashlib
 import os
 import sqlite3
 import tempfile
+from contextlib import contextmanager
 import unittest
 
 from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
 from tmm_core.reservation_outbox_receiver import _canonical_payload
 from tmm_core.reservation_lifecycle import authorize_reservation, create_reservation
 from tmm_core.reservation_schema_v2 import ensure_reservation_schema_v2
+
+
+@contextmanager
+def _managed_connection(*args, **kwargs):
+    """Preserve sqlite3 transaction semantics and always close the connection."""
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 class SQLiteSettlementStoreTests(unittest.TestCase):
@@ -97,7 +109,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                                         fills=[self.buy()], timestamp=10)
         self.assertEqual(first, second)
         self.assertEqual(self.store.snapshot()["cash"], "9899")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 1)
 
     def test_changed_payload_hash_is_rejected(self):
@@ -134,9 +146,10 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         ensure_reservation_schema_v2(db)
         db.commit()
         db.close()
-        audit_before = sqlite3.connect(self.path).execute(
-            "SELECT COUNT(*) FROM audit"
-        ).fetchone()[0]
+        with _managed_connection(self.path) as audit_db:
+            audit_before = audit_db.execute(
+                "SELECT COUNT(*) FROM main.audit"
+            ).fetchone()[0]
         invalid = {"fill_id": "bad", "market_id": "BTC/USDT", "side": "SELL",
                    "quantity": "1", "price": "100", "fee_quote": "0"}
         with self.assertRaisesRegex(SettlementStoreError, "inventory"):
@@ -152,7 +165,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 timestamp=10,
             )
         self.assertEqual(self.store.snapshot()["cash"], "10000")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM batches").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM fills").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], audit_before)
@@ -178,7 +191,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
 
         self.store.acknowledge_outbox("settle:b-5:BTC", receiver_receipt="receipt-1")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             status = db.execute("SELECT status FROM batches WHERE batch_id='b-5'").fetchone()[0]
         self.assertEqual(status, "COMMITTED_PENDING_OUTBOX")
 
@@ -189,7 +202,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             status = db.execute("SELECT status FROM batches WHERE batch_id='b-5'").fetchone()[0]
         self.assertEqual(status, "COMPLETE")
         self.assertEqual(self.store.pending_outbox(), [])
@@ -211,7 +224,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 timestamp=20,
             )
         self.assertEqual(self.store.snapshot(), before)
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM batches WHERE batch_id='b-legacy-sell'"
             ).fetchone())
@@ -230,7 +243,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         )
         self.assertEqual(reopened.snapshot(), before)
         self.assertTrue(reopened.verify_audit_chain())
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             tables = {
                 row[0] for row in db.execute(
                     "SELECT name FROM main.sqlite_master WHERE type='table'"
@@ -242,7 +255,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
 
     def test_reopen_rejects_partial_reservation_v2_without_recreating_table(self):
         self.enable_reservations()
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("DROP TABLE reservation_outbox")
 
         with self.assertRaisesRegex(SettlementStoreError, "partial reservation schema"):
@@ -251,7 +264,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 currency="USDT", opening_cash="10000",
             )
 
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM main.sqlite_master "
                 "WHERE type='table' AND name='reservation_outbox'"
@@ -281,7 +294,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(len(self.store.pending_outbox()), 1)
         self.assertEqual(len(self.store.pending_reservation_outbox()), 1)
         self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
                 "COMMITTED_PENDING_OUTBOX",
@@ -293,7 +306,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT consumed_quantity,version FROM reservations").fetchone(),
                 ("0.25", 3),
@@ -318,7 +331,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 sell_settlements=[self.sell_settlement()], timestamp=20,
             )
         self.assertEqual(self.store.snapshot(), before)
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM batches WHERE batch_id='b-no-allocation'"
             ).fetchone())
@@ -334,7 +347,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                 sell_allocations=[self.allocation(version=1)], timestamp=20,
             )
         self.assertEqual(self.store.snapshot(), before)
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertIsNone(db.execute(
                 "SELECT 1 FROM batches WHERE batch_id='b-stale-allocation'"
             ).fetchone())
@@ -378,7 +391,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                     fill_id="sell-2", reservation_id="r-2", version=2
                 )], timestamp=21,
             )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             rows = {
                 reservation_id: (consumed, version, status)
                 for reservation_id, consumed, version, status in db.execute(
@@ -409,7 +422,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         expected_hash, expected_receipt = self.reservation_ack_evidence(
             "reservation-allocation:a-1"
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservation_outbox SET account_id='other-account' "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
@@ -432,7 +445,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "DELETE FROM main.reservation_outbox "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
@@ -444,7 +457,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "SELL fill quantity does not match allocation ledger"):
             self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             status = db.execute(
                 "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
             ).fetchone()[0]
@@ -458,7 +471,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             rows = db.execute("SELECT seq,event_json FROM main.audit ORDER BY seq").fetchall()
             target = next(seq for seq,event in rows if "RESERVATION_QUANTITY_CONSUMED" in event)
             db.execute("UPDATE main.audit SET event_json='{}' WHERE seq=?", (target,))
@@ -482,7 +495,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             seq = db.execute(
                 "SELECT seq FROM main.audit WHERE event_json LIKE '%RESERVATION_OUTBOX_ACKNOWLEDGED%'"
             ).fetchone()[0]
@@ -506,7 +519,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.store._append_audit(db, {
                 "kind":"RESERVATION_OUTBOX_ACKNOWLEDGED",
                 "account_id":"paper","batch_id":"b-reserved-sell",
@@ -531,7 +544,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservation_outbox SET receiver_receipt='forged-receipt' "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
@@ -540,7 +553,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "acknowledged reservation outbox receipt mismatch"):
             self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             batch_status = db.execute(
                 "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
             ).fetchone()[0]
@@ -565,7 +578,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservation_outbox SET payload_sha256=? "
                 "WHERE idempotency_key='reservation-allocation:a-1'",
@@ -585,7 +598,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         expected_hash, expected_receipt = self.reservation_ack_evidence(
             "reservation-allocation:a-1"
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservation_allocations SET allocated_quantity='0.2' "
                 "WHERE allocation_id='a-1'"
@@ -628,7 +641,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservations SET expires_at=15 WHERE reservation_id='r-1'"
             )
@@ -646,7 +659,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         expected_hash, expected_receipt = self.reservation_ack_evidence(
             "reservation-allocation:a-1"
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "UPDATE main.reservation_outbox "
                 "SET allocated_quantity='0.2' "
@@ -684,7 +697,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "DELETE FROM main.reservation_outbox "
                 "WHERE idempotency_key='reservation-allocation:a-1'"
@@ -693,7 +706,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
             self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             status = db.execute(
                 "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
             ).fetchone()[0]
@@ -711,7 +724,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             sell_settlements=[self.sell_settlement()],
             sell_allocations=[self.allocation()], timestamp=20,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "INSERT INTO main.reservation_outbox "
                 "SELECT 'duplicate-key',allocation_id,batch_id,reservation_id,fill_id,"
@@ -723,7 +736,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             self.store.pending_reservation_outbox()
         with self.assertRaisesRegex(SettlementStoreError, "exactly one outbox row"):
             self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             status = db.execute(
                 "SELECT status FROM main.batches WHERE batch_id='b-reserved-sell'"
             ).fetchone()[0]
@@ -735,7 +748,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             batch_id="b-reserve-buy", fills=[self.buy(qty="2")], timestamp=10
         )
         self.enable_reservations(quantity="0.5")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("PRAGMA foreign_keys=ON")
             db.execute("BEGIN IMMEDIATE")
             create_reservation(
@@ -794,7 +807,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
         self.assertEqual(
             {item["allocation_id"] for item in pending}, {"a-one","a-two"}
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             reservation = db.execute(
                 "SELECT consumed_quantity,version,status FROM main.reservations "
                 "WHERE reservation_id='r-1'"
@@ -843,13 +856,13 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
             "reservation-allocation:a-1", receiver_receipt=expected_receipt,
             expected_payload_sha256=expected_hash,
         )
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
                 "COMMITTED_PENDING_OUTBOX",
             )
         self.store.acknowledge_outbox("settle:reserved", receiver_receipt="legacy-receipt")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT status FROM batches WHERE batch_id='b-reserved-sell'").fetchone()[0],
                 "COMPLETE",
@@ -876,19 +889,19 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                                   opening_cash="10000")
 
     def test_missing_table_is_not_silently_recreated(self):
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("DROP TABLE outbox")
         with self.assertRaisesRegex(SettlementStoreError, "schema mismatch"):
             SQLiteSettlementStore(self.path, account_id="paper-research",
                                   currency="USDT", opening_cash="10000")
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             tables = {row[0] for row in db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )}
         self.assertNotIn("outbox", tables)
 
     def test_changed_table_constraint_is_rejected_even_when_columns_match(self):
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("PRAGMA writable_schema=ON")
             db.execute(
                 "UPDATE sqlite_master SET sql=replace(sql, 'CHECK(singleton=1)', "
@@ -900,7 +913,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                                   currency="USDT", opening_cash="10000")
 
     def test_unapproved_trigger_is_rejected(self):
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute(
                 "CREATE TRIGGER injected_audit_trigger AFTER INSERT ON fills "
                 "BEGIN UPDATE account SET cash='0' WHERE singleton=1; END"
@@ -910,7 +923,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
                                   currency="USDT", opening_cash="10000")
 
     def test_unapproved_index_is_rejected(self):
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("CREATE INDEX injected_fill_index ON fills(market_id)")
         with self.assertRaisesRegex(SettlementStoreError, "unapproved schema objects"):
             SQLiteSettlementStore(self.path, account_id="paper-research",
@@ -919,7 +932,7 @@ class SQLiteSettlementStoreTests(unittest.TestCase):
     def test_audit_corruption_detected(self):
         self.store.apply_batch(batch_id="b-8",
                                fills=[self.buy()], timestamp=10)
-        with sqlite3.connect(self.path) as db:
+        with _managed_connection(self.path) as db:
             db.execute("UPDATE audit SET event_json='{}' WHERE seq=1")
         self.assertFalse(self.store.verify_audit_chain())
 
