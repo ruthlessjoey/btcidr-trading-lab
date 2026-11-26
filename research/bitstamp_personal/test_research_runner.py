@@ -161,6 +161,44 @@ class ResearchRunnerTests(unittest.TestCase):
             "WORST_CASE_HIGH_BEFORE_LOW",
         )
 
+    def test_open_terminal_position_has_mark_to_market_but_no_realized_net_return(self):
+        result = backtest(
+            [candle("100", "100"), candle("100", "105"), candle("110", "112")],
+            [1, 1, 1],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertGreater(Decimal(result["open_position_at_end"]), Decimal("0"))
+        self.assertIsNone(result["net_return_pct"])
+        self.assertIsNotNone(result["mark_to_market_return_pct"])
+        self.assertEqual(
+            result["return_valuation"],
+            "MARK_TO_MARKET_AFTER_EXECUTED_COSTS",
+        )
+        self.assertEqual(
+            result["terminal_position_status"],
+            "OPEN_MARKED_TO_MARKET_NO_EXIT_FILL",
+        )
+        self.assertGreater(Decimal(result["open_position_mark_value"]), Decimal("0"))
+
+    def test_flat_terminal_position_reports_realized_net_return(self):
+        result = backtest(
+            [candle("100", "100"), candle("100", "105"), candle("110", "110")],
+            [1, 0, 0],
+            fee_bps=Decimal("16"),
+            half_spread_bps=Decimal("5"),
+            slippage_bps=Decimal("10"),
+        )
+        self.assertEqual(Decimal(result["open_position_at_end"]), Decimal("0"))
+        self.assertIsNotNone(result["net_return_pct"])
+        self.assertEqual(
+            result["net_return_pct"],
+            result["mark_to_market_return_pct"],
+        )
+        self.assertEqual(result["terminal_position_status"], "FLAT")
+        self.assertEqual(Decimal(result["open_position_mark_value"]), Decimal("0"))
+
     def test_backtest_rejects_invalid_candle_low(self):
         candles = [candle(), candle("100", "105", low_price="101")]
         with self.assertRaisesRegex(ValueError, "candle low"):
