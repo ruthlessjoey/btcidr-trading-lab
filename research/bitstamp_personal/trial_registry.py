@@ -41,6 +41,7 @@ def verify_trial_registry(raw: bytes) -> dict:
         raise TrialRegistryError("registry must be strict UTF-8") from exc
     previous = _ZERO
     started = {}
+    finished = set()
     counts = {}
     event_count = 0
     for line_number, line in enumerate(text.splitlines(), 1):
@@ -86,12 +87,17 @@ def verify_trial_registry(raw: bytes) -> dict:
             if set(payload) != {"trial_id", "status", "result_sha256"}:
                 raise TrialRegistryError("TRIAL_FINISHED payload schema is invalid")
             trial_id, status, result_hash = payload["trial_id"], payload["status"], payload["result_sha256"]
-            if trial_id not in started:
+            if not isinstance(trial_id, str) or trial_id not in started:
                 raise TrialRegistryError("TRIAL_FINISHED references unknown trial")
-            if status not in {"COMPLETED", "FAILED", "ABANDONED"}:
+            if trial_id in finished:
+                raise TrialRegistryError("trial may only be finished once")
+            if not isinstance(status, str) or status not in {"COMPLETED", "FAILED", "ABANDONED"}:
                 raise TrialRegistryError("trial finish status is invalid")
             if result_hash is not None and (not isinstance(result_hash, str) or not _HASH.fullmatch(result_hash)):
                 raise TrialRegistryError("result_sha256 must be null or lowercase SHA-256")
+            if status == "COMPLETED" and result_hash is None:
+                raise TrialRegistryError("completed trial requires result SHA-256")
+            finished.add(trial_id)
         else:
             raise TrialRegistryError("unknown trial registry event")
         previous = digest
