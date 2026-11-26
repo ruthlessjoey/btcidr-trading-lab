@@ -13,6 +13,11 @@ from research_runner import (
     split_ranges,
     plan_walk_forward_folds,
     _backtest_walk_forward_fold,
+    _cost_sensitivity_matrix,
+    COST_SENSITIVITY_MULTIPLIERS,
+    PARTICIPATION_SENSITIVITY_LEVELS,
+    _market_impact_sensitivity_matrix,
+    MARKET_IMPACT_SURCHARGE_BPS,
     assess_global_oos_calendar_alignment,
     validate_preregistered_run,
     _epoch,
@@ -529,6 +534,28 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertIsNotNone(item["base_costs"]["net_return_pct"])
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
+                if "cost_sensitivity" in item:
+                    self.assertEqual(len(item["cost_sensitivity"]), 20)
+                    self.assertEqual(len(item["market_impact_sensitivity"]), 20)
+                    two_x_five_pct = next(
+                        row for row in item["cost_sensitivity"]
+                        if row["cost_multiplier"] == "2" and row["participation"] == "0.05"
+                    )
+                    one_x_five_pct = next(
+                        row for row in item["cost_sensitivity"]
+                        if row["cost_multiplier"] == "1" and row["participation"] == "0.05"
+                    )
+                    zero_impact_five_pct = next(
+                        row for row in item["market_impact_sensitivity"]
+                        if row["market_impact_surcharge_bps_per_side"] == "0"
+                        and row["participation"] == "0.05"
+                    )
+                    self.assertEqual(two_x_five_pct["net_return_pct"],
+                                     item["two_x_costs"]["net_return_pct"])
+                    self.assertEqual(one_x_five_pct["net_return_pct"],
+                                     item["base_costs"]["net_return_pct"])
+                    self.assertEqual(zero_impact_five_pct["net_return_pct"],
+                                     item["base_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertIn("promotion_screens", result)
@@ -570,3 +597,71 @@ class GlobalTrialUniverseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CostSensitivityTests(unittest.TestCase):
+    def test_cost_sensitivity_grid_has_twenty_frozen_scenarios(self):
+        candles = [candle() for _ in range(100)]
+        signals = [1] * 40
+        grid = _cost_sensitivity_matrix(
+            candles, 10, 50, signals,
+            base_spread=Decimal("5"), base_slippage=Decimal("10"),
+        )
+        keys = {(row["cost_multiplier"], row["participation"]) for row in grid}
+        self.assertEqual(len(grid), 20)
+        self.assertEqual(len(keys), 20)
+        self.assertEqual(keys.__contains__(("2", "0.05")), True)
+        self.assertTrue(all(row["terminal_position_status"] == "FLAT" for row in grid))
+        base_at_1x_5pct = next(row for row in grid
+                               if row["cost_multiplier"] == "1" and row["participation"] == "0.05")
+        zero_impact = next(row for row in _market_impact_sensitivity_matrix(
+            candles, 10, 50, signals,
+            base_spread=Decimal("5"), base_slippage=Decimal("10"),
+        ) if row["market_impact_surcharge_bps_per_side"] == "0"
+          and row["participation"] == "0.05")
+        self.assertEqual(base_at_1x_5pct["net_return_pct"], zero_impact["net_return_pct"])
+
+    def test_participation_is_validated_and_changes_capacity(self):
+        candles = [candle(volume="100") for _ in range(8)]
+        signals = [1, 1, 1, 1, 0, 0, 0, 0]
+        kwargs = {
+            "fee_bps": Decimal("0"), "half_spread_bps": Decimal("0"),
+            "slippage_bps": Decimal("0"),
+        }
+        low = backtest(candles, signals, participation=Decimal("0.01"), **kwargs)
+        high = backtest(candles, signals, participation=Decimal("0.10"), **kwargs)
+        self.assertLess(Decimal(low["turnover"]), Decimal(high["turnover"]))
+        for value in (Decimal("0"), Decimal("1.01"), True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                backtest(candles, signals, participation=value, **kwargs)
+
+    def test_market_impact_matrix_has_twenty_uncalibrated_scenarios(self):
+        candles = [candle() for _ in range(100)]
+        grid = _market_impact_sensitivity_matrix(
+            candles, 10, 50, [1] * 40,
+            base_spread=Decimal("5"), base_slippage=Decimal("10"),
+        )
+        keys = {
+            (row["market_impact_surcharge_bps_per_side"], row["participation"])
+            for row in grid
+        }
+        self.assertEqual(len(grid), 20)
+        self.assertEqual(len(keys), 20)
+        self.assertIn(("20", "0.05"), keys)
+        self.assertTrue(all(row["terminal_position_status"] == "FLAT" for row in grid))
+
+    def test_additive_impact_surcharge_reduces_net_return(self):
+        candles = [candle(volume="1000") for _ in range(8)]
+        signals = [1, 1, 1, 1, 0, 0, 0, 0]
+        kwargs = {
+            "fee_bps": Decimal("0"), "half_spread_bps": Decimal("0"),
+            "slippage_bps": Decimal("0"), "participation": Decimal("0.10"),
+        }
+        zero = backtest(candles, signals, market_impact_bps=Decimal("0"), **kwargs)
+        impact = backtest(candles, signals, market_impact_bps=Decimal("20"), **kwargs)
+        self.assertLess(Decimal(impact["net_return_pct"]), Decimal(zero["net_return_pct"]))
+        self.assertEqual(impact["fill_count"], zero["fill_count"])
+        with self.assertRaisesRegex(ValueError, "market_impact_bps"):
+            backtest(candles, signals, market_impact_bps=Decimal("-1"), **kwargs)
+
+

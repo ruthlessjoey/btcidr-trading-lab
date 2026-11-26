@@ -113,3 +113,14 @@ The manifest is intentionally NOT VERIFIED: exact historic market-order enable t
 ## Global DSR calendar alignment
 
 Global DSR treats every market × strategy series in each fold as one cross-market trial universe. Matching fold numbers alone is insufficient when assets have different listing/inception dates. Before DSR runs, the runner now compares each market's exact UTC OOS start, OOS end-exclusive and next-open liquidation timestamp for all five folds. If any market differs or required timestamps are malformed/missing, every market's promotion screen is blocked as `BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE`. The final holdout remains untouched. A per-market-inception schedule will therefore need a versioned calendar-alignment design before it can pass this gate; equal timestamps are required, not just equal fold IDs or sample counts.
+
+
+## Cost and participation sensitivity (diagnostic only)
+
+Every OOS strategy fold replays the same signal sequence across a frozen 20-case grid: cost multipliers `1x, 1.5x, 2x, 3x, 5x` applied equally to per-side fee, half-spread and slippage, crossed with prior-hour-volume participation caps `1%, 2.5%, 5%, 10%`. The primary promotion gate remains the preregistered 1x and 2x cases at 5% participation; the wider matrix is a fragility diagnostic only.
+
+## Additive market-impact sensitivity (uncalibrated)
+
+A separate 20-case grid adds per-side impact surcharges of `0, 5, 10, 20, 40 bps` across `1%, 2.5%, 5%, 10%` prior-hour-volume participation. This is an additive surcharge, not a calibrated square-root impact model or a claim about actual fills. It is a diagnostic stress only and cannot be called realistic without venue-specific order-book depth and execution evidence. All matrix constants are included in the cost-model hash.
+
+The 16 bps fee is a public API example, not the user's actual fee tier; spread and slippage remain assumptions. Participation uses previous-hour volume because future volume is unknown at the decision point. The sensitivity matrix does not replace a calibrated fill model or enable trading.
