@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -8,6 +9,7 @@ from tmm_core import reservation_migration_preflight as preflight_module
 from tmm_core.reservation_migration_preflight import (
     inspect_v1_migration_eligibility,
 )
+from tmm_core.sqlite_settlement_store import _event_hash
 
 
 DDL = """
@@ -61,6 +63,23 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         )
         self.db.execute(
             "INSERT INTO metadata VALUES('market_registration_audit','required-v1')"
+        )
+        initial = {
+            "kind": "ACCOUNT_INITIALIZED", "account_id": "paper",
+            "currency": "USDT", "opening_cash": "1000",
+            "market_registration_audit": "required-v1",
+        }
+        initial_json = json.dumps(initial, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        initial_hash = _event_hash("0" * 64, initial)
+        market = {
+            "kind": "MARKET_REGISTERED", "account_id": "paper",
+            "market_id": "BTC/USDT", "base_asset": "BTC", "quote_asset": "USDT",
+        }
+        market_json = json.dumps(market, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        market_hash = _event_hash(initial_hash, market)
+        self.db.executemany(
+            "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+            [(initial_json, "0" * 64, initial_hash), (market_json, initial_hash, market_hash)],
         )
         ensure_reservation_schema_v2(self.db)
         self.db.commit()
