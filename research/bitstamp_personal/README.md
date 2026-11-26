@@ -61,3 +61,8 @@ The gate validates supplied metrics; it does not calculate or authenticate DSR/b
 ## Five-fold OOS design (next preregistration version)
 
 A separate helper now defines five sequential, non-overlapping test windows after a fixed 50% historical warm-up region, with 50-bar embargoes between folds and at least 500 bars per fold. Strategy parameters must be frozen before these windows are evaluated; the helper does not fit or tune strategies. This is a design component only: the current V1 runner still executes its original 60/20/20 split, and no V2 data run is authorized or enabled by this helper. A versioned V2 preregistration and fold-metric integration are required before any new public-data request.
+
+
+## Statistical evidence primitives
+
+The research simulator can optionally expose its close-equity marks for offline statistical analysis. A separate dependency-free module computes non-overlapping 24-bar returns, a Deflated Sharpe probability using the complete registered trial count, and a deterministic paired circular block-bootstrap lower bound against the same-cost baseline. These are evidence primitives only; they do not verify that trial registration is complete, prove that a holdout was untouched, or make a strategy promotable by themselves.

@@ -90,6 +90,25 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(signals[28], 1)
         self.assertTrue(set(signals).issubset({0, 1}))
 
+    def test_backtest_equity_curve_is_opt_in_and_aligned_to_segment(self):
+        candles = [
+            candle("100", "100"),
+            candle("100", "105"),
+            candle("105", "110"),
+        ]
+        kwargs = {
+            "fee_bps": Decimal("16"),
+            "half_spread_bps": Decimal("5"),
+            "slippage_bps": Decimal("10"),
+        }
+        normal = backtest(candles, [1, 1, 0], **kwargs)
+        detailed = backtest(candles, [1, 1, 0], include_equity_curve=True, **kwargs)
+        self.assertNotIn("equity_curve", normal)
+        self.assertEqual(len(detailed["equity_curve"]), len(candles))
+        self.assertEqual(detailed["equity_curve"][0], "10000")
+        with self.assertRaisesRegex(ValueError, "must be boolean"):
+            backtest(candles, [1, 1, 0], include_equity_curve=1, **kwargs)
+
     def test_backtest_executes_at_next_open_and_accounts_for_costs(self):
         candles = [
             candle("100", "100"),
