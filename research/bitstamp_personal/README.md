@@ -60,3 +60,8 @@ Partial sells do not close a cycle while any base inventory remains, including o
 
 
 The OHLC reader verifies that the provider's returned pair normalizes to the exact requested market symbol on every page, in addition to requiring stable identity across pages.
+
+
+## Release blocker: historical universe / survivorship bias
+
+V1 currently selects candidates from Bitstamp's current active SPOT market list. That cannot establish which instruments were listed, matching and tradable throughout the 2024-2026 historical window; it can omit later-delisted or historically ineligible markets and bias the result. The runner therefore fails closed before any provider request while point-in-time universe evidence is NOT_VERIFIED. Do not dispatch the public-research workflow for V1. V2 requires hash-pinned historical listing/matching evidence, lifecycle-aware windows and the integrated five-fold promotion screen.
