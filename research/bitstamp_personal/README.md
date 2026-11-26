@@ -86,3 +86,6 @@ The promotion screen also requires at least 30 complete, non-overlapping 24-bar 
 ## V2 dataset completeness and identity
 
 The V2 evaluator requires the complete adapter manifest: exact 2024-01-01 00:00 UTC through 2026-11-01 00:00 UTC coverage, 24,840 contiguous 1-hour candles, zero gaps, exact pair identity, raw-page hash and normalized-row hash. Missing, reordered, truncated or mismatched data fail closed before backtesting. The full manifest digest is bound into every promotion fold.
+
+
+Point-in-time listing research and unresolved conflicts are recorded in `POINT_IN_TIME_UNIVERSE_RESEARCH.md`. The V2 public-data gate remains NOT_VERIFIED.
