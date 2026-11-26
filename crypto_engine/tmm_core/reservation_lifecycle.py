@@ -12,7 +12,10 @@ import sqlite3
 from decimal import Decimal, InvalidOperation
 
 from .sqlite_settlement_store import _event_hash
-from .reservation_schema_v2 import ensure_reservation_schema_v2
+from .reservation_schema_v2 import (
+    ReservationSchemaError, _verify_account_market_baseline,
+    ensure_reservation_schema_v2,
+)
 
 
 _MAX_SQLITE_INTEGER = 2**63 - 1
@@ -42,21 +45,11 @@ def _require_transaction(db: sqlite3.Connection) -> None:
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
     try:
-        markers = dict(db.execute(
-            "SELECT key,value FROM main.metadata WHERE key IN "
-            "('account_initialization_audit','market_registration_audit')"
-        ))
-    except sqlite3.Error as exc:
+        _verify_account_market_baseline(db)
+    except (ReservationSchemaError, sqlite3.Error) as exc:
         raise ReservationLifecycleError(
-            "explicit account and market audit baselines are required before reservation changes"
+            "verified account and market audit baselines are required before reservation changes"
         ) from exc
-    if markers != {
-        "account_initialization_audit": "required-v1",
-        "market_registration_audit": "required-v1",
-    }:
-        raise ReservationLifecycleError(
-            "explicit account and market audit baselines are required before reservation changes"
-        )
     ensure_reservation_schema_v2(db)
     _validate_audit_schema(db)
 
