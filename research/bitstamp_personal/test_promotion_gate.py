@@ -73,4 +73,6 @@ class GateTests(unittest.TestCase):
         with self.assertRaisesRegex(PromotionEvidenceError, "trial-registry hash"):
             evaluate_promotion_gate(rows)
 
+
+
 if __name__=="__main__":unittest.main()
