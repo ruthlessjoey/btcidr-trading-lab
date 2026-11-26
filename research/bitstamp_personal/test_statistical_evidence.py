@@ -15,6 +15,12 @@ class StatisticalEvidenceTests(unittest.TestCase):
         self.assertEqual(len(returns), 31)
         self.assertTrue(all(value > 0 for value in returns))
 
+    def test_equity_curve_accepts_internal_decimal_strings(self):
+        curve = [str(Decimal("10000") * (Decimal("1.001") ** index)) for index in range(24 * 31 + 1)]
+        returns = non_overlapping_24bar_returns(curve)
+        self.assertEqual(len(returns), 31)
+        self.assertTrue(all(value > 0 for value in returns))
+
     def test_non_overlapping_returns_ignore_incomplete_trailing_block(self):
         curve = [10000.0 * (1.001 ** index) for index in range(24 * 31 + 12)]
         returns = non_overlapping_24bar_returns(curve)
