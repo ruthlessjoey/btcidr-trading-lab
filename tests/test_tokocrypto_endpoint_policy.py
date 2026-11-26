@@ -160,26 +160,30 @@ class TokocryptoUrlPolicyTests(unittest.TestCase):
 
 
 class TokocryptoKlinesOnlyTests(unittest.TestCase):
-    def test_fetch_candles_uses_only_the_approved_endpoint(self):
+    def test_direct_fetch_candles_is_blocked_before_opener(self):
         source = fetcher.Source(
             "tokocrypto-mbx",
             "binance_style",
             "https://www.tokocrypto.site",
         )
         opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
-        candles, requests = fetcher.fetch_candles(
-            source, "BTC_USDT", "1h",
-            1699999200, 1700002800,
-            5, 1, opener, NO_SLEEP,
-        )
-        self.assertEqual(requests, 1)
-        self.assertEqual(len(candles), 1)
-        self.assertEqual(candles[0].time, 1699999200)
-        self.assertEqual(len(opener.calls), 1)
-        parsed = urllib.parse.urlsplit(opener.calls[0][0])
-        self.assertEqual(parsed.scheme, "https")
-        self.assertEqual(parsed.netloc, "www.tokocrypto.site")
-        self.assertEqual(parsed.path, "/api/v3/klines")
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto candle retrieval is disabled"):
+            fetcher.fetch_candles(
+                source, "BTC_USDT", "1h",
+                1699999200, 1700002800,
+                5, 1, opener, NO_SLEEP,
+            )
+        self.assertEqual(opener.calls, [])
+
+    def test_low_level_http_get_json_is_blocked_before_opener(self):
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto JSON transport is disabled"):
+            fetcher.http_get_json(VALID_URL, 5, 1, opener, NO_SLEEP)
+        self.assertEqual(opener.calls, [])
+
+    def test_default_opener_blocks_tokocrypto_before_network(self):
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto transport is disabled"):
+            fetcher.default_opener(VALID_URL, 5)
 
     def test_provider_server_time_fails_without_network_access(self):
         provider = providers.build("tokocrypto")
@@ -190,23 +194,45 @@ class TokocryptoKlinesOnlyTests(unittest.TestCase):
         self.assertEqual(http.requests, 0)
         self.assertEqual(opener.calls, [])
 
-    def test_provider_candles_use_the_approved_endpoint(self):
+    def test_direct_provider_candles_is_blocked_before_http(self):
         provider = providers.build("tokocrypto")
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        http = providers.Http(5, 1, opener, NO_SLEEP)
+        with self.assertRaisesRegex(fetcher.ApiError, "Direct Tokocrypto provider-adapter retrieval is disabled"):
+            provider.candles("1h", 1699999200, 1700002800, http)
+        self.assertEqual(http.requests, 0)
+        self.assertEqual(opener.calls, [])
+
+    def test_non_tokocrypto_fetcher_candles_path_remains_available(self):
+        source = fetcher.Source("generic", "binance_style", "https://example.test")
+        opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
+        candles, requests = fetcher.fetch_candles(
+            source, "BTC_USDT", "1h",
+            1699999200, 1700002800,
+            5, 1, opener, NO_SLEEP,
+        )
+        self.assertEqual(requests, 1)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(len(opener.calls), 1)
+        self.assertIn("example.test", opener.calls[0][0])
+
+    def test_non_tokocrypto_provider_adapter_path_remains_available(self):
+        provider = providers.build("binance-vision")
         opener = ScriptedOpener(json.dumps(synthetic_kline()).encode("utf-8"))
         http = providers.Http(5, 1, opener, NO_SLEEP)
         candles = provider.candles("1h", 1699999200, 1700002800, http)
         self.assertEqual(len(candles), 1)
         self.assertEqual(http.requests, 1)
-        self.assertEqual(len(http.log), 1)
-        self.assertEqual(http.log[0][0], "/api/v3/klines")
-        parsed = urllib.parse.urlsplit(opener.calls[0][0])
-        self.assertEqual(parsed.netloc, "www.tokocrypto.site")
-        self.assertEqual(parsed.path, "/api/v3/klines")
+        self.assertEqual(len(opener.calls), 1)
+        self.assertIn("data-api.binance.vision", opener.calls[0][0])
 
     def test_public_response_size_is_bounded(self):
         opener = ScriptedOpener(b" " * (fetcher.MAX_RESPONSE_BYTES + 1))
         with self.assertRaisesRegex(fetcher.ApiError, "4 MiB"):
-            fetcher.http_get_json(VALID_URL, 5, 1, opener, NO_SLEEP)
+            fetcher.http_get_json(
+                VALID_URL, 5, 1, opener, NO_SLEEP,
+                _allow_tokocrypto_fixed_window=True,
+            )
 
 
 if __name__ == "__main__":

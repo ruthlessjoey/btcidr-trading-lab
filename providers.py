@@ -154,6 +154,11 @@ class BinanceStyle:
         return fetcher.extract_server_time(http.get(self.src.time_url()))
 
     def candles(self, tf, start_s, end_s, http):
+        if self.name == "tokocrypto":
+            raise ApiError(
+                "Direct Tokocrypto provider-adapter retrieval is disabled; "
+                "use fetch_tokocrypto_fixed_window for explicitly scoped historical research"
+            )
         if tf not in TF_SECONDS:
             raise ValueError(f"unknown timeframe {tf!r}")
         window = self.MAX_PER_REQUEST * TF_SECONDS[tf]
