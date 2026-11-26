@@ -71,7 +71,8 @@ class ResearchRunnerTests(unittest.TestCase):
         ])
         self.assertFalse(missing["aligned"])
         invalid = [dict(row) for row in candles]
-        invalid[3000].pop("timestamp")
+        target_index = plan_walk_forward_folds(len(candles))[0]["test_end"] - 1
+        invalid[target_index].pop("timestamp")
         result = assess_global_oos_calendar_alignment([
             ({"market_symbol": "btc"}, {"candles": invalid}),
         ])
