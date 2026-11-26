@@ -59,18 +59,6 @@ def verify_append_only_registry(
         )
 
     appended = head_bytes[len(base_bytes):]
-    try:
-        parsed = parse_trial_registry(
-            head_bytes,
-            expected_market_symbols=expected_market_symbols,
-            expected_strategies=expected_strategies,
-            preregistration_id=preregistration_id,
-        )
-    except TrialRegistryError as exc:
-        raise AppendOnlyRegistryError(
-            f"head trial registry semantic validation failed: {exc}"
-        ) from exc
-
     if appended:
         try:
             appended_text = appended.decode("utf-8", errors="strict")
@@ -82,6 +70,18 @@ def verify_append_only_registry(
         appended_events = len(new_lines)
     else:
         appended_events = 0
+
+    try:
+        parsed = parse_trial_registry(
+            head_bytes,
+            expected_market_symbols=expected_market_symbols,
+            expected_strategies=expected_strategies,
+            preregistration_id=preregistration_id,
+        )
+    except TrialRegistryError as exc:
+        raise AppendOnlyRegistryError(
+            f"head trial registry semantic validation failed: {exc}"
+        ) from exc
 
     return {
         "status": "APPEND_ONLY_VERIFIED",
