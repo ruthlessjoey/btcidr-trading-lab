@@ -101,3 +101,10 @@ The runner now fetches all preregistered markets into memory, generates each mar
 
 
 The ledger parser verifies the current file's exact expected trial universe and event order. Append-only history itself must also be verified against Git commit history and reviewed diffs; the parser cannot detect a malicious rewrite that removes prior status events while retaining all initial registrations.
+
+
+## Point-in-time universe gate integrated with global DSR and append-only trial registry
+
+The public-data runner verifies the structured point-in-time evidence manifest before the first Bitstamp market-metadata or OHLC request. It uses the verifier's per-market eligible start timestamps for retrieval, rather than blindly requesting one common start for every pair. The run summary binds the global 14-trial DSR result to the accepted evidence digest and date-policy mode. This gate runs before the global DSR universe and append-only registry from PR #249.
+
+The manifest is intentionally NOT VERIFIED: exact historic market-order enable timestamps, continuous status ledgers, source snapshot digests, affirmative data-rights acceptance, independent-review attestations and an approved date policy are still missing. The accepted digest is deliberately unpinned. Therefore all requests remain blocked before network access. A future per-market inception choice requires a versioned review of row counts, OOS fold windows, embargoes and untouched holdout before any promotion.

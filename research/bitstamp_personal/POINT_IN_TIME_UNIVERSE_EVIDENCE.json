@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "preregistration_id": "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD",
+  "candidate_symbols": [
+    "btcusd",
+    "ethusd",
+    "xrpusd",
+    "dogeusd",
+    "shibusd",
+    "pepeusd",
+    "solusd"
+  ],
+  "requested_window": {
+    "start_timestamp": 1704067200,
+    "end_timestamp": 1793491200,
+    "interval_seconds": 3600
+  },
+  "date_policy": {
+    "status": "NOT_SELECTED",
+    "mode": "NOT_SELECTED",
+    "decision_note": "Per-market inception dates are recommended to preserve the wider candidate universe without inventing pre-listing candles. This remains an explicit decision; no option is silently applied."
+  },
+  "data_rights": {
+    "status": "NOT_VERIFIED",
+    "scope": "PERSONAL_NONCOMMERCIAL_SPOT_RESEARCH",
+    "source_ids": [
+      "bitstamp_api_rights"
+    ]
+  },
+  "independent_review": {
+    "status": "NOT_VERIFIED",
+    "reviewers": []
+  },
+  "source_evidence": [
+    {
+      "source_id": "bitstamp_api_status_semantics",
+      "evidence_type": "API_SEMANTICS",
+      "url": "https://www.bitstamp.net/api/",
+      "published_date": "2026-11-09",
+      "claim": "Current market status distinguishes order entry, matching and instant/market-order availability; the current endpoint does not provide the historical 2024-2026 status ledger.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "btc_eth_tick_size_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/changes-to-tick-sizes/",
+      "published_date": "2022-08-02",
+      "claim": "BTC/USD and ETH/USD existed before the V2 window; the notice also records a no-matching maintenance event in August 2022.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "xrp_listing_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/bitstamp-introduces-xrp-trading/",
+      "published_date": "2017-01-10",
+      "claim": "XRP trading launch was announced with trading beginning 17 January 2017; later continuous order-status history remains unverified.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "xrp_us_halt_notice",
+      "evidence_type": "JURISDICTIONAL_STATUS_NOTICE",
+      "url": "https://blog.bitstamp.net/post/xrp-trading-and-deposits-be-halted-us-customers/",
+      "published_date": "2020-12-25",
+      "claim": "XRP trading was halted for US customers only; this must not be confused with global public-market OHLC availability.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "xrp_us_resume_notice",
+      "evidence_type": "JURISDICTIONAL_STATUS_NOTICE",
+      "url": "https://blog.bitstamp.net/post/xrp-is-back-in-the-us-start-trading-today/",
+      "published_date": "2023-07-13",
+      "claim": "XRP US customer trading resumed before the V2 interval; complete global matching history remains unverified.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "doge_listing_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/were-listing-dogecoin-doge/",
+      "published_date": "2022-12-22",
+      "claim": "DOGE/USD and DOGE/EUR were announced as launched and available to trade.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "shib_listing_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/shib-listing/",
+      "published_date": "2022-06-06",
+      "claim": "SHIB/USD limit-only matching began 7 June 2022 at 11:00 UTC; full trading and all order types were deferred until sufficient liquidity.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "shib_earlier_schedule_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/lots-of-fresh-faces-around-bitstamp-these-days-4-new-cryptocurrencies/",
+      "published_date": "2021-12-08",
+      "claim": "An earlier SHIB rollout schedule was postponed; it does not establish the eventual market-order-enable timestamp.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "sol_listing_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/sol-and-dot-are-now-available/",
+      "published_date": "2022-08-24",
+      "claim": "SOL/USD limit-only matching began 23 August 2022 at 11:00 UTC; full trading and all order types were deferred until sufficient liquidity.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "pepe_global_listing_notice",
+      "evidence_type": "LISTING_NOTICE",
+      "url": "https://blog.bitstamp.net/post/bitstamps-new-listings-lmwr-pepe-blur-and-vext/",
+      "published_date": "2024-02-13",
+      "claim": "PEPE/USD and PEPE/EUR were announced for global listing on 13 February 2024, except Singapore and the US; this is after the frozen V2 common start.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "pepe_us_listing_notice",
+      "evidence_type": "JURISDICTIONAL_STATUS_NOTICE",
+      "url": "https://blog.bitstamp.net/post/were-listing-pepe-and-relisting-sol-in-the-usa/",
+      "published_date": "2024-11-29",
+      "claim": "PEPE and SOL were announced for US trading; this regional event does not establish global market-order status for the whole V2 period.",
+      "snapshot_sha256": null
+    },
+    {
+      "source_id": "bitstamp_api_rights",
+      "evidence_type": "DATA_RIGHTS",
+      "url": "https://www.bitstamp.net/api/",
+      "published_date": "2026-11-27",
+      "claim": "Current API documentation states a commercial Data License Agreement is required for companies using exchange data commercially; it does not affirm personal noncommercial use rights for this project.",
+      "snapshot_sha256": null
+    }
+  ],
+  "markets": [
+    {
+      "market_symbol": "btcusd",
+      "pair": "BTC/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": null,
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": null,
+      "jurisdictional_notes": [
+        "BTC/ETH maintenance notice records a no-matching event; the complete 2024-2026 market-wide matching ledger is not available in the located sources."
+      ],
+      "source_ids": [
+        "btc_eth_tick_size_notice",
+        "bitstamp_api_status_semantics"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "ethusd",
+      "pair": "ETH/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": null,
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": null,
+      "jurisdictional_notes": [
+        "BTC/ETH maintenance notice records a no-matching event; the complete 2024-2026 market-wide matching ledger is not available in the located sources."
+      ],
+      "source_ids": [
+        "btc_eth_tick_size_notice",
+        "bitstamp_api_status_semantics"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "xrpusd",
+      "pair": "XRP/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": "2017-01-10",
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": null,
+      "jurisdictional_notes": [
+        "US-specific 2021-2023 restrictions are not applied to the global market. Global market-wide matching history in 2024-2026 is not established."
+      ],
+      "source_ids": [
+        "xrp_listing_notice",
+        "xrp_us_halt_notice",
+        "xrp_us_resume_notice"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "dogeusd",
+      "pair": "DOGE/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": "2022-12-22",
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": null,
+      "jurisdictional_notes": [
+        "Listing notice describes DOGE as launched and tradable, but not the exact market-order-enable timestamp or subsequent matching history."
+      ],
+      "source_ids": [
+        "doge_listing_notice",
+        "bitstamp_api_status_semantics"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "shibusd",
+      "pair": "SHIB/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": "2022-06-06",
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": 1654599600,
+      "jurisdictional_notes": [
+        "Limit-only matching began 2022-06-07 11:00 UTC; full order types were deferred until sufficient liquidity, with no exact enable timestamp in the located notice.",
+        "Launch exclusions included US and Singapore."
+      ],
+      "source_ids": [
+        "shib_listing_notice",
+        "shib_earlier_schedule_notice"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "pepeusd",
+      "pair": "PEPE/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": "2024-02-13",
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": null,
+      "jurisdictional_notes": [
+        "PEPE was not listed at the frozen V2 common start of 2024-01-01. The exact first full market-order timestamp is not established by the announcement.",
+        "Initial global listing excluded US and Singapore; US listing was announced separately in November 2024."
+      ],
+      "source_ids": [
+        "pepe_global_listing_notice",
+        "pepe_us_listing_notice"
+      ],
+      "status_intervals": []
+    },
+    {
+      "market_symbol": "solusd",
+      "pair": "SOL/USD",
+      "market_type": "SPOT",
+      "global_scope": "GLOBAL_PUBLIC_MARKET",
+      "listing_announcement_date": "2022-08-24",
+      "first_listing_timestamp": null,
+      "first_matching_enabled_timestamp": null,
+      "first_market_orders_enabled_timestamp": null,
+      "eligible_start_timestamp": null,
+      "limit_only_matching_from_timestamp": 1661252400,
+      "jurisdictional_notes": [
+        "Limit-only matching began 2022-08-23 11:00 UTC; full order types were deferred until sufficient liquidity, with no exact enable timestamp in the located notice.",
+        "Initial global listing excluded Singapore; US availability was announced later."
+      ],
+      "source_ids": [
+        "sol_listing_notice",
+        "pepe_us_listing_notice"
+      ],
+      "status_intervals": []
+    }
+  ]
+}
