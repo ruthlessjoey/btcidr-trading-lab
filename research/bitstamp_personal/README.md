@@ -49,3 +49,10 @@ Train, validation and holdout each begin with a separate flat research account. 
 
 
 - Every OHLC page's returned pair identity is normalized and compared to the exact requested market symbol before candle rows are accepted; a stable but wrong pair is rejected.
+
+
+## Fail-closed multi-fold promotion screen
+
+`promotion_gate.py` checks completed fold summaries against frozen defaults: >=5 ordered non-overlapping OOS folds; positive net return in >=60% of folds; beats same-cost buy-and-hold in >=60% with positive mean excess; positive mean net return and positive mean return at 2x costs; >=60% positive folds at 2x costs; max drawdown <=20% per fold; profit factor >=1.20 per fold; DSR >=0.95 per fold; positive paired block-bootstrap excess-return lower bound per fold; >=30 closed trades and >=100 observations aggregate. Every fold must use the same dataset SHA-256 and append-only registered-trial count. A 2x-cost return cannot exceed its same-signal base-cost return.
+
+The gate does not run strategies or calculate DSR/bootstrap statistics. A pass means only `ELIGIBLE_FOR_INDEPENDENT_HUMAN_REVIEW_NOT_PROVEN_PROFITABLE`; it never enables PAPER/LIVE. Dataset/preprocessing hash provenance, untouched status, embargo, statistics and actual costs still require independent verification. Run offline tests with `python -m unittest discover -s research/bitstamp_personal -p 'test_*.py' -v`.
