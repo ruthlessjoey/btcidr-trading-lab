@@ -41,6 +41,22 @@ def _require_transaction(db: sqlite3.Connection) -> None:
         raise ReservationLifecycleError("a trusted SQLite connection is required")
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
+    try:
+        markers = dict(db.execute(
+            "SELECT key,value FROM main.metadata WHERE key IN "
+            "('account_initialization_audit','market_registration_audit')"
+        ))
+    except sqlite3.Error as exc:
+        raise ReservationLifecycleError(
+            "explicit account and market audit baselines are required before reservation changes"
+        ) from exc
+    if markers != {
+        "account_initialization_audit": "required-v1",
+        "market_registration_audit": "required-v1",
+    }:
+        raise ReservationLifecycleError(
+            "explicit account and market audit baselines are required before reservation changes"
+        )
     ensure_reservation_schema_v2(db)
     _validate_audit_schema(db)
 
