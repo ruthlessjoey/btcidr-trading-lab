@@ -41,3 +41,8 @@ This is exploratory research, not an installable trading system. The workflow do
 ## Terminal return valuation
 
 A segment that ends with an open long position reports mark-to-market return and the marked value of the remaining inventory separately. The `net_return_pct` field is null unless the segment ends flat, because the simulator does not invent a terminal exit fill or liquidation cost. The mark-to-market return is after costs on the fills that were actually simulated, not a realized liquidation return.
+
+
+## Walk-forward segment state
+
+Train, validation and holdout each begin with a separate flat research account. Rolling indicators can use prior historical candles for warmup, but stateful strategy targets (such as RSI's hold-until-exit rule) reset to flat at each segment boundary. No position target from the prior segment is inherited.
