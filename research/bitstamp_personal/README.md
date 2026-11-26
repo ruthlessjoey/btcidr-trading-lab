@@ -41,3 +41,6 @@ This is exploratory research, not an installable trading system. The workflow do
 ## Terminal return valuation
 
 A segment that ends with an open long position reports mark-to-market return and the marked value of the remaining inventory separately. The `net_return_pct` field is null unless the segment ends flat, because the simulator does not invent a terminal exit fill or liquidation cost. The mark-to-market return is after costs on the fills that were actually simulated, not a realized liquidation return.
+
+
+- Every OHLC page's returned pair identity is normalized and compared to the exact requested market symbol before candle rows are accepted; a stable but wrong pair is rejected.

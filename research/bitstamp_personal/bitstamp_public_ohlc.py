@@ -289,6 +289,11 @@ def fetch_spot_history(
         if not isinstance(pair, str) or not pair.strip():
             raise BitstampDataError("OHLC response is missing its market identity")
         pair = pair.strip()
+        normalized_pair = re.sub(r"[^a-z0-9]", "", pair.casefold())
+        if normalized_pair != market_symbol.casefold():
+            raise BitstampDataError(
+                "OHLC response market identity does not match the requested market symbol"
+            )
         if observed_pair is None:
             observed_pair = pair
         elif pair.casefold() != observed_pair.casefold():
