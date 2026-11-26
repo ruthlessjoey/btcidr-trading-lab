@@ -247,7 +247,7 @@ def _verify_market(
         )
     if not any(source["evidence_type"] == "MARKET_STATUS_LEDGER" for source in market_sources):
         raise PointInTimeUniverseError(
-            f"{symbol} matching/market-order timestamps lack a MARKET_STATUS_LEDGER source"
+            f"{symbol} matching/market-order timestamps lack a MARKET_STATUS_LEDGER source; interval evidence is not MARKET_STATUS_LEDGER"
         )
     if not (first_listing <= first_matching <= first_market_orders):
         raise PointInTimeUniverseError(
