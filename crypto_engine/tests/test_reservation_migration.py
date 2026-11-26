@@ -13,6 +13,7 @@ from tmm_core.reservation_migration import (
     ReservationMigrationError,
     create_v2_migrated_copy,
 )
+from tmm_core.sqlite_settlement_store import SettlementStoreError, SQLiteSettlementStore
 
 
 @contextmanager
@@ -77,6 +78,53 @@ class ReservationMigrationCopyTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.backup.stat().st_mode),0o400)
         self.assertEqual(stat.S_IMODE(self.output.stat().st_mode),0o600)
         self.assertEqual(len(result.original_table_sha256),8)
+
+    def test_migrated_copy_stays_read_only_until_audit_baseline_bootstrap(self):
+        create_v2_migrated_copy(self.source,self.backup,self.output)
+        store = SQLiteSettlementStore(
+            self.output, account_id="paper-research", currency="USDT",
+            opening_cash="1000",
+        )
+        # Read-only diagnostics remain available, but schema enablement alone
+        # cannot authorize mutation or delivery from a pre-marker legacy store.
+        self.assertEqual(store.snapshot()["cash"], "1000")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.register_market("ETH/USDT", "ETH", "USDT")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.apply_batch(
+                batch_id="blocked-buy",
+                fills=[{
+                    "fill_id":"blocked-fill","market_id":"BTC/USDT","side":"BUY",
+                    "quantity":"0.1","price":"100","fee_quote":"0",
+                }],
+                timestamp=11,
+            )
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.pending_outbox()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.pending_reservation_outbox()
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.acknowledge_outbox("missing", receiver_receipt="receipt")
+        with self.assertRaisesRegex(
+            SettlementStoreError, "legacy database is read-only"
+        ):
+            store.acknowledge_reservation_outbox(
+                "missing", receiver_receipt="receipt",
+                expected_payload_sha256="0" * 64,
+            )
+        with _managed_connection(self.output) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.fills").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM main.batches").fetchone()[0], 1)
 
     def test_unresolved_source_is_blocked_before_any_copy_is_created(self):
         with _managed_connection(self.source) as db:
