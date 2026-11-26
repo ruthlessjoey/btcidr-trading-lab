@@ -16,6 +16,7 @@ on:
       - research/verify-promotion-registry-and-fold-statistics-2026-11-27
       - research/bitstamp-v2-integrated-promotion-and-data-manifest-2026-11-27
       - research/bitstamp-point-in-time-universe-evidence-review-2026-11-27
+      - security/hash-pin-bitstamp-point-in-time-evidence-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
