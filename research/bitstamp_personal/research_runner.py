@@ -459,7 +459,6 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
             "promotion_status": "BLOCKED_GAPS",
             "results": {},
         }
-    ranges = split_ranges(len(candles))
     is_meme = dataset["market_symbol"] in MEME_SYMBOLS
     base_spread = D(15 if is_meme else 5)
     base_slippage = D(20 if is_meme else 10)
@@ -467,21 +466,6 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
     two_x_spread = base_spread * D(2)
     two_x_slippage = base_slippage * D(2)
     results = {}
-    for strategy in STRATEGIES:
-        results[strategy] = {}
-        for split_name, (start, end) in ranges.items():
-            segment = candles[start:end]
-            segment_signals = _signals_for_segment(strategy, candles, start, end)
-            results[strategy][split_name] = {
-                "base_costs": backtest(
-                    segment, segment_signals, fee_bps=FEE_BPS,
-                    half_spread_bps=base_spread, slippage_bps=base_slippage,
-                ),
-                "stress_costs": backtest(
-                    segment, segment_signals, fee_bps=two_x_fee,
-                    half_spread_bps=two_x_spread, slippage_bps=two_x_slippage,
-                ),
-            }
     # Five expanding-training OOS folds, each ending with a next-open
     # liquidation candle. OOS ranges are non-overlapping and embargoed.
     walk_forward_folds = []
@@ -516,14 +500,7 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
         )
         walk_forward_folds.append(fold_result)
 
-    buy_hold_signals = [1] * len(candles)
-    holdout_start, holdout_end = ranges["holdout"]
-    results["BUY_AND_HOLD_BASELINE"] = {
-        "holdout_base_costs": backtest(
-            candles[holdout_start:holdout_end], buy_hold_signals[holdout_start:holdout_end],
-            fee_bps=FEE_BPS, half_spread_bps=base_spread, slippage_bps=base_slippage,
-        )
-    }
+    results["walk_forward_folds"] = walk_forward_folds
     return {
         "market_symbol": dataset["market_symbol"],
         "pair": dataset["pair"],
