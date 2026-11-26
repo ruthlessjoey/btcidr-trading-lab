@@ -6,6 +6,7 @@ its synchronization accuracy is not independently verified here.
 """
 from __future__ import annotations
 
+import math
 import re
 from typing import Callable
 
@@ -101,6 +102,14 @@ def fetch_tokocrypto_candles(
             raise fetcher.ApiError("Tokocrypto returned a candle outside the requested closed UTC window")
         if previous_open is not None and candle.time <= previous_open:
             raise fetcher.ApiError("Tokocrypto returned duplicate or out-of-order candle timestamps")
+        values = (candle.open, candle.high, candle.low, candle.close, candle.volume)
+        if any(not math.isfinite(value) for value in values):
+            raise fetcher.ApiError("Tokocrypto returned non-finite OHLCV values")
+        if min(candle.open, candle.high, candle.low, candle.close) <= 0 or candle.volume < 0:
+            raise fetcher.ApiError("Tokocrypto returned nonpositive prices or negative volume")
+        if (candle.high < max(candle.open, candle.close, candle.low)
+                or candle.low > min(candle.open, candle.close, candle.high)):
+            raise fetcher.ApiError("Tokocrypto returned inconsistent OHLC bounds")
         previous_open = candle.time
     return {
         **window,
