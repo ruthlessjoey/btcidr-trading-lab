@@ -16,6 +16,9 @@ from typing import Callable
 from bitstamp_public_ohlc import (
     BitstampDataError, fetch_spot_history, fetch_spot_markets,
 )
+from point_in_time_universe import (
+    PointInTimeUniverseError, load_verified_point_in_time_universe_evidence,
+)
 
 D = Decimal
 INITIAL_CASH = D("10000")
@@ -32,21 +35,15 @@ PREREGISTERED_MIN_MARKETS = 3
 PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
 
-# V2 cannot use the current active-market list as a historical universe. It can
-# omit later-delisted or historically unavailable instruments. Keep all public
-# data collection blocked until independently reviewed, point-in-time listing
-# and trading/matching interval evidence is available and hash-pinned.
-POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS = "NOT_VERIFIED"
-
-
-def require_v2_point_in_time_universe_evidence() -> None:
-    if POINT_IN_TIME_UNIVERSE_EVIDENCE_STATUS != "VERIFIED":
+def require_v2_point_in_time_universe_evidence() -> dict:
+    """Require reviewed, hash-pinned point-in-time evidence before network access."""
+    try:
+        return load_verified_point_in_time_universe_evidence()
+    except PointInTimeUniverseError as exc:
         raise BitstampDataError(
-            "V2 public research blocked before network access: point-in-time SPOT "
-            "listing/trading/matching history is NOT_VERIFIED; current active "
-            "markets can omit delisted or historically unavailable instruments "
-            "and create survivorship bias"
-        )
+            "V2 public research blocked before network access: point-in-time "
+            f"universe evidence is NOT_VERIFIED ({exc})"
+        ) from exc
 
 
 
