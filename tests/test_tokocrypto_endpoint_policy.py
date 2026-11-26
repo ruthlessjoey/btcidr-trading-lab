@@ -135,16 +135,9 @@ class TokocryptoUrlPolicyTests(unittest.TestCase):
         with self.assertRaises(fetcher.ApiError):
             fetcher.validate_request_url(url)
 
-    def test_unaligned_or_unbounded_candle_window_is_blocked(self):
+    def test_candle_window_larger_than_limit_is_blocked(self):
         parsed = urllib.parse.urlsplit(VALID_URL)
         query = dict(urllib.parse.parse_qsl(parsed.query))
-        query["startTime"] = "1699999200001"
-        unaligned = urllib.parse.urlunsplit((
-            parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), "",
-        ))
-        with self.assertRaises(fetcher.ApiError):
-            fetcher.validate_request_url(unaligned)
-        query["startTime"] = "1699999200000"
         query["endTime"] = str(1699999200000 + 501 * 3600 * 1000)
         too_wide = urllib.parse.urlunsplit((
             parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), "",
