@@ -534,6 +534,27 @@ class WalkForwardFoldTests(unittest.TestCase):
                 self.assertIsNotNone(item["base_costs"]["net_return_pct"])
                 self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
                 self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
+                self.assertEqual(len(item["cost_sensitivity"]), 20)
+                self.assertEqual(len(item["market_impact_sensitivity"]), 20)
+                two_x_five_pct = next(
+                    row for row in item["cost_sensitivity"]
+                    if row["cost_multiplier"] == "2" and row["participation"] == "0.05"
+                )
+                one_x_five_pct = next(
+                    row for row in item["cost_sensitivity"]
+                    if row["cost_multiplier"] == "1" and row["participation"] == "0.05"
+                )
+                zero_impact_five_pct = next(
+                    row for row in item["market_impact_sensitivity"]
+                    if row["market_impact_surcharge_bps_per_side"] == "0"
+                    and row["participation"] == "0.05"
+                )
+                self.assertEqual(two_x_five_pct["net_return_pct"],
+                                 item["two_x_costs"]["net_return_pct"])
+                self.assertEqual(one_x_five_pct["net_return_pct"],
+                                 item["base_costs"]["net_return_pct"])
+                self.assertEqual(zero_impact_five_pct["net_return_pct"],
+                                 item["base_costs"]["net_return_pct"])
         self.assertNotIn("holdout", result["results"])
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertIn("promotion_screens", result)
