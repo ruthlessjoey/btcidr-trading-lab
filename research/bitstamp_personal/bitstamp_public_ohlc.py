@@ -231,6 +231,8 @@ def fetch_spot_history(
             raise BitstampDataError(f"{name} must be a nonnegative integer")
     if end_timestamp <= start_timestamp:
         raise BitstampDataError("end_timestamp must be after start_timestamp")
+    if start_timestamp % STEP_SECONDS or end_timestamp % STEP_SECONDS:
+        raise BitstampDataError("requested range must align to exact 1-hour candle boundaries")
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or not 1 <= max_pages <= MAX_PAGES:
         raise BitstampDataError("max_pages must be between 1 and 100")
 
@@ -238,6 +240,7 @@ def fetch_spot_history(
     by_open = {}
     page_hashes = []
     pages = 0
+    observed_pair = None
     while cursor > start_timestamp:
         if pages >= max_pages:
             raise BitstampDataError("OHLC pagination exceeded the hard page limit")
@@ -257,6 +260,11 @@ def fetch_spot_history(
         pair = data.get("pair") or data.get("market")
         if not isinstance(pair, str) or not pair.strip():
             raise BitstampDataError("OHLC response is missing its market identity")
+        pair = pair.strip()
+        if observed_pair is None:
+            observed_pair = pair
+        elif pair.casefold() != observed_pair.casefold():
+            raise BitstampDataError("OHLC market identity changed between pages")
         rows = data.get("ohlc")
         if not isinstance(rows, list):
             raise BitstampDataError("OHLC response data.ohlc must be a list")
@@ -289,14 +297,29 @@ def fetch_spot_history(
     if not candles:
         raise BitstampDataError("no closed OHLC candles returned for requested range")
     gaps = []
+    if candles[0]["open_timestamp"] > start_timestamp:
+        gaps.append({
+            "gap_type": "LEADING",
+            "after_open_timestamp": None,
+            "before_open_timestamp": candles[0]["open_timestamp"],
+            "missing_hours": (candles[0]["open_timestamp"] - start_timestamp) // STEP_SECONDS,
+        })
     for index in range(1, len(candles)):
         delta = candles[index]["open_timestamp"] - candles[index - 1]["open_timestamp"]
         if delta != STEP_SECONDS:
             gaps.append({
+                "gap_type": "INTERNAL",
                 "after_open_timestamp": candles[index - 1]["open_timestamp"],
                 "before_open_timestamp": candles[index]["open_timestamp"],
                 "missing_hours": max(0, delta // STEP_SECONDS - 1),
             })
+    if candles[-1]["timestamp"] < end_timestamp:
+        gaps.append({
+            "gap_type": "TRAILING",
+            "after_open_timestamp": candles[-1]["open_timestamp"],
+            "before_open_timestamp": None,
+            "missing_hours": (end_timestamp - candles[-1]["timestamp"]) // STEP_SECONDS,
+        })
     canonical = json.dumps(
         candles, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
         allow_nan=False,
