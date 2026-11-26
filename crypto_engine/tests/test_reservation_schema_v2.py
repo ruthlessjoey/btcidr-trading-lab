@@ -10,6 +10,7 @@ from tmm_core.reservation_schema_v2 import (
 class ReservationSchemaV2Tests(unittest.TestCase):
     def connection(self):
         db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
         db.execute("PRAGMA foreign_keys=ON")
         db.executescript("""
             CREATE TABLE markets(
