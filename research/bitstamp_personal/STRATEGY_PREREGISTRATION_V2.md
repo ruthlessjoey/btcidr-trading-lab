@@ -59,3 +59,8 @@ Each of the five OOS fold summaries supplied to the promotion screen must contai
 ## Dataset completeness and identity gate
 
 The evaluator accepts only the complete adapter manifest for the frozen interval: 24,840 contiguous 1-hour candles from 2024-01-01 00:00 UTC through the 2026-11-01 00:00 UTC close boundary; exact requested market symbol and returned pair; zero gaps; matching row count and timestamps; valid normalized-row SHA-256 and raw-page SHA-256. Any mismatch blocks all fold evaluation. The evaluator binds the exact market identity, interval, normalized rows and raw page provenance into the dataset manifest hash.
+
+
+## Point-in-time universe research status
+
+Official Bitstamp listing notices reveal a material date conflict: PEPE/USD was announced globally on 13 February 2024, after the frozen 1 January 2024 start. SHIB and SOL notices document limit-only matching phases but do not state the exact full-trading/market-order enable time. The public research gate remains NOT_VERIFIED. See `POINT_IN_TIME_UNIVERSE_RESEARCH.md`; do not run public data until the universe and market-order history are independently verified and the PEPE date design is amended.
