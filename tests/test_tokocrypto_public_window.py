@@ -3,7 +3,9 @@ import unittest
 from urllib.parse import parse_qs, urlsplit
 
 import fetcher
-from tokocrypto_public_window import (\n    build_window, fetch_tokocrypto_candles, validate_complete_candle_grid,\n)
+from tokocrypto_public_window import (
+    build_window, fetch_tokocrypto_candles, validate_complete_candle_grid,
+)
 
 
 NOW_UTC = 1_700_000_000
@@ -51,11 +53,10 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
     def test_current_window_fetch_is_blocked_before_network(self):
         opener = FakeOpener()
         with self.assertRaisesRegex(fetcher.ApiError, "current-window collection is blocked"):
-            validate_complete_candle_grid(
-                fetcher.parse_klines(opener.rows),
-                start_epoch_utc=START_INCLUSIVE,
-                end_epoch_utc_exclusive=END_EXCLUSIVE,
-                timeframe="1h",
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=NOW_UTC, opener=opener,
+                sleep=lambda _: None,
             )
         self.assertEqual(opener.urls, [])
 
