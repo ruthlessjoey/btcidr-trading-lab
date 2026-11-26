@@ -40,3 +40,13 @@ The current V2 preregistration covers 1-hour USD spot markets from 2024-01-01 00
 - Independently review this evidence and hash-pin an accepted universe manifest before changing the runner gate to VERIFIED.
 
 No provider API was called and no market data was downloaded for this research note.
+
+
+## Current order-entry and matching status semantics
+
+Bitstamp's official [API changelog](https://www.bitstamp.net/api/) dated 9 November 2026 distinguishes order entry from matching:
+- Operational: `trading=Enabled`, `matching=Enabled`.
+- No-matching halt: `trading=Enabled`, `matching=Disabled`; limit orders can be entered/cancelled, but market and instant orders are rejected.
+- Full halt: both fields are `Disabled`.
+
+The current Bitstamp adapter requires both fields to be `Enabled`, and its offline tests explicitly reject a market with matching disabled. This is the correct current-state fail-closed check. The public endpoint reports current status only; it does not provide the historical 2024–2026 status ledger needed to prove continuous market-order availability.
