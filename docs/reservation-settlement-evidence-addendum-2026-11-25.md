@@ -1440,3 +1440,17 @@ A follow-up review identified that low-level reservation lifecycle operations sh
 - **230 tests per interpreter / 460 total; zero actual ResourceWarning or ignored-connection output.**
 
 This is an additional fail-closed guard, not independent security acceptance or proof of profitability.
+
+
+## Canonical audit JSON encoding guard — exact-head verification — 27 November 2026
+
+The settlement-store audit verifier now rejects noncanonical JSON encodings as well as duplicate object keys. A leading-whitespace mutation that preserves the parsed JSON object and therefore leaves the canonical event hash unchanged is rejected. Audit rows must match sorted-key, compact JSON encoding with `ensure_ascii=False`, consistent with the store's append routine.
+
+### Exact-head CI
+- PR #208 head: `9bbaf49e6358b116547f347edcd2073032327dce`.
+- Actions run [45870608585](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45870608585): both Python 3.11.18 and 3.13.18 passed.
+- SQLite 3.46.1.
+- Eight suites: 26 schema, 24 lifecycle, 16 allocations, 13 atomic allocations, 83 settlement store, 17 receiver, 12 offline journal/settlement, 40 read-only migration preflight.
+- **231 tests per interpreter / 462 total; zero actual ResourceWarning or ignored-connection output.**
+
+Independent adversarial review remains pending; this test result is not a release or profitability certification.
