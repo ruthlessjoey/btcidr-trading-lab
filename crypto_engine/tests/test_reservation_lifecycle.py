@@ -33,6 +33,9 @@ class ReservationLifecycleTests(unittest.TestCase):
                 market_id TEXT PRIMARY KEY, base_asset TEXT NOT NULL, quote_asset TEXT NOT NULL
             );
             INSERT INTO markets VALUES('BTC/USDT','BTC','USDT');
+            CREATE TABLE holdings(
+                market_id TEXT PRIMARY KEY REFERENCES markets(market_id), quantity TEXT NOT NULL
+            );
             CREATE TABLE batches(
                 batch_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN
@@ -52,6 +55,23 @@ class ReservationLifecycleTests(unittest.TestCase):
                 event_json TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL
             );
         """)
+        initial = {
+            "kind": "ACCOUNT_INITIALIZED", "account_id": "paper-research",
+            "currency": "USDT", "opening_cash": "1000",
+            "market_registration_audit": "required-v1",
+        }
+        initial_json = json.dumps(initial, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        initial_hash = _event_hash("0" * 64, initial)
+        market = {
+            "kind": "MARKET_REGISTERED", "account_id": "paper-research",
+            "market_id": "BTC/USDT", "base_asset": "BTC", "quote_asset": "USDT",
+        }
+        market_json = json.dumps(market, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        market_hash = _event_hash(initial_hash, market)
+        self.db.executemany(
+            "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
+            [(initial_json, "0" * 64, initial_hash), (market_json, initial_hash, market_hash)],
+        )
         self.db.execute("BEGIN IMMEDIATE")
         ensure_reservation_schema_v2(self.db)
         self.db.commit()
@@ -85,6 +105,14 @@ class ReservationLifecycleTests(unittest.TestCase):
             previous = stored_hash
         return True
 
+    def test_corrupt_base_audit_chain_blocks_reservation_mutation(self):
+        self.db.execute("UPDATE audit SET event_hash=? WHERE seq=1", ("0" * 64,))
+        self.db.commit()
+        with self.assertRaisesRegex(
+            ReservationLifecycleError, "verified account and market audit baselines"
+        ):
+            self.create(reservation_id="corrupt-audit-r")
+
     def test_pre_marker_store_cannot_create_or_change_reservations(self):
         self.db.execute(
             "DELETE FROM metadata WHERE key IN "
@@ -110,7 +138,7 @@ class ReservationLifecycleTests(unittest.TestCase):
         self.assertEqual((row["status"], row["version"]), ("PENDING", 1))
         self.assertEqual(row["expires_at"], 200)
         self.assertEqual(row["consumed_quantity"], "0")
-        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 1)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0], 3)
         self.assertTrue(self.audit_is_valid())
 
     def test_create_rejects_timestamp_outside_sqlite_integer_range(self):
