@@ -1,0 +1,33 @@
+# Bitstamp personal spot-data research
+
+This is an isolated, noncommercial research-only workstream. It uses unauthenticated public Bitstamp SPOT market metadata and 1-hour OHLC candles. It does not access an account, credentials, wallet, order endpoint, private API or live trading.
+
+## Data rights and storage
+Bitstamp's API documentation identifies the public markets and OHLC endpoints and states that companies using Bitstamp exchange data for their own commercial purposes must obtain a commercial Data License Agreement. This branch is limited to personal, noncommercial research, with no raw-data redistribution. Any commercial product, signal distribution or resale requires a separate written license assessment and approval.
+
+Sources:
+- https://www.bitstamp.net/api/
+- https://www.bitstamp.net/fee-schedule/
+
+The GitHub Actions workflow keeps candles in runner memory, emits only summary metrics and hashes, and uploads no dataset artifact. It does not retain raw provider data.
+
+## Preregistered research
+- Symbols: BTC/USD, ETH/USD, XRP/USD, DOGE/USD, SHIB/USD, PEPE/USD and SOL/USD where Bitstamp currently exposes a SPOT market.
+- Interval: 1 hour; closed candles only.
+- Period: 2024-01-01 through 2026-11-01 UTC.
+- Strategies: fixed SMA20/50 long-only trend; fixed RSI14 long-only mean reversion (enter below 30, exit above 55); buy-and-hold is a baseline only.
+- Chronological split: 60% train / 20% validation / 20% holdout with 50-bar embargo between segments.
+- No parameter search, no tuning on validation or holdout, all preregistered strategies reported.
+- Execution: signal at candle close, execute at next candle open; maximum participation 5% of prior-hour base volume.
+- Costs: 16 bps taker fee per side as a documented public API example (not the user's actual fee tier); assumed spread/slippage scenarios are reported separately. These are assumptions, not historical order-book observations.
+- Long-only spot, no shorts, leverage, margin or derivatives.
+
+## Fail-closed conditions
+- Only exact HTTPS host www.bitstamp.net and documented public markets/OHLC paths.
+- No redirects, no credentials, no cookies, strict TLS, 4 MiB response cap, duplicate-key JSON rejection, 1000-row page cap and bounded pagination.
+- Only SPOT markets; exact market identity must match.
+- Duplicate candles, invalid OHLC, gaps, insufficient history or market identity mismatch block the affected backtest.
+- No raw data artifacts or dataset publication.
+
+## Important limits
+This is exploratory research, not an installable trading system. The workflow does not place orders. Results do not establish profitability, high win rate, independent validation or production readiness. A missing/unsupported meme-coin market is reported; the script does not substitute another asset silently.
