@@ -85,7 +85,7 @@ def evaluate_five_fold_strategy(
         raise WalkForwardEvaluationError("supplied candles or market identity do not match verified dataset manifest")
     if strategy_id not in STRATEGIES:
         raise WalkForwardEvaluationError("strategy_id is not preregistered")
-    dataset_hash = canonical_dataset_sha256(normalized_symbol, candles)
+    dataset_hash = verified_dataset["manifest_sha256"]
     try:
         registry = verify_trial_registry(trial_registry_bytes)
     except ValueError as exc:
