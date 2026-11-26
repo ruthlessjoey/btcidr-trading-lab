@@ -1343,3 +1343,48 @@ PR #210 carries the migration preflight and copy-only migration path onto the ne
 5. Continue preregistered multi-market profitability research with point-in-time data, realistic costs, untouched chronological holdouts and independent reproduction.
 
 Release state: install/trading NOT READY; PAPER ON HOLD; LIVE DISABLED/ABSENT; profitability NOT ESTABLISHED; whole-project completion UNRATED.
+
+
+## Combined PR #208 candidate stack — exact-head verification — 27 November 2026
+
+### Exact candidate and lineage
+- PR #208 head: `de43d7e8e852853493e8c6bcd3cd6d9c5372cdfd`.
+- Base: PR #205 branch `security/legacy-read-only-validation-v2-2026-11-26`, exact base SHA `d3940f94237b7c23e59678612ea11dea86cbd22f`.
+- PR #208 remains draft/open/unmerged.
+- This is a combined candidate for #203 legacy pre-marker read-only behavior, #205 isolated validation, #208 audit sequence/JSON checks, offline journal cleanup and the read-only migration preflight. It is not a release artifact.
+
+### New changes carried into the combined stack
+- Audit verification now rejects duplicate JSON object keys. Regression duplicates a top-level key in a persisted event while leaving the default parser's effective dictionary/hash unchanged; the strict verifier must fail closed.
+- Offline batch journal connections use a journal-owned close-on-exit SQLite connection class. Regression proves use after context exit raises `sqlite3.ProgrammingError`.
+- Read-only reservation migration preflight from #209 was carried into #208 with its exact source/test blob SHAs `483c60ec2355979b7cfccf89eeb613f563037b94` and `c961fa30776cfdab17cffa293bd55962d04de8df`. No copy migration module was carried.
+- Preflight requires query-only mode, checks schema shape, bounded audit/event payloads, genesis sequence 1, contiguous sequence, canonical JSON and hash links. It performs no migration/bootstrap.
+- Workflow sparse checkout and path filters now include offline journal and read-only migration preflight.
+
+### Exact-head Actions evidence
+- Run [45868115365](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45868115365), previous exact head before migration preflight: 186 tests per Python interpreter; both passed with zero actual ResourceWarnings.
+- Run [45868342950](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45868342950), current head `de43d7e8e852853493e8c6bcd3cd6d9c5372cdfd): both Python matrix jobs passed.
+- Python 3.11.18 and 3.13.18 / SQLite 3.46.1 each passed:
+  - schema v2 25
+  - reservation lifecycle 21
+  - allocations 16
+  - atomic allocations 13
+  - settlement store 82
+  - receiver 17
+  - offline batch settlement/journal 12
+  - read-only migration preflight 40
+  - **226 tests per interpreter; 452 across both jobs**
+- Zero actual `ResourceWarning` or ignored SQLite connection output in either job.
+
+### Remaining integration boundary
+- PR #209 still contains a separate copy-only migration implementation based on #164. It is intentionally not merged into #208; copy-only schema staging does not establish cash, inventory or market identity authority.
+- PR #157 remains structural eligibility only. No existing user database has been accessed, migrated or bootstrapped.
+- Independent adversarial review of the combined #203/#205/#208 candidate remains pending.
+- External checkpoint signer/genesis design remains documentation-only. No signer, storage or recovery authority selected.
+- No profitability evidence is created by these persistence/security tests.
+
+### Current release state
+- Install/trading readiness: NOT READY.
+- PAPER: ON HOLD / disabled.
+- LIVE: DISABLED / ABSENT.
+- Profitability/high win rate: NOT ESTABLISHED.
+- Overall completion: UNRATED.
