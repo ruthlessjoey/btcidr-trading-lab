@@ -14,7 +14,7 @@ Candidate Bitstamp SPOT markets: BTC/USD, ETH/USD, XRP/USD, DOGE/USD, SHIB/USD, 
 
 ## Fixed strategy family
 1. SMA20/50 long-only trend: at candle close, target 100% long only when SMA20 > SMA50 and close > SMA20; otherwise target flat.
-2. RSI14 simple-average mean reversion, long-only: enter when RSI14 < 30; exit when RSI14 > 55; otherwise maintain prior target.
+2. RSI14 simple-average mean reversion, long-only: enter when RSI14 < 30; exit when RSI14 > 55; otherwise maintain prior target. A 14-change window with zero gains and zero losses is neutral (RSI 50), not overbought.
 3. Buy-and-hold is a benchmark only, not a candidate strategy.
 
 No parameter optimization or search is permitted in this run.
