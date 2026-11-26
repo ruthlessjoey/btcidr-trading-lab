@@ -1401,12 +1401,18 @@ class SQLiteSettlementStore:
 
     def _verify_chain(self, db: sqlite3.Connection) -> bool:
         previous = "0" * 64
-        for event_json, stored_previous, stored_hash in db.execute(
-                "SELECT event_json,previous_hash,event_hash FROM audit ORDER BY seq"):
+        expected_sequence = 1
+        for sequence, event_json, stored_previous, stored_hash in db.execute(
+                "SELECT seq,event_json,previous_hash,event_hash FROM main.audit ORDER BY seq"):
+            # The chain's checkpoint sequence must identify an exact contiguous
+            # prefix, not merely the ordering of rows that happen to remain.
+            if sequence != expected_sequence:
+                return False
             event = json.loads(event_json)
             if stored_previous != previous or _event_hash(previous, event) != stored_hash:
                 return False
             previous = stored_hash
+            expected_sequence += 1
         return True
 
     def _initialize(self, db: sqlite3.Connection, opening_cash: str) -> None:
