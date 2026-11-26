@@ -213,6 +213,7 @@ class ResearchRunnerTests(unittest.TestCase):
             result["mark_to_market_return_pct"],
         )
         self.assertEqual(result["terminal_position_status"], "FLAT")
+        self.assertEqual(result["return_valuation"], "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT")
         self.assertEqual(Decimal(result["open_position_mark_value"]), Decimal("0"))
 
     def test_backtest_rejects_invalid_candle_low(self):
@@ -412,7 +413,7 @@ class WalkForwardFoldTests(unittest.TestCase):
         )
         self.assertEqual(result["terminal_position_status"], "FLAT")
         self.assertIsNotNone(result["net_return_pct"])
-        self.assertEqual(result["return_valuation"], "MARK_TO_MARKET_AFTER_EXECUTED_COSTS")
+        self.assertEqual(result["return_valuation"], "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT")
         self.assertEqual(Decimal(result["open_position_at_end"]), Decimal("0"))
 
     def test_fold_backtest_rejects_missing_liquidation_bar_or_bad_signal_count(self):
