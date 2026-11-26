@@ -85,6 +85,15 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         self.assertEqual(markets["btcusd"]["market_type"], "SPOT")
         self.assertEqual(len(digest), 64)
 
+    def test_market_list_rejects_duplicate_spot_symbols(self):
+        payload = [
+            {"market_symbol": "btcusd", "market_type": "SPOT", "name": "BTC/USD"},
+            {"market_symbol": "btcusd", "market_type": "SPOT", "name": "BTC/USD"},
+        ]
+        opener = FakeOpener([FakeResponse(json.dumps(payload))])
+        with self.assertRaisesRegex(BitstampDataError, "duplicate SPOT market"):
+            fetch_spot_markets(opener=opener)
+
     def test_candle_validation_rejects_bad_prices_and_volume(self):
         for row in (
             candle(3600, open_="0"),
@@ -92,6 +101,8 @@ class BitstampPublicOhlcTests(unittest.TestCase):
             candle(3600, low="102"),
             candle(3600, volume="-1"),
             candle(3601),
+            {"timestamp": 3600.5, "open": "100", "high": "102", "low": "99", "close": "101", "volume": "10"},
+            {"timestamp": "3600", "open": 100.5, "high": "102", "low": "99", "close": "101", "volume": "10"},
         ):
             with self.subTest(row=row), self.assertRaises(BitstampDataError):
                 _normalize_candle(row, step=3600)
