@@ -239,7 +239,15 @@ def parse_klines(raw):
         try:
             if not isinstance(row, (list, tuple)) or len(row) < 6:
                 raise ValueError("expected a list of at least 6 values")
-            out.append(Candle(to_seconds(row[0]), float(row[1]), float(row[2]),
+            raw_timestamp = row[0]
+            if (isinstance(raw_timestamp, bool)
+                    or not isinstance(raw_timestamp, (str, int))
+                    or (isinstance(raw_timestamp, str)
+                        and not re.fullmatch(r"[0-9]{1,16}", raw_timestamp))):
+                raise ValueError("candle timestamp must be an integer or decimal-digit string")
+            if any(isinstance(value, bool) for value in row[1:6]):
+                raise ValueError("boolean OHLCV values are forbidden")
+            out.append(Candle(to_seconds(raw_timestamp), float(row[1]), float(row[2]),
                               float(row[3]), float(row[4]), float(row[5])))
         except (TypeError, ValueError) as e:
             raise ApiError(f"candle #{i} has an unexpected format ({e}): {str(row)[:200]}")
