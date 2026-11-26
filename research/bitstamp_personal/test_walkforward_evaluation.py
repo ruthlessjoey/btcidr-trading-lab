@@ -56,7 +56,7 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         self.assertEqual(result["trial_registry_sha256"], verify_trial_registry(trial_registry())["registry_sha256"])
         self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
         for fold in result["folds"]:
-            self.assertEqual(fold["observations"], 31)
+            self.assertEqual(fold["observations"], 101)
             self.assertEqual(fold["registered_trial_count"], 2)
             self.assertEqual(fold["trial_registry_sha256"], result["trial_registry_sha256"])
             self.assertTrue(0 <= fold["max_drawdown"] < 1)
