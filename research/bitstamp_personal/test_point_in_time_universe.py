@@ -164,6 +164,18 @@ class PointInTimeUniverseTests(unittest.TestCase):
         with self.assertRaisesRegex(PointInTimeUniverseError, "does not follow full-order eligibility"):
             verify_fixture(manifest)
 
+    def test_market_timestamps_require_typed_listing_and_status_sources(self):
+        manifest = valid_manifest()
+        status = next(x for x in manifest["source_evidence"] if x["source_id"] == "status")
+        status["evidence_type"] = "API_SEMANTICS"
+        with self.assertRaisesRegex(PointInTimeUniverseError, "MARKET_STATUS_LEDGER"):
+            verify_fixture(manifest)
+        manifest = valid_manifest()
+        listing = next(x for x in manifest["source_evidence"] if x["source_id"] == "listing")
+        listing["evidence_type"] = "JURISDICTIONAL_STATUS_NOTICE"
+        with self.assertRaisesRegex(PointInTimeUniverseError, "LISTING_NOTICE"):
+            verify_fixture(manifest)
+
     def test_limit_only_does_not_supply_market_order_enable_timestamp(self):
         manifest = valid_manifest()
         shib = next(m for m in manifest["markets"] if m["market_symbol"] == "shibusd")
