@@ -20,6 +20,7 @@ on:
       - research/require-aligned-global-oos-fold-calendar-2026-11-27
       - research/integrated-oos-calendar-execution-sensitivity-2026-11-27
       - security/enforce-append-only-trial-ledger-history-2026-11-27
+      - security/pin-trial-ledger-genesis-root-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
