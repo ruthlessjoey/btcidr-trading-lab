@@ -1,6 +1,6 @@
 name: Reservation Settlement Isolated Tests
 
-# Re-run all safe suites for the corrected pre-marker legacy read-only fixture.
+# Revalidate PR 209 audit-sequence preflight and deterministic test-connection cleanup. Parent PR 164 now carries the same deterministic fixture cleanup and warning-trace gate.
 
 on:
   push:
@@ -15,8 +15,12 @@ on:
       - "crypto_engine/tmm_core/reservation_lifecycle.py"
       - "crypto_engine/tmm_core/reservation_allocations.py"
       - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tests/test_reservation_migration.py"
       - "crypto_engine/tests/test_reservation_schema_v2.py"
       - "crypto_engine/tests/test_reservation_lifecycle.py"
       - "crypto_engine/tests/test_reservation_allocations.py"
@@ -31,8 +35,12 @@ on:
       - "crypto_engine/tmm_core/reservation_lifecycle.py"
       - "crypto_engine/tmm_core/reservation_allocations.py"
       - "crypto_engine/tmm_core/reservation_outbox_receiver.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration.py"
       - "crypto_engine/tests/test_sqlite_settlement_store.py"
       - "crypto_engine/tests/test_reservation_outbox_receiver.py"
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tests/test_reservation_migration.py"
       - "crypto_engine/tests/test_reservation_schema_v2.py"
       - "crypto_engine/tests/test_reservation_lifecycle.py"
       - "crypto_engine/tests/test_reservation_allocations.py"
@@ -75,8 +83,12 @@ jobs:
             /crypto_engine/tmm_core/reservation_lifecycle.py
             /crypto_engine/tmm_core/reservation_allocations.py
             /crypto_engine/tmm_core/reservation_outbox_receiver.py
+            /crypto_engine/tmm_core/reservation_migration_preflight.py
+            /crypto_engine/tmm_core/reservation_migration.py
             /crypto_engine/tests/test_sqlite_settlement_store.py
             /crypto_engine/tests/test_reservation_outbox_receiver.py
+            /crypto_engine/tests/test_reservation_migration_preflight.py
+            /crypto_engine/tests/test_reservation_migration.py
             /crypto_engine/tests/test_reservation_schema_v2.py
             /crypto_engine/tests/test_reservation_lifecycle.py
             /crypto_engine/tests/test_reservation_allocations.py
@@ -92,19 +104,45 @@ jobs:
         run: python -c 'import sqlite3, sys; print("python=" + sys.version.replace("\\n", " ")); print("sqlite=" + sqlite3.sqlite_version)'
 
       - name: Run reservation schema v2 regression suite
-        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_schema_v2.py' -v
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_schema_v2.py' -v
 
       - name: Run reservation lifecycle regression suite
-        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_lifecycle.py' -v
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_lifecycle.py' -v
 
       - name: Run reservation allocations regression suite
-        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_allocations.py' -v
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_allocations.py' -v
 
       - name: Run reservation atomic allocations regression suite
-        run: python -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_atomic_allocations.py' -v
 
       - name: Run settlement store regression suite
-        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v
+        run: |
+          set +e
+          python -X tracemalloc=10 -W always::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_sqlite_settlement_store.py' -v > "$RUNNER_TEMP/settlement-store.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/settlement-store.log"
+          if grep -q "ResourceWarning:" "$RUNNER_TEMP/settlement-store.log"; then
+            echo "Unclosed SQLite resources detected in settlement store tests"
+            exit 1
+          fi
+          exit "$test_status"
 
       - name: Run reservation receiver regression suite
-        run: python -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v
+        run: |
+          set +e
+          python -X tracemalloc=10 -W always::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_outbox_receiver.py' -v > "$RUNNER_TEMP/reservation-receiver.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/reservation-receiver.log"
+          if grep -q "ResourceWarning:" "$RUNNER_TEMP/reservation-receiver.log"; then
+            echo "Unclosed SQLite resources detected in reservation receiver tests"
+            exit 1
+          fi
+          exit "$test_status"
+
+      - name: Run read-only reservation migration preflight regression suite
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_migration_preflight.py' -v
+
+      - name: Run copy-only reservation migration regression suite
+        run: python -X tracemalloc=5 -W error::ResourceWarning -m unittest discover -s crypto_engine/tests -p 'test_reservation_migration.py' -v
