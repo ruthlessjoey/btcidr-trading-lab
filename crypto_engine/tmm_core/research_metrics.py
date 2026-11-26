@@ -244,7 +244,7 @@ def _exposure_metrics(curve: object) -> dict[str, object]:
         for market_id in sorted(keys):
             value = _number(market_values[market_id], f"exposure_curve[{index}].market_values[{market_id}]")
             weight = _number(market_weights[market_id], f"exposure_curve[{index}].market_weights[{market_id}]")
-            if value < 0 or weight < 0 or weight != value / equity:
+            if value < 0 or weight < 0 or abs(weight - value / equity) > D("1e-24"):
                 raise ResearchMetricsError(f"exposure_curve[{index}] has inconsistent market weights")
             values[market_id] = value
             weights[market_id] = weight
@@ -253,9 +253,9 @@ def _exposure_metrics(curve: object) -> dict[str, object]:
             raise ResearchMetricsError(f"exposure_curve[{index}] cash and market values do not reconcile to equity")
         gross = invested / equity
         cash_weight = cash / equity
-        if _number(row.get("gross_exposure"), f"exposure_curve[{index}].gross_exposure") != gross:
+        if abs(_number(row.get("gross_exposure"), f"exposure_curve[{index}].gross_exposure") - gross) > D("1e-24"):
             raise ResearchMetricsError(f"exposure_curve[{index}] gross exposure does not reconcile")
-        if _number(row.get("cash_weight"), f"exposure_curve[{index}].cash_weight") != cash_weight:
+        if abs(_number(row.get("cash_weight"), f"exposure_curve[{index}].cash_weight") - cash_weight) > D("1e-24"):
             raise ResearchMetricsError(f"exposure_curve[{index}] cash weight does not reconcile")
         gross_weights.append(gross)
         cash_weights.append(cash_weight)
@@ -302,7 +302,10 @@ def summarize_backtest_result(result: Mapping[str, object]) -> dict[str, object]
         exposure = _exposure_metrics(result.get("exposure_curve"))
         calculated_total_return = final_equity / initial_cash - D("1")
         curve = result["equity_curve"]
+        curve_initial = _number(curve[0]["equity"], "equity_curve initial equity")
         curve_final = _number(curve[-1]["equity"], "equity_curve final equity")
+        if curve_initial != initial_cash:
+            raise ResearchMetricsError("initial_cash does not match first equity_curve observation")
         if curve_final != final_equity:
             raise ResearchMetricsError("final_equity does not match final equity_curve observation")
 
