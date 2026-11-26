@@ -138,7 +138,7 @@ class Coinbase:
 
 
 class BinanceStyle:
-    """Binance-layout klines. Used for Binance's market-data-only host and for Tokocrypto."""
+    """Binance-layout candle adapter; Tokocrypto time/symbol discovery is disabled."""
     MAX_PER_REQUEST = 500
 
     def __init__(self, name, label, quote, pair, base_url, docs, style="binance_style"):
@@ -146,6 +146,11 @@ class BinanceStyle:
         self.pair, self.src = pair, fetcher.Source(name, style, base_url)
 
     def server_time(self, http):
+        if self.name == "tokocrypto":
+            raise ApiError(
+                "Tokocrypto server-time access is not approved; "
+                "only the exact public /api/v3/klines endpoint is permitted"
+            )
         return fetcher.extract_server_time(http.get(self.src.time_url()))
 
     def candles(self, tf, start_s, end_s, http):
