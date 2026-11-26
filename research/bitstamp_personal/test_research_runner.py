@@ -372,10 +372,6 @@ class ResearchRunnerTests(unittest.TestCase):
                 backtest([candle(), candle()], [0, 1], **costs)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class WalkForwardFoldTests(unittest.TestCase):
     def test_five_folds_are_chronological_disjoint_and_embargoed(self):
         folds = plan_walk_forward_folds(10000)
@@ -416,6 +412,42 @@ class WalkForwardFoldTests(unittest.TestCase):
         self.assertEqual(result["return_valuation"], "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT")
         self.assertEqual(Decimal(result["open_position_at_end"]), Decimal("0"))
 
+    def test_market_evaluation_uses_only_five_fold_oos_results(self):
+        candles = [candle() for _ in range(5000)]
+        dataset = {
+            "market_symbol": "btcusd",
+            "pair": "BTC/USD",
+            "row_count": len(candles),
+            "first_open_timestamp": 1,
+            "last_close_timestamp": 2,
+            "dataset_sha256": "a" * 64,
+            "raw_page_sha256": "b" * 64,
+            "page_count": 1,
+            "coverage_status": "CONTIGUOUS",
+            "gap_count": 0,
+            "candles": candles,
+        }
+        result = evaluate_market({"market_symbol": "btcusd"}, dataset)
+        self.assertEqual(len(result["walk_forward_folds"]), 5)
+        self.assertEqual(result["walk_forward_status"],
+                         "FIVE_OOS_FOLDS_WITH_NEXT_OPEN_TERMINAL_LIQUIDATION_STATISTICS_PENDING")
+        self.assertEqual(result["cost_assumptions"]["two_x_fee_bps_per_side"], "32")
+        self.assertEqual(result["results"]["walk_forward_folds"], result["walk_forward_folds"])
+        for fold in result["walk_forward_folds"]:
+            self.assertEqual(fold["liquidation_index"], fold["test_end"])
+            self.assertIn("SMA20_50_LONG_ONLY", fold["strategies"])
+            for item in list(fold["strategies"].values()) + [
+                {"base_costs": fold["buy_hold_base_costs"],
+                 "two_x_costs": fold["buy_hold_two_x_costs"]}
+            ]:
+                self.assertEqual(item["base_costs"]["terminal_position_status"], "FLAT")
+                self.assertEqual(item["base_costs"]["return_valuation"],
+                                 "REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT")
+                self.assertIsNotNone(item["base_costs"]["net_return_pct"])
+                self.assertEqual(item["two_x_costs"]["terminal_position_status"], "FLAT")
+                self.assertIsNotNone(item["two_x_costs"]["net_return_pct"])
+        self.assertNotIn("holdout", result["results"])
+
     def test_fold_backtest_rejects_missing_liquidation_bar_or_bad_signal_count(self):
         candles = [candle() for _ in range(30)]
         with self.assertRaisesRegex(ValueError, "bounds or signals"):
@@ -424,3 +456,7 @@ class WalkForwardFoldTests(unittest.TestCase):
                 fee_bps=Decimal("16"), half_spread_bps=Decimal("5"),
                 slippage_bps=Decimal("10"),
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
