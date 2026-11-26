@@ -44,14 +44,14 @@ def _require_transaction(db: sqlite3.Connection) -> None:
         raise ReservationLifecycleError("a trusted SQLite connection is required")
     if not db.in_transaction:
         raise ReservationLifecycleError("caller-owned BEGIN IMMEDIATE transaction is required")
+    _validate_audit_schema(db)
     try:
         _verify_account_market_baseline(db)
     except (ReservationSchemaError, sqlite3.Error) as exc:
         raise ReservationLifecycleError(
-            "verified account and market audit baselines are required before reservation changes"
+            "explicit account and market audit baselines must be verified before reservation changes"
         ) from exc
     ensure_reservation_schema_v2(db)
-    _validate_audit_schema(db)
 
 
 def _text(value: object, field: str, limit: int = 128) -> str:
