@@ -28,4 +28,8 @@ class RegistryTests(unittest.TestCase):
    with self.assertRaises(TrialRegistryError):parse_trial_registry(raw(x),expected_market_symbols=M,expected_strategies=S,preregistration_id=P)
   for value in (b"\n",b"\xff"):
    with self.assertRaises(TrialRegistryError):parse_trial_registry(value,expected_market_symbols=M,expected_strategies=S,preregistration_id=P)
+ def test_non_string_identity_fields_fail_closed(self):
+  x=[row(m,s) for m in M for s in S];x[0]["market_symbol"]=[]
+  with self.assertRaises(TrialRegistryError):parse_trial_registry(raw(x),expected_market_symbols=M,expected_strategies=S,preregistration_id=P)
+
 if __name__=="__main__":unittest.main()
