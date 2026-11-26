@@ -13,6 +13,7 @@ from research_runner import (
     split_ranges,
     plan_walk_forward_folds,
     _backtest_walk_forward_fold,
+    assess_global_oos_calendar_alignment,
     validate_preregistered_run,
     _epoch,
     main,
@@ -31,6 +32,53 @@ def candle(open_price="100", close_price="100", volume="10000", low_price=None):
 
 
 class ResearchRunnerTests(unittest.TestCase):
+    def test_global_oos_calendar_requires_identical_utc_windows_across_markets(self):
+        start = 1704067200
+        candles = [{
+            "open_timestamp": start + index * 3600,
+            "timestamp": start + (index + 1) * 3600,
+            "open": "100", "high": "100", "low": "100",
+            "close": "100", "volume": "10000",
+        } for index in range(6000)]
+        aligned = assess_global_oos_calendar_alignment([
+            ({"market_symbol": "btcusd"}, {"candles": candles}),
+            ({"market_symbol": "ethusd"}, {"candles": candles}),
+        ])
+        self.assertTrue(aligned["aligned"])
+        self.assertEqual(aligned["status"], "ALIGNED")
+
+        later_start = start + 24 * 3600
+        shifted = [{
+            **candle,
+            "open_timestamp": candle["open_timestamp"] + 24 * 3600,
+            "timestamp": candle["timestamp"] + 24 * 3600,
+        } for candle in candles]
+        mismatch = assess_global_oos_calendar_alignment([
+            ({"market_symbol": "btcusd"}, {"candles": candles}),
+            ({"market_symbol": "pepeusd"}, {"candles": shifted}),
+        ])
+        self.assertFalse(mismatch["aligned"])
+        self.assertEqual(mismatch["status"], "BLOCKED_GLOBAL_OOS_CALENDAR_MISMATCH")
+        self.assertIn("not time-aligned", mismatch["reason"])
+
+    def test_global_oos_calendar_blocks_missing_or_noncontiguous_timestamps(self):
+        candles = [{
+            "open_timestamp": 1704067200 + index * 3600,
+            "timestamp": 1704067200 + (index + 1) * 3600,
+        } for index in range(6000)]
+        missing = assess_global_oos_calendar_alignment([
+            ({"market_symbol": "btc"}, {"candles": []}),
+        ])
+        self.assertFalse(missing["aligned"])
+        invalid = [dict(row) for row in candles]
+        target_index = plan_walk_forward_folds(len(candles))[0]["test_end"] - 1
+        invalid[target_index].pop("timestamp")
+        result = assess_global_oos_calendar_alignment([
+            ({"market_symbol": "btc"}, {"candles": invalid}),
+        ])
+        self.assertFalse(result["aligned"])
+        self.assertEqual(result["status"], "BLOCKED_GLOBAL_OOS_CALENDAR_INVALID")
+
     def test_point_in_time_gate_blocks_before_any_public_request(self):
         output = io.StringIO()
         with patch(

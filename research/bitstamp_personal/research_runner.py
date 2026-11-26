@@ -729,6 +729,86 @@ def evaluate_market(
     }
 
 
+def assess_global_oos_calendar_alignment(market_datasets: list[tuple[dict, dict]]) -> dict:
+    """Require identical UTC OOS and terminal-liquidation boundaries across markets.
+
+    Fold indices are not a substitute for calendar alignment: per-market
+    inception dates can produce different UTC windows even when fold IDs match.
+    """
+    if not isinstance(market_datasets, list) or not market_datasets:
+        return {
+            "aligned": False,
+            "status": "BLOCKED_GLOBAL_OOS_CALENDAR_UNAVAILABLE",
+            "reason": "no market datasets are available for calendar alignment",
+            "market_calendars": {},
+        }
+    calendars = {}
+    reference = None
+    reference_market = None
+    for market, dataset in market_datasets:
+        symbol = market.get("market_symbol")
+        candles = dataset.get("candles")
+        if not isinstance(symbol, str) or not isinstance(candles, list):
+            return {
+                "aligned": False,
+                "status": "BLOCKED_GLOBAL_OOS_CALENDAR_INVALID",
+                "reason": "market identity or candle rows are unavailable",
+                "market_calendars": calendars,
+            }
+        try:
+            folds = plan_walk_forward_folds(len(candles))
+            intervals = []
+            for fold in folds:
+                start_index = fold["test_start"]
+                end_index = fold["test_end"]
+                liquidation_index = fold["liquidation_index"]
+                start_open = candles[start_index]["open_timestamp"]
+                end_close = candles[end_index - 1]["timestamp"]
+                liquidation_open = candles[liquidation_index]["open_timestamp"]
+                for value in (start_open, end_close, liquidation_open):
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError("fold calendar timestamps must be nonnegative integers")
+                if end_close != liquidation_open:
+                    raise ValueError(
+                        f"{symbol} fold {fold['fold_id']} is not contiguous with its liquidation candle"
+                    )
+                intervals.append({
+                    "fold_id": fold["fold_id"],
+                    "oos_start_timestamp": start_open,
+                    "oos_end_timestamp_exclusive": end_close,
+                    "liquidation_open_timestamp": liquidation_open,
+                })
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
+            calendars[symbol] = {"error": str(exc)}
+            return {
+                "aligned": False,
+                "status": "BLOCKED_GLOBAL_OOS_CALENDAR_INVALID",
+                "reason": f"{symbol} fold calendar could not be verified: {exc}",
+                "market_calendars": calendars,
+            }
+        calendars[symbol] = intervals
+        if reference is None:
+            reference = intervals
+            reference_market = symbol
+        elif intervals != reference:
+            return {
+                "aligned": False,
+                "status": "BLOCKED_GLOBAL_OOS_CALENDAR_MISMATCH",
+                "reason": (
+                    f"{symbol} OOS/terminal-liquidation UTC windows do not match "
+                    f"reference market {reference_market}; global DSR trial series are not time-aligned"
+                ),
+                "reference_market": reference_market,
+                "market_calendars": calendars,
+            }
+    return {
+        "aligned": True,
+        "status": "ALIGNED",
+        "reference_market": reference_market,
+        "market_calendars": calendars,
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--start", default="2024-01-01")
@@ -812,11 +892,14 @@ def main(argv=None) -> int:
             )
             for market, dataset in market_datasets
         ]
+        global_oos_calendar = assess_global_oos_calendar_alignment(market_datasets)
+        output["global_oos_calendar_alignment"] = global_oos_calendar
         complete_trial_universe = (
             len(selected) * len(STRATEGIES) == registered_trial_count
             and len(market_results) == len(selected)
             and all(len(row.get("walk_forward_folds", [])) == WALK_FORWARD_FOLD_COUNT
                     for row in market_results)
+            and global_oos_calendar["aligned"]
         )
         if complete_trial_universe:
             global_trial_series_by_fold = []
@@ -845,7 +928,13 @@ def main(argv=None) -> int:
                 row["promotion_screens"] = {
                     strategy: {
                         "status": "BLOCKED_STATISTICAL_EVIDENCE_INCOMPLETE",
-                        "reason": "not all preregistered markets produced five valid folds; global DSR trial universe incomplete",
+                        "reason": (
+                            "not all preregistered markets produced five valid folds; "
+                            "global DSR trial universe or shared UTC OOS calendar is incomplete: "
+                            + global_oos_calendar["reason"]
+                            if not global_oos_calendar["aligned"]
+                            else "not all preregistered markets produced five valid folds; global DSR trial universe incomplete"
+                        ),
                         "fold_statistics": [],
                     } for strategy in STRATEGIES
                 }
