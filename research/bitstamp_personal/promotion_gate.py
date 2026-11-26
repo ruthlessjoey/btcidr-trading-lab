@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from trial_registry import TrialRegistryError, verify_trial_registry
+from statistical_evidence import MINIMUM_RETURN_OBSERVATIONS
 
 class PromotionError(ValueError):
     """Malformed or incomplete promotion evidence."""
@@ -139,6 +140,11 @@ def evaluate_promotion_gate(
             raise PromotionError("max_drawdown must be in [0, 1)")
         if row["profit_factor"] < 0:
             raise PromotionError("profit_factor cannot be negative")
+        if row["observations"] < MINIMUM_RETURN_OBSERVATIONS:
+            raise PromotionError(
+                f"fold[{i}].observations must include at least "
+                f"{MINIMUM_RETURN_OBSERVATIONS} complete non-overlapping 24-bar returns"
+            )
         if not 0 <= row["deflated_sharpe_probability"] <= 1:
             raise PromotionError("deflated_sharpe_probability must be in [0, 1]")
         rows.append(row)
@@ -197,6 +203,7 @@ def evaluate_promotion_gate(
             "minimum_observations": MINIMUM_OBSERVATIONS,
             "minimum_dsr_probability": MINIMUM_DSR_PROBABILITY,
             "minimum_fold_embargo_bars": MINIMUM_FOLD_EMBARGO_BARS,
+            "minimum_observations_per_fold": MINIMUM_RETURN_OBSERVATIONS,
             "maximum_trial_registry_bytes": MAXIMUM_TRIAL_REGISTRY_BYTES,
             "frozen_trial_registry_sha256": FROZEN_TRIAL_REGISTRY_SHA256,
             "frozen_trial_registry_family": FROZEN_RESEARCH_FAMILY,
