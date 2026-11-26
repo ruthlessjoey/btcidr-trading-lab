@@ -15,12 +15,12 @@ The public API documentation states that companies using Bitstamp exchange data 
 
 ## Preregistered research
 
-Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1`. The runner rejects date, candidate-universe, minimum-market and meme-market requirement overrides; any design change must be versioned and frozen before a new data request.
+Preregistration ID: `BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD`. The runner rejects date, candidate-universe, minimum-market and meme-market requirement overrides; any design change must be versioned and frozen before a new data request.
 - Symbols: BTC/USD, ETH/USD, XRP/USD, DOGE/USD, SHIB/USD, PEPE/USD and SOL/USD where Bitstamp currently exposes a SPOT market.
 - Interval: 1 hour; closed candles only.
 - Period: first eligible candle opens at 2024-01-01 00:00 UTC; last eligible candle closes no later than 2026-11-01 00:00 UTC.
 - Strategies: fixed SMA20/50 long-only trend; fixed RSI14 long-only mean reversion (enter below 30, exit above 55); buy-and-hold is a baseline only.
-- Chronological split: 60% train / 20% validation / 20% holdout with 50-bar embargo between segments.
+- Evaluation: 40% initial training history followed by five expanding-training, chronological OOS test folds; 50-bar embargo before each test fold and between test folds. Each fold reserves the immediately following candle for explicit next-open terminal liquidation; that liquidation candle is excluded from OOS test indices. No parameter tuning is performed.
 - No parameter search, no tuning on validation or holdout, all preregistered strategies reported.
 - Execution: signal at candle close, execute at next candle open; maximum participation 5% of prior-hour base volume.
 - Costs: 16 bps taker fee per side as a documented public API example (not the user's actual fee tier); assumed spread/slippage scenarios are reported separately. These are assumptions, not historical order-book observations.
@@ -61,3 +61,10 @@ The gate does not run strategies or calculate DSR/bootstrap statistics. A pass m
 ### Additional promotion evidence binding
 
 Every fold must also use identical SHA-256 hashes for the frozen cost model and strategy configuration. Candidate and same-cost benchmark returns must be explicitly tagged `REALIZED_NET_AFTER_COSTS_TERMINAL_FLAT`, and the terminal position must be `FLAT`. This prevents an open-position mark-to-market result from being silently passed off as a realized net return. The gate still relies on independent verification that the hashes bind to the actual source/configuration and that benchmark liquidation uses the same documented execution rules.
+
+
+## Five-fold walk-forward execution (V2)
+
+The runner now creates five expanding-training OOS folds. Every fold starts with a flat research account, uses causal prior-close indicator warm-up, enters only from next-open signals, and reserves the next candle after the test interval for explicit terminal liquidation at that candle's open with the same modeled fee/spread/slippage. The liquidation candle is not included in the fold's test index range. Fifty additional candles are embargoed before the next fold. The same fold dates are replayed for the candidate and buy-and-hold baseline.
+
+The 2x-cost replay doubles every cost component, including the per-side fee, half-spread and slippage, while preserving the exact same signals and candles. The fold runner reports base and 2x cost results but remains non-promotable until DSR and paired block-bootstrap statistics are computed and independently verified.
