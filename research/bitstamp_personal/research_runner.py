@@ -22,6 +22,14 @@ INITIAL_CASH = D("10000")
 PARTICIPATION = D("0.05")
 FEE_BPS = D("16")  # documented public API example only; not the user's fee tier
 STRATEGIES = ("SMA20_50_LONG_ONLY", "RSI14_MEAN_REVERSION_LONG_ONLY")
+PREREGISTRATION_ID = "BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V1"
+PREREGISTERED_START = "2024-01-01"
+PREREGISTERED_END = "2026-11-01"
+PREREGISTERED_SYMBOLS = (
+    "btcusd", "ethusd", "xrpusd", "dogeusd", "shibusd", "pepeusd", "solusd"
+)
+PREREGISTERED_MIN_MARKETS = 3
+PREREGISTERED_REQUIRE_MEME = True
 MEME_SYMBOLS = {"dogeusd", "shibusd", "pepeusd", "bonkusd", "flokusd"}
 
 
@@ -36,6 +44,22 @@ def _epoch(value: str, *, end: bool = False) -> int:
     if end:
         moment = moment.replace(hour=23, minute=0)
     return int(moment.timestamp()) + (3600 if end else 0)
+
+
+def validate_preregistered_run(
+    start: str, end: str, symbols: str, min_markets: int, require_meme: bool
+) -> list[str]:
+    """Reject CLI overrides that would silently change the frozen research design."""
+    expected_symbols = ",".join(PREREGISTERED_SYMBOLS)
+    if start != PREREGISTERED_START or end != PREREGISTERED_END:
+        raise BitstampDataError("requested date range differs from the frozen preregistration")
+    if symbols.lower() != expected_symbols:
+        raise BitstampDataError("candidate market universe differs from the frozen preregistration")
+    if min_markets != PREREGISTERED_MIN_MARKETS:
+        raise BitstampDataError("minimum market count differs from the frozen preregistration")
+    if require_meme is not PREREGISTERED_REQUIRE_MEME:
+        raise BitstampDataError("meme-market requirement differs from the frozen preregistration")
+    return list(PREREGISTERED_SYMBOLS)
 
 
 def _wilson(wins: int, total: int, z: float = 1.96):
@@ -299,11 +323,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        candidates = validate_preregistered_run(
+            args.start, args.end, args.symbols, args.min_markets, args.require_meme
+        )
         start_ts = _epoch(args.start)
         end_ts = _epoch(args.end, end=True)
-        candidates = [value.strip().lower() for value in args.symbols.split(",") if value.strip()]
-        if not candidates or len(set(candidates)) != len(candidates):
-            raise BitstampDataError("symbols must be a unique comma-separated list")
         markets, markets_hash = fetch_spot_markets()
         selected = [markets[symbol] for symbol in candidates if symbol in markets]
         missing = [symbol for symbol in candidates if symbol not in markets]
@@ -313,6 +337,7 @@ def main(argv=None) -> int:
             raise BitstampDataError("no preregistered meme-coin SPOT market is available")
         output = {
             "research_only": True,
+            "preregistration_id": PREREGISTRATION_ID,
             "provider": "Bitstamp public API",
             "provider_terms_scope": "personal noncommercial research only; no redistribution; commercial use requires a signed data license",
             "markets_response_sha256": markets_hash,
