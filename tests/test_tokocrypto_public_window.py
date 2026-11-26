@@ -10,7 +10,7 @@ class FakeOpener:
     def __init__(self, rows=None):
         self.urls = []
         self.rows = rows if rows is not None else [
-            [1699999200000, "100", "102", "99", "101", "12"]
+            [1699995600000, "100", "102", "99", "101", "12"]
         ]
 
     def __call__(self, url, timeout):
@@ -77,6 +77,27 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 build_window(**args)
         self.assertEqual(opener.urls, [])
+
+    def test_open_or_out_of_window_candle_is_rejected(self):
+        opener = FakeOpener(rows=[
+            [1699999200000, "100", "102", "99", "101", "12"]
+        ])
+        with self.assertRaisesRegex(fetcher.ApiError, "outside the requested closed UTC window"):
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=1_700_000_000, opener=opener,
+                sleep=lambda _: None,
+            )
+
+    def test_duplicate_or_out_of_order_candle_timestamps_are_rejected(self):
+        row = [1699995600000, "100", "102", "99", "101", "12"]
+        opener = FakeOpener(rows=[row, row])
+        with self.assertRaisesRegex(fetcher.ApiError, "duplicate or out-of-order"):
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=1_700_000_000, opener=opener,
+                sleep=lambda _: None,
+            )
 
     def test_empty_provider_response_fails_closed(self):
         opener = FakeOpener(rows=[])
