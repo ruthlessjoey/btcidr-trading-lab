@@ -3,6 +3,7 @@ import os
 import sqlite3
 import stat
 import tempfile
+from contextlib import contextmanager
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -12,6 +13,17 @@ from tmm_core.reservation_migration import (
     ReservationMigrationError,
     create_v2_migrated_copy,
 )
+
+
+@contextmanager
+def _managed_connection(*args, **kwargs):
+    """Preserve sqlite3 transaction semantics and always close the connection."""
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 DDL = """
@@ -67,7 +79,7 @@ class ReservationMigrationCopyTests(unittest.TestCase):
         self.assertEqual(len(result.original_table_sha256),8)
 
     def test_unresolved_source_is_blocked_before_any_copy_is_created(self):
-        with sqlite3.connect(self.source) as db:
+        with _managed_connection(self.source) as db:
             db.execute(
                 "INSERT INTO batches VALUES('b-processing','request-hash','PROCESSING',20,'{}')"
             )
