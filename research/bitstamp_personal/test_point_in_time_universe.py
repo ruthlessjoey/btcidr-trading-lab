@@ -131,6 +131,14 @@ class PointInTimeUniverseTests(unittest.TestCase):
         with self.assertRaisesRegex(PointInTimeUniverseError, "not fully eligible"):
             verify_fixture(manifest)
 
+    def test_per_market_inception_clamps_preexisting_markets_to_requested_window_start(self):
+        manifest = valid_manifest()
+        manifest["date_policy"]["mode"] = "PER_MARKET_INCEPTION"
+        # BTC was fully order-eligible before the requested interval. The
+        # research window still begins on the frozen 2024-01-01 boundary.
+        result = verify_fixture(manifest)
+        self.assertEqual(result["eligible_start_by_symbol"]["btcusd"], START)
+
     def test_per_market_inception_must_follow_full_market_order_time(self):
         manifest = valid_manifest()
         manifest["date_policy"]["mode"] = "PER_MARKET_INCEPTION"
