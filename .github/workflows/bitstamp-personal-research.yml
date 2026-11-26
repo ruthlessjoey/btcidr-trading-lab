@@ -19,6 +19,7 @@ on:
       - security/integrate-pit-universe-gate-with-global-dsr-2026-11-27
       - research/require-aligned-global-oos-fold-calendar-2026-11-27
       - research/integrated-oos-calendar-execution-sensitivity-2026-11-27
+      - security/enforce-append-only-trial-ledger-history-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
@@ -66,6 +67,22 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "${{ matrix.python-version }}"
+
+      - name: Verify trial registry is append-only against the PR base / previous push
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          BASE_FILE="$RUNNER_TEMP/experiment_registry_base.jsonl"
+          : > "$BASE_FILE"
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            if git cat-file -e "FETCH_HEAD:research/bitstamp_personal/experiment_registry.jsonl" 2>/dev/null; then
+              git show "FETCH_HEAD:research/bitstamp_personal/experiment_registry.jsonl" > "$BASE_FILE"
+            fi
+          fi
+          python research/bitstamp_personal/verify_append_only_registry.py \
+            "$BASE_FILE" research/bitstamp_personal/experiment_registry.jsonl
 
       - name: Run offline provider, pagination and strategy tests
         run: python -m unittest discover -s research/bitstamp_personal -p 'test_*.py' -v
