@@ -114,6 +114,35 @@ class ReservationLifecycleTests(unittest.TestCase):
         ):
             self.create(reservation_id="corrupt-audit-r")
 
+    def test_genesis_rejects_unexpected_fields_even_with_valid_rehashed_chain(self):
+        initial_json = self.db.execute(
+            "SELECT event_json FROM audit WHERE seq=1"
+        ).fetchone()[0]
+        market_json = self.db.execute(
+            "SELECT event_json FROM audit WHERE seq=2"
+        ).fetchone()[0]
+        initial = json.loads(initial_json)
+        market = json.loads(market_json)
+        initial["unexpected"] = "unapproved"
+        new_initial_json = json.dumps(
+            initial, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        new_initial_hash = _event_hash("0" * 64, initial)
+        new_market_hash = _event_hash(new_initial_hash, market)
+        self.db.execute(
+            "UPDATE audit SET event_json=?,event_hash=? WHERE seq=1",
+            (new_initial_json, new_initial_hash),
+        )
+        self.db.execute(
+            "UPDATE audit SET previous_hash=?,event_hash=? WHERE seq=2",
+            (new_initial_hash, new_market_hash),
+        )
+        self.db.commit()
+        with self.assertRaisesRegex(
+            ReservationLifecycleError, "explicit account and market audit baselines"
+        ):
+            self.create(reservation_id="unexpected-genesis-field-r")
+
     def test_missing_account_genesis_blocks_reservation_mutation(self):
         self.db.execute("DELETE FROM audit")
         self.db.commit()
