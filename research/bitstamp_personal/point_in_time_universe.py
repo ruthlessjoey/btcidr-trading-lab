@@ -240,6 +240,15 @@ def _verify_market(
     ):
         raise PointInTimeUniverseError(f"{symbol}.jurisdictional_notes must be bounded strings")
     _referenced_sources(market["source_ids"], source_index, f"{symbol}.source_ids")
+    market_sources = [source_index[source_id] for source_id in market["source_ids"]]
+    if not any(source["evidence_type"] == "LISTING_NOTICE" for source in market_sources):
+        raise PointInTimeUniverseError(
+            f"{symbol} listing timestamp lacks a source classified as LISTING_NOTICE"
+        )
+    if not any(source["evidence_type"] == "MARKET_STATUS_LEDGER" for source in market_sources):
+        raise PointInTimeUniverseError(
+            f"{symbol} matching/market-order timestamps lack a MARKET_STATUS_LEDGER source"
+        )
     if not (first_listing <= first_matching <= first_market_orders):
         raise PointInTimeUniverseError(
             f"{symbol} first listing/matching/market-order timestamps are inconsistent"
