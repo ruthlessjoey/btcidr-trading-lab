@@ -1,3 +1,5 @@
+import hashlib
+import json
 import unittest
 from decimal import Decimal
 
@@ -6,6 +8,7 @@ from walkforward_evaluation import (
     evaluate_five_fold_strategy,
 )
 from trial_registry import verify_trial_registry
+from dataset_manifest import verify_dataset_manifest
 
 
 def trial_registry():
@@ -16,41 +19,39 @@ def trial_registry():
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def synthetic_candles(count):
-    rows = []
-    previous = Decimal("100")
-    for index in range(count):
-        phase = index % 40
-        if phase < 20:
-            close = Decimal("100") - Decimal(phase) * Decimal("0.4")
-        else:
-            close = Decimal("92") + Decimal(phase - 20) * Decimal("0.4")
-        open_price = previous
-        high = max(open_price, close) + Decimal("0.5")
-        low = min(open_price, close) - Decimal("0.5")
-        rows.append({
-            "open": str(open_price), "high": str(high), "low": str(low),
-            "close": str(close), "volume": "10000",
-        })
-        previous = close
-    return rows
+def synthetic_dataset():
+    rows=[]
+    previous=Decimal("100")
+    for index in range(24840):
+        phase=index%40
+        close=Decimal("100")-Decimal(phase)*Decimal("0.4") if phase<20 else Decimal("92")+Decimal(phase-20)*Decimal("0.4")
+        op=previous;high=max(op,close)+Decimal("0.5");low=min(op,close)-Decimal("0.5")
+        opened=1704067200+index*3600
+        rows.append({"open_timestamp":opened,"timestamp":opened+3600,"open":str(op),
+          "high":str(high),"low":str(low),"close":str(close),"volume":"10000"})
+        previous=close
+    raw=json.dumps(rows,sort_keys=True,separators=(",",":")).encode()
+    return {"market_symbol":"dogeusd","pair":"DOGE/USD","step_seconds":3600,
+      "row_count":24840,"first_open_timestamp":1704067200,"last_close_timestamp":1793491200,
+      "gap_count":0,"gaps":[],"coverage_status":"CONTIGUOUS",
+      "dataset_sha256":hashlib.sha256(raw).hexdigest(),"raw_page_sha256":"b"*64,
+      "page_count":25,"candles":rows}
 
 
 class WalkForwardEvaluationTests(unittest.TestCase):
     def test_builds_five_gate_ready_folds_and_same_cost_baseline(self):
-        rows = synthetic_candles(7900)
-        result = evaluate_five_fold_strategy(
-            rows,
+        dataset=synthetic_dataset()
+        result=evaluate_five_fold_strategy(
+            dataset["candles"],market_symbol=dataset["market_symbol"],
             strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
-            market_symbol="dogeusd",
-            trial_registry_bytes=trial_registry(),
+            trial_registry_bytes=trial_registry(),dataset_manifest=dataset,
         )
         self.assertEqual(len(result["folds"]), 5)
         self.assertEqual(result["registered_trial_count"], 2)
         self.assertEqual(result["costs"]["fee_bps_per_side"], "16")
         self.assertEqual(result["costs"]["half_spread_bps_per_side"], "15")
         self.assertEqual(result["costs"]["slippage_bps_per_side"], "20")
-        self.assertEqual(result["dataset_sha256"], canonical_dataset_sha256("dogeusd", rows))
+        self.assertEqual(result["dataset_sha256"], canonical_dataset_sha256("dogeusd", dataset["candles"]))
         self.assertEqual(result["trial_registry_sha256"], verify_trial_registry(trial_registry())["registry_sha256"])
         self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
         for fold in result["folds"]:
@@ -61,18 +62,16 @@ class WalkForwardEvaluationTests(unittest.TestCase):
             self.assertTrue(0 <= fold["deflated_sharpe_probability"] <= 1)
 
     def test_costs_and_dataset_identity_are_frozen_by_market_symbol(self):
-        rows = synthetic_candles(7900)
-        digest = canonical_dataset_sha256("btcusd", rows)
-        self.assertEqual(len(digest), 64)
-        self.assertNotEqual(digest, canonical_dataset_sha256("ethusd", rows))
+        dataset=synthetic_dataset()
+        digest=canonical_dataset_sha256("btcusd",dataset["candles"])
+        self.assertEqual(len(digest),64)
+        self.assertNotEqual(digest,canonical_dataset_sha256("ethusd",dataset["candles"]))
         with self.assertRaisesRegex(WalkForwardEvaluationError, "frozen V2 universe"):
-            canonical_dataset_sha256("not-a-market", rows)
-        with self.assertRaisesRegex(WalkForwardEvaluationError, "frozen V2 universe"):
-            evaluate_five_fold_strategy(
-                rows, market_symbol="not-a-market",
-                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
-                trial_registry_bytes=trial_registry(),
-            )
+            canonical_dataset_sha256("not-a-market",dataset["candles"])
+        with self.assertRaisesRegex(WalkForwardEvaluationError,"completeness validation"):
+            bad=dict(dataset);bad["gap_count"]=1
+            evaluate_five_fold_strategy(dataset["candles"],market_symbol="dogeusd",
+              strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",trial_registry_bytes=trial_registry(),dataset_manifest=bad)
 
     def test_strategy_must_be_present_in_verified_trial_registry(self):
         # Two registered SMA attempts meet the minimum trial count, but RSI
@@ -102,22 +101,19 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         raw = ("\n".join(events) + "\n").encode()
         with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
             evaluate_five_fold_strategy(
-                synthetic_candles(7900), market_symbol="btcusd",
+                synthetic_dataset()["candles"], market_symbol="dogeusd",
                 strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
                 trial_registry_bytes=raw,
             )
 
     def test_invalid_strategy_or_registry_fails_closed(self):
-        rows = synthetic_candles(7900)
-        kwargs = {
-            "market_symbol": "btcusd",
-            "trial_registry_bytes": trial_registry(),
-        }
+        dataset=synthetic_dataset()
+        kwargs={"market_symbol":"dogeusd","trial_registry_bytes":trial_registry(),"dataset_manifest":dataset}
         with self.assertRaisesRegex(WalkForwardEvaluationError, "not preregistered"):
-            evaluate_five_fold_strategy(rows, strategy_id="UNREGISTERED", **kwargs)
+            evaluate_five_fold_strategy(dataset["candles"], strategy_id="UNREGISTERED", **kwargs)
         with self.assertRaisesRegex(WalkForwardEvaluationError, "integrity validation"):
             evaluate_five_fold_strategy(
-                rows, strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                dataset["candles"], strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
                 **{**kwargs, "trial_registry_bytes": b"tampered\n"},
             )
 
