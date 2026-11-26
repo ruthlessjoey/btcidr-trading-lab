@@ -6,12 +6,24 @@ import fetcher
 from tokocrypto_public_window import build_window, fetch_tokocrypto_candles
 
 
+NOW_UTC = 1_700_000_000
+INTERVAL_SECONDS = 3600
+END_EXCLUSIVE = (NOW_UTC // INTERVAL_SECONDS) * INTERVAL_SECONDS
+START_INCLUSIVE = END_EXCLUSIVE - 86400
+
+
+def complete_1h_rows():
+    return [
+        [(START_INCLUSIVE + index * INTERVAL_SECONDS) * 1000,
+         "100", "102", "99", "101", "12"]
+        for index in range(24)
+    ]
+
+
 class FakeOpener:
     def __init__(self, rows=None):
         self.urls = []
-        self.rows = rows if rows is not None else [
-            [1699995600000, "100", "102", "99", "101", "12"]
-        ]
+        self.rows = rows if rows is not None else complete_1h_rows()
 
     def __call__(self, url, timeout):
         self.urls.append(url)
@@ -63,6 +75,9 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
             )
         self.assertEqual(result["clock_source"], "caller_supplied_utc_epoch")
         self.assertEqual(result["endpoint"], fetcher.TOKOCRYPTO_KLINES_PATH)
+        self.assertEqual(result["expected_candles"], 24)
+        self.assertEqual(result["received_candles"], 24)
+        self.assertEqual(result["data_quality_status"], "COMPLETE_CONTIGUOUS_CLOSED_GRID")
 
     def test_no_request_is_made_for_invalid_window_inputs(self):
         opener = FakeOpener()
@@ -90,8 +105,8 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
             )
 
     def test_duplicate_or_out_of_order_candle_timestamps_are_rejected(self):
-        row = [1699995600000, "100", "102", "99", "101", "12"]
-        opener = FakeOpener(rows=[row, row])
+        rows = complete_1h_rows()
+        opener = FakeOpener(rows=rows + [rows[-1]])
         with self.assertRaisesRegex(fetcher.ApiError, "duplicate or out-of-order"):
             fetch_tokocrypto_candles(
                 pair="BTC_USDT", timeframe="1h", lookback_days=1,
@@ -108,13 +123,43 @@ class TokocryptoCallerClockWindowTests(unittest.TestCase):
         )
         for row in invalid_rows:
             with self.subTest(row=row):
-                opener = FakeOpener(rows=[row])
+                rows = complete_1h_rows()
+                rows[-1] = row
+                opener = FakeOpener(rows=rows)
                 with self.assertRaises(fetcher.ApiError):
                     fetch_tokocrypto_candles(
                         pair="BTC_USDT", timeframe="1h", lookback_days=1,
                         now_epoch_utc=1_700_000_000, opener=opener,
                         sleep=lambda _: None,
                     )
+
+    def test_missing_middle_candle_is_rejected(self):
+        rows = complete_1h_rows()
+        del rows[10]
+        opener = FakeOpener(rows=rows)
+        with self.assertRaisesRegex(fetcher.ApiError, "candle grid is incomplete: 1 missing interval"):
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=NOW_UTC, opener=opener, sleep=lambda _: None,
+            )
+
+    def test_missing_first_candle_is_rejected(self):
+        rows = complete_1h_rows()[1:]
+        opener = FakeOpener(rows=rows)
+        with self.assertRaisesRegex(fetcher.ApiError, "candle grid is incomplete: 1 missing interval"):
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=NOW_UTC, opener=opener, sleep=lambda _: None,
+            )
+
+    def test_missing_trailing_candle_is_rejected(self):
+        rows = complete_1h_rows()[:-1]
+        opener = FakeOpener(rows=rows)
+        with self.assertRaisesRegex(fetcher.ApiError, "1 trailing interval"):
+            fetch_tokocrypto_candles(
+                pair="BTC_USDT", timeframe="1h", lookback_days=1,
+                now_epoch_utc=NOW_UTC, opener=opener, sleep=lambda _: None,
+            )
 
     def test_parser_rejects_fractional_boolean_and_malformed_timestamps(self):
         bad_rows = (

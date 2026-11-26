@@ -5,6 +5,7 @@ on:
     branches:
       - security/tokocrypto-klines-only-2026-11-27
       - security/tokocrypto-caller-clock-window-2026-11-27
+      - security/tokocrypto-candle-completeness-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
@@ -13,11 +14,13 @@ on:
       - "tokocrypto_public_window.py"
       - "tests/test_tokocrypto_public_window.py"
       - "docs/tokocrypto-public-klines-policy.md"
+      - "docs/tokocrypto-candle-completeness.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
   pull_request:
     branches:
       - main
       - security/tokocrypto-klines-only-2026-11-27
+      - security/tokocrypto-caller-clock-window-2026-11-27
     paths:
       - "fetcher.py"
       - "providers.py"
