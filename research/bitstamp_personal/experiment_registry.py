@@ -22,7 +22,7 @@ def parse_trial_registry(raw:bytes,*,expected_market_symbols,expected_strategies
  for line_no,line in enumerate(text.splitlines(),1):
   if not line.strip(): raise TrialRegistryError(f"blank registry line at {line_no}")
   try: row=json.loads(line,object_pairs_hook=_unique_pairs)
-  except (json.JSONDecodeError,TrialRegistryError) as e: raise TrialRegistryError(f"invalid registry JSON at line {line_no}: {e}") from e
+  except (json.JSONDecodeError,TrialRegistryError,RecursionError) as e: raise TrialRegistryError(f"invalid registry JSON at line {line_no}: {e}") from e
   if not isinstance(row,dict) or set(row)!=FIELDS: raise TrialRegistryError(f"line {line_no} must contain exactly the required fields")
   m,s,trial=row["market_symbol"],row["strategy_id"],row["trial_id"]
   if not all(isinstance(v,str) and v for v in (m,s,trial,row["preregistration_id"],row["event"],row["registered_date"])):
