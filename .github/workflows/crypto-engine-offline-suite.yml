@@ -56,6 +56,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - "crypto_engine/tests/test_reservation_migration.py"
+      - "crypto_engine/tests/test_reservation_migration_preflight.py"
+      - "crypto_engine/tmm_core/reservation_migration.py"
+      - "crypto_engine/tmm_core/reservation_migration_preflight.py"
       - "crypto_engine/tmm_core/__init__.py"
       - "crypto_engine/tmm_core/exposure_policy.py"
       - "crypto_engine/tmm_core/ingest.py"
