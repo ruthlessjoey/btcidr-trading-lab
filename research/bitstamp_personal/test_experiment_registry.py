@@ -1,5 +1,6 @@
 import json,unittest
-from experiment_registry import TrialRegistryError,parse_trial_registry
+from pathlib import Path
+from experiment_registry import TrialRegistryError,parse_trial_registry,load_trial_registry
 P="TEST_V1";M=("btcusd","ethusd");S=("SMA","RSI")
 def row(m,s,event="REGISTERED"):
  return {"trial_id":f"{P}:{m}:{s}","market_symbol":m,"strategy_id":s,"preregistration_id":P,"event":event,"registered_date":"2026-11-27"}
@@ -31,5 +32,13 @@ class RegistryTests(unittest.TestCase):
  def test_non_string_identity_fields_fail_closed(self):
   x=[row(m,s) for m in M for s in S];x[0]["market_symbol"]=[]
   with self.assertRaises(TrialRegistryError):parse_trial_registry(raw(x),expected_market_symbols=M,expected_strategies=S,preregistration_id=P)
+
+
+ def test_committed_v2_registry_contains_all_fourteen_trials(self):
+  path=Path(__file__).with_name("experiment_registry.jsonl")
+  result=load_trial_registry(path,expected_market_symbols=("btcusd","ethusd","xrpusd","dogeusd","shibusd","pepeusd","solusd"),expected_strategies=("SMA20_50_LONG_ONLY","RSI14_MEAN_REVERSION_LONG_ONLY"),preregistration_id="BITSTAMP_PERSONAL_SPOT_RESEARCH_2026-11-27_V2_5FOLD")
+  self.assertEqual(result["registered_trial_count"],14)
+  self.assertEqual(result["event_count"],14)
+  self.assertTrue(all(state=="REGISTERED" for state in result["trial_statuses"].values()))
 
 if __name__=="__main__":unittest.main()
