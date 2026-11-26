@@ -75,18 +75,31 @@ class WalkForwardEvaluationTests(unittest.TestCase):
             )
 
     def test_strategy_must_be_present_in_verified_trial_registry(self):
-        # Build a valid registry containing only SMA; RSI is a known strategy
-        # but must not be evaluated without a matching registered trial.
+        # Two registered SMA attempts meet the minimum trial count, but RSI
+        # must still be rejected because it is absent from the verified registry.
         import hashlib, json
-        payload = {
-            "config_sha256": "19754128395ac4f102c189419600c200ad39cc3257658e4855bac20191e5012f",
-            "research_family": "BITSTAMP_PERSONAL_SPOT_V2",
-            "strategy_id": "SMA20_50_LONG_ONLY",
-            "trial_id": "BITSTAMP_V2_SMA20_50_LONG_ONLY",
-        }
-        core = {"seq": 1, "event": "TRIAL_STARTED", "payload": payload, "previous_hash": "0" * 64}
-        record_hash = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        raw = (json.dumps({**core, "record_hash": record_hash}, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        events = []
+        previous = "0" * 64
+        for seq, trial_id in enumerate(("SMA_TRIAL_ONE", "SMA_TRIAL_TWO"), 1):
+            payload = {
+                "config_sha256": ("a" if seq == 1 else "b") * 64,
+                "research_family": "BITSTAMP_PERSONAL_SPOT_V2",
+                "strategy_id": "SMA20_50_LONG_ONLY",
+                "trial_id": trial_id,
+            }
+            core = {
+                "seq": seq, "event": "TRIAL_STARTED",
+                "payload": payload, "previous_hash": previous,
+            }
+            record_hash = hashlib.sha256(
+                json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            events.append(json.dumps(
+                {**core, "record_hash": record_hash},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            previous = record_hash
+        raw = ("\\n".join(events) + "\\n").encode()
         with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
             evaluate_five_fold_strategy(
                 synthetic_candles(7900), market_symbol="btcusd",
