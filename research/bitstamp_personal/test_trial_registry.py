@@ -34,6 +34,7 @@ class TrialRegistryTests(unittest.TestCase):
         raw = encode([(i + 1, *event) for i, event in enumerate(events)])
         result = verify_trial_registry(raw)
         self.assertEqual(result["trial_counts"], {"FAMILY": 3})
+        self.assertEqual(result["trial_strategies"], {"FAMILY": ["SMA", "SMA", "SMA"]})
         self.assertEqual(result["registry_sha256"], hashlib.sha256(raw).hexdigest())
 
     def test_rejects_payload_tampering(self):
