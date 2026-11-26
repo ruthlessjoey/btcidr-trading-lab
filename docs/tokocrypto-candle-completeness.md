@@ -74,3 +74,8 @@ The fixed UTC-boundary research interface remains separate. It still does not pr
 The general fetcher, low-level JSON transport, and legacy provider adapter are not authorized entry points for Tokocrypto candles. They reject Tokocrypto requests before invoking an opener. The only supported helper that opts into the Tokocrypto transport scope is `fetch_tokocrypto_fixed_window`, which requires explicit frozen UTC boundaries and passes the private fixed-window scope through the bounded fetcher.
 
 This narrows ordinary call paths; it does not make caller-supplied boundaries authentic. The fixed-window helper still labels provider clock skew `NOT_VERIFIED` and temporal past assertion `NOT_PERFORMED`. A request must only be made after the preregistration is independently verified as historical and market identity/data rights are accepted. No current-window or unattended collection is enabled.
+
+
+## Internal fixed-window capability token
+
+The internal Tokocrypto opt-in is represented by an identity-only object, not a boolean keyword. Ordinary callers passing `True` do not satisfy the gate. The fixed-window helper passes the private token through the bounded transport stack. This is defense against accidental API misuse, not protection from hostile code already executing in the same Python process; process isolation and code review remain necessary.
