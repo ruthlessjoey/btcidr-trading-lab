@@ -146,15 +146,34 @@ def fetch_spot_markets(*, opener=None) -> tuple[dict[str, dict[str, object]], st
             continue
         if row.get("market_type") != "SPOT":
             continue
+        # Bitstamp documents separate order-entry and matching states. A market
+        # with matching disabled is not currently executable even if trading
+        # remains Enabled during a no-matching halt.
+        if row.get("trading") != "Enabled" or row.get("matching") != "Enabled":
+            continue
+        name = row.get("name")
+        base_currency = row.get("base_currency")
+        counter_currency = row.get("counter_currency")
+        if not all(isinstance(value, str) and value.strip()
+                   for value in (name, base_currency, counter_currency)):
+            raise BitstampDataError("SPOT market identity metadata is incomplete")
+        base_code = base_currency.strip().lower()
+        quote_code = counter_currency.strip().lower()
+        if (not re.fullmatch(r"[a-z0-9]{2,15}", base_code)
+                or not re.fullmatch(r"[a-z0-9]{2,15}", quote_code)):
+            raise BitstampDataError("SPOT base/quote currency code is invalid")
+        named_symbol = re.sub(r"[^a-z0-9]", "", name.lower())
+        if symbol != base_code + quote_code or named_symbol != symbol:
+            raise BitstampDataError("SPOT market symbol, name, base and quote identity do not agree")
         if symbol in markets:
             raise BitstampDataError("duplicate SPOT market symbol in markets response")
         markets[symbol] = {
             "market_symbol": symbol,
-            "name": row.get("name"),
-            "base_currency": row.get("base_currency"),
-            "counter_currency": row.get("counter_currency"),
-            "trading": row.get("trading"),
-            "matching": row.get("matching"),
+            "name": name.strip(),
+            "base_currency": base_currency.strip().upper(),
+            "counter_currency": counter_currency.strip().upper(),
+            "trading": "Enabled",
+            "matching": "Enabled",
             "market_type": "SPOT",
         }
     if not markets:
