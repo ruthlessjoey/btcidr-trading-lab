@@ -1484,3 +1484,29 @@ The low-level reservation mutation guard now also requires the account initializ
 
 ### Independent review gate
 Workstream A immutable AI review run [45871121400](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45871121400) was skipped by workflow conditions because PR #208 is draft, based on PR #205 rather than main, and outside the fixed path allowlist. This is not a review pass. Separate independent adversarial acceptance remains pending.
+
+
+## Isolated prototype journal durability milestone — 27 November 2026
+
+The separate external-research prototype (not integrated into the trading-lab repository) now hardens local journal creation and has process-crash fault-injection coverage.
+
+### Changes
+- Journal file creation fsyncs the file and parent directory.
+- Writer-lease file creation fsyncs the file and parent directory.
+- Newly created parent-directory entries are fsynced.
+- Added tests for directory fsync, failure before the first append byte, partial append failure and child-process `os._exit` during a partial append.
+- Pre-write failure replays prior state and permits a retry. Partial trailing records fail closed on restart; no auto-truncation. Recovery is manual forensic quarantine unless a separately verified trusted checkpoint exists.
+
+### Exact package verification
+- Updated archive: `TwinMoneyMaker_ExternalResearch_2026-11-27_DURABILITY.zip`.
+- ZIP SHA-256: `874e97adce66276f6b036bd06ad8a327c28e2fc9bcabbf8fd33509c717318936`.
+- Extracted the exact ZIP into a fresh disposable directory and reran its installer.
+- Python 3.13.5; **185/185 tests passed**, `pip check`, static boundary scan across 18 modules and `compileall` passed.
+- Standard library only; zero third-party packages installed and zero network requests.
+- Test evidence: `evidence/PROTOTYPE_DURABILITY_FAULT_INJECTION_185.txt` inside the ZIP.
+
+### Limits
+- Process/I/O fault injection is not a physical power-cut, storage-controller-cache, device-loss or cross-platform durability certification.
+- macOS/iOS behavior remains unverified.
+- No real market data, strategy backtest or profitability result was produced.
+- Prototype remains separate; no code was copied into the BTC/IDR repository and no integration approval was inferred.
