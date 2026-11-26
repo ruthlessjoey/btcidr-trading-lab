@@ -12,6 +12,9 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db = sqlite3.connect(":memory:")
         db.execute("PRAGMA foreign_keys=ON")
         db.executescript("""
+            CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+            INSERT INTO metadata VALUES('account_initialization_audit','required-v1');
+            INSERT INTO metadata VALUES('market_registration_audit','required-v1');
             CREATE TABLE markets(
                 market_id TEXT PRIMARY KEY,
                 base_asset TEXT NOT NULL,
@@ -104,6 +107,20 @@ class ReservationSchemaV2Tests(unittest.TestCase):
         db.execute("BEGIN")
         with self.assertRaisesRegex(ReservationSchemaError, "base settlement schema definition mismatch for markets"):
             ensure_reservation_schema_v2(db)
+        db.rollback()
+        db.close()
+
+    def test_refuses_schema_creation_without_both_audit_baselines(self):
+        db = self.connection()
+        db.execute("DELETE FROM metadata")
+        db.execute("BEGIN")
+        with self.assertRaisesRegex(
+            ReservationSchemaError, "explicit account and market audit baseline"
+        ):
+            ensure_reservation_schema_v2(db)
+        self.assertIsNone(db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='reservations'"
+        ).fetchone())
         db.rollback()
         db.close()
 
