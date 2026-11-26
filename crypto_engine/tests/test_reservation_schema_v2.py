@@ -113,6 +113,7 @@ class ReservationSchemaV2Tests(unittest.TestCase):
     def test_refuses_schema_creation_without_both_audit_baselines(self):
         db = self.connection()
         db.execute("DELETE FROM metadata")
+        db.commit()
         db.execute("BEGIN")
         with self.assertRaisesRegex(
             ReservationSchemaError, "explicit account and market audit baseline"
