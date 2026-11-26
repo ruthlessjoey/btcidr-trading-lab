@@ -90,6 +90,7 @@ class ReservationLifecycleTests(unittest.TestCase):
             "DELETE FROM metadata WHERE key IN "
             "('account_initialization_audit','market_registration_audit')"
         )
+        self.db.commit()
         self.begin()
         with self.assertRaisesRegex(
             ReservationLifecycleError, "explicit account and market audit baselines"
