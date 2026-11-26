@@ -212,5 +212,44 @@ class ResearchRunnerTests(unittest.TestCase):
         self.assertEqual(result["results"], {})
 
 
+    def test_backtest_rejects_nonbinary_and_boolean_signals(self):
+        for signals in ([2, 0], [-1, 0], [True, 0], [0.0, 1]):
+            with self.subTest(signals=signals), self.assertRaisesRegex(ValueError, "signal"):
+                backtest(
+                    [candle(), candle()], signals,
+                    fee_bps=Decimal("16"), half_spread_bps=Decimal("5"),
+                    slippage_bps=Decimal("10"),
+                )
+
+    def test_backtest_rejects_nonfinite_and_impossible_ohlcv(self):
+        invalid_candles = (
+            [{**candle(), "open": "NaN"}, candle()],
+            [candle(), {**candle(), "close": "Infinity"}],
+            [candle(), {**candle(), "volume": "-1"}],
+            [candle(), {**candle(), "high": "99"}],
+            [candle(), {**candle(), "low": "101"}],
+            [candle(), {**candle(), "open": True}],
+        )
+        for candles in invalid_candles:
+            with self.subTest(candles=candles), self.assertRaises(ValueError):
+                backtest(
+                    candles, [0, 1],
+                    fee_bps=Decimal("16"), half_spread_bps=Decimal("5"),
+                    slippage_bps=Decimal("10"),
+                )
+
+    def test_backtest_rejects_invalid_execution_cost_assumptions(self):
+        invalid_costs = (
+            {"fee_bps": Decimal("-1"), "half_spread_bps": Decimal("5"), "slippage_bps": Decimal("10")},
+            {"fee_bps": Decimal("NaN"), "half_spread_bps": Decimal("5"), "slippage_bps": Decimal("10")},
+            {"fee_bps": Decimal("10000"), "half_spread_bps": Decimal("5"), "slippage_bps": Decimal("10")},
+            {"fee_bps": Decimal("16"), "half_spread_bps": Decimal("5000"), "slippage_bps": Decimal("5000")},
+            {"fee_bps": Decimal("16"), "half_spread_bps": Decimal("5"), "slippage_bps": Decimal("Infinity")},
+        )
+        for costs in invalid_costs:
+            with self.subTest(costs=costs), self.assertRaises(ValueError):
+                backtest([candle(), candle()], [0, 1], **costs)
+
+
 if __name__ == "__main__":
     unittest.main()
