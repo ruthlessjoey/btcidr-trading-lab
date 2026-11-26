@@ -76,11 +76,22 @@ def _wilson(wins: int, total: int, z: float = 1.96):
     return [round(max(0.0, center - margin), 6), round(min(1.0, center + margin), 6)]
 
 
-def _make_signals(strategy: str, candles: list[dict]) -> list[int]:
+def _make_signals(
+    strategy: str,
+    candles: list[dict],
+    *,
+    reset_target_at: int | None = None,
+) -> list[int]:
     closes = [D(row["close"]) for row in candles]
     signals = []
     target = 0
     for index, close in enumerate(closes):
+        # A stateful strategy must not carry an open target across an
+        # independent train/validation/holdout account boundary. Historical
+        # closes remain available for indicator warmup; only the position state
+        # resets immediately before the first signal in the new segment.
+        if index == reset_target_at:
+            target = 0
         if strategy == "SMA20_50_LONG_ONLY":
             if index >= 49:
                 fast = sum(closes[index - 19:index + 1], D("0")) / D(20)
@@ -329,8 +340,14 @@ def backtest(
 
 
 def _signals_for_segment(strategy: str, all_candles: list[dict], start: int, end: int) -> list[int]:
-    # Indicators are computed causally from history through each candle close.
-    all_signals = make_signals(strategy, all_candles[:end])
+    """Build causal signals with indicator warmup but a fresh flat segment state."""
+    if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end <= start or end > len(all_candles):
+        raise ValueError("segment signal bounds are invalid")
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        all_signals = _make_signals(
+            strategy, all_candles[:end], reset_target_at=start,
+        )
     return all_signals[start:end]
 
 
@@ -369,11 +386,10 @@ def evaluate_market(market: dict, dataset: dict) -> dict:
     stress_slippage = D(50 if is_meme else 25)
     results = {}
     for strategy in STRATEGIES:
-        signals = make_signals(strategy, candles)
         results[strategy] = {}
         for split_name, (start, end) in ranges.items():
             segment = candles[start:end]
-            segment_signals = signals[start:end]
+            segment_signals = _signals_for_segment(strategy, candles, start, end)
             results[strategy][split_name] = {
                 "base_costs": backtest(
                     segment, segment_signals, fee_bps=FEE_BPS,
