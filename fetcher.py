@@ -26,6 +26,11 @@ TOKOCRYPTO_BASE_URL = "https://www.tokocrypto.site"
 TOKOCRYPTO_KLINES_PATH = "/api/v3/klines"
 TOKOCRYPTO_ALLOWED_QUERY = frozenset({"symbol", "interval", "startTime", "endTime", "limit"})
 
+# Identity-only in-process capability used by the fixed-window research module.
+# This deters accidental API misuse; it is not a security boundary against
+# arbitrary code already executing inside this Python process.
+_TOKOCRYPTO_FIXED_WINDOW_CAPABILITY = object()
+
 
 class ApiError(Exception):
     """Raised when the exchange gives no usable answer."""
@@ -132,10 +137,11 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 _TOKOCRYPTO_NO_REDIRECT = urllib.request.build_opener(_NoRedirectHandler)
 
 
-def _open_json_response(url, timeout, *, allow_tokocrypto_fixed_window=False):
-    """Shared bounded GET implementation with a private historical-window scope."""
+def _open_json_response(url, timeout, *, tokocrypto_capability=None):
+    """Shared bounded GET implementation with an identity-only historical scope."""
     validate_request_url(url)
-    if _is_tokocrypto_host(url) and allow_tokocrypto_fixed_window is not True:
+    if (_is_tokocrypto_host(url)
+            and tokocrypto_capability is not _TOKOCRYPTO_FIXED_WINDOW_CAPABILITY):
         raise ApiError(
             "Direct Tokocrypto transport is disabled; use the explicit fixed-window research interface"
         )
@@ -155,12 +161,14 @@ def _open_json_response(url, timeout, *, allow_tokocrypto_fixed_window=False):
 
 def default_opener(url, timeout):
     """Default GET opener. Tokocrypto requires the fixed-window capability."""
-    return _open_json_response(url, timeout, allow_tokocrypto_fixed_window=False)
+    return _open_json_response(url, timeout)
 
 
-def _fixed_window_opener(url, timeout):
-    """Private opener used only by the explicit fixed-window research helper."""
-    return _open_json_response(url, timeout, allow_tokocrypto_fixed_window=True)
+def _fixed_window_opener(url, timeout, *, tokocrypto_capability=None):
+    """Private opener requiring the identity-only fixed-window capability."""
+    return _open_json_response(
+        url, timeout, tokocrypto_capability=tokocrypto_capability,
+    )
 
 
 def snippet(body, size=200):
@@ -168,10 +176,11 @@ def snippet(body, size=200):
     return " ".join(text.split())[:size]
 
 
-def http_get_json(url, timeout, retries, opener, sleep, *, _allow_tokocrypto_fixed_window=False):
-    """GET a URL and decode JSON. Tokocrypto requires explicit fixed-window scope."""
+def http_get_json(url, timeout, retries, opener, sleep, *, _tokocrypto_capability=None):
+    """GET a URL and decode JSON. Tokocrypto requires the fixed-window capability."""
     validate_request_url(url)
-    if _is_tokocrypto_host(url) and _allow_tokocrypto_fixed_window is not True:
+    if (_is_tokocrypto_host(url)
+            and _tokocrypto_capability is not _TOKOCRYPTO_FIXED_WINDOW_CAPABILITY):
         raise ApiError(
             "Direct Tokocrypto JSON transport is disabled; use the explicit fixed-window research interface"
         )
@@ -278,16 +287,19 @@ def fetch_server_time(src, timeout, retries, opener, sleep):
 
 
 def fetch_candles(src, pair, tf, start_s, end_s, timeout, retries, opener, sleep,
-                 *, _allow_tokocrypto_fixed_window=False):
-    """Fetch candles between bounds. Tokocrypto requires explicit fixed-window scope."""
+                 *, _tokocrypto_capability=None):
+    """Fetch candles between bounds. Tokocrypto requires the fixed-window capability."""
     if tf not in TF_SECONDS:
         raise ValueError(f"unknown timeframe {tf!r}")
-    if src.is_tokocrypto and _allow_tokocrypto_fixed_window is not True:
+    if (src.is_tokocrypto
+            and _tokocrypto_capability is not _TOKOCRYPTO_FIXED_WINDOW_CAPABILITY):
         raise ApiError(
             "Direct Tokocrypto candle retrieval is disabled; use fetch_tokocrypto_fixed_window"
         )
     if src.is_tokocrypto and opener is default_opener:
-        opener = _fixed_window_opener
+        opener = lambda url, timeout: _fixed_window_opener(
+            url, timeout, tokocrypto_capability=_tokocrypto_capability,
+        )
     window = CANDLES_PER_REQUEST * TF_SECONDS[tf]
     candles, requests_made = [], 0
     chunk_start = int(start_s)
@@ -299,7 +311,7 @@ def fetch_candles(src, pair, tf, start_s, end_s, timeout, retries, opener, sleep
              "limit": CANDLES_PER_REQUEST})
         raw = http_get_json(
             f"{src.klines_url()}?{query}", timeout, retries, opener, sleep,
-            _allow_tokocrypto_fixed_window=_allow_tokocrypto_fixed_window,
+            _tokocrypto_capability=_tokocrypto_capability,
         )
         candles.extend(parse_klines(raw))
         requests_made += 1
