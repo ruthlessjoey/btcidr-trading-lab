@@ -16,6 +16,7 @@ on:
       - research/integrate-walkforward-statistical-promotion-2026-11-27
       - research/global-trial-dsr-universe-2026-11-27
       - research/append-only-trial-registry-2026-11-27
+      - research/cost-and-participation-sensitivity-matrix-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
