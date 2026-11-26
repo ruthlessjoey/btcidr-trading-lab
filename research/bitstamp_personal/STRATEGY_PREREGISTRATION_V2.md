@@ -41,3 +41,8 @@ Personal, noncommercial SPOT research only. No raw data redistribution, account 
 - Append every new/failed/abandoned candidate trial; do not delete or rewrite previous events. Preserve Git history. The hash chain is tamper-evident, not WORM or an external trust anchor.
 
 No public-data request is made by this preregistration.
+
+
+## Dataset completeness and identity gate
+
+The evaluator accepts only the complete adapter manifest for the frozen interval: 24,840 contiguous 1-hour candles from 2024-01-01 00:00 UTC through the 2026-11-01 00:00 UTC close boundary; exact requested market symbol and returned pair; zero gaps; matching row count and timestamps; valid normalized-row SHA-256 and raw-page SHA-256. Any mismatch blocks all fold evaluation. The evaluator binds the exact market identity, interval, normalized rows and raw page provenance.
