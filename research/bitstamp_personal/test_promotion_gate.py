@@ -65,10 +65,12 @@ class GateTests(unittest.TestCase):
   x=folds();x[0]["test_end"]=x[0]["test_start"]
   with self.assertRaises(PromotionEvidenceError):evaluate_promotion_gate(x)
   x=folds();before=copy.deepcopy(x);evaluate_promotion_gate(x);self.assertEqual(x,before)
-if __name__=="__main__":unittest.main()
+
 
     def test_trial_registry_hash_must_match_across_folds(self):
         rows = valid_folds()
         rows[1]["trial_registry_sha256"] = "f" * 64
         with self.assertRaisesRegex(PromotionEvidenceError, "trial-registry hash"):
             evaluate_promotion_gate(rows)
+
+if __name__=="__main__":unittest.main()
