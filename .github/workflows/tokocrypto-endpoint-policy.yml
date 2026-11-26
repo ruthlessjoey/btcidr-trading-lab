@@ -23,6 +23,8 @@ on:
       - "providers.py"
       - "config.json"
       - "tests/test_tokocrypto_endpoint_policy.py"
+      - "tokocrypto_public_window.py"
+      - "tests/test_tokocrypto_public_window.py"
       - "docs/tokocrypto-public-klines-policy.md"
       - ".github/workflows/tokocrypto-endpoint-policy.yml"
 
