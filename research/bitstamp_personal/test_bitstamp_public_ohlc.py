@@ -147,7 +147,7 @@ class BitstampPublicOhlcTests(unittest.TestCase):
         for row in (
             candle(3600, open_="1e61"),
             candle(3600, volume="9" * 41),
-            candle(3600, close_="1e-61"),
+            candle(3600, close="1e-61"),
             {**candle(3600), "timestamp": "9" * 13},
         ):
             with self.subTest(row=row), self.assertRaises(BitstampDataError):
