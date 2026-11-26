@@ -72,6 +72,7 @@ class ReservationLifecycleTests(unittest.TestCase):
             "INSERT INTO audit(event_json,previous_hash,event_hash) VALUES(?,?,?)",
             [(initial_json, "0" * 64, initial_hash), (market_json, initial_hash, market_hash)],
         )
+        self.db.commit()
         self.db.execute("BEGIN IMMEDIATE")
         ensure_reservation_schema_v2(self.db)
         self.db.commit()
