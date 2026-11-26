@@ -52,3 +52,8 @@ Each train, validation and holdout segment uses a separate account that starts f
 ## Buy-and-hold benchmark execution
 
 The buy-and-hold benchmark is not a 100%-target rebalancing strategy. It establishes one fixed base-quantity target from the initial next-open entry price after modeled fee/spread/slippage. If the 5% prior-hour participation cap prevents full entry, the remaining quantity is retried at later eligible opens, but the original base-quantity target does not increase when the price falls. Once entered, the position is held; no hourly target-weight rebalance occurs. The benchmark remains long-only and uses the same next-open fill, fee, spread/slippage and participation assumptions.
+
+
+## Exact flat-state definition
+
+A terminal position is classified as flat only when the simulated base inventory is exactly zero after executed sell fills. One smallest accounting quantum is still an open holding; the simulator must not label it realized or flat merely because its mark rounds to a zero-cent amount.
