@@ -358,6 +358,7 @@ class ReservationMigrationPreflightTests(unittest.TestCase):
         self.assertFalse(result.eligible)
         self.assertTrue(any("audit chain" in item for item in result.blockers))
 
+    # Sequence position is part of the independently verified audit prefix.
     def test_audit_genesis_sequence_must_be_one(self):
         payload = '{"kind":"TEST"}'
         digest = hashlib.sha256(("0" * 64 + payload).encode("utf-8")).hexdigest()
