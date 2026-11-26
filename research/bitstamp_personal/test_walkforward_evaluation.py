@@ -86,7 +86,7 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         }
         core = {"seq": 1, "event": "TRIAL_STARTED", "payload": payload, "previous_hash": "0" * 64}
         record_hash = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        raw = (json.dumps({**core, "record_hash": record_hash}, sort_keys=True, separators=(",", ":")) + "\\n").encode()
+        raw = (json.dumps({**core, "record_hash": record_hash}, sort_keys=True, separators=(",", ":")) + "\n").encode()
         with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
             evaluate_five_fold_strategy(
                 synthetic_candles(7900), market_symbol="btcusd",
