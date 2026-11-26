@@ -1470,3 +1470,17 @@ Sources:
 - Apple, *Apple Platform Security*, August 2026: https://help.apple.com/pdf/security/en_US/apple-platform-security-guide.pdf
 
 This is a platform feasibility constraint, not an implementation failure or permission to introduce a cloud/network dependency. No PAPER activation is authorized.
+
+
+## Exact genesis schema enforcement — PR #208 current verified head — 27 November 2026
+
+The low-level reservation mutation guard now also requires the account initialization event to have the exact expected field set. A synthetic test adds an unexpected genesis field, recomputes both affected event hashes into a valid chain, and confirms reservation mutation is still rejected. This prevents a structurally altered but internally rehashed genesis event from being accepted.
+
+- PR #208 exact head: `4a2dbfe7752df6bac2a421c5e23f7b736e8703d0`.
+- Actions run [45871127382](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45871127382): Python 3.11.18 and 3.13.18 both passed.
+- SQLite 3.46.1.
+- Eight suites: 26 schema, 25 lifecycle, 16 allocations, 13 atomic allocations, 83 settlement store, 17 receiver, 12 offline journal/settlement, 40 read-only migration preflight.
+- **232 tests per interpreter / 464 total; zero actual ResourceWarning or ignored-connection output.**
+
+### Independent review gate
+Workstream A immutable AI review run [45871121400](https://github.com/ruthlessjoey/btcidr-trading-lab/actions/runs/45871121400) was skipped by workflow conditions because PR #208 is draft, based on PR #205 rather than main, and outside the fixed path allowlist. This is not a review pass. Separate independent adversarial acceptance remains pending.
