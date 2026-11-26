@@ -50,3 +50,12 @@ Bitstamp's official [API changelog](https://www.bitstamp.net/api/) dated 9 Novem
 - Full halt: both fields are `Disabled`.
 
 The current Bitstamp adapter requires both fields to be `Enabled`, and its offline tests explicitly reject a market with matching disabled. This is the correct current-state fail-closed check. The public endpoint reports current status only; it does not provide the historical 2024–2026 status ledger needed to prove continuous market-order availability.
+
+
+## Structured evidence gate — 27 November 2026 follow-up
+
+A structured `POINT_IN_TIME_UNIVERSE_EVIDENCE.json` and offline `point_in_time_universe.py` verifier define the evidence required to reopen public research. The verifier requires the exact frozen candidate universe and date window; an explicitly approved date policy (common start or per-market inception); exact first listing, matching-enabled and instant/market-order-enabled timestamps per pair; contiguous full SPOT order-status intervals through the frozen end; official Bitstamp source snapshots with SHA-256 digests, including historical market-status ledgers; affirmative personal/noncommercial data-rights acceptance; and two distinct independent reviewers attesting to the same evidence digest. The accepted digest must also be pinned in code.
+
+The current manifest intentionally has an unselected date policy, missing first full market-order timestamps, no historical interval ledger, uncaptured source snapshots, unverified rights and no independent acceptance. The verifier therefore cannot pass and the public research runner remains blocked before market metadata or OHLC requests. The key design choice remains explicit: common start, per-market inception dates (recommended to preserve the wider market universe without fabricating pre-listing candles), or defer affected symbols into a separate cohort.
+
+The official Bitstamp API changelog dated 9 November 2026 distinguishes order entry (`trading`), order matching (`matching`) and instant/market-order availability. A no-matching halt can leave trading Enabled while matching is Disabled, with market/instant orders rejected. The current markets endpoint is current-state only and does not provide the historical 2024–2026 status ledger.
