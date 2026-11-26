@@ -2,7 +2,8 @@ import unittest
 from decimal import Decimal
 
 from walkforward_evaluation import (
-    RESEARCH_FAMILY, WalkForwardEvaluationError, evaluate_five_fold_strategy,
+    RESEARCH_FAMILY, WalkForwardEvaluationError, canonical_dataset_sha256,
+    evaluate_five_fold_strategy,
 )
 from trial_registry import verify_trial_registry
 
@@ -41,14 +42,15 @@ class WalkForwardEvaluationTests(unittest.TestCase):
         result = evaluate_five_fold_strategy(
             rows,
             strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
-            dataset_sha256="a" * 64,
+            market_symbol="dogeusd",
             trial_registry_bytes=trial_registry(),
-            fee_bps=Decimal("16"),
-            half_spread_bps=Decimal("15"),
-            slippage_bps=Decimal("20"),
         )
         self.assertEqual(len(result["folds"]), 5)
         self.assertEqual(result["registered_trial_count"], 2)
+        self.assertEqual(result["costs"]["fee_bps_per_side"], "16")
+        self.assertEqual(result["costs"]["half_spread_bps_per_side"], "15")
+        self.assertEqual(result["costs"]["slippage_bps_per_side"], "20")
+        self.assertEqual(result["dataset_sha256"], canonical_dataset_sha256("dogeusd", rows))
         self.assertEqual(result["trial_registry_sha256"], verify_trial_registry(trial_registry())["registry_sha256"])
         self.assertEqual(result["profitability_status"], "NOT_VERIFIED")
         for fold in result["folds"]:
@@ -58,14 +60,58 @@ class WalkForwardEvaluationTests(unittest.TestCase):
             self.assertTrue(0 <= fold["max_drawdown"] < 1)
             self.assertTrue(0 <= fold["deflated_sharpe_probability"] <= 1)
 
+    def test_costs_and_dataset_identity_are_frozen_by_market_symbol(self):
+        rows = synthetic_candles(7900)
+        digest = canonical_dataset_sha256("btcusd", rows)
+        self.assertEqual(len(digest), 64)
+        self.assertNotEqual(digest, canonical_dataset_sha256("ethusd", rows))
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "frozen V2 universe"):
+            canonical_dataset_sha256("not-a-market", rows)
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "frozen V2 universe"):
+            evaluate_five_fold_strategy(
+                rows, market_symbol="not-a-market",
+                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                trial_registry_bytes=trial_registry(),
+            )
+
+    def test_strategy_must_be_present_in_verified_trial_registry(self):
+        # Two registered SMA attempts meet the minimum trial count, but RSI
+        # must still be rejected because it is absent from the verified registry.
+        import hashlib, json
+        events = []
+        previous = "0" * 64
+        for seq, trial_id in enumerate(("SMA_TRIAL_ONE", "SMA_TRIAL_TWO"), 1):
+            payload = {
+                "config_sha256": ("a" if seq == 1 else "b") * 64,
+                "research_family": "BITSTAMP_PERSONAL_SPOT_V2",
+                "strategy_id": "SMA20_50_LONG_ONLY",
+                "trial_id": trial_id,
+            }
+            core = {
+                "seq": seq, "event": "TRIAL_STARTED",
+                "payload": payload, "previous_hash": previous,
+            }
+            record_hash = hashlib.sha256(
+                json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            events.append(json.dumps(
+                {**core, "record_hash": record_hash},
+                sort_keys=True, separators=(",", ":"),
+            ))
+            previous = record_hash
+        raw = ("\n".join(events) + "\n").encode()
+        with self.assertRaisesRegex(WalkForwardEvaluationError, "missing from the verified trial registry"):
+            evaluate_five_fold_strategy(
+                synthetic_candles(7900), market_symbol="btcusd",
+                strategy_id="RSI14_MEAN_REVERSION_LONG_ONLY",
+                trial_registry_bytes=raw,
+            )
+
     def test_invalid_strategy_or_registry_fails_closed(self):
         rows = synthetic_candles(7900)
         kwargs = {
-            "dataset_sha256": "a" * 64,
+            "market_symbol": "btcusd",
             "trial_registry_bytes": trial_registry(),
-            "fee_bps": Decimal("16"),
-            "half_spread_bps": Decimal("5"),
-            "slippage_bps": Decimal("10"),
         }
         with self.assertRaisesRegex(WalkForwardEvaluationError, "not preregistered"):
             evaluate_five_fold_strategy(rows, strategy_id="UNREGISTERED", **kwargs)

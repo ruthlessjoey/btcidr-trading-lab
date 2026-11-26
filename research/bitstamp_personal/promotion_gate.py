@@ -77,7 +77,7 @@ def evaluate_promotion_gate(*, folds: Sequence[Mapping[str, object]]) -> dict[st
             raise PromotionError("all folds must bind to the same immutable dataset hash")
         trials = _count(fold["registered_trial_count"], f"fold[{i}].registered_trial_count")
         if trials < 2:
-            raise PromotionError("registered_trial_count must include all candidate trials and baseline")
+            raise PromotionError("registered_trial_count must include every candidate trial, including failed and abandoned attempts")
         if trial_count is None:
             trial_count = trials
         elif trials != trial_count:

@@ -14,6 +14,7 @@ on:
       - research/bitstamp-statistical-evidence-metrics-2026-11-27
       - research/bitstamp-hash-chained-trial-registry-2026-11-27
       - research/bitstamp-v2-five-fold-metric-evaluator-2026-11-27
+      - security/freeze-bitstamp-v2-costs-and-dataset-identity-2026-11-27
     paths:
       - "research/bitstamp_personal/**"
       - ".github/workflows/bitstamp-personal-research.yml"
