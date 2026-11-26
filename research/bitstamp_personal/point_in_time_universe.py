@@ -95,7 +95,8 @@ def _source_index(sources: object) -> dict[str, dict[str, Any]]:
         source_id = _string(source["source_id"], f"source_evidence[{index}].source_id", maximum=128)
         if source_id in result:
             raise PointInTimeUniverseError("source_id values must be unique")
-        if source["evidence_type"] not in allowed_types:
+        if (not isinstance(source["evidence_type"], str)
+                or source["evidence_type"] not in allowed_types):
             raise PointInTimeUniverseError(f"source_evidence[{index}].evidence_type is invalid")
         url = _string(source["url"], f"source_evidence[{index}].url", maximum=2048)
         if not url.startswith("https://"):
@@ -123,6 +124,8 @@ def _referenced_sources(
 ) -> None:
     if not isinstance(ids, list) or not ids:
         raise PointInTimeUniverseError(f"{field} must reference at least one evidence source")
+    if any(not isinstance(source_id, str) for source_id in ids):
+        raise PointInTimeUniverseError(f"{field} source IDs must be strings")
     if len(set(ids)) != len(ids):
         raise PointInTimeUniverseError(f"{field} contains duplicate source IDs")
     for source_id in ids:
@@ -362,9 +365,9 @@ def verify_point_in_time_universe_evidence(
     policy = manifest["date_policy"]
     if not isinstance(policy, dict) or set(policy) != {"status", "mode", "decision_note"}:
         raise PointInTimeUniverseError("date_policy schema is invalid")
-    if policy["status"] != "APPROVED" or policy["mode"] not in {
-        "COMMON_START", "PER_MARKET_INCEPTION",
-    }:
+    if (policy["status"] != "APPROVED"
+            or not isinstance(policy["mode"], str)
+            or policy["mode"] not in {"COMMON_START", "PER_MARKET_INCEPTION"}):
         raise PointInTimeUniverseError("V2 date policy decision is not approved")
 
     sources = _source_index(manifest["source_evidence"])
