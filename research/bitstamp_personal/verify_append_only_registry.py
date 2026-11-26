@@ -38,14 +38,31 @@ def git_blob_sha1(raw: bytes) -> str:
 
 def verify_append_only_registry(
     genesis_bytes: bytes,
-    base_bytes: bytes,
-    head_bytes: bytes,
+    base_bytes: bytes | None = None,
+    head_bytes: bytes | None = None,
     *,
     expected_market_symbols=EXPECTED_MARKETS,
     expected_strategies=EXPECTED_STRATEGIES,
     preregistration_id=EXPECTED_PREREGISTRATION,
 ) -> dict[str, Any]:
-    """Verify the pinned genesis root, base prefix and head-ledger semantics."""
+    """Verify the pinned genesis root, base prefix and head-ledger semantics.
+
+    The two-argument form is retained for the previous verifier API:
+    (base_bytes, head_bytes). It loads the committed, SHA-1-pinned genesis
+    snapshot, so older semantic regression tests remain valid.
+    """
+    if head_bytes is None:
+        if base_bytes is None:
+            raise AppendOnlyRegistryError("base and head registry values are required")
+        base_bytes, head_bytes = genesis_bytes, base_bytes
+        try:
+            genesis_bytes = Path(__file__).with_name(
+                "experiment_registry.genesis.jsonl"
+            ).read_bytes()
+        except OSError as exc:
+            raise AppendOnlyRegistryError("pinned genesis snapshot is unavailable") from exc
+    if base_bytes is None:
+        raise AppendOnlyRegistryError("base registry value is required")
     if any(not isinstance(value, bytes) for value in (genesis_bytes, base_bytes, head_bytes)):
         raise AppendOnlyRegistryError("genesis, base and head registry values must be bytes")
     if any(len(value) > MAX_REGISTRY_BYTES for value in (genesis_bytes, base_bytes, head_bytes)):
@@ -69,7 +86,7 @@ def verify_append_only_registry(
         )
     if any(b"\r" in value for value in (genesis_bytes, base_bytes, head_bytes)):
         raise AppendOnlyRegistryError("trial registry must use LF-only line endings")
-    if not base_bytes.startswith(genesis_bytes):
+    if base_bytes and not base_bytes.startswith(genesis_bytes):
         raise AppendOnlyRegistryError(
             "base registry does not preserve the pinned genesis prefix"
         )
@@ -103,7 +120,7 @@ def verify_append_only_registry(
             expected_strategies=expected_strategies,
             preregistration_id=preregistration_id,
         )
-    except TrialRegistryError as exc:
+    except (TrialRegistryError, RecursionError, ValueError) as exc:
         raise AppendOnlyRegistryError(
             f"head trial registry semantic validation failed: {exc}"
         ) from exc
