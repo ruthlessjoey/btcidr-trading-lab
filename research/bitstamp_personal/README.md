@@ -149,3 +149,10 @@ The original 14 V2_5FOLD registrations are preserved in `experiment_registry.gen
 ## Public API data-rights terms research — 2026-11-29
 
 `BITSTAMP_PUBLIC_API_DATA_RIGHTS_TERMS_RESEARCH_2026-11-29.md` records the official API commercial-use licence statement and the Bitstamp Ltd Terms of Use. Neither source expressly resolves personal noncommercial retention of raw public API candles or derived research artifacts. `data_rights.status` therefore remains `NOT_VERIFIED`; no API request or data download is authorized.
+
+
+## Point-in-time evidence captures and data-rights gate
+
+Official-page research extracts are stored under `evidence/source_captures/`. They are small structured excerpts, not full page copies or raw market data. The manifest binds each capture to a relative path and SHA-256. The offline verifier rejects missing/tampered files, path traversal, symbolic links and captures larger than 64 KiB. This proves the committed evidence-extract bytes match the manifest; it does not authenticate the original website or replace independent review. Reviewers must follow the official URLs and validate the claims against the original pages.
+
+The official Bitstamp API documentation describes a commercial Data License Agreement for companies using exchange data commercially. The Bitstamp Ltd Terms separately define Site Materials and restrict copying/scraping/collection, but do not expressly resolve private retention of public API OHLC or derived research outputs. The applicable contracting entity is not established. Therefore `data_rights.status` remains `NOT_VERIFIED`, and no public market-data request or durable market-data storage is permitted by this candidate until written clarification is obtained and independently reviewed. No legal permission is inferred from the commercial-use clause.
