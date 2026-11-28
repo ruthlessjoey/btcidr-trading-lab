@@ -83,6 +83,7 @@ jobs:
             fi
           fi
           python research/bitstamp_personal/verify_append_only_registry.py \
+            research/bitstamp_personal/experiment_registry.genesis.jsonl \
             "$BASE_FILE" research/bitstamp_personal/experiment_registry.jsonl
 
       - name: Run offline provider, pagination and strategy tests
