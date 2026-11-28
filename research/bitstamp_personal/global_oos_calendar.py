@@ -75,8 +75,8 @@ def build_global_oos_calendar(
     interval_seconds = _timestamp(interval_seconds, "interval_seconds")
     if interval_seconds <= 0:
         raise GlobalOOSCalendarError("interval_seconds must be positive")
-    if not isinstance(market_datasets, list) or len(market_datasets) < 2:
-        raise GlobalOOSCalendarError("at least two market datasets are required")
+    if not isinstance(market_datasets, list) or not market_datasets:
+        raise GlobalOOSCalendarError("at least one market dataset is required")
 
     indexed: dict[str, dict[str, Any]] = {}
     common_start = None
