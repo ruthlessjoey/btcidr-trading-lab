@@ -49,3 +49,10 @@ Keep unchanged:
 - Public research blocked before the first provider request.
 
 This note is a terms-research record only. It is not legal advice, does not grant permission, and does not authorize any API request or data download.
+
+
+## Evidence-capture integrity amendment (2026-11-29)
+
+Thirteen official-source evidence capsules are stored under `evidence/source_captures/`, including a separate Bitstamp Ltd Terms extract. The manifest binds each capsule to a relative path and SHA-256. The offline verifier recomputes the file hash, prevents path traversal and symlink use, and enforces a 64 KiB cap. These are short structured research extracts, not raw HTML or complete source snapshots. Their hashes protect the committed extract bytes; they do not authenticate the live origin page or replace independent source review.
+
+The Terms excerpt supports only the stated ambiguity: it defines Site Materials and limits copying/scraping/collection, but is silent on public API OHLC retention and derived research retention. The applicable contracting entity is not established. Data rights remain `NOT_VERIFIED`; durable market-data collection remains blocked pending written clarification and independent review.
