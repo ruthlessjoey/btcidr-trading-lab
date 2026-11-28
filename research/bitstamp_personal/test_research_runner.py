@@ -50,7 +50,7 @@ class ResearchRunnerTests(unittest.TestCase):
             ({"market_symbol": "ethusd"}, {"candles": candles}),
         ])
         self.assertTrue(aligned["aligned"])
-        self.assertEqual(aligned["status"], "ALIGNED")
+        self.assertEqual(aligned["status"], "ALIGNED_PER_MARKET_INCEPTION_COMMON_UTC_OOS_V1")
 
         later_start = start + 24 * 3600
         shifted = [{
@@ -64,7 +64,7 @@ class ResearchRunnerTests(unittest.TestCase):
         ])
         self.assertFalse(mismatch["aligned"])
         self.assertEqual(mismatch["status"], "BLOCKED_GLOBAL_OOS_CALENDAR_MISMATCH")
-        self.assertIn("not time-aligned", mismatch["reason"])
+        self.assertIn("common end boundary", mismatch["reason"])
 
     def test_global_oos_calendar_blocks_missing_or_noncontiguous_timestamps(self):
         candles = [{
