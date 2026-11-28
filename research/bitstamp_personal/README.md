@@ -129,3 +129,8 @@ The 16 bps fee is a public API example, not the user's actual fee tier; spread a
 ## Automated Git-history append-only enforcement
 
 The trial-registry parser validates current-ledger schema, the 14 preregistered trials and event order. CI now adds a base-to-head byte-prefix check: `experiment_registry.jsonl` must preserve the exact previous file bytes and may only add complete LF-delimited JSON events at the end. The check uses the PR base SHA on pull requests and the previous commit SHA on pushes, then passes the current full ledger through the existing semantic parser. Rewrites, deletions, reordering, partial events, CRLF changes and invalid appended entries fail offline CI. No provider requests are made.
+
+
+## Versioned per-market inception / common UTC OOS calendar
+
+The approved `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1` amendment is documented in `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1.md`. The common calendar planner retains each market's own verified inception history for expanding training and indicator warmup, then maps identical UTC OOS folds, next-open liquidation bars and the untouched final holdout into each market's own candle indices. The user's date-policy approval does not waive any rights, historical status, source-hash or independent-review gate.
