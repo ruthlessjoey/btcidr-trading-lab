@@ -144,3 +144,8 @@ The original 14 V2_5FOLD registrations are preserved in `experiment_registry.gen
 ## Historical market-status evidence research — 2026-11-29
 
 `BITSTAMP_HISTORICAL_STATUS_EVIDENCE_RESEARCH_2026-11-29.md` records the official API's current order-entry/matching semantics, the authenticated public-order-event gap-recovery endpoint, and the partial SHIB/SOL listing timestamps. The manifest now records SHIB post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-06-07, and SOL post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-08-23. Full market-order enablement and continuous historical status remain unverified; no provider request was made.
+
+
+## Public API data-rights terms research — 2026-11-29
+
+`BITSTAMP_PUBLIC_API_DATA_RIGHTS_TERMS_RESEARCH_2026-11-29.md` records the official API commercial-use licence statement and the Bitstamp Ltd Terms of Use. Neither source expressly resolves personal noncommercial retention of raw public API candles or derived research artifacts. `data_rights.status` therefore remains `NOT_VERIFIED`; no API request or data download is authorized.
