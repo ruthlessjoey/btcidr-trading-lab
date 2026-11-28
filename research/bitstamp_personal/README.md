@@ -139,3 +139,8 @@ The approved `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1` amendment is documented in
 ### Pinned append-only trial-ledger genesis
 
 The original 14 V2_5FOLD registrations are preserved in `experiment_registry.genesis.jsonl`. Its exact Git blob SHA-1 is `10dbeb52941c08cda1f7b1d724b543b41dd6fdc2` and its collision-resistant SHA-256 is `d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d`. Offline CI verifies both commitments, requires the PR base and head ledgers to preserve the exact genesis byte prefix, and then requires the head to preserve the complete base prefix. The original working ledger remains unchanged.
+
+
+## Historical market-status evidence research — 2026-11-29
+
+`BITSTAMP_HISTORICAL_STATUS_EVIDENCE_RESEARCH_2026-11-29.md` records the official API's current order-entry/matching semantics, the authenticated public-order-event gap-recovery endpoint, and the partial SHIB/SOL listing timestamps. The manifest now records SHIB post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-06-07, and SOL post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-08-23. Full market-order enablement and continuous historical status remain unverified; no provider request was made.
