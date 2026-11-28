@@ -37,27 +37,42 @@ def candle(open_price="100", close_price="100", volume="10000", low_price=None):
 
 
 class ResearchRunnerTests(unittest.TestCase):
-    def test_global_oos_calendar_requires_identical_utc_windows_across_markets(self):
+    def test_global_oos_calendar_maps_per_market_inception_to_identical_utc_windows(self):
         start = 1704067200
         candles = [{
             "open_timestamp": start + index * 3600,
             "timestamp": start + (index + 1) * 3600,
             "open": "100", "high": "100", "low": "100",
             "close": "100", "volume": "10000",
-        } for index in range(6000)]
+        } for index in range(6200)]
+        later_market_candles = candles[100:]
         aligned = assess_global_oos_calendar_alignment([
             ({"market_symbol": "btcusd"}, {"candles": candles}),
-            ({"market_symbol": "ethusd"}, {"candles": candles}),
+            ({"market_symbol": "pepeusd"}, {"candles": later_market_candles}),
         ])
         self.assertTrue(aligned["aligned"])
-        self.assertEqual(aligned["status"], "ALIGNED_PER_MARKET_INCEPTION_COMMON_UTC_OOS_V1")
+        self.assertEqual(
+            aligned["status"], "ALIGNED_PER_MARKET_INCEPTION_COMMON_UTC_OOS_V1"
+        )
+        self.assertEqual(aligned["common_start_timestamp"], start + 100 * 3600)
+        self.assertEqual(
+            aligned["market_calendars"]["btcusd"],
+            aligned["market_calendars"]["pepeusd"],
+        )
+        self.assertGreater(
+            aligned["fold_plans_by_market"]["btcusd"][0]["test_start"],
+            aligned["fold_plans_by_market"]["pepeusd"][0]["test_start"],
+        )
+        self.assertEqual(
+            aligned["holdouts_by_market"]["btcusd"]["start_timestamp"],
+            aligned["holdouts_by_market"]["pepeusd"]["start_timestamp"],
+        )
 
-        later_start = start + 24 * 3600
         shifted = [{
-            **candle,
-            "open_timestamp": candle["open_timestamp"] + 24 * 3600,
-            "timestamp": candle["timestamp"] + 24 * 3600,
-        } for candle in candles]
+            **row,
+            "open_timestamp": row["open_timestamp"] + 24 * 3600,
+            "timestamp": row["timestamp"] + 24 * 3600,
+        } for row in candles]
         mismatch = assess_global_oos_calendar_alignment([
             ({"market_symbol": "btcusd"}, {"candles": candles}),
             ({"market_symbol": "pepeusd"}, {"candles": shifted}),
@@ -83,6 +98,42 @@ class ResearchRunnerTests(unittest.TestCase):
         ])
         self.assertFalse(result["aligned"])
         self.assertEqual(result["status"], "BLOCKED_GLOBAL_OOS_CALENDAR_INVALID")
+
+    def test_evaluate_market_uses_mapped_global_fold_and_holdout_indices(self):
+        start = 1704067200
+        all_candles = [{
+            "open_timestamp": start + index * 3600,
+            "timestamp": start + (index + 1) * 3600,
+            "open": "100", "high": "101", "low": "99",
+            "close": "100", "volume": "10000",
+        } for index in range(6200)]
+        later_candles = all_candles[100:]
+        alignment = assess_global_oos_calendar_alignment([
+            ({"market_symbol": "btcusd"}, {"candles": all_candles}),
+            ({"market_symbol": "pepeusd"}, {"candles": later_candles}),
+        ])
+        plan = alignment["fold_plans_by_market"]["pepeusd"]
+        holdout = alignment["holdouts_by_market"]["pepeusd"]
+        dataset = {
+            "market_symbol": "pepeusd", "pair": "PEPE/USD",
+            "row_count": len(later_candles), "dataset_sha256": "a" * 64,
+            "raw_page_sha256": "b" * 64, "page_count": 1,
+            "coverage_status": "CONTIGUOUS", "gap_count": 0,
+            "candles": later_candles,
+        }
+        result = evaluate_market(
+            {"market_symbol": "pepeusd"}, dataset,
+            registered_trial_count=2, bootstrap_replicates=1000,
+            compute_promotion=False, fold_plan=plan, final_holdout=holdout,
+        )
+        self.assertEqual(result["walk_forward_folds"][0]["test_start"], plan[0]["test_start"])
+        self.assertEqual(result["walk_forward_folds"][-1]["test_end"], plan[-1]["test_end"])
+        self.assertEqual(result["final_holdout"]["start_index"], holdout["start_index"])
+        self.assertEqual(
+            result["final_holdout"]["start_timestamp"],
+            alignment["market_calendars"]["btcusd"][-1]["oos_end_timestamp_exclusive"]
+            + (holdout["start_index"] - plan[-1]["test_end"]) * 3600,
+        )
 
     def test_point_in_time_gate_blocks_before_any_public_request(self):
         output = io.StringIO()
