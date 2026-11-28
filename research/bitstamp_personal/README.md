@@ -129,3 +129,30 @@ The 16 bps fee is a public API example, not the user's actual fee tier; spread a
 ## Automated Git-history append-only enforcement
 
 The trial-registry parser validates current-ledger schema, the 14 preregistered trials and event order. CI now adds a base-to-head byte-prefix check: `experiment_registry.jsonl` must preserve the exact previous file bytes and may only add complete LF-delimited JSON events at the end. The check uses the PR base SHA on pull requests and the previous commit SHA on pushes, then passes the current full ledger through the existing semantic parser. Rewrites, deletions, reordering, partial events, CRLF changes and invalid appended entries fail offline CI. No provider requests are made.
+
+
+## Versioned per-market inception / common UTC OOS calendar
+
+The approved `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1` amendment is documented in `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1.md`. The common calendar planner retains each market's own verified inception history for expanding training and indicator warmup, then maps identical UTC OOS folds, next-open liquidation bars and the untouched final holdout into each market's own candle indices. The user's date-policy approval does not waive any rights, historical status, source-hash or independent-review gate.
+
+
+### Pinned append-only trial-ledger genesis
+
+The original 14 V2_5FOLD registrations are preserved in `experiment_registry.genesis.jsonl`. Its exact Git blob SHA-1 is `10dbeb52941c08cda1f7b1d724b543b41dd6fdc2` and its collision-resistant SHA-256 is `d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d`. Offline CI verifies both commitments, requires the PR base and head ledgers to preserve the exact genesis byte prefix, and then requires the head to preserve the complete base prefix. The original working ledger remains unchanged.
+
+
+## Historical market-status evidence research — 2026-11-29
+
+`BITSTAMP_HISTORICAL_STATUS_EVIDENCE_RESEARCH_2026-11-29.md` records the official API's current order-entry/matching semantics, the authenticated public-order-event gap-recovery endpoint, and the partial SHIB/SOL listing timestamps. The manifest now records SHIB post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-06-07, and SOL post-only (07:00 UTC) and limit-only matching (11:00 UTC) on 2022-08-23. Full market-order enablement and continuous historical status remain unverified; no provider request was made.
+
+
+## Public API data-rights terms research — 2026-11-29
+
+`BITSTAMP_PUBLIC_API_DATA_RIGHTS_TERMS_RESEARCH_2026-11-29.md` records the official API commercial-use licence statement and the Bitstamp Ltd Terms of Use. Neither source expressly resolves personal noncommercial retention of raw public API candles or derived research artifacts. `data_rights.status` therefore remains `NOT_VERIFIED`; no API request or data download is authorized.
+
+
+## Point-in-time evidence captures and data-rights gate
+
+Official-page research extracts are stored under `evidence/source_captures/`. They are small structured excerpts, not full page copies or raw market data. The manifest binds each capture to a relative path and SHA-256. The offline verifier rejects missing/tampered files, path traversal, symbolic links and captures larger than 64 KiB. This proves the committed evidence-extract bytes match the manifest; it does not authenticate the original website or replace independent review. Reviewers must follow the official URLs and validate the claims against the original pages.
+
+The official Bitstamp API documentation describes a commercial Data License Agreement for companies using exchange data commercially. The Bitstamp Ltd Terms separately define Site Materials and restrict copying/scraping/collection, but do not expressly resolve private retention of public API OHLC or derived research outputs. The applicable contracting entity is not established. Therefore `data_rights.status` remains `NOT_VERIFIED`, and no public market-data request or durable market-data storage is permitted by this candidate until written clarification is obtained and independently reviewed. No legal permission is inferred from the commercial-use clause.
