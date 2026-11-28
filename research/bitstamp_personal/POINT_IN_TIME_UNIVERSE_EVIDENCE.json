@@ -24,7 +24,8 @@
     "status": "NOT_VERIFIED",
     "scope": "PERSONAL_NONCOMMERCIAL_SPOT_RESEARCH",
     "source_ids": [
-      "bitstamp_api_rights"
+      "bitstamp_api_rights",
+      "bitstamp_ltd_terms"
     ]
   },
   "independent_review": {
@@ -37,8 +38,9 @@
       "evidence_type": "API_SEMANTICS",
       "url": "https://www.bitstamp.net/api/",
       "published_date": "2026-11-09",
-      "claim": "Current market status distinguishes order entry, matching and instant/market-order availability; the current endpoint does not provide the historical 2024-2026 status ledger.",
-      "snapshot_sha256": null
+      "claim": "Current API documentation distinguishes order-entry, matching, and instant/market-order state. Current fields do not provide a historical 2024-2026 market-status ledger.",
+      "snapshot_sha256": "1a6d609c0a2f70617efc87fe82fcba24121db4cc707772ba15d481d4ad5e51fe",
+      "snapshot_path": "evidence/source_captures/bitstamp_api_status_semantics.json"
     },
     {
       "source_id": "btc_eth_tick_size_notice",
@@ -46,7 +48,8 @@
       "url": "https://blog.bitstamp.net/post/changes-to-tick-sizes/",
       "published_date": "2022-08-02",
       "claim": "BTC/USD and ETH/USD existed before the V2 window; the notice also records a no-matching maintenance event in August 2022.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "cb8c31dbf961a3ea470d2329c159055a0eb11e92048a1b2931c50387c11a969b",
+      "snapshot_path": "evidence/source_captures/btc_eth_tick_size_notice.json"
     },
     {
       "source_id": "xrp_listing_notice",
@@ -54,7 +57,8 @@
       "url": "https://blog.bitstamp.net/post/bitstamp-introduces-xrp-trading/",
       "published_date": "2017-01-10",
       "claim": "XRP trading launch was announced with trading beginning 17 January 2017; later continuous order-status history remains unverified.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "fb65c9a0836232369bd646c2d33d9677f8a2625aa71421b739e34522c779395f",
+      "snapshot_path": "evidence/source_captures/xrp_listing_notice.json"
     },
     {
       "source_id": "xrp_us_halt_notice",
@@ -62,7 +66,8 @@
       "url": "https://blog.bitstamp.net/post/xrp-trading-and-deposits-be-halted-us-customers/",
       "published_date": "2020-12-25",
       "claim": "XRP trading was halted for US customers only; this must not be confused with global public-market OHLC availability.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "1456e874047dccf4c433dccf2c9416fda35c36bc324cad0a91898e7673343870",
+      "snapshot_path": "evidence/source_captures/xrp_us_halt_notice.json"
     },
     {
       "source_id": "xrp_us_resume_notice",
@@ -70,7 +75,8 @@
       "url": "https://blog.bitstamp.net/post/xrp-is-back-in-the-us-start-trading-today/",
       "published_date": "2023-07-13",
       "claim": "XRP US customer trading resumed before the V2 interval; complete global matching history remains unverified.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "564d442916fb221a211ba3cf62352409f3acd03ca7f8bc8a77a7e7e05fcd50ba",
+      "snapshot_path": "evidence/source_captures/xrp_us_resume_notice.json"
     },
     {
       "source_id": "doge_listing_notice",
@@ -78,7 +84,8 @@
       "url": "https://blog.bitstamp.net/post/were-listing-dogecoin-doge/",
       "published_date": "2022-12-22",
       "claim": "DOGE/USD and DOGE/EUR were announced as launched and available to trade.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "e5d73493995d9252d2514f2b810ee432de002439671187b9907965bbab0e6e42",
+      "snapshot_path": "evidence/source_captures/doge_listing_notice.json"
     },
     {
       "source_id": "shib_listing_notice",
@@ -86,7 +93,8 @@
       "url": "https://blog.bitstamp.net/post/shib-listing/",
       "published_date": "2022-06-06",
       "claim": "SHIB/USD post-only order entry began 2022-06-07 07:00 UTC; limit-only matching began 11:00 UTC. Full trading and all order types were deferred until sufficient liquidity, with no exact market-order-enable timestamp.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "86066f24d2548d9c19cce434a7e6e54014afa56e5b66a55ce6b639f864605116",
+      "snapshot_path": "evidence/source_captures/shib_listing_notice.json"
     },
     {
       "source_id": "shib_earlier_schedule_notice",
@@ -94,7 +102,8 @@
       "url": "https://blog.bitstamp.net/post/lots-of-fresh-faces-around-bitstamp-these-days-4-new-cryptocurrencies/",
       "published_date": "2021-12-08",
       "claim": "An earlier SHIB rollout schedule was postponed; it does not establish the eventual market-order-enable timestamp.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "4c52815500f08495b497df50e4669e2d80bd6920d48a0e0f4de09371e9d0bc3b",
+      "snapshot_path": "evidence/source_captures/shib_earlier_schedule_notice.json"
     },
     {
       "source_id": "sol_listing_notice",
@@ -102,7 +111,8 @@
       "url": "https://blog.bitstamp.net/post/sol-and-dot-are-now-available/",
       "published_date": "2022-08-24",
       "claim": "SOL/USD post-only order entry began 2022-08-23 07:00 UTC; limit-only matching began 11:00 UTC. Full trading and all order types were deferred until sufficient liquidity, with no exact market-order-enable timestamp.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "3e5039a461df440c7ba4c04f9abf4eb0e0d77b161bfa2f7f040053c2eac2da67",
+      "snapshot_path": "evidence/source_captures/sol_listing_notice.json"
     },
     {
       "source_id": "pepe_global_listing_notice",
@@ -110,7 +120,8 @@
       "url": "https://blog.bitstamp.net/post/bitstamps-new-listings-lmwr-pepe-blur-and-vext/",
       "published_date": "2024-02-13",
       "claim": "PEPE/USD and PEPE/EUR were announced for global listing on 13 February 2024, except Singapore and the US; this is after the frozen V2 common start.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "ba2e20914bbd1e873bfc537714de91dc9cc5ae936934ef40866226f3a00f9483",
+      "snapshot_path": "evidence/source_captures/pepe_global_listing_notice.json"
     },
     {
       "source_id": "pepe_us_listing_notice",
@@ -118,15 +129,26 @@
       "url": "https://blog.bitstamp.net/post/were-listing-pepe-and-relisting-sol-in-the-usa/",
       "published_date": "2024-11-29",
       "claim": "PEPE and SOL were announced for US trading; this regional event does not establish global market-order status for the whole V2 period.",
-      "snapshot_sha256": null
+      "snapshot_sha256": "b7afb61528ef0b87c3cc265fbc4d713bfe2622f9afb824fa16d09274e6aedce9",
+      "snapshot_path": "evidence/source_captures/pepe_us_listing_notice.json"
     },
     {
       "source_id": "bitstamp_api_rights",
       "evidence_type": "DATA_RIGHTS",
       "url": "https://www.bitstamp.net/api/",
       "published_date": "2026-11-27",
-      "claim": "Current API documentation states a commercial Data License Agreement is required for companies using exchange data commercially; it does not affirm personal noncommercial use rights for this project.",
-      "snapshot_sha256": null
+      "claim": "Bitstamp directs companies using exchange data for commercial purposes to sign a Data License Agreement; this does not expressly resolve private noncommercial API-data retention.",
+      "snapshot_sha256": "dc6f22a195cca0618b106bfe0c75cf1de605a797bb32121da9622b2fca83fad0",
+      "snapshot_path": "evidence/source_captures/bitstamp_api_rights.json"
+    },
+    {
+      "source_id": "bitstamp_ltd_terms",
+      "evidence_type": "DATA_RIGHTS",
+      "url": "https://www.bitstamp.net/legal/terms-of-use/ltd/",
+      "published_date": "2025-05-30",
+      "claim": "The Bitstamp Ltd Terms define Materials as Site content and permit limited personal/informational/noncommercial use, while restricting copying, scraping, collection, and distribution. They do not expressly address public API OHLC retention or derived research output retention.",
+      "snapshot_path": "evidence/source_captures/bitstamp_ltd_terms.json",
+      "snapshot_sha256": "d99c4bef4a29bae26ece2f6536a1620239b7c4ced77c6eb6cbfe3bb21394de68"
     }
   ],
   "markets": [
