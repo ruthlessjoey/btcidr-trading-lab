@@ -85,7 +85,7 @@
       "evidence_type": "LISTING_NOTICE",
       "url": "https://blog.bitstamp.net/post/shib-listing/",
       "published_date": "2022-06-06",
-      "claim": "SHIB/USD limit-only matching began 7 June 2022 at 11:00 UTC; full trading and all order types were deferred until sufficient liquidity.",
+      "claim": "SHIB/USD post-only order entry began 2022-06-07 07:00 UTC; limit-only matching began 11:00 UTC. Full trading and all order types were deferred until sufficient liquidity, with no exact market-order-enable timestamp.",
       "snapshot_sha256": null
     },
     {
@@ -101,7 +101,7 @@
       "evidence_type": "LISTING_NOTICE",
       "url": "https://blog.bitstamp.net/post/sol-and-dot-are-now-available/",
       "published_date": "2022-08-24",
-      "claim": "SOL/USD limit-only matching began 23 August 2022 at 11:00 UTC; full trading and all order types were deferred until sufficient liquidity.",
+      "claim": "SOL/USD post-only order entry began 2022-08-23 07:00 UTC; limit-only matching began 11:00 UTC. Full trading and all order types were deferred until sufficient liquidity, with no exact market-order-enable timestamp.",
       "snapshot_sha256": null
     },
     {
@@ -217,14 +217,15 @@
       "market_type": "SPOT",
       "global_scope": "GLOBAL_PUBLIC_MARKET",
       "listing_announcement_date": "2022-06-06",
-      "first_listing_timestamp": null,
-      "first_matching_enabled_timestamp": null,
+      "first_listing_timestamp": 1654585200,
+      "first_matching_enabled_timestamp": 1654599600,
       "first_market_orders_enabled_timestamp": null,
       "eligible_start_timestamp": null,
       "limit_only_matching_from_timestamp": 1654599600,
       "jurisdictional_notes": [
         "Limit-only matching began 2022-06-07 11:00 UTC; full order types were deferred until sufficient liquidity, with no exact enable timestamp in the located notice.",
-        "Launch exclusions included US and Singapore."
+        "Launch exclusions included US and Singapore.",
+        "Official listing schedule: post-only order entry began 2022-06-07 07:00 UTC; limit-only matching began 11:00 UTC. Full market-order enablement was deferred until sufficient liquidity and remains undated."
       ],
       "source_ids": [
         "shib_listing_notice",
@@ -259,14 +260,15 @@
       "market_type": "SPOT",
       "global_scope": "GLOBAL_PUBLIC_MARKET",
       "listing_announcement_date": "2022-08-24",
-      "first_listing_timestamp": null,
-      "first_matching_enabled_timestamp": null,
+      "first_listing_timestamp": 1661238000,
+      "first_matching_enabled_timestamp": 1661252400,
       "first_market_orders_enabled_timestamp": null,
       "eligible_start_timestamp": null,
       "limit_only_matching_from_timestamp": 1661252400,
       "jurisdictional_notes": [
         "Limit-only matching began 2022-08-23 11:00 UTC; full order types were deferred until sufficient liquidity, with no exact enable timestamp in the located notice.",
-        "Initial global listing excluded Singapore; US availability was announced later."
+        "Initial global listing excluded Singapore; US availability was announced later.",
+        "Official listing schedule: post-only order entry began 2022-08-23 07:00 UTC; limit-only matching began 11:00 UTC. Full market-order enablement was deferred until sufficient liquidity and remains undated. The separate 2023 US-only halt is jurisdictional, not evidence of a global market halt."
       ],
       "source_ids": [
         "sol_listing_notice",
