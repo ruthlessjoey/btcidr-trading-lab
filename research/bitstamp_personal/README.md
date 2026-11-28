@@ -134,3 +134,8 @@ The trial-registry parser validates current-ledger schema, the 14 preregistered 
 ## Versioned per-market inception / common UTC OOS calendar
 
 The approved `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1` amendment is documented in `PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1.md`. The common calendar planner retains each market's own verified inception history for expanding training and indicator warmup, then maps identical UTC OOS folds, next-open liquidation bars and the untouched final holdout into each market's own candle indices. The user's date-policy approval does not waive any rights, historical status, source-hash or independent-review gate.
+
+
+### Pinned append-only trial-ledger genesis
+
+The original 14 V2_5FOLD registrations are preserved in `experiment_registry.genesis.jsonl`. Its exact Git blob SHA-1 is `10dbeb52941c08cda1f7b1d724b543b41dd6fdc2` and its collision-resistant SHA-256 is `d461f624d8b4af01ec262952574d0e62457154e89614eb3364b3444a52d7ce1d`. Offline CI verifies both commitments, requires the PR base and head ledgers to preserve the exact genesis byte prefix, and then requires the head to preserve the complete base prefix. The original working ledger remains unchanged.
