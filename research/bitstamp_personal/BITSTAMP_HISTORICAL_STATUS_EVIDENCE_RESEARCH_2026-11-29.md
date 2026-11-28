@@ -78,3 +78,8 @@ The following remain unchanged:
 - Public research: blocked before the first provider request.
 
 The partial SHIB and SOL timestamps are source-derived facts, not a complete eligibility attestation. No status interval or market-order eligibility has been inferred from a listing notice.
+
+
+## Evidence-capture integrity amendment (2026-11-29)
+
+The official listing/API research claims are now paired with 13 small structured evidence extracts under `evidence/source_captures/`. The manifest binds every extract to a local relative path and SHA-256. Offline verification confirms the exact capture bytes, rejects traversal/symlinks and enforces a 64 KiB bound. These extracts preserve short supporting passages and limitations; they are not full HTML copies and do not replace checking the official URL during independent review.
