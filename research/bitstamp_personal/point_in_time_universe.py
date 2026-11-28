@@ -78,7 +78,72 @@ def _sha(value: object, field: str) -> str:
     return value
 
 
-def _source_index(sources: object) -> dict[str, dict[str, Any]]:
+def _verify_source_capture(
+    source_id: str,
+    snapshot_path: object,
+    snapshot_sha256: object,
+    *,
+    snapshot_root: Path | None,
+) -> None:
+    """Verify a bounded evidence-capture file without network or symlink access."""
+    if snapshot_path is None and snapshot_sha256 is None:
+        return
+    if snapshot_path is None or snapshot_sha256 is None:
+        raise PointInTimeUniverseError(
+            f"source {source_id} must bind both snapshot_path and snapshot_sha256"
+        )
+    _sha(snapshot_sha256, f"{source_id}.snapshot_sha256")
+    if not isinstance(snapshot_path, str) or not snapshot_path or "\\" in snapshot_path:
+        raise PointInTimeUniverseError(f"source {source_id} snapshot_path is invalid")
+    parts = snapshot_path.split("/")
+    if (parts[:2] != ["evidence", "source_captures"]
+            or any(part in {"", ".", ".."} for part in parts)
+            or snapshot_path.startswith("/")):
+        raise PointInTimeUniverseError(
+            f"source {source_id} snapshot_path must stay under evidence/source_captures"
+        )
+    if snapshot_root is None:
+        raise PointInTimeUniverseError(
+            f"source {source_id} capture root is unavailable for offline verification"
+        )
+    root = Path(snapshot_root).resolve()
+    candidate = root.joinpath(*parts)
+    current = root
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise PointInTimeUniverseError(
+                f"source {source_id} snapshot path contains a symbolic link"
+            )
+    try:
+        resolved = candidate.resolve(strict=True)
+        if not resolved.is_relative_to(root) or not resolved.is_file():
+            raise PointInTimeUniverseError(
+                f"source {source_id} snapshot path escapes the evidence root"
+            )
+        raw = resolved.read_bytes()
+    except PointInTimeUniverseError:
+        raise
+    except OSError as exc:
+        raise PointInTimeUniverseError(
+            f"source {source_id} evidence capture file is missing or unreadable"
+        ) from exc
+    if not raw or len(raw) > 64 * 1024:
+        raise PointInTimeUniverseError(
+            f"source {source_id} evidence capture must be 1 byte to 64 KiB"
+        )
+    actual = hashlib.sha256(raw).hexdigest()
+    if actual != snapshot_sha256:
+        raise PointInTimeUniverseError(
+            f"source {source_id} evidence capture SHA-256 does not match"
+        )
+
+
+def _source_index(
+    sources: object,
+    *,
+    snapshot_root: Path | None,
+) -> dict[str, dict[str, Any]]:
     if not isinstance(sources, list) or not sources:
         raise PointInTimeUniverseError("source_evidence must be a non-empty list")
     result: dict[str, dict[str, Any]] = {}
@@ -89,7 +154,7 @@ def _source_index(sources: object) -> dict[str, dict[str, Any]]:
     for index, source in enumerate(sources):
         if not isinstance(source, dict) or set(source) != {
             "source_id", "evidence_type", "url", "published_date",
-            "claim", "snapshot_sha256",
+            "claim", "snapshot_path", "snapshot_sha256",
         }:
             raise PointInTimeUniverseError(f"source_evidence[{index}] schema is invalid")
         source_id = _string(source["source_id"], f"source_evidence[{index}].source_id", maximum=128)
@@ -112,8 +177,12 @@ def _source_index(sources: object) -> dict[str, dict[str, Any]]:
                 f"source_evidence[{index}].published_date must be YYYY-MM-DD or null"
             )
         _string(source["claim"], f"source_evidence[{index}].claim", maximum=2048)
-        if source["snapshot_sha256"] is not None:
-            _sha(source["snapshot_sha256"], f"source_evidence[{index}].snapshot_sha256")
+        _verify_source_capture(
+            source_id,
+            source["snapshot_path"],
+            source["snapshot_sha256"],
+            snapshot_root=snapshot_root,
+        )
         result[source_id] = source
     return result
 
@@ -132,7 +201,7 @@ def _referenced_sources(
         if not isinstance(source_id, str) or source_id not in source_index:
             raise PointInTimeUniverseError(f"{field} references an unknown source")
         source = source_index[source_id]
-        if source["snapshot_sha256"] is None:
+        if source["snapshot_sha256"] is None or source["snapshot_path"] is None:
             raise PointInTimeUniverseError(
                 f"{field} source {source_id} has no captured, hash-pinned source snapshot"
             )
@@ -315,6 +384,7 @@ def verify_point_in_time_universe_evidence(
     raw: bytes,
     *,
     expected_sha256: str | None,
+    snapshot_root: Path | None = None,
 ) -> dict[str, Any]:
     """Verify source facts, order-state intervals, rights and independent review."""
     if not isinstance(raw, bytes) or not raw:
@@ -373,7 +443,7 @@ def verify_point_in_time_universe_evidence(
             or policy["mode"] not in {"COMMON_START", "PER_MARKET_INCEPTION"}):
         raise PointInTimeUniverseError("V2 date policy decision is not approved")
 
-    sources = _source_index(manifest["source_evidence"])
+    sources = _source_index(manifest["source_evidence"], snapshot_root=snapshot_root)
     rights = manifest["data_rights"]
     if not isinstance(rights, dict) or set(rights) != {"status", "scope", "source_ids"}:
         raise PointInTimeUniverseError("data_rights schema is invalid")
@@ -428,5 +498,5 @@ def load_verified_point_in_time_universe_evidence() -> dict[str, Any]:
             "point-in-time evidence manifest is unavailable"
         ) from exc
     return verify_point_in_time_universe_evidence(
-        raw, expected_sha256=EXPECTED_EVIDENCE_SHA256,
+        raw, expected_sha256=EXPECTED_EVIDENCE_SHA256, snapshot_root=path.parent,
     )
