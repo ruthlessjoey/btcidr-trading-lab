@@ -2,9 +2,11 @@ import copy
 import hashlib
 import json
 import unittest
+from pathlib import Path
 
 from point_in_time_universe import (
     PointInTimeUniverseError,
+    _source_index,
     evidence_payload_sha256,
     verify_point_in_time_universe_evidence,
 )
@@ -152,6 +154,16 @@ def verify_fixture(
 
 
 class PointInTimeUniverseTests(unittest.TestCase):
+    def test_committed_official_source_capture_files_match_manifest_hashes(self):
+        root = Path(__file__).parent
+        manifest = json.loads((root / "POINT_IN_TIME_UNIVERSE_EVIDENCE.json").read_text("utf-8"))
+        indexed = _source_index(manifest["source_evidence"], snapshot_root=root)
+        self.assertEqual(len(indexed), 13)
+        self.assertEqual(
+            manifest["data_rights"]["source_ids"],
+            ["bitstamp_api_rights", "bitstamp_ltd_terms"],
+        )
+
     def test_accepts_complete_reviewed_evidence(self):
         manifest = valid_manifest()
         result = verify_fixture(manifest)
