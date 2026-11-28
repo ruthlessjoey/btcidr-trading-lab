@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import unittest
 
@@ -12,6 +13,19 @@ SYMBOLS = ("btcusd", "ethusd", "xrpusd", "dogeusd", "shibusd", "pepeusd", "solus
 START = 1704067200
 END = 1793491200
 STEP = 3600
+
+
+def _fixture_capture_bytes(source):
+    payload = {
+        "capture_schema_version": 1,
+        "capture_kind": "SYNTHETIC_UNIT_TEST_FIXTURE",
+        "source_id": source["source_id"],
+        "source_url": source["url"],
+        "source_published_date": source["published_date"],
+        "claim": source["claim"],
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
 
 
 def valid_manifest():
@@ -29,6 +43,13 @@ def valid_manifest():
          "claim": "Synthetic accepted personal research rights record for unit tests.",
          "snapshot_sha256": "c" * 64},
     ]
+    for source in sources:
+        source["snapshot_path"] = (
+            "evidence/source_captures/" + source["source_id"] + ".json"
+        )
+        source["snapshot_sha256"] = hashlib.sha256(
+            _fixture_capture_bytes(source)
+        ).hexdigest()
     markets = []
     for symbol in SYMBOLS:
         listing = START - 100 * STEP
@@ -88,17 +109,46 @@ def valid_manifest():
     return manifest
 
 
-def verify_fixture(manifest, *, refresh_review=True):
-    digest = evidence_payload_sha256(manifest)
-    if refresh_review and isinstance(manifest.get("independent_review"), dict):
-        for reviewer in manifest["independent_review"].get("reviewers", []):
-            if isinstance(reviewer, dict):
-                reviewer["reviewed_evidence_sha256"] = digest
-    raw = json.dumps(manifest, sort_keys=True, separators=(",", ":"),
-                     ensure_ascii=False).encode()
-    return verify_point_in_time_universe_evidence(
-        raw, expected_sha256=digest,
-    )
+def verify_fixture(
+    manifest, *, refresh_review=True, refresh_snapshots=True,
+    corrupt_snapshot_id=None, omit_snapshot_id=None,
+):
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp)
+        for source in manifest["source_evidence"]:
+            if refresh_snapshots:
+                source["snapshot_path"] = (
+                    "evidence/source_captures/" + source["source_id"] + ".json"
+                )
+                source["snapshot_sha256"] = hashlib.sha256(
+                    _fixture_capture_bytes(source)
+                ).hexdigest()
+            snapshot_path = source.get("snapshot_path")
+            if (isinstance(snapshot_path, str)
+                    and not snapshot_path.startswith("/")
+                    and all(part not in {"", ".", ".."} for part in snapshot_path.split("/"))
+                    and "\\\\" not in snapshot_path):
+                target = root.joinpath(*snapshot_path.split("/"))
+                if source["source_id"] != omit_snapshot_id:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    capture = _fixture_capture_bytes(source)
+                    if source["source_id"] == corrupt_snapshot_id:
+                        capture += b"tampered"
+                    target.write_bytes(capture)
+
+        digest = evidence_payload_sha256(manifest)
+        if refresh_review and isinstance(manifest.get("independent_review"), dict):
+            for reviewer in manifest["independent_review"].get("reviewers", []):
+                if isinstance(reviewer, dict):
+                    reviewer["reviewed_evidence_sha256"] = digest
+        raw = json.dumps(manifest, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=False).encode()
+        return verify_point_in_time_universe_evidence(
+            raw, expected_sha256=digest, snapshot_root=root,
+        )
 
 
 class PointInTimeUniverseTests(unittest.TestCase):
@@ -192,8 +242,8 @@ class PointInTimeUniverseTests(unittest.TestCase):
             verify_fixture(manifest)
         manifest = valid_manifest()
         manifest["source_evidence"][1]["snapshot_sha256"] = None
-        with self.assertRaisesRegex(PointInTimeUniverseError, "no captured"):
-            verify_fixture(manifest)
+        with self.assertRaisesRegex(PointInTimeUniverseError, "both snapshot_path and snapshot_sha256"):
+            verify_fixture(manifest, refresh_snapshots=False)
 
     def test_source_host_snapshot_and_market_identity_are_checked(self):
         manifest = valid_manifest()
@@ -204,6 +254,22 @@ class PointInTimeUniverseTests(unittest.TestCase):
         manifest["markets"][0]["pair"] = "ETH/USD"
         with self.assertRaisesRegex(PointInTimeUniverseError, "pair does not match"):
             verify_fixture(manifest)
+
+    def test_source_capture_file_hash_is_checked(self):
+        manifest = valid_manifest()
+        with self.assertRaisesRegex(PointInTimeUniverseError, "SHA-256 does not match"):
+            verify_fixture(manifest, corrupt_snapshot_id="listing")
+
+    def test_referenced_source_capture_file_is_required(self):
+        manifest = valid_manifest()
+        with self.assertRaisesRegex(PointInTimeUniverseError, "missing or unreadable"):
+            verify_fixture(manifest, omit_snapshot_id="listing")
+
+    def test_source_capture_path_cannot_escape_evidence_root(self):
+        manifest = valid_manifest()
+        manifest["source_evidence"][0]["snapshot_path"] = "../../outside.json"
+        with self.assertRaisesRegex(PointInTimeUniverseError, "must stay under evidence/source_captures"):
+            verify_fixture(manifest, refresh_snapshots=False)
 
     def test_rights_need_explicit_acceptance(self):
         manifest = valid_manifest()
