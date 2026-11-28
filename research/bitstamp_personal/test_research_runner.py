@@ -116,7 +116,10 @@ class ResearchRunnerTests(unittest.TestCase):
         holdout = alignment["holdouts_by_market"]["pepeusd"]
         dataset = {
             "market_symbol": "pepeusd", "pair": "PEPE/USD",
-            "row_count": len(later_candles), "dataset_sha256": "a" * 64,
+            "row_count": len(later_candles),
+            "first_open_timestamp": later_candles[0]["open_timestamp"],
+            "last_close_timestamp": later_candles[-1]["timestamp"],
+            "dataset_sha256": "a" * 64,
             "raw_page_sha256": "b" * 64, "page_count": 1,
             "coverage_status": "CONTIGUOUS", "gap_count": 0,
             "candles": later_candles,
