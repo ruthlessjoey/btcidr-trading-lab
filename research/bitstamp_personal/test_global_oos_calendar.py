@@ -21,7 +21,13 @@ def dataset(symbol, offset, *, gap_at=None, end_shift=0):
             "close": "100", "volume": "1000",
         })
     if end_shift:
-        candles[-1]["timestamp"] += end_shift
+        next_open = candles[-1]["timestamp"]
+        candles.append({
+            "open_timestamp": next_open,
+            "timestamp": next_open + STEP,
+            "open": "100", "high": "101", "low": "99",
+            "close": "100", "volume": "1000",
+        })
     return ({"market_symbol": symbol}, {"candles": candles})
 
 
