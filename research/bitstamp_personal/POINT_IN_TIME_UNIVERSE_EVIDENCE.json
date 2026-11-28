@@ -16,9 +16,9 @@
     "interval_seconds": 3600
   },
   "date_policy": {
-    "status": "NOT_SELECTED",
-    "mode": "NOT_SELECTED",
-    "decision_note": "Per-market inception dates are recommended to preserve the wider candidate universe without inventing pre-listing candles. This remains an explicit decision; no option is silently applied."
+    "status": "APPROVED",
+    "mode": "PER_MARKET_INCEPTION",
+    "decision_note": "User approved the versioned PER_MARKET_INCEPTION_GLOBAL_UTC_OOS_V1 design on 2026-11-29. Each market starts from its verified full market-order eligibility timestamp; all markets share identical UTC OOS folds, terminal-liquidation boundaries and untouched final holdout. Approval of the date policy does not approve incomplete market-status evidence, data rights, source snapshots or independent review."
   },
   "data_rights": {
     "status": "NOT_VERIFIED",
